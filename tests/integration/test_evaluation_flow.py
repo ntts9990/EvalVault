@@ -16,7 +16,7 @@ from evalvault.domain.entities import (
     TestCaseResult,
     MetricScore,
 )
-from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.domain.services.evaluator import RagasEvaluator, TestCaseEvalResult
 from evalvault.ports.outbound.llm_port import LLMPort
 from tests.integration.conftest import get_test_model
 
@@ -75,16 +75,22 @@ class TestEvaluationFlowWithMock:
         """전체 평가 플로우 테스트 (Mock LLM)."""
         evaluator = RagasEvaluator()
 
-        # Mock the Ragas evaluation to return fixed scores
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9, "answer_relevancy": 0.85},
-            "tc-002": {"faithfulness": 0.75, "answer_relevancy": 0.8},
+        # Mock the Ragas evaluation to return fixed scores with token usage
+        mock_results = {
+            "tc-001": TestCaseEvalResult(
+                scores={"faithfulness": 0.9, "answer_relevancy": 0.85},
+                tokens_used=200,
+            ),
+            "tc-002": TestCaseEvalResult(
+                scores={"faithfulness": 0.75, "answer_relevancy": 0.8},
+                tokens_used=180,
+            ),
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -108,20 +114,23 @@ class TestEvaluationFlowWithMock:
         assert "faithfulness" in result.metrics_evaluated
         assert "answer_relevancy" in result.metrics_evaluated
 
+        # Verify token tracking
+        assert result.total_tokens == 380
+
     @pytest.mark.asyncio
     async def test_evaluation_with_thresholds(self, sample_dataset, mock_llm):
         """임계값 적용 평가 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9},  # Pass
-            "tc-002": {"faithfulness": 0.5},  # Fail
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}),  # Pass
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.5}),  # Fail
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -140,12 +149,15 @@ class TestEvaluationFlowWithMock:
         """평가 시간 기록 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {"tc-001": {"faithfulness": 0.9}, "tc-002": {"faithfulness": 0.8}}
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}),
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
+        }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,

@@ -5,7 +5,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from evalvault.domain.entities import Dataset, TestCase, EvaluationRun, MetricType
-from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.domain.services.evaluator import RagasEvaluator, TestCaseEvalResult
 from evalvault.ports.outbound.llm_port import LLMPort
 from tests.unit.conftest import get_test_model
 
@@ -76,16 +76,22 @@ class TestRagasEvaluator:
         """evaluate 메서드가 EvaluationRun을 반환하는지 테스트."""
         evaluator = RagasEvaluator()
 
-        # Mock the Ragas evaluation
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9, "answer_relevancy": 0.85},
-            "tc-002": {"faithfulness": 0.75, "answer_relevancy": 0.8},
+        # Mock the Ragas evaluation with TestCaseEvalResult
+        mock_results = {
+            "tc-001": TestCaseEvalResult(
+                scores={"faithfulness": 0.9, "answer_relevancy": 0.85},
+                tokens_used=150,
+            ),
+            "tc-002": TestCaseEvalResult(
+                scores={"faithfulness": 0.75, "answer_relevancy": 0.8},
+                tokens_used=120,
+            ),
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -100,6 +106,10 @@ class TestRagasEvaluator:
             assert result.model_name == get_test_model()
             assert len(result.results) == 2
             assert result.metrics_evaluated == ["faithfulness", "answer_relevancy"]
+            # Verify token tracking
+            assert result.total_tokens == 270  # 150 + 120
+            assert result.results[0].tokens_used == 150
+            assert result.results[1].tokens_used == 120
 
     @pytest.mark.asyncio
     async def test_evaluate_aggregates_scores_correctly(
@@ -108,15 +118,15 @@ class TestRagasEvaluator:
         """평가 결과가 올바르게 집계되는지 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9},
-            "tc-002": {"faithfulness": 0.5},
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}, tokens_used=100),
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.5}, tokens_used=80),
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -134,20 +144,23 @@ class TestRagasEvaluator:
             avg_faithfulness = result.get_avg_score("faithfulness")
             assert avg_faithfulness == pytest.approx(0.7)
 
+            # Check total tokens
+            assert result.total_tokens == 180
+
     @pytest.mark.asyncio
     async def test_evaluate_sets_timestamps(self, sample_dataset, mock_llm, thresholds):
         """평가 시작/종료 시간이 올바르게 설정되는지 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9},
-            "tc-002": {"faithfulness": 0.8},
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}),
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -169,23 +182,29 @@ class TestRagasEvaluator:
         """여러 메트릭을 동시에 평가할 수 있는지 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {
-            "tc-001": {
-                "faithfulness": 0.9,
-                "answer_relevancy": 0.85,
-                "context_precision": 0.8,
-            },
-            "tc-002": {
-                "faithfulness": 0.75,
-                "answer_relevancy": 0.7,
-                "context_precision": 0.65,
-            },
+        mock_results = {
+            "tc-001": TestCaseEvalResult(
+                scores={
+                    "faithfulness": 0.9,
+                    "answer_relevancy": 0.85,
+                    "context_precision": 0.8,
+                },
+                tokens_used=300,
+            ),
+            "tc-002": TestCaseEvalResult(
+                scores={
+                    "faithfulness": 0.75,
+                    "answer_relevancy": 0.7,
+                    "context_precision": 0.65,
+                },
+                tokens_used=280,
+            ),
         }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -208,9 +227,9 @@ class TestRagasEvaluator:
         """임계값이 올바르게 적용되는지 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {
-            "tc-001": {"faithfulness": 0.9},
-            "tc-002": {"faithfulness": 0.6},
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}),
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.6}),
         }
 
         custom_thresholds = {"faithfulness": 0.8}
@@ -218,7 +237,7 @@ class TestRagasEvaluator:
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -239,12 +258,15 @@ class TestRagasEvaluator:
         """임계값이 EvaluationRun에 저장되는지 테스트."""
         evaluator = RagasEvaluator()
 
-        mock_scores = {"tc-001": {"faithfulness": 0.9}, "tc-002": {"faithfulness": 0.8}}
+        mock_results = {
+            "tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}),
+            "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
+        }
 
         with patch.object(
             evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
         ) as mock_eval:
-            mock_eval.return_value = mock_scores
+            mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,

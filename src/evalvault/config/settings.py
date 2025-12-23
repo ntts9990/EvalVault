@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     openai_model: str = Field(
         default="gpt-5-nano", description="OpenAI model to use for evaluation"
     )
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-small", description="OpenAI embedding model"
+    )
 
     # Ragas Evaluation Thresholds (SLA)
     threshold_faithfulness: float = Field(default=0.7, ge=0.0, le=1.0)

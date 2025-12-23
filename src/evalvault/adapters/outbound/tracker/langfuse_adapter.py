@@ -30,7 +30,7 @@ class LangfuseAdapter(TrackerPort):
             secret_key=secret_key,
             host=host,
         )
-        self._traces: dict[str, Any] = {}
+        self._traces: dict[str, Any] = {}  # trace_id -> root span
 
     def start_trace(self, name: str, metadata: dict[str, Any] | None = None) -> str:
         """
@@ -43,12 +43,24 @@ class LangfuseAdapter(TrackerPort):
         Returns:
             trace_id: Unique identifier for the trace
         """
-        trace = self._client.trace(
-            name=name,
-            metadata=metadata,
-        )
-        self._traces[trace.id] = trace
-        return trace.id
+        # Support both old (trace) and new (start_span) Langfuse API
+        if hasattr(self._client, "start_span"):
+            # Langfuse 3.x: start_span creates a root span with trace
+            # Set span name to match trace name for visibility
+            span = self._client.start_span(name=name)
+            trace_id = span.trace_id
+            # Update trace-level name and metadata
+            span.update_trace(name=name, metadata=metadata)
+            self._traces[trace_id] = span
+        else:
+            # Langfuse 2.x: use trace method
+            trace = self._client.trace(
+                name=name,
+                metadata=metadata,
+            )
+            trace_id = trace.id
+            self._traces[trace_id] = trace
+        return trace_id
 
     def add_span(
         self,
@@ -72,12 +84,23 @@ class LangfuseAdapter(TrackerPort):
         if trace_id not in self._traces:
             raise ValueError(f"Trace not found: {trace_id}")
 
-        trace = self._traces[trace_id]
-        trace.span(
-            name=name,
-            input=input_data,
-            output=output_data,
-        )
+        trace_or_span = self._traces[trace_id]
+        # Support both old and new Langfuse API
+        if hasattr(trace_or_span, "start_span"):
+            # Langfuse 3.x: create nested span
+            child_span = trace_or_span.start_span(
+                name=name,
+                input=input_data,
+                output=output_data,
+            )
+            child_span.end()
+        else:
+            # Langfuse 2.x: use span method on trace
+            trace_or_span.span(
+                name=name,
+                input=input_data,
+                output=output_data,
+            )
 
     def log_score(
         self,
@@ -101,12 +124,22 @@ class LangfuseAdapter(TrackerPort):
         if trace_id not in self._traces:
             raise ValueError(f"Trace not found: {trace_id}")
 
-        trace = self._traces[trace_id]
-        trace.score(
-            name=name,
-            value=value,
-            comment=comment,
-        )
+        trace_or_span = self._traces[trace_id]
+        # Support both old and new Langfuse API
+        if hasattr(trace_or_span, "score_trace"):
+            # Langfuse 3.x: use score_trace on span
+            trace_or_span.score_trace(
+                name=name,
+                value=value,
+                comment=comment,
+            )
+        else:
+            # Langfuse 2.x: use score method on trace
+            trace_or_span.score(
+                name=name,
+                value=value,
+                comment=comment,
+            )
 
     def save_artifact(
         self,
@@ -132,13 +165,18 @@ class LangfuseAdapter(TrackerPort):
         if trace_id not in self._traces:
             raise ValueError(f"Trace not found: {trace_id}")
 
-        trace = self._traces[trace_id]
-        # Store artifact in metadata with special prefix
+        trace_or_span = self._traces[trace_id]
         artifact_metadata = {
             f"artifact_{name}": data,
             f"artifact_{name}_type": artifact_type,
         }
-        trace.update(metadata=artifact_metadata)
+        # Support both old and new Langfuse API
+        if hasattr(trace_or_span, "update_trace"):
+            # Langfuse 3.x: update_trace on span
+            trace_or_span.update_trace(metadata=artifact_metadata)
+        else:
+            # Langfuse 2.x: update on trace
+            trace_or_span.update(metadata=artifact_metadata)
 
     def end_trace(self, trace_id: str) -> None:
         """
@@ -152,6 +190,13 @@ class LangfuseAdapter(TrackerPort):
         """
         if trace_id not in self._traces:
             raise ValueError(f"Trace not found: {trace_id}")
+
+        trace_or_span = self._traces[trace_id]
+        # Support both old and new Langfuse API
+        if hasattr(trace_or_span, "end"):
+            # Langfuse 3.x: end the span
+            trace_or_span.end()
+        # Langfuse 2.x trace objects don't need explicit end
 
         # Flush all pending data to Langfuse
         self._client.flush()
@@ -269,7 +314,16 @@ class LangfuseAdapter(TrackerPort):
                     comment=f"[{status}] {metric.name}: {metric.score:.2f} (threshold: {metric.threshold})",
                 )
 
-        # Flush the trace
+        # End the root span and flush
+        # In Langfuse 3.x (OTEL-based), span must be ended for data to be exported
+        trace_or_span = self._traces.get(trace_id)
+        if trace_or_span and hasattr(trace_or_span, "end"):
+            trace_or_span.end()
+
         self._client.flush()
+
+        # Remove from active traces
+        if trace_id in self._traces:
+            del self._traces[trace_id]
 
         return trace_id

@@ -34,14 +34,26 @@ src/evalvault/
 │   └── outbound/
 │       ├── dataset/      # CSV, Excel, JSON loaders
 │       ├── llm/          # OpenAIAdapter
+│       ├── storage/      # (미구현 - Phase 5 예정)
 │       └── tracker/      # LangfuseAdapter
 └── config/               # Settings (pydantic-settings)
 ```
+
+### Port/Adapter 구현 현황
+
+| Port | Adapter | Status |
+|------|---------|--------|
+| LLMPort | OpenAIAdapter | ✅ 구현됨 |
+| DatasetPort | CSV/Excel/JSON Loaders | ✅ 구현됨 |
+| TrackerPort | LangfuseAdapter | ✅ 구현됨 |
+| StoragePort | - | ⏳ 미구현 (Phase 5) |
+| EvaluatorPort | RagasEvaluator | ✅ 구현됨 |
 
 ## External Services Configuration
 
 ### OpenAI
 - **Model**: `gpt-5-nano` (default, configurable via OPENAI_MODEL)
+- **Note**: `gpt-5-nano`는 실제 사용 가능한 모델입니다. 변경하지 마세요.
 - **Usage**: Ragas metric evaluation via LangChain
 
 ### Langfuse (Self-hosted)
@@ -104,6 +116,7 @@ Create `.env` file (copy from `.env.example`):
 # OpenAI (required)
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5-nano
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # OPENAI_BASE_URL=https://api.openai.com/v1  # optional
 
 # Langfuse (self-hosted)
@@ -145,33 +158,51 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 
 ## Current Implementation Status
 
-| Component | Status | Tests |
-|-----------|--------|-------|
-| Domain Entities | ✅ Complete | 19 |
-| Port Interfaces | ✅ Complete | 24 |
-| Data Loaders | ✅ Complete | 21 |
-| RagasEvaluator | ✅ Complete | 11 |
-| OpenAIAdapter | ✅ Complete | 4 |
-| LangfuseAdapter | ✅ Complete | 18 |
-| CLI | ✅ Complete | 7 |
-| Integration Tests | ✅ Complete | 17 |
+| Component | Status | Unit Tests | Integration Tests |
+|-----------|--------|------------|-------------------|
+| Domain Entities | ✅ Complete | 19 | - |
+| Port Interfaces | ✅ Complete | 24 | - |
+| Data Loaders | ✅ Complete | 21 | 8 |
+| RagasEvaluator | ✅ Complete | 7 | 6 |
+| OpenAIAdapter | ✅ Complete | 4 | - |
+| LangfuseAdapter | ✅ Complete | 18 | 5 |
+| CLI | ✅ Complete | 7 | - |
 
-**Total: 116 tests passing**
+**Test Summary:**
+- Unit Tests: 100
+- Integration Tests: 18
+- **Total: 118 tests passing**
 
 ## Roadmap
 
-### Phase 4: Foundation Enhancement (P0)
+### Phase 1-3: Core System (Completed)
+- [x] Domain Entities (TestCase, Dataset, EvaluationRun, MetricScore)
+- [x] Port Interfaces (LLMPort, DatasetPort, StoragePort, TrackerPort, EvaluatorPort)
+- [x] Data Loaders (CSV, Excel, JSON)
+- [x] RagasEvaluator with async evaluation (4 metrics)
+- [x] OpenAI Adapter (LangChain integration)
+- [x] Langfuse Adapter (trace/score logging)
+- [x] CLI Interface (run, metrics, config commands)
+- [x] Configuration via pydantic-settings
+- [ ] ~~StorageAdapter~~ → Phase 5로 이동
+
+### Phase 4: Foundation Enhancement (P0 - Next)
 - [ ] Language detection utility (`langdetect`)
 - [ ] Korean prompt customization for Ragas
 - [ ] FactualCorrectness metric
 - [ ] SemanticSimilarity metric
+- [ ] Azure OpenAI Adapter (선택)
+- [ ] Anthropic Claude Adapter (선택)
 
-### Phase 5: Insurance Domain (P1)
+### Phase 5: Storage & Domain (P1)
+- [ ] SQLite storage adapter (StoragePort 구현)
+- [ ] Evaluation history 조회/비교 기능
 - [ ] InsuranceTermAccuracy metric
 - [ ] Basic Testset Generation
-- [ ] SQLite storage adapter
 
 ### Phase 6: Advanced Features (P2)
 - [ ] Knowledge Graph-based testset generation
 - [ ] Experiment management system
 - [ ] Multilingual prompt expansion
+- [ ] PostgreSQL storage adapter (선택)
+- [ ] MLflow Tracker adapter (선택)

@@ -68,32 +68,32 @@ class TestStartTrace:
 
     def test_start_trace_without_metadata(self, langfuse_adapter):
         """Test starting a trace without metadata."""
-        mock_trace = MagicMock()
-        mock_trace.id = "trace-123"
-        langfuse_adapter._client.trace.return_value = mock_trace
+        mock_span = MagicMock()
+        mock_span.trace_id = "trace-123"
+        langfuse_adapter._client.start_span.return_value = mock_span
 
         trace_id = langfuse_adapter.start_trace(name="test-trace")
 
         assert trace_id == "trace-123"
-        langfuse_adapter._client.trace.assert_called_once_with(
-            name="test-trace",
-            metadata=None,
-        )
+        langfuse_adapter._client.start_span.assert_called_once_with(name="test-trace")
+        # update_trace should be called to set trace-level name and metadata
+        mock_span.update_trace.assert_called_once_with(name="test-trace", metadata=None)
         assert "trace-123" in langfuse_adapter._traces
 
     def test_start_trace_with_metadata(self, langfuse_adapter):
         """Test starting a trace with metadata."""
-        mock_trace = MagicMock()
-        mock_trace.id = "trace-456"
-        langfuse_adapter._client.trace.return_value = mock_trace
+        mock_span = MagicMock()
+        mock_span.trace_id = "trace-456"
+        langfuse_adapter._client.start_span.return_value = mock_span
 
         metadata = {"dataset": "test-dataset", "version": "1.0.0"}
         trace_id = langfuse_adapter.start_trace(name="evaluation-run", metadata=metadata)
 
         assert trace_id == "trace-456"
-        langfuse_adapter._client.trace.assert_called_once_with(
-            name="evaluation-run",
-            metadata=metadata,
+        langfuse_adapter._client.start_span.assert_called_once_with(name="evaluation-run")
+        # update_trace should be called to set trace-level name and metadata
+        mock_span.update_trace.assert_called_once_with(
+            name="evaluation-run", metadata=metadata
         )
 
 
@@ -102,21 +102,26 @@ class TestAddSpan:
 
     def test_add_span_without_data(self, langfuse_adapter):
         """Test adding a span without input/output data."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        mock_child_span = MagicMock()
+        mock_root_span.start_span.return_value = mock_child_span
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         langfuse_adapter.add_span(trace_id="trace-123", name="test-span")
 
-        mock_trace.span.assert_called_once_with(
+        mock_root_span.start_span.assert_called_once_with(
             name="test-span",
             input=None,
             output=None,
         )
+        mock_child_span.end.assert_called_once()
 
     def test_add_span_with_input_output(self, langfuse_adapter):
         """Test adding a span with input and output data."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        mock_child_span = MagicMock()
+        mock_root_span.start_span.return_value = mock_child_span
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         input_data = {"question": "What is Python?"}
         output_data = {"answer": "A programming language"}
@@ -128,11 +133,12 @@ class TestAddSpan:
             output_data=output_data,
         )
 
-        mock_trace.span.assert_called_once_with(
+        mock_root_span.start_span.assert_called_once_with(
             name="llm-call",
             input=input_data,
             output=output_data,
         )
+        mock_child_span.end.assert_called_once()
 
     def test_add_span_trace_not_found(self, langfuse_adapter):
         """Test adding a span to non-existent trace raises error."""
@@ -148,8 +154,8 @@ class TestLogScore:
 
     def test_log_score_without_comment(self, langfuse_adapter):
         """Test logging a score without comment."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         langfuse_adapter.log_score(
             trace_id="trace-123",
@@ -157,7 +163,7 @@ class TestLogScore:
             value=0.85,
         )
 
-        mock_trace.score.assert_called_once_with(
+        mock_root_span.score_trace.assert_called_once_with(
             name="faithfulness",
             value=0.85,
             comment=None,
@@ -165,8 +171,8 @@ class TestLogScore:
 
     def test_log_score_with_comment(self, langfuse_adapter):
         """Test logging a score with comment."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         langfuse_adapter.log_score(
             trace_id="trace-123",
@@ -175,7 +181,7 @@ class TestLogScore:
             comment="RAGAS evaluation result",
         )
 
-        mock_trace.score.assert_called_once_with(
+        mock_root_span.score_trace.assert_called_once_with(
             name="answer_relevancy",
             value=0.92,
             comment="RAGAS evaluation result",
@@ -196,8 +202,8 @@ class TestSaveArtifact:
 
     def test_save_artifact_json(self, langfuse_adapter):
         """Test saving JSON artifact."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         data = {"key": "value", "number": 123}
         langfuse_adapter.save_artifact(
@@ -207,15 +213,15 @@ class TestSaveArtifact:
             artifact_type="json",
         )
 
-        mock_trace.update.assert_called_once()
-        call_kwargs = mock_trace.update.call_args[1]
+        mock_root_span.update_trace.assert_called_once()
+        call_kwargs = mock_root_span.update_trace.call_args[1]
         assert call_kwargs["metadata"]["artifact_test-artifact"] == data
         assert call_kwargs["metadata"]["artifact_test-artifact_type"] == "json"
 
     def test_save_artifact_text(self, langfuse_adapter):
         """Test saving text artifact."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         data = "This is a text artifact"
         langfuse_adapter.save_artifact(
@@ -225,8 +231,8 @@ class TestSaveArtifact:
             artifact_type="text",
         )
 
-        mock_trace.update.assert_called_once()
-        call_kwargs = mock_trace.update.call_args[1]
+        mock_root_span.update_trace.assert_called_once()
+        call_kwargs = mock_root_span.update_trace.call_args[1]
         assert call_kwargs["metadata"]["artifact_log-output"] == data
         assert call_kwargs["metadata"]["artifact_log-output_type"] == "text"
 
@@ -245,11 +251,12 @@ class TestEndTrace:
 
     def test_end_trace(self, langfuse_adapter):
         """Test ending a trace."""
-        mock_trace = MagicMock()
-        langfuse_adapter._traces["trace-123"] = mock_trace
+        mock_root_span = MagicMock()
+        langfuse_adapter._traces["trace-123"] = mock_root_span
 
         langfuse_adapter.end_trace(trace_id="trace-123")
 
+        mock_root_span.end.assert_called_once()
         langfuse_adapter._client.flush.assert_called_once()
         assert "trace-123" not in langfuse_adapter._traces
 
@@ -297,24 +304,31 @@ class TestLogEvaluationRun:
             total_tokens=2700,
         )
 
-        mock_trace = MagicMock()
-        mock_trace.id = "trace-eval-123"
-        langfuse_adapter._client.trace.return_value = mock_trace
+        mock_root_span = MagicMock()
+        mock_root_span.trace_id = "trace-eval-123"
+        mock_child_span = MagicMock()
+        mock_root_span.start_span.return_value = mock_child_span
+        langfuse_adapter._client.start_span.return_value = mock_root_span
 
         trace_id = langfuse_adapter.log_evaluation_run(run)
 
-        # Verify trace was created with correct metadata
+        # Verify trace was created
         assert trace_id == "trace-eval-123"
-        langfuse_adapter._client.trace.assert_called_once()
-        call_kwargs = langfuse_adapter._client.trace.call_args[1]
-        assert call_kwargs["name"] == "evaluation-run-run-123"
-        assert call_kwargs["metadata"]["dataset_name"] == "test-dataset"
-        assert call_kwargs["metadata"]["model_name"] == "gpt-4o"
-        assert call_kwargs["metadata"]["total_test_cases"] == 2
-        assert call_kwargs["metadata"]["pass_rate"] == 1.0
+        langfuse_adapter._client.start_span.assert_called_once()
+
+        # Verify trace-level metadata was set via update_trace
+        mock_root_span.update_trace.assert_called()
+        update_trace_calls = mock_root_span.update_trace.call_args_list
+        # First call should set name and metadata
+        first_call = update_trace_calls[0]
+        assert first_call[1]["name"] == "evaluation-run-run-123"
+        assert first_call[1]["metadata"]["dataset_name"] == "test-dataset"
+        assert first_call[1]["metadata"]["model_name"] == "gpt-4o"
+        assert first_call[1]["metadata"]["total_test_cases"] == 2
+        assert first_call[1]["metadata"]["pass_rate"] == 1.0
 
         # Verify scores were logged
-        assert mock_trace.score.call_count >= 2  # At least avg scores
+        assert mock_root_span.score_trace.call_count >= 2  # At least avg scores
 
         # Verify flush was called
         langfuse_adapter._client.flush.assert_called_once()
@@ -339,16 +353,20 @@ class TestLogEvaluationRun:
             ],
         )
 
-        mock_trace = MagicMock()
-        mock_trace.id = "trace-eval-456"
-        langfuse_adapter._client.trace.return_value = mock_trace
+        mock_root_span = MagicMock()
+        mock_root_span.trace_id = "trace-eval-456"
+        mock_child_span = MagicMock()
+        mock_root_span.start_span.return_value = mock_child_span
+        langfuse_adapter._client.start_span.return_value = mock_root_span
 
         trace_id = langfuse_adapter.log_evaluation_run(run)
 
         assert trace_id == "trace-eval-456"
-        call_kwargs = langfuse_adapter._client.trace.call_args[1]
-        assert call_kwargs["metadata"]["passed_test_cases"] == 1
-        assert call_kwargs["metadata"]["pass_rate"] == 0.5
+        # Verify metadata via update_trace
+        update_trace_calls = mock_root_span.update_trace.call_args_list
+        first_call = update_trace_calls[0]
+        assert first_call[1]["metadata"]["passed_test_cases"] == 1
+        assert first_call[1]["metadata"]["pass_rate"] == 0.5
 
     def test_log_evaluation_run_empty_results(self, langfuse_adapter):
         """Test logging evaluation run with no results."""
@@ -359,13 +377,15 @@ class TestLogEvaluationRun:
             model_name="gpt-4o",
         )
 
-        mock_trace = MagicMock()
-        mock_trace.id = "trace-empty"
-        langfuse_adapter._client.trace.return_value = mock_trace
+        mock_root_span = MagicMock()
+        mock_root_span.trace_id = "trace-empty"
+        langfuse_adapter._client.start_span.return_value = mock_root_span
 
         trace_id = langfuse_adapter.log_evaluation_run(run)
 
         assert trace_id == "trace-empty"
-        call_kwargs = langfuse_adapter._client.trace.call_args[1]
-        assert call_kwargs["metadata"]["total_test_cases"] == 0
-        assert call_kwargs["metadata"]["pass_rate"] == 0.0
+        # Verify metadata via update_trace
+        update_trace_calls = mock_root_span.update_trace.call_args_list
+        first_call = update_trace_calls[0]
+        assert first_call[1]["metadata"]["total_test_cases"] == 0
+        assert first_call[1]["metadata"]["pass_rate"] == 0.0

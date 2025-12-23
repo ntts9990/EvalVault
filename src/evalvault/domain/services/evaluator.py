@@ -1,7 +1,9 @@
 """Ragas evaluation service."""
 
+from dataclasses import dataclass
 from datetime import datetime
 
+from langchain_community.callbacks import get_openai_callback
 from ragas import SingleTurnSample
 from ragas.metrics import (
     AnswerRelevancy,
@@ -17,6 +19,14 @@ from evalvault.domain.entities import (
     TestCaseResult,
 )
 from evalvault.ports.outbound.llm_port import LLMPort
+
+
+@dataclass
+class TestCaseEvalResult:
+    """Ragas 평가 결과 (토큰 사용량 포함)."""
+
+    scores: dict[str, float]
+    tokens_used: int = 0
 
 
 class RagasEvaluator:
@@ -71,17 +81,20 @@ class RagasEvaluator:
             thresholds = dict.fromkeys(metrics, 0.7)
 
         # Evaluate with Ragas
-        scores_by_test_case = await self._evaluate_with_ragas(
+        eval_results_by_test_case = await self._evaluate_with_ragas(
             dataset=dataset, metrics=metrics, llm=llm
         )
 
         # Aggregate results
+        total_tokens = 0
         for test_case in dataset.test_cases:
-            tc_scores = scores_by_test_case.get(test_case.id, {})
+            eval_result = eval_results_by_test_case.get(
+                test_case.id, TestCaseEvalResult(scores={})
+            )
 
             metric_scores = []
             for metric_name in metrics:
-                score_value = tc_scores.get(metric_name, 0.0)
+                score_value = eval_result.scores.get(metric_name, 0.0)
                 threshold = thresholds.get(metric_name, 0.7)
 
                 metric_scores.append(
@@ -95,8 +108,13 @@ class RagasEvaluator:
             test_case_result = TestCaseResult(
                 test_case_id=test_case.id,
                 metrics=metric_scores,
+                tokens_used=eval_result.tokens_used,
             )
             run.results.append(test_case_result)
+            total_tokens += eval_result.tokens_used
+
+        # Set total tokens
+        run.total_tokens = total_tokens
 
         # Finalize run
         run.finished_at = datetime.now()
@@ -104,7 +122,7 @@ class RagasEvaluator:
 
     async def _evaluate_with_ragas(
         self, dataset: Dataset, metrics: list[str], llm: LLMPort
-    ) -> dict[str, dict[str, float]]:
+    ) -> dict[str, TestCaseEvalResult]:
         """Ragas로 실제 평가 수행.
 
         Args:
@@ -113,8 +131,8 @@ class RagasEvaluator:
             llm: LLM 어댑터
 
         Returns:
-            테스트 케이스 ID별 메트릭 점수
-            예: {"tc-001": {"faithfulness": 0.9, "answer_relevancy": 0.85}}
+            테스트 케이스 ID별 평가 결과 (토큰 사용량 포함)
+            예: {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}, tokens_used=150)}
         """
         # Convert dataset to Ragas format
         ragas_samples = []
@@ -137,19 +155,35 @@ class RagasEvaluator:
         # Get LangChain LLM for Ragas
         ragas_llm = llm.as_ragas_llm()
 
-        # Evaluate using Ragas
-        # Note: We need to pass the LLM to each metric
-        results = {}
+        # Get embeddings if available (required for some metrics like answer_relevancy)
+        ragas_embeddings = None
+        if hasattr(llm, "as_ragas_embeddings"):
+            ragas_embeddings = llm.as_ragas_embeddings()
+
+        # Evaluate using Ragas with token tracking
+        results: dict[str, TestCaseEvalResult] = {}
         for idx, sample in enumerate(ragas_samples):
             test_case_id = dataset.test_cases[idx].id
-            results[test_case_id] = {}
+            scores: dict[str, float] = {}
+            test_case_tokens = 0
 
             for metric in ragas_metrics:
                 # Set LLM for the metric
                 metric.llm = ragas_llm
 
-                # Evaluate the sample
-                score = await metric.single_turn_ascore(sample)
-                results[test_case_id][metric.name] = score
+                # Set embeddings if available (required for answer_relevancy, etc.)
+                if ragas_embeddings is not None and hasattr(metric, "embeddings"):
+                    metric.embeddings = ragas_embeddings
+
+                # Evaluate the sample with token tracking
+                with get_openai_callback() as cb:
+                    score = await metric.single_turn_ascore(sample)
+                    scores[metric.name] = score
+                    test_case_tokens += cb.total_tokens
+
+            results[test_case_id] = TestCaseEvalResult(
+                scores=scores,
+                tokens_used=test_case_tokens,
+            )
 
         return results
