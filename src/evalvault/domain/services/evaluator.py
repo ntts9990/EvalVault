@@ -5,11 +5,13 @@ from datetime import datetime
 
 from langchain_community.callbacks import get_openai_callback
 from ragas import SingleTurnSample
-from ragas.metrics import (
+from ragas.metrics.collections import (
     AnswerRelevancy,
     ContextPrecision,
     ContextRecall,
     Faithfulness,
+    FactualCorrectness,
+    SemanticSimilarity,
 )
 
 from evalvault.domain.entities import (
@@ -23,10 +25,16 @@ from evalvault.ports.outbound.llm_port import LLMPort
 
 @dataclass
 class TestCaseEvalResult:
-    """Ragas 평가 결과 (토큰 사용량 포함)."""
+    """Ragas 평가 결과 (토큰 사용량, 비용, 타이밍 포함)."""
 
     scores: dict[str, float]
     tokens_used: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    latency_ms: int = 0
 
 
 class RagasEvaluator:
@@ -41,7 +49,12 @@ class RagasEvaluator:
         "answer_relevancy": AnswerRelevancy,
         "context_precision": ContextPrecision,
         "context_recall": ContextRecall,
+        "factual_correctness": FactualCorrectness,
+        "semantic_similarity": SemanticSimilarity,
     }
+
+    # Metrics that require embeddings
+    EMBEDDING_REQUIRED_METRICS = {"answer_relevancy", "semantic_similarity"}
 
     async def evaluate(
         self,
@@ -87,6 +100,7 @@ class RagasEvaluator:
 
         # Aggregate results
         total_tokens = 0
+        total_cost = 0.0
         for test_case in dataset.test_cases:
             eval_result = eval_results_by_test_case.get(
                 test_case.id, TestCaseEvalResult(scores={})
@@ -109,6 +123,10 @@ class RagasEvaluator:
                 test_case_id=test_case.id,
                 metrics=metric_scores,
                 tokens_used=eval_result.tokens_used,
+                latency_ms=eval_result.latency_ms,
+                cost_usd=eval_result.cost_usd if eval_result.cost_usd > 0 else None,
+                started_at=eval_result.started_at,
+                finished_at=eval_result.finished_at,
                 # 원본 데이터 포함 (Langfuse 로깅용)
                 question=test_case.question,
                 answer=test_case.answer,
@@ -117,9 +135,11 @@ class RagasEvaluator:
             )
             run.results.append(test_case_result)
             total_tokens += eval_result.tokens_used
+            total_cost += eval_result.cost_usd
 
-        # Set total tokens
+        # Set total tokens and cost
         run.total_tokens = total_tokens
+        run.total_cost_usd = total_cost if total_cost > 0 else None
 
         # Finalize run
         run.finished_at = datetime.now()
@@ -150,45 +170,77 @@ class RagasEvaluator:
             )
             ragas_samples.append(sample)
 
-        # Initialize Ragas metrics
-        ragas_metrics = []
-        for metric_name in metrics:
-            metric_class = self.METRIC_MAP.get(metric_name)
-            if metric_class:
-                ragas_metrics.append(metric_class())
-
-        # Get LangChain LLM for Ragas
+        # Get Ragas LLM and embeddings
         ragas_llm = llm.as_ragas_llm()
-
-        # Get embeddings if available (required for some metrics like answer_relevancy)
         ragas_embeddings = None
         if hasattr(llm, "as_ragas_embeddings"):
             ragas_embeddings = llm.as_ragas_embeddings()
 
-        # Evaluate using Ragas with token tracking
+        # Initialize Ragas metrics with LLM (new Ragas API requires llm at init)
+        ragas_metrics = []
+        for metric_name in metrics:
+            metric_class = self.METRIC_MAP.get(metric_name)
+            if metric_class:
+                # Pass embeddings for metrics that require it
+                if metric_name in self.EMBEDDING_REQUIRED_METRICS and ragas_embeddings:
+                    ragas_metrics.append(metric_class(llm=ragas_llm, embeddings=ragas_embeddings))
+                else:
+                    ragas_metrics.append(metric_class(llm=ragas_llm))
+
+        # Evaluate using Ragas with token, cost, and timing tracking
         results: dict[str, TestCaseEvalResult] = {}
         for idx, sample in enumerate(ragas_samples):
             test_case_id = dataset.test_cases[idx].id
             scores: dict[str, float] = {}
             test_case_tokens = 0
+            test_case_prompt_tokens = 0
+            test_case_completion_tokens = 0
+            test_case_cost = 0.0
+
+            # Track start time for this test case
+            test_case_started_at = datetime.now()
 
             for metric in ragas_metrics:
-                # Set LLM for the metric
-                metric.llm = ragas_llm
-
-                # Set embeddings if available (required for answer_relevancy, etc.)
-                if ragas_embeddings is not None and hasattr(metric, "embeddings"):
-                    metric.embeddings = ragas_embeddings
-
-                # Evaluate the sample with token tracking
+                # Evaluate the sample with token and cost tracking
                 with get_openai_callback() as cb:
-                    score = await metric.single_turn_ascore(sample)
-                    scores[metric.name] = score
+                    # Build kwargs based on metric type
+                    ascore_kwargs = {
+                        "user_input": sample.user_input,
+                        "response": sample.response,
+                    }
+                    # Add contexts for metrics that require it
+                    if metric.name in ("faithfulness", "context_precision", "context_recall"):
+                        ascore_kwargs["retrieved_contexts"] = sample.retrieved_contexts
+                    # Add reference for metrics that require it
+                    if metric.name in ("context_recall", "factual_correctness"):
+                        ascore_kwargs["reference"] = sample.reference
+
+                    result = await metric.ascore(**ascore_kwargs)
+                    # Handle both MetricResult and float returns
+                    if hasattr(result, "score"):
+                        scores[metric.name] = result.score
+                    else:
+                        scores[metric.name] = float(result)
                     test_case_tokens += cb.total_tokens
+                    test_case_prompt_tokens += cb.prompt_tokens
+                    test_case_completion_tokens += cb.completion_tokens
+                    test_case_cost += cb.total_cost
+
+            # Track end time and calculate latency
+            test_case_finished_at = datetime.now()
+            latency_ms = int(
+                (test_case_finished_at - test_case_started_at).total_seconds() * 1000
+            )
 
             results[test_case_id] = TestCaseEvalResult(
                 scores=scores,
                 tokens_used=test_case_tokens,
+                prompt_tokens=test_case_prompt_tokens,
+                completion_tokens=test_case_completion_tokens,
+                cost_usd=test_case_cost,
+                started_at=test_case_started_at,
+                finished_at=test_case_finished_at,
+                latency_ms=latency_ms,
             )
 
         return results

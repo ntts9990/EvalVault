@@ -283,15 +283,35 @@ class LangfuseAdapter(TrackerPort):
             metadata["total_cost_usd"] = run.total_cost_usd
             trace_output["summary"]["total_cost_usd"] = run.total_cost_usd
 
-        # Create trace with input and output
-        trace = self._client.trace(
-            name=f"evaluation-run-{run.run_id}",
+        # Create tags for filtering
+        tags = [
+            f"dataset:{run.dataset_name}",
+            f"model:{run.model_name}",
+            "passed" if run.pass_rate >= 1.0 else "failed",
+        ]
+        # Add metric tags
+        for metric_name in run.metrics_evaluated:
+            tags.append(f"metric:{metric_name}")
+
+        # Create trace using Langfuse v3 API (start_span creates a trace)
+        trace_name = f"evaluation-run-{run.run_id}"
+        root_span = self._client.start_span(name=trace_name)
+        trace_id = root_span.trace_id
+
+        # Update trace-level metadata, input, output, tags
+        root_span.update_trace(
+            name=trace_name,
             input=trace_input,
             output=trace_output,
             metadata=metadata,
+            tags=tags,
         )
-        trace_id = trace.id
-        self._traces[trace_id] = trace
+        # Update span with timing
+        root_span.update(
+            start_time=run.started_at,
+            end_time=run.finished_at,
+        )
+        self._traces[trace_id] = root_span
 
         # Log average scores for each metric
         for metric_name, summary in metric_summary.items():
@@ -338,13 +358,19 @@ class LangfuseAdapter(TrackerPort):
             if result.cost_usd:
                 span_metadata["cost_usd"] = result.cost_usd
 
-            # Create span with full data
-            trace.span(
+            # Create child span with full data and timing (Langfuse v3 API)
+            child_span = root_span.start_span(
                 name=f"test-case-{result.test_case_id}",
                 input=span_input,
                 output=span_output,
                 metadata=span_metadata,
             )
+            # Update span with timing
+            child_span.update(
+                start_time=result.started_at,
+                end_time=result.finished_at,
+            )
+            child_span.end()
 
             # Log individual metric scores
             for metric in result.metrics:
@@ -355,6 +381,40 @@ class LangfuseAdapter(TrackerPort):
                     value=metric.score,
                     comment=f"[{status}] {metric.name}: {metric.score:.3f} (threshold: {metric.threshold})",
                 )
+
+        # Add a generation span for cost tracking if we have usage data
+        if run.total_tokens > 0:
+            # Calculate total prompt and completion tokens
+            total_prompt_tokens = sum(
+                r.tokens_used // 2 for r in run.results  # Approximate if not tracked
+            )
+            total_completion_tokens = run.total_tokens - total_prompt_tokens
+
+            # Create generation span for cost tracking (Langfuse v3 API)
+            generation_span = root_span.start_generation(
+                name="ragas-evaluation",
+                model=run.model_name,
+                input={"metrics": run.metrics_evaluated, "total_test_cases": run.total_test_cases},
+                output={"total_tokens": run.total_tokens},
+                usage={
+                    "input": total_prompt_tokens,
+                    "output": total_completion_tokens,
+                    "total": run.total_tokens,
+                },
+                metadata={
+                    "evaluation_type": "ragas",
+                    "metrics": run.metrics_evaluated,
+                    "total_test_cases": run.total_test_cases,
+                },
+            )
+            generation_span.update(
+                start_time=run.started_at,
+                end_time=run.finished_at,
+            )
+            generation_span.end()
+
+        # End the root span
+        root_span.end()
 
         # Flush data to Langfuse
         self._client.flush()

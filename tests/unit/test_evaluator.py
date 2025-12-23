@@ -67,6 +67,8 @@ class TestRagasEvaluator:
             "answer_relevancy": 0.7,
             "context_precision": 0.7,
             "context_recall": 0.7,
+            "factual_correctness": 0.7,
+            "semantic_similarity": 0.7,
         }
 
     @pytest.mark.asyncio
@@ -293,3 +295,24 @@ class TestRagasEvaluator:
         assert result.total_test_cases == 0
         assert result.pass_rate == 0.0
         assert len(result.results) == 0
+
+    def test_metric_map_includes_factual_correctness(self):
+        """METRIC_MAP에 factual_correctness가 포함되는지 테스트."""
+        evaluator = RagasEvaluator()
+        assert "factual_correctness" in evaluator.METRIC_MAP
+        from ragas.metrics.collections import FactualCorrectness
+        assert evaluator.METRIC_MAP["factual_correctness"] == FactualCorrectness
+
+    def test_metric_map_includes_semantic_similarity(self):
+        """METRIC_MAP에 semantic_similarity가 포함되는지 테스트."""
+        evaluator = RagasEvaluator()
+        assert "semantic_similarity" in evaluator.METRIC_MAP
+        from ragas.metrics.collections import SemanticSimilarity
+        assert evaluator.METRIC_MAP["semantic_similarity"] == SemanticSimilarity
+
+    def test_embedding_required_metrics_constant(self):
+        """EMBEDDING_REQUIRED_METRICS가 올바르게 정의되는지 테스트."""
+        evaluator = RagasEvaluator()
+        assert hasattr(evaluator, "EMBEDDING_REQUIRED_METRICS")
+        assert "answer_relevancy" in evaluator.EMBEDDING_REQUIRED_METRICS
+        assert "semantic_similarity" in evaluator.EMBEDDING_REQUIRED_METRICS

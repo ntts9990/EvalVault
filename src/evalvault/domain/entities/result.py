@@ -14,6 +14,8 @@ class MetricType(str, Enum):
     ANSWER_RELEVANCY = "answer_relevancy"
     CONTEXT_PRECISION = "context_precision"
     CONTEXT_RECALL = "context_recall"
+    FACTUAL_CORRECTNESS = "factual_correctness"
+    SEMANTIC_SIMILARITY = "semantic_similarity"
 
 
 @dataclass
@@ -38,9 +40,13 @@ class TestCaseResult:
     test_case_id: str
     metrics: list[MetricScore]
     tokens_used: int = 0  # 총 토큰 사용량
-    latency_ms: int = 0  # 응답 시간
+    latency_ms: int = 0  # 응답 시간 (밀리초)
     cost_usd: float | None = None  # 비용 (계산 가능한 경우)
     trace_id: str | None = None  # Langfuse trace ID
+
+    # 타이밍 정보 (Langfuse span timing용)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
     # 원본 테스트 케이스 데이터 (Langfuse 로깅용)
     question: str | None = None

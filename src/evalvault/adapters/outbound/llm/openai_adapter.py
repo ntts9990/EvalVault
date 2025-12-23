@@ -1,16 +1,18 @@
 """OpenAI LLM adapter for Ragas evaluation."""
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
 class OpenAIAdapter(LLMPort):
-    """OpenAI LLM adapter using LangChain.
+    """OpenAI LLM adapter using Ragas native interface.
 
-    This adapter wraps LangChain's ChatOpenAI and OpenAIEmbeddings to provide
-    a consistent interface for Ragas metrics evaluation.
+    This adapter uses Ragas's llm_factory and embedding_factory to provide
+    a consistent interface for Ragas metrics evaluation without deprecation warnings.
     """
 
     def __init__(self, settings: Settings):
@@ -23,29 +25,30 @@ class OpenAIAdapter(LLMPort):
         self._model_name = settings.openai_model
         self._embedding_model_name = settings.openai_embedding_model
 
-        # Build kwargs for ChatOpenAI
-        llm_kwargs = {
-            "model": self._model_name,
-            "temperature": 0.0,  # Deterministic for evaluation
-        }
-
-        # Build kwargs for OpenAIEmbeddings
-        embedding_kwargs = {
-            "model": self._embedding_model_name,
-        }
-
-        # Add API key if provided
+        # Build OpenAI client kwargs
+        client_kwargs = {}
         if settings.openai_api_key:
-            llm_kwargs["api_key"] = settings.openai_api_key
-            embedding_kwargs["api_key"] = settings.openai_api_key
-
-        # Add custom base URL if provided
+            client_kwargs["api_key"] = settings.openai_api_key
         if settings.openai_base_url:
-            llm_kwargs["openai_api_base"] = settings.openai_base_url
-            embedding_kwargs["openai_api_base"] = settings.openai_base_url
+            client_kwargs["base_url"] = settings.openai_base_url
 
-        self._llm = ChatOpenAI(**llm_kwargs)
-        self._embeddings = OpenAIEmbeddings(**embedding_kwargs)
+        # Create async OpenAI client for async evaluation
+        self._client = AsyncOpenAI(**client_kwargs)
+
+        # Create Ragas LLM using llm_factory with async client
+        # gpt-5-nano/mini: 400K context, 128K max output tokens
+        self._ragas_llm = llm_factory(
+            model=self._model_name,
+            provider="openai",
+            client=self._client,
+            max_tokens=32768,  # gpt-5 series supports up to 128K output tokens
+        )
+
+        # Create Ragas embeddings using OpenAIEmbeddings with async client
+        self._ragas_embeddings = RagasOpenAIEmbeddings(
+            model=self._embedding_model_name,
+            client=self._client,
+        )
 
     def get_model_name(self) -> str:
         """Get the model name being used.
@@ -55,25 +58,27 @@ class OpenAIAdapter(LLMPort):
         """
         return self._model_name
 
-    def as_ragas_llm(self) -> ChatOpenAI:
-        """Return the LangChain ChatOpenAI instance for Ragas.
+    def as_ragas_llm(self):
+        """Return the Ragas LLM instance.
 
-        Ragas metrics expect LangChain LLM instances.
-
-        Returns:
-            ChatOpenAI instance configured with settings
-        """
-        return self._llm
-
-    def as_ragas_embeddings(self) -> OpenAIEmbeddings:
-        """Return the LangChain OpenAIEmbeddings instance for Ragas.
-
-        Ragas metrics like answer_relevancy require embeddings.
+        Returns the Ragas-native LLM created via llm_factory for use
+        with Ragas metrics evaluation.
 
         Returns:
-            OpenAIEmbeddings instance configured with settings
+            Ragas LLM instance configured with settings
         """
-        return self._embeddings
+        return self._ragas_llm
+
+    def as_ragas_embeddings(self):
+        """Return the Ragas embeddings instance.
+
+        Returns the Ragas-native embeddings created via embedding_factory
+        for use with Ragas metrics like answer_relevancy.
+
+        Returns:
+            Ragas embeddings instance configured with settings
+        """
+        return self._ragas_embeddings
 
     def get_embedding_model_name(self) -> str:
         """Get the embedding model name being used.
