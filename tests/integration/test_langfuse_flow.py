@@ -24,14 +24,22 @@ class TestLangfuseFlowWithMock:
     @pytest.fixture
     def sample_evaluation_run(self):
         """테스트용 평가 결과."""
+        started_at = datetime.now()
+        finished_at = started_at + timedelta(seconds=30)
+        tc1_started = started_at + timedelta(seconds=1)
+        tc1_finished = started_at + timedelta(seconds=15)
+        tc2_started = started_at + timedelta(seconds=16)
+        tc2_finished = started_at + timedelta(seconds=29)
+
         return EvaluationRun(
             dataset_name="integration-test",
             dataset_version="1.0.0",
             model_name=get_test_model(),
-            started_at=datetime.now(),
-            finished_at=datetime.now() + timedelta(seconds=30),
+            started_at=started_at,
+            finished_at=finished_at,
             metrics_evaluated=["faithfulness", "answer_relevancy"],
             thresholds={"faithfulness": 0.7, "answer_relevancy": 0.7},
+            total_tokens=1250,
             results=[
                 TestCaseResult(
                     test_case_id="tc-001",
@@ -39,6 +47,14 @@ class TestLangfuseFlowWithMock:
                         MetricScore(name="faithfulness", score=0.9, threshold=0.7),
                         MetricScore(name="answer_relevancy", score=0.85, threshold=0.7),
                     ],
+                    tokens_used=650,
+                    latency_ms=14000,
+                    started_at=tc1_started,
+                    finished_at=tc1_finished,
+                    question="이 보험의 보장금액은 얼마인가요?",
+                    answer="보장금액은 1억원입니다.",
+                    contexts=["해당 보험의 사망 보장금액은 1억원입니다."],
+                    ground_truth="1억원",
                 ),
                 TestCaseResult(
                     test_case_id="tc-002",
@@ -46,6 +62,14 @@ class TestLangfuseFlowWithMock:
                         MetricScore(name="faithfulness", score=0.7, threshold=0.7),
                         MetricScore(name="answer_relevancy", score=0.8, threshold=0.7),
                     ],
+                    tokens_used=600,
+                    latency_ms=13000,
+                    started_at=tc2_started,
+                    finished_at=tc2_finished,
+                    question="보험료 납입 기간은 어떻게 되나요?",
+                    answer="납입 기간은 10년입니다.",
+                    contexts=["보험료 납입 기간은 10년으로 설정됩니다."],
+                    ground_truth="10년",
                 ),
             ],
         )
@@ -154,20 +178,36 @@ class TestRealLangfuseFlow:
     @pytest.fixture
     def sample_run(self):
         """테스트용 간단한 평가 결과."""
+        started_at = datetime.now()
+        finished_at = started_at + timedelta(seconds=5)
+        tc_started = started_at + timedelta(milliseconds=100)
+        tc_finished = started_at + timedelta(seconds=4, milliseconds=500)
+
         return EvaluationRun(
             dataset_name="real-langfuse-test",
             dataset_version="1.0.0",
             model_name=get_test_model(),
-            started_at=datetime.now(),
-            finished_at=datetime.now() + timedelta(seconds=5),
+            started_at=started_at,
+            finished_at=finished_at,
             metrics_evaluated=["faithfulness"],
             thresholds={"faithfulness": 0.7},
+            total_tokens=450,
             results=[
                 TestCaseResult(
                     test_case_id="tc-001",
                     metrics=[
                         MetricScore(name="faithfulness", score=0.85, threshold=0.7),
                     ],
+                    tokens_used=450,
+                    latency_ms=4400,
+                    started_at=tc_started,
+                    finished_at=tc_finished,
+                    question="이 보험의 보장범위는 무엇인가요?",
+                    answer="해당 보험은 사망, 장해, 질병 치료비를 보장합니다.",
+                    contexts=[
+                        "본 보험의 보장 범위는 다음과 같습니다: 1) 사망보험금 1억원, 2) 장해보험금 최대 1억원, 3) 질병 치료비 실손 보장."
+                    ],
+                    ground_truth="사망, 장해, 질병 치료비 보장",
                 ),
             ],
         )

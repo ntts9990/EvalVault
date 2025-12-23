@@ -391,12 +391,14 @@ class LangfuseAdapter(TrackerPort):
             total_completion_tokens = run.total_tokens - total_prompt_tokens
 
             # Create generation span for cost tracking (Langfuse v3 API)
-            generation_span = root_span.start_generation(
+            # Note: use start_observation with as_type='generation' (SDK 3.x)
+            generation_span = root_span.start_observation(
                 name="ragas-evaluation",
+                as_type="generation",
                 model=run.model_name,
                 input={"metrics": run.metrics_evaluated, "total_test_cases": run.total_test_cases},
                 output={"total_tokens": run.total_tokens},
-                usage={
+                usage_details={
                     "input": total_prompt_tokens,
                     "output": total_completion_tokens,
                     "total": run.total_tokens,
