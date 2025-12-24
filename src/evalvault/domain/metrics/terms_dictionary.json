@@ -1,0 +1,102 @@
+{
+  "보험금": {
+    "canonical": "보험금",
+    "variants": ["보험금", "보험 금액", "지급금", "보상금", "보험급여"],
+    "english": ["insurance benefit", "insurance payout", "claim amount"]
+  },
+  "보험료": {
+    "canonical": "보험료",
+    "variants": ["보험료", "납입료", "월 보험료", "연 보험료", "보험료납입"],
+    "english": ["premium", "insurance premium", "monthly premium"]
+  },
+  "피보험자": {
+    "canonical": "피보험자",
+    "variants": ["피보험자", "보험 대상자", "피보험인"],
+    "english": ["insured", "insured person", "policyholder"]
+  },
+  "보험계약자": {
+    "canonical": "보험계약자",
+    "variants": ["보험계약자", "계약자", "보험가입자"],
+    "english": ["contractor", "policy owner", "subscriber"]
+  },
+  "보험수익자": {
+    "canonical": "보험수익자",
+    "variants": ["보험수익자", "수익자", "보험금수령인"],
+    "english": ["beneficiary", "insurance beneficiary"]
+  },
+  "면책기간": {
+    "canonical": "면책기간",
+    "variants": ["면책기간", "면책 기간", "보장제외기간"],
+    "english": ["waiting period", "exclusion period"]
+  },
+  "보장내용": {
+    "canonical": "보장내용",
+    "variants": ["보장내용", "보장 내용", "보험보장", "담보내용"],
+    "english": ["coverage", "insurance coverage", "benefits"]
+  },
+  "해지환급금": {
+    "canonical": "해지환급금",
+    "variants": ["해지환급금", "해약환급금", "중도해지환급금"],
+    "english": ["surrender value", "cash surrender value"]
+  },
+  "보험가입금액": {
+    "canonical": "보험가입금액",
+    "variants": ["보험가입금액", "가입금액", "보장금액"],
+    "english": ["sum insured", "coverage amount", "insured amount"]
+  },
+  "특약": {
+    "canonical": "특약",
+    "variants": ["특약", "특별약관", "부가특약"],
+    "english": ["rider", "special clause", "additional coverage"]
+  },
+  "주계약": {
+    "canonical": "주계약",
+    "variants": ["주계약", "주보험", "기본계약"],
+    "english": ["main contract", "base policy", "primary coverage"]
+  },
+  "갱신": {
+    "canonical": "갱신",
+    "variants": ["갱신", "재계약", "계약갱신"],
+    "english": ["renewal", "contract renewal", "policy renewal"]
+  },
+  "보험기간": {
+    "canonical": "보험기간",
+    "variants": ["보험기간", "보험 기간", "보장기간"],
+    "english": ["policy term", "insurance period", "coverage period"]
+  },
+  "납입기간": {
+    "canonical": "납입기간",
+    "variants": ["납입기간", "납입 기간", "보험료납입기간"],
+    "english": ["premium payment period", "payment term"]
+  },
+  "실손보험": {
+    "canonical": "실손보험",
+    "variants": ["실손보험", "실비보험", "실손의료보험"],
+    "english": ["actual expense insurance", "indemnity insurance"]
+  },
+  "정액보험": {
+    "canonical": "정액보험",
+    "variants": ["정액보험", "정액형보험"],
+    "english": ["fixed benefit insurance", "lump sum insurance"]
+  },
+  "암보험": {
+    "canonical": "암보험",
+    "variants": ["암보험", "암 보험", "암진단보험"],
+    "english": ["cancer insurance"]
+  },
+  "사망보험금": {
+    "canonical": "사망보험금",
+    "variants": ["사망보험금", "사망보장금", "사망급여"],
+    "english": ["death benefit", "death insurance benefit"]
+  },
+  "진단비": {
+    "canonical": "진단비",
+    "variants": ["진단비", "진단금", "진단보험금"],
+    "english": ["diagnosis benefit", "diagnosis coverage"]
+  },
+  "입원비": {
+    "canonical": "입원비",
+    "variants": ["입원비", "입원급여", "입원보험금"],
+    "english": ["hospitalization benefit", "hospitalization coverage"]
+  }
+}

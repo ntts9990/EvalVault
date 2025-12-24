@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from langchain_community.callbacks import get_openai_callback
 from ragas import SingleTurnSample
 from ragas.metrics.collections import (
     AnswerRelevancy,
@@ -187,44 +186,38 @@ class RagasEvaluator:
                 else:
                     ragas_metrics.append(metric_class(llm=ragas_llm))
 
-        # Evaluate using Ragas with token, cost, and timing tracking
+        # Evaluate using Ragas with token and timing tracking
         results: dict[str, TestCaseEvalResult] = {}
         for idx, sample in enumerate(ragas_samples):
             test_case_id = dataset.test_cases[idx].id
             scores: dict[str, float] = {}
-            test_case_tokens = 0
-            test_case_prompt_tokens = 0
-            test_case_completion_tokens = 0
-            test_case_cost = 0.0
+
+            # Reset token tracking before each test case
+            if hasattr(llm, "reset_token_usage"):
+                llm.reset_token_usage()
 
             # Track start time for this test case
             test_case_started_at = datetime.now()
 
             for metric in ragas_metrics:
-                # Evaluate the sample with token and cost tracking
-                with get_openai_callback() as cb:
-                    # Build kwargs based on metric type
-                    ascore_kwargs = {
-                        "user_input": sample.user_input,
-                        "response": sample.response,
-                    }
-                    # Add contexts for metrics that require it
-                    if metric.name in ("faithfulness", "context_precision", "context_recall"):
-                        ascore_kwargs["retrieved_contexts"] = sample.retrieved_contexts
-                    # Add reference for metrics that require it
-                    if metric.name in ("context_recall", "factual_correctness"):
-                        ascore_kwargs["reference"] = sample.reference
+                # Build kwargs based on metric type
+                ascore_kwargs = {
+                    "user_input": sample.user_input,
+                    "response": sample.response,
+                }
+                # Add contexts for metrics that require it
+                if metric.name in ("faithfulness", "context_precision", "context_recall"):
+                    ascore_kwargs["retrieved_contexts"] = sample.retrieved_contexts
+                # Add reference for metrics that require it
+                if metric.name in ("context_recall", "factual_correctness"):
+                    ascore_kwargs["reference"] = sample.reference
 
-                    result = await metric.ascore(**ascore_kwargs)
-                    # Handle both MetricResult and float returns
-                    if hasattr(result, "score"):
-                        scores[metric.name] = result.score
-                    else:
-                        scores[metric.name] = float(result)
-                    test_case_tokens += cb.total_tokens
-                    test_case_prompt_tokens += cb.prompt_tokens
-                    test_case_completion_tokens += cb.completion_tokens
-                    test_case_cost += cb.total_cost
+                result = await metric.ascore(**ascore_kwargs)
+                # Handle both MetricResult and float returns
+                if hasattr(result, "score"):
+                    scores[metric.name] = result.score
+                else:
+                    scores[metric.name] = float(result)
 
             # Track end time and calculate latency
             test_case_finished_at = datetime.now()
@@ -232,12 +225,23 @@ class RagasEvaluator:
                 (test_case_finished_at - test_case_started_at).total_seconds() * 1000
             )
 
+            # Get token usage for this test case
+            test_case_prompt_tokens = 0
+            test_case_completion_tokens = 0
+            test_case_tokens = 0
+            if hasattr(llm, "get_and_reset_token_usage"):
+                (
+                    test_case_prompt_tokens,
+                    test_case_completion_tokens,
+                    test_case_tokens,
+                ) = llm.get_and_reset_token_usage()
+
             results[test_case_id] = TestCaseEvalResult(
                 scores=scores,
                 tokens_used=test_case_tokens,
                 prompt_tokens=test_case_prompt_tokens,
                 completion_tokens=test_case_completion_tokens,
-                cost_usd=test_case_cost,
+                cost_usd=0.0,  # Cost tracking not available via direct API
                 started_at=test_case_started_at,
                 finished_at=test_case_finished_at,
                 latency_ms=latency_ms,

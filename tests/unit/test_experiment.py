@@ -1,0 +1,347 @@
+"""Tests for Experiment entity and ExperimentManager service."""
+
+import pytest
+from datetime import datetime
+from unittest.mock import Mock
+
+from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.services.experiment_manager import (
+    ExperimentManager,
+    MetricComparison,
+)
+
+
+class TestExperimentGroup:
+    """ExperimentGroup 엔티티 테스트."""
+
+    def test_create_experiment_group(self):
+        """ExperimentGroup 생성 테스트."""
+        group = ExperimentGroup(name="control", description="Baseline model")
+        assert group.name == "control"
+        assert group.description == "Baseline model"
+        assert group.run_ids == []
+
+    def test_add_run_ids(self):
+        """run_id 추가 테스트."""
+        group = ExperimentGroup(name="control")
+        group.run_ids.append("run-123")
+        group.run_ids.append("run-456")
+        assert len(group.run_ids) == 2
+        assert "run-123" in group.run_ids
+
+
+class TestExperiment:
+    """Experiment 엔티티 테스트."""
+
+    def test_create_experiment(self):
+        """Experiment 생성 테스트."""
+        exp = Experiment(
+            name="A/B Test",
+            description="Testing model performance",
+            hypothesis="Model A is better than Model B",
+        )
+        assert exp.name == "A/B Test"
+        assert exp.description == "Testing model performance"
+        assert exp.hypothesis == "Model A is better than Model B"
+        assert exp.status == "draft"
+        assert exp.experiment_id is not None
+        assert exp.groups == []
+        assert exp.metrics_to_compare == []
+
+    def test_experiment_default_values(self):
+        """기본값 설정 테스트."""
+        exp = Experiment(name="Test")
+        assert exp.name == "Test"
+        assert exp.description == ""
+        assert exp.hypothesis == ""
+        assert exp.status == "draft"
+        assert exp.conclusion is None
+        assert isinstance(exp.created_at, datetime)
+
+    def test_add_group(self):
+        """그룹 추가 테스트."""
+        exp = Experiment(name="Test")
+        group = exp.add_group("control", "Baseline model")
+
+        assert len(exp.groups) == 1
+        assert group.name == "control"
+        assert group.description == "Baseline model"
+        assert group in exp.groups
+
+    def test_add_multiple_groups(self):
+        """여러 그룹 추가 테스트."""
+        exp = Experiment(name="Test")
+        exp.add_group("control", "Baseline")
+        exp.add_group("variant_a", "New model A")
+        exp.add_group("variant_b", "New model B")
+
+        assert len(exp.groups) == 3
+        group_names = [g.name for g in exp.groups]
+        assert "control" in group_names
+        assert "variant_a" in group_names
+        assert "variant_b" in group_names
+
+    def test_add_run_to_group(self):
+        """그룹에 run 추가 테스트."""
+        exp = Experiment(name="Test")
+        exp.add_group("control")
+        exp.add_run_to_group("control", "run-123")
+
+        assert "run-123" in exp.groups[0].run_ids
+
+    def test_add_multiple_runs_to_group(self):
+        """그룹에 여러 run 추가 테스트."""
+        exp = Experiment(name="Test")
+        exp.add_group("control")
+        exp.add_run_to_group("control", "run-123")
+        exp.add_run_to_group("control", "run-456")
+        exp.add_run_to_group("control", "run-789")
+
+        assert len(exp.groups[0].run_ids) == 3
+
+    def test_add_run_to_nonexistent_group(self):
+        """존재하지 않는 그룹에 run 추가 시 예외 발생."""
+        exp = Experiment(name="Test")
+        with pytest.raises(ValueError, match="Group not found: nonexistent"):
+            exp.add_run_to_group("nonexistent", "run-123")
+
+    def test_experiment_status_transitions(self):
+        """실험 상태 전환 테스트."""
+        exp = Experiment(name="Test")
+        assert exp.status == "draft"
+
+        exp.status = "running"
+        assert exp.status == "running"
+
+        exp.status = "completed"
+        assert exp.status == "completed"
+
+        exp.status = "archived"
+        assert exp.status == "archived"
+
+
+class TestMetricComparison:
+    """MetricComparison 테스트."""
+
+    def test_create_metric_comparison(self):
+        """MetricComparison 생성 테스트."""
+        comparison = MetricComparison(
+            metric_name="faithfulness",
+            group_scores={"control": 0.75, "variant_a": 0.85},
+            best_group="variant_a",
+            improvement=13.33,
+        )
+        assert comparison.metric_name == "faithfulness"
+        assert comparison.group_scores["control"] == 0.75
+        assert comparison.group_scores["variant_a"] == 0.85
+        assert comparison.best_group == "variant_a"
+        assert comparison.improvement == pytest.approx(13.33)
+
+
+class TestExperimentManager:
+    """ExperimentManager 서비스 테스트."""
+
+    @pytest.fixture
+    def mock_storage(self):
+        """Mock StoragePort 픽스처."""
+        storage = Mock()
+        return storage
+
+    @pytest.fixture
+    def sample_runs(self):
+        """샘플 EvaluationRun 데이터."""
+        # Control group run
+        run1 = EvaluationRun(
+            run_id="run-control-1",
+            dataset_name="test-dataset",
+            model_name="gpt-4o",
+            metrics_evaluated=["faithfulness", "answer_relevancy"],
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    metrics=[
+                        MetricScore(name="faithfulness", score=0.8, threshold=0.7),
+                        MetricScore(name="answer_relevancy", score=0.75, threshold=0.7),
+                    ],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-002",
+                    metrics=[
+                        MetricScore(name="faithfulness", score=0.7, threshold=0.7),
+                        MetricScore(name="answer_relevancy", score=0.7, threshold=0.7),
+                    ],
+                ),
+            ],
+        )
+
+        # Variant A run
+        run2 = EvaluationRun(
+            run_id="run-variant-a-1",
+            dataset_name="test-dataset",
+            model_name="gpt-5-nano",
+            metrics_evaluated=["faithfulness", "answer_relevancy"],
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    metrics=[
+                        MetricScore(name="faithfulness", score=0.9, threshold=0.7),
+                        MetricScore(name="answer_relevancy", score=0.85, threshold=0.7),
+                    ],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-002",
+                    metrics=[
+                        MetricScore(name="faithfulness", score=0.85, threshold=0.7),
+                        MetricScore(name="answer_relevancy", score=0.8, threshold=0.7),
+                    ],
+                ),
+            ],
+        )
+
+        return {"control": run1, "variant_a": run2}
+
+    def test_create_experiment(self, mock_storage):
+        """실험 생성 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(
+            name="Model Comparison",
+            description="Compare GPT-4o vs GPT-5-nano",
+            hypothesis="GPT-5-nano will have higher faithfulness scores",
+            metrics=["faithfulness", "answer_relevancy"],
+        )
+
+        assert exp.name == "Model Comparison"
+        assert exp.description == "Compare GPT-4o vs GPT-5-nano"
+        assert exp.hypothesis == "GPT-5-nano will have higher faithfulness scores"
+        assert exp.metrics_to_compare == ["faithfulness", "answer_relevancy"]
+        assert exp.status == "draft"
+        assert exp.experiment_id in manager._experiments
+
+    def test_create_experiment_with_defaults(self, mock_storage):
+        """기본값으로 실험 생성 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(name="Test Experiment")
+
+        assert exp.name == "Test Experiment"
+        assert exp.description == ""
+        assert exp.hypothesis == ""
+        assert exp.metrics_to_compare == []
+
+    def test_get_experiment(self, mock_storage):
+        """실험 조회 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(name="Test")
+
+        retrieved = manager.get_experiment(exp.experiment_id)
+        assert retrieved == exp
+
+    def test_get_experiment_not_found(self, mock_storage):
+        """존재하지 않는 실험 조회 시 예외."""
+        manager = ExperimentManager(mock_storage)
+        with pytest.raises(KeyError, match="Experiment not found"):
+            manager.get_experiment("nonexistent-id")
+
+    def test_compare_groups(self, mock_storage, sample_runs):
+        """그룹 간 메트릭 비교 테스트."""
+        # Setup storage mock to return sample runs
+        mock_storage.get_run.side_effect = lambda run_id: sample_runs.get(
+            "control" if "control" in run_id else "variant_a"
+        )
+
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(
+            name="Test",
+            metrics=["faithfulness", "answer_relevancy"],
+        )
+        exp.add_group("control")
+        exp.add_group("variant_a")
+        exp.add_run_to_group("control", "run-control-1")
+        exp.add_run_to_group("variant_a", "run-variant-a-1")
+
+        comparisons = manager.compare_groups(exp.experiment_id)
+
+        assert len(comparisons) == 2
+
+        # Check faithfulness comparison
+        faith_comp = next(c for c in comparisons if c.metric_name == "faithfulness")
+        assert faith_comp.group_scores["control"] == pytest.approx(0.75)
+        assert faith_comp.group_scores["variant_a"] == pytest.approx(0.875)
+        assert faith_comp.best_group == "variant_a"
+        assert faith_comp.improvement > 0
+
+    def test_compare_groups_empty_groups(self, mock_storage):
+        """빈 그룹 비교 시 빈 리스트 반환."""
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(name="Test", metrics=["faithfulness"])
+        exp.add_group("control")
+
+        comparisons = manager.compare_groups(exp.experiment_id)
+        assert comparisons == []
+
+    def test_get_summary(self, mock_storage, sample_runs):
+        """실험 요약 통계 테스트."""
+        mock_storage.get_run.side_effect = lambda run_id: sample_runs.get(
+            "control" if "control" in run_id else "variant_a"
+        )
+
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(
+            name="Test",
+            metrics=["faithfulness", "answer_relevancy"],
+        )
+        exp.add_group("control")
+        exp.add_group("variant_a")
+        exp.add_run_to_group("control", "run-control-1")
+        exp.add_run_to_group("variant_a", "run-variant-a-1")
+
+        summary = manager.get_summary(exp.experiment_id)
+
+        assert summary["experiment_id"] == exp.experiment_id
+        assert summary["name"] == "Test"
+        assert summary["status"] == "draft"
+        assert len(summary["groups"]) == 2
+        assert "control" in summary["groups"]
+        assert "variant_a" in summary["groups"]
+
+    def test_conclude_experiment(self, mock_storage):
+        """실험 완료 및 결론 기록 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp = manager.create_experiment(name="Test")
+
+        manager.conclude_experiment(
+            exp.experiment_id,
+            conclusion="Variant A shows 15% improvement in faithfulness",
+        )
+
+        updated_exp = manager.get_experiment(exp.experiment_id)
+        assert updated_exp.status == "completed"
+        assert updated_exp.conclusion == "Variant A shows 15% improvement in faithfulness"
+
+    def test_list_experiments(self, mock_storage):
+        """실험 목록 조회 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp1 = manager.create_experiment(name="Experiment 1")
+        exp2 = manager.create_experiment(name="Experiment 2")
+
+        experiments = manager.list_experiments()
+        assert len(experiments) == 2
+        assert exp1 in experiments
+        assert exp2 in experiments
+
+    def test_list_experiments_by_status(self, mock_storage):
+        """상태별 실험 목록 조회 테스트."""
+        manager = ExperimentManager(mock_storage)
+        exp1 = manager.create_experiment(name="Draft Experiment")
+        exp2 = manager.create_experiment(name="Running Experiment")
+        exp2.status = "running"
+        exp3 = manager.create_experiment(name="Completed Experiment")
+        manager.conclude_experiment(exp3.experiment_id, "Done")
+
+        draft_exps = manager.list_experiments(status="draft")
+        assert len(draft_exps) == 1
+        assert draft_exps[0].name == "Draft Experiment"
+
+        completed_exps = manager.list_experiments(status="completed")
+        assert len(completed_exps) == 1
+        assert completed_exps[0].name == "Completed Experiment"

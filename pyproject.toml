@@ -19,6 +19,7 @@ dependencies = [
     "xlrd",      # For reading .xls files (Excel 97-2003)
     "chardet",   # For automatic encoding detection in CSV files
     "structlog",
+    "langdetect", # For language detection (Phase 4)
 ]
 
 [project.optional-dependencies]
@@ -29,7 +30,17 @@ dev = [
     "pytest-mock",
     "pytest-xdist",
     "pytest-rerunfailures",
+    "pytest-html",      # HTML test reports
     "ruff",
+]
+anthropic = [
+    "anthropic",
+]
+postgres = [
+    "psycopg[binary]>=3.0.0",
+]
+mlflow = [
+    "mlflow>=2.0.0",
 ]
 
 [project.scripts]
@@ -57,3 +68,7 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Report generation options (can be overridden via CLI)
+addopts = "--tb=short"
+# JUnit XML output for CI/CD integration
+junit_family = "xunit2"

@@ -50,6 +50,14 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Test reports
+reports/*.html
+reports/*.xml
+reports/assets/
+
+# E2E test results database
+data/e2e_results/*.db
+
 # Translations
 *.mo
 *.pot

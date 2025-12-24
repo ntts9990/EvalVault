@@ -1,0 +1,316 @@
+"""SQLite storage adapter for evaluation results."""
+
+import json
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
+from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+
+
+class SQLiteStorageAdapter:
+    """SQLite 기반 평가 결과 저장 어댑터.
+
+    Implements StoragePort using SQLite database for local persistence.
+    """
+
+    def __init__(self, db_path: str | Path = "evalvault.db"):
+        """Initialize SQLite storage adapter.
+
+        Args:
+            db_path: Path to SQLite database file (default: evalvault.db)
+        """
+        self.db_path = Path(db_path)
+        self._init_db()
+
+    def _init_db(self) -> None:
+        """Initialize database schema from schema.sql."""
+        schema_path = Path(__file__).parent / "schema.sql"
+        with open(schema_path) as f:
+            schema_sql = f.read()
+
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")  # Enable foreign key constraints
+        conn.executescript(schema_sql)
+        conn.commit()
+        conn.close()
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get a database connection with foreign keys enabled."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+    def save_run(self, run: EvaluationRun) -> str:
+        """평가 실행 결과를 저장합니다.
+
+        Args:
+            run: 저장할 평가 실행 결과
+
+        Returns:
+            저장된 run의 ID
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Insert evaluation run
+            cursor.execute(
+                """
+                INSERT INTO evaluation_runs (
+                    run_id, dataset_name, dataset_version, model_name,
+                    started_at, finished_at, total_tokens, total_cost_usd,
+                    pass_rate, metrics_evaluated, thresholds, langfuse_trace_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.run_id,
+                    run.dataset_name,
+                    run.dataset_version,
+                    run.model_name,
+                    run.started_at.isoformat(),
+                    run.finished_at.isoformat() if run.finished_at else None,
+                    run.total_tokens,
+                    run.total_cost_usd,
+                    run.pass_rate,
+                    json.dumps(run.metrics_evaluated),
+                    json.dumps(run.thresholds),
+                    run.langfuse_trace_id,
+                ),
+            )
+
+            # Insert test case results
+            for result in run.results:
+                cursor.execute(
+                    """
+                    INSERT INTO test_case_results (
+                        run_id, test_case_id, tokens_used, latency_ms,
+                        cost_usd, trace_id, started_at, finished_at,
+                        question, answer, contexts, ground_truth
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run.run_id,
+                        result.test_case_id,
+                        result.tokens_used,
+                        result.latency_ms,
+                        result.cost_usd,
+                        result.trace_id,
+                        result.started_at.isoformat() if result.started_at else None,
+                        result.finished_at.isoformat() if result.finished_at else None,
+                        result.question,
+                        result.answer,
+                        json.dumps(result.contexts) if result.contexts else None,
+                        result.ground_truth,
+                    ),
+                )
+
+                result_id = cursor.lastrowid
+
+                # Insert metric scores
+                for metric in result.metrics:
+                    cursor.execute(
+                        """
+                        INSERT INTO metric_scores (
+                            result_id, metric_name, score, threshold, reason
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            result_id,
+                            metric.name,
+                            metric.score,
+                            metric.threshold,
+                            metric.reason,
+                        ),
+                    )
+
+            conn.commit()
+            return run.run_id
+
+        finally:
+            conn.close()
+
+    def get_run(self, run_id: str) -> EvaluationRun:
+        """저장된 평가 실행 결과를 조회합니다.
+
+        Args:
+            run_id: 조회할 run의 ID
+
+        Returns:
+            EvaluationRun 객체
+
+        Raises:
+            KeyError: run_id에 해당하는 결과가 없는 경우
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Fetch evaluation run
+            cursor.execute(
+                """
+                SELECT run_id, dataset_name, dataset_version, model_name,
+                       started_at, finished_at, total_tokens, total_cost_usd,
+                       pass_rate, metrics_evaluated, thresholds, langfuse_trace_id
+                FROM evaluation_runs
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            )
+            run_row = cursor.fetchone()
+
+            if not run_row:
+                raise KeyError(f"Run not found: {run_id}")
+
+            # Fetch test case results
+            cursor.execute(
+                """
+                SELECT id, test_case_id, tokens_used, latency_ms, cost_usd,
+                       trace_id, started_at, finished_at, question, answer,
+                       contexts, ground_truth
+                FROM test_case_results
+                WHERE run_id = ?
+                ORDER BY id
+                """,
+                (run_id,),
+            )
+            result_rows = cursor.fetchall()
+
+            # Reconstruct test case results
+            results = []
+            for result_row in result_rows:
+                result_id = result_row[0]
+
+                # Fetch metric scores for this result
+                cursor.execute(
+                    """
+                    SELECT metric_name, score, threshold, reason
+                    FROM metric_scores
+                    WHERE result_id = ?
+                    ORDER BY id
+                    """,
+                    (result_id,),
+                )
+                metric_rows = cursor.fetchall()
+
+                metrics = [
+                    MetricScore(
+                        name=m[0],
+                        score=m[1],
+                        threshold=m[2],
+                        reason=m[3],
+                    )
+                    for m in metric_rows
+                ]
+
+                results.append(
+                    TestCaseResult(
+                        test_case_id=result_row[1],
+                        metrics=metrics,
+                        tokens_used=result_row[2],
+                        latency_ms=result_row[3],
+                        cost_usd=result_row[4],
+                        trace_id=result_row[5],
+                        started_at=(
+                            datetime.fromisoformat(result_row[6])
+                            if result_row[6]
+                            else None
+                        ),
+                        finished_at=(
+                            datetime.fromisoformat(result_row[7])
+                            if result_row[7]
+                            else None
+                        ),
+                        question=result_row[8],
+                        answer=result_row[9],
+                        contexts=json.loads(result_row[10]) if result_row[10] else None,
+                        ground_truth=result_row[11],
+                    )
+                )
+
+            # Reconstruct EvaluationRun
+            return EvaluationRun(
+                run_id=run_row[0],
+                dataset_name=run_row[1],
+                dataset_version=run_row[2],
+                model_name=run_row[3],
+                started_at=datetime.fromisoformat(run_row[4]),
+                finished_at=(
+                    datetime.fromisoformat(run_row[5]) if run_row[5] else None
+                ),
+                total_tokens=run_row[6],
+                total_cost_usd=run_row[7],
+                results=results,
+                metrics_evaluated=json.loads(run_row[9]),
+                thresholds=json.loads(run_row[10]),
+                langfuse_trace_id=run_row[11],
+            )
+
+        finally:
+            conn.close()
+
+    def list_runs(
+        self,
+        limit: int = 100,
+        dataset_name: str | None = None,
+        model_name: str | None = None,
+    ) -> list[EvaluationRun]:
+        """저장된 평가 실행 결과 목록을 조회합니다.
+
+        Args:
+            limit: 최대 조회 개수
+            dataset_name: 필터링할 데이터셋 이름 (선택)
+            model_name: 필터링할 모델 이름 (선택)
+
+        Returns:
+            EvaluationRun 객체 리스트 (최신순)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Build query with optional filters
+            query = "SELECT run_id FROM evaluation_runs WHERE 1=1"
+            params = []
+
+            if dataset_name:
+                query += " AND dataset_name = ?"
+                params.append(dataset_name)
+
+            if model_name:
+                query += " AND model_name = ?"
+                params.append(model_name)
+
+            query += " ORDER BY started_at DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query, params)
+            run_ids = [row[0] for row in cursor.fetchall()]
+
+            # Fetch full runs
+            runs = [self.get_run(run_id) for run_id in run_ids]
+            return runs
+
+        finally:
+            conn.close()
+
+    def delete_run(self, run_id: str) -> bool:
+        """평가 실행 결과를 삭제합니다.
+
+        Args:
+            run_id: 삭제할 run의 ID
+
+        Returns:
+            삭제 성공 여부
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("DELETE FROM evaluation_runs WHERE run_id = ?", (run_id,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+
+        finally:
+            conn.close()

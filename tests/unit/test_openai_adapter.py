@@ -65,3 +65,53 @@ class TestOpenAIAdapter:
         assert ragas_llm is not None
         # The Ragas LLM wraps the OpenAI client, verify adapter is functional
         assert adapter.get_model_name() == "gpt-5-mini"
+
+    def test_token_usage_methods_exist(self, settings):
+        """토큰 사용량 추적 메서드가 존재하는지 테스트."""
+        adapter = OpenAIAdapter(settings)
+        assert hasattr(adapter, "get_token_usage")
+        assert hasattr(adapter, "get_and_reset_token_usage")
+        assert hasattr(adapter, "reset_token_usage")
+
+    def test_token_usage_initial_values(self, settings):
+        """초기 토큰 사용량이 0인지 테스트."""
+        adapter = OpenAIAdapter(settings)
+        prompt, completion, total = adapter.get_token_usage()
+        assert prompt == 0
+        assert completion == 0
+        assert total == 0
+
+    def test_reset_token_usage(self, settings):
+        """토큰 사용량 리셋이 동작하는지 테스트."""
+        adapter = OpenAIAdapter(settings)
+        # Manually add some tokens for testing
+        adapter._token_usage.add(100, 50, 150)
+
+        # Verify tokens were added
+        prompt, completion, total = adapter.get_token_usage()
+        assert total == 150
+
+        # Reset and verify
+        adapter.reset_token_usage()
+        prompt, completion, total = adapter.get_token_usage()
+        assert prompt == 0
+        assert completion == 0
+        assert total == 0
+
+    def test_get_and_reset_token_usage(self, settings):
+        """get_and_reset_token_usage가 값을 반환하고 리셋하는지 테스트."""
+        adapter = OpenAIAdapter(settings)
+        # Manually add some tokens for testing
+        adapter._token_usage.add(100, 50, 150)
+
+        # Get and reset
+        prompt, completion, total = adapter.get_and_reset_token_usage()
+        assert prompt == 100
+        assert completion == 50
+        assert total == 150
+
+        # Verify reset happened
+        prompt2, completion2, total2 = adapter.get_token_usage()
+        assert prompt2 == 0
+        assert completion2 == 0
+        assert total2 == 0

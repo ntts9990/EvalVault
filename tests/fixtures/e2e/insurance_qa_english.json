@@ -1,0 +1,59 @@
+{
+  "name": "e2e-insurance-qa-english",
+  "version": "1.0.0",
+  "description": "English insurance QA dataset for E2E testing",
+  "test_cases": [
+    {
+      "id": "en-001",
+      "question": "What is the death benefit amount for this policy?",
+      "answer": "The death benefit for this policy is $100,000.",
+      "contexts": [
+        "The death benefit under this policy is $100,000, payable upon the death of the insured during the policy term.",
+        "To file a claim, you will need a death certificate and beneficiary identification."
+      ],
+      "ground_truth": "$100,000"
+    },
+    {
+      "id": "en-002",
+      "question": "What is the premium payment period?",
+      "answer": "The premium payment period is 20 years.",
+      "contexts": [
+        "The premium payment period is 20 years with monthly premiums of $50.",
+        "If you have difficulty paying premiums, you may apply for a payment deferral."
+      ],
+      "ground_truth": "20 years"
+    },
+    {
+      "id": "en-003",
+      "question": "How much is the cancer diagnosis benefit?",
+      "answer": "You can receive $30,000 for a cancer diagnosis.",
+      "contexts": [
+        "The cancer diagnosis benefit is $30,000 for standard cancers.",
+        "For thyroid cancer and skin cancers, the benefit is reduced to $3,000.",
+        "The cancer diagnosis benefit is payable only once."
+      ],
+      "ground_truth": "$30,000"
+    },
+    {
+      "id": "en-004",
+      "question": "What are the coverage exclusions?",
+      "answer": "Pre-existing conditions, suicide within 2 years, and intentional injuries are excluded.",
+      "contexts": [
+        "Coverage exclusions include: pre-existing conditions diagnosed within 2 years before policy inception.",
+        "Suicide within 2 years of policy inception is not covered.",
+        "Self-inflicted injuries and injuries from illegal activities are excluded."
+      ],
+      "ground_truth": "Pre-existing conditions, suicide within 2 years, intentional injuries"
+    },
+    {
+      "id": "en-005",
+      "question": "What is the waiting period for illness coverage?",
+      "answer": "There is a 90-day waiting period for illness-related claims.",
+      "contexts": [
+        "For illness coverage, there is a 90-day waiting period from the policy effective date.",
+        "Accident coverage has no waiting period and is effective immediately."
+      ],
+      "ground_truth": "90 days"
+    }
+  ]
+}
