@@ -1,4 +1,12 @@
-"""Prompt templates for different languages."""
+"""Prompt templates for different languages.
+
+NOTE: These prompts are OPTIONAL and NOT used by default.
+The evaluator uses Ragas framework's default prompts.
+
+These custom prompts are provided for future use cases where
+language-specific evaluation prompts might be needed.
+To use them, pass --language flag to CLI (not implemented yet).
+"""
 
 from evalvault.domain.prompts.base import PromptTemplate
 from evalvault.domain.prompts.chinese import ChinesePrompts

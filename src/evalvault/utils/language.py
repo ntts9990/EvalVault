@@ -1,4 +1,11 @@
-"""Language detection utilities using langdetect."""
+"""Language detection utilities using langdetect.
+
+NOTE: This utility is OPTIONAL and NOT used by default in the evaluation pipeline.
+The evaluator uses Ragas framework's default prompts regardless of language.
+
+This is provided for future use cases where language-specific behavior
+might be needed (e.g., custom prompts, language-aware preprocessing).
+"""
 
 from collections import Counter
 

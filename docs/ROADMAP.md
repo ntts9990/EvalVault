@@ -55,16 +55,15 @@ EvalVault의 개발 로드맵입니다. Phase 1-6까지 모두 완료되었습�
 
 #### Implemented Features
 
-**Language Detection** (`src/evalvault/utils/language.py`):
+**Language Detection** (`src/evalvault/utils/language.py`) - *Optional, not used by default*:
 - `LanguageDetector.detect(text)` - 단일 텍스트 언어 감지
 - `LanguageDetector.detect_with_confidence(text)` - 신뢰도와 함께 감지
 - `LanguageDetector.detect_dataset_language(texts)` - 데이터셋 주요 언어 감지
 
-**Korean Prompts** (`src/evalvault/domain/prompts/`):
-- `BasePromptTemplate` - 프롬프트 템플릿 추상 클래스
-- `KoreanPromptTemplate` - 한국어 평가 프롬프트
-- `EnglishPromptTemplate` - 영어 평가 프롬프트
-- `get_prompt_template(language)` - 언어별 템플릿 팩토리
+**Multilingual Prompts** (`src/evalvault/domain/prompts/`) - *Optional, not used by default*:
+- 기본값: Ragas 프레임워크 원본 프롬프트 사용
+- 향후 CLI `--language` 옵션으로 커스텀 프롬프트 선택 가능 (미구현)
+- 지원 언어: English, Korean, Japanese, Chinese
 
 **New Metrics**:
 - `factual_correctness` - ground_truth 대비 사실적 정확성
