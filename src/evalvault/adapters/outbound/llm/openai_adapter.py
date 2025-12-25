@@ -1,5 +1,6 @@
 """OpenAI LLM adapter for Ragas evaluation."""
 
+import asyncio
 import threading
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,6 +11,31 @@ from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
+
+
+class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
+    """OpenAI embeddings with legacy LangChain-style methods.
+
+    Ragas AnswerRelevancy metric expects embed_query/embed_documents methods
+    but the modern RagasOpenAIEmbeddings only has embed_text/embed_texts.
+    This wrapper adds the legacy methods for compatibility.
+    """
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a single query text (LangChain-style method)."""
+        return self.embed_text(text)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Embed multiple documents (LangChain-style method)."""
+        return self.embed_texts(texts)
+
+    async def aembed_query(self, text: str) -> list[float]:
+        """Async embed a single query text."""
+        return await self.aembed_text(text)
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Async embed multiple documents."""
+        return await self.aembed_texts(texts)
 
 
 @dataclass
@@ -126,8 +152,9 @@ class OpenAIAdapter(LLMPort):
             max_tokens=32768,  # gpt-5 series supports up to 128K output tokens
         )
 
-        # Create Ragas embeddings using OpenAIEmbeddings with tracking client
-        self._ragas_embeddings = RagasOpenAIEmbeddings(
+        # Create Ragas embeddings using OpenAIEmbeddingsWithLegacy with tracking client
+        # Uses our wrapper that adds embed_query/embed_documents for compatibility
+        self._ragas_embeddings = OpenAIEmbeddingsWithLegacy(
             model=self._embedding_model_name,
             client=self._client,
         )
