@@ -140,7 +140,7 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ## 문서
 
-**[상세 사용자 가이드](docs/README.md)** - 설치, 설정, 메트릭 설명, 문제 해결 등
+**[상세 사용자 가이드](docs/USER_GUIDE.md)** - 설치, 설정, 메트릭 설명, 문제 해결 등
 
 ## 아키텍처
 
