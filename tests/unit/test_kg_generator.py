@@ -2,12 +2,13 @@
 
 import pytest
 
-from evalvault.domain.entities import Dataset, TestCase
-from evalvault.domain.services.entity_extractor import Entity, Relation
+from evalvault.domain.entities import Dataset, EntityModel, RelationModel, TestCase
+from evalvault.domain.services.entity_extractor import Relation
 from evalvault.domain.services.kg_generator import (
     KnowledgeGraph,
     KnowledgeGraphGenerator,
 )
+from evalvault.ports.outbound.relation_augmenter_port import RelationAugmenterPort
 
 
 class TestKnowledgeGraph:
@@ -22,7 +23,7 @@ class TestKnowledgeGraph:
     def test_add_entity(self):
         """Test adding entity as node to graph."""
         graph = KnowledgeGraph()
-        entity = Entity(name="삼성생명", entity_type="organization", attributes={})
+        entity = EntityModel(name="삼성생명", entity_type="organization", attributes={})
 
         graph.add_entity(entity)
         assert graph.get_node_count() == 1
@@ -31,13 +32,17 @@ class TestKnowledgeGraph:
     def test_add_relation(self):
         """Test adding relation as edge to graph."""
         graph = KnowledgeGraph()
-        e1 = Entity(name="삼성생명", entity_type="organization", attributes={})
-        e2 = Entity(name="종신보험", entity_type="product", attributes={})
+        e1 = EntityModel(name="삼성생명", entity_type="organization", attributes={})
+        e2 = EntityModel(name="종신보험", entity_type="product", attributes={})
 
         graph.add_entity(e1)
         graph.add_entity(e2)
 
-        relation = Relation(source="삼성생명", target="종신보험", relation_type="provides")
+        relation = RelationModel(
+            source="삼성생명",
+            target="종신보험",
+            relation_type="provides",
+        )
         graph.add_relation(relation)
 
         assert graph.get_edge_count() >= 1
@@ -46,12 +51,16 @@ class TestKnowledgeGraph:
     def test_get_neighbors(self):
         """Test getting neighbors of a node."""
         graph = KnowledgeGraph()
-        graph.add_entity(Entity("삼성생명", "organization", {}))
-        graph.add_entity(Entity("종신보험", "product", {}))
-        graph.add_entity(Entity("정기보험", "product", {}))
+        graph.add_entity(EntityModel(name="삼성생명", entity_type="organization", attributes={}))
+        graph.add_entity(EntityModel(name="종신보험", entity_type="product", attributes={}))
+        graph.add_entity(EntityModel(name="정기보험", entity_type="product", attributes={}))
 
-        graph.add_relation(Relation("삼성생명", "종신보험", "provides"))
-        graph.add_relation(Relation("삼성생명", "정기보험", "provides"))
+        graph.add_relation(
+            RelationModel(source="삼성생명", target="종신보험", relation_type="provides")
+        )
+        graph.add_relation(
+            RelationModel(source="삼성생명", target="정기보험", relation_type="provides")
+        )
 
         neighbors = graph.get_neighbors("삼성생명")
         assert len(neighbors) == 2
@@ -61,7 +70,9 @@ class TestKnowledgeGraph:
     def test_get_entity(self):
         """Test retrieving entity from graph."""
         graph = KnowledgeGraph()
-        entity = Entity("삼성생명", "organization", {"industry": "insurance"})
+        entity = EntityModel(
+            name="삼성생명", entity_type="organization", attributes={"industry": "insurance"}
+        )
         graph.add_entity(entity)
 
         retrieved = graph.get_entity("삼성생명")
@@ -72,12 +83,16 @@ class TestKnowledgeGraph:
     def test_get_relations_for_entity(self):
         """Test getting all relations for an entity."""
         graph = KnowledgeGraph()
-        graph.add_entity(Entity("종신보험", "product", {}))
-        graph.add_entity(Entity("사망보험금", "coverage", {}))
-        graph.add_entity(Entity("1억원", "money", {}))
+        graph.add_entity(EntityModel(name="종신보험", entity_type="product", attributes={}))
+        graph.add_entity(EntityModel(name="사망보험금", entity_type="coverage", attributes={}))
+        graph.add_entity(EntityModel(name="1억원", entity_type="money", attributes={}))
 
-        graph.add_relation(Relation("종신보험", "사망보험금", "has_coverage"))
-        graph.add_relation(Relation("종신보험", "1억원", "has_amount"))
+        graph.add_relation(
+            RelationModel(source="종신보험", target="사망보험금", relation_type="has_coverage")
+        )
+        graph.add_relation(
+            RelationModel(source="종신보험", target="1억원", relation_type="has_amount")
+        )
 
         relations = graph.get_relations_for_entity("종신보험")
         assert len(relations) >= 2
@@ -283,6 +298,11 @@ class TestKnowledgeGraphGenerator:
         assert "num_entities" in stats
         assert "num_relations" in stats
         assert stats["num_entities"] > 0
+        assert "build_metrics" in stats
+        assert "relation_types" in stats
+        assert "isolated_entities" in stats
+        assert "sample_entities" in stats
+        assert "sample_relations" in stats
 
     def test_generate_questions_by_entity_type(self, sample_documents):
         """Test generating questions focused on specific entity types."""
@@ -339,3 +359,45 @@ class TestKnowledgeGraphGenerator:
 
         assert len(dataset) >= 3
         assert all(isinstance(tc, TestCase) for tc in dataset.test_cases)
+
+    def test_build_metrics_exposed(self, sample_documents):
+        """그래프 구축 후 계측값을 확인할 수 있다."""
+        generator = KnowledgeGraphGenerator()
+        generator.build_graph(sample_documents)
+
+        metrics = generator.get_build_metrics()
+        assert metrics["documents_processed"] == len(sample_documents)
+        assert metrics["entities_processed"] >= metrics["entities_added"] >= 0
+        assert metrics["relations_added"] >= 0
+
+    def test_relation_augmenter_improves_confidence(self):
+        """저신뢰 관계를 LLM 보강기로 향상시킨다."""
+
+        class DummyAugmenter(RelationAugmenterPort):
+            def __init__(self):
+                self.invocations = 0
+
+            def augment_relations(self, document_text, entities, low_confidence_relations):
+                self.invocations += 1
+                return [
+                    Relation(
+                        source=low_confidence_relations[0].source,
+                        target=low_confidence_relations[0].target,
+                        relation_type=low_confidence_relations[0].relation_type,
+                        confidence=0.95,
+                        provenance="llm",
+                        evidence="verified by llm",
+                    )
+                ]
+
+        augmenter = DummyAugmenter()
+        generator = KnowledgeGraphGenerator(
+            relation_augmenter=augmenter,
+            low_confidence_threshold=0.99,
+        )
+        text = "종신보험 상품은 고객에게 다양한 혜택을 제공하며 사망보험금을 보장합니다."
+        generator.build_graph([text])
+
+        assert augmenter.invocations == 1
+        relations = generator.get_graph().get_relations_for_entity("종신보험")
+        assert any(relation.provenance == "llm" for relation in relations)

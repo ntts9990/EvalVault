@@ -22,12 +22,15 @@ class TestEntity:
         assert entity.name == "삼성생명"
         assert entity.entity_type == "organization"
         assert entity.attributes["industry"] == "insurance"
+        assert entity.confidence == 1.0
+        assert entity.provenance == "regex"
 
     def test_entity_with_empty_attributes(self):
         """Test entity with empty attributes."""
         entity = Entity(name="종신보험", entity_type="product", attributes={})
         assert entity.name == "종신보험"
         assert entity.attributes == {}
+        assert entity.confidence == 1.0
 
 
 class TestRelation:
@@ -226,6 +229,8 @@ class TestEntityExtractor:
                 "belongs_to",
                 "is_a",
             ]
+            assert 0.3 <= relation.confidence <= 1.0
+            assert relation.provenance in {"regex", "llm"}
 
     def test_extract_entities_deduplication(self, extractor):
         """Test that duplicate entities are handled properly."""

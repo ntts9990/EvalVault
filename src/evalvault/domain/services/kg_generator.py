@@ -5,12 +5,15 @@ from collections import defaultdict
 from datetime import datetime
 from uuid import uuid4
 
-from evalvault.domain.entities import Dataset, TestCase
+import networkx as nx
+
+from evalvault.domain.entities import Dataset, EntityModel, RelationModel, TestCase
 from evalvault.domain.services.entity_extractor import (
-    Entity,
+    Entity as ExtractedEntity,
     EntityExtractor,
-    Relation,
+    Relation as ExtractedRelation,
 )
+from evalvault.ports.outbound.relation_augmenter_port import RelationAugmenterPort
 
 
 class KnowledgeGraph:
@@ -21,32 +24,31 @@ class KnowledgeGraph:
 
     def __init__(self):
         """Initialize knowledge graph."""
-        self._nodes: dict[str, Entity] = {}  # entity_name -> Entity
-        self._edges: dict[str, list[tuple[str, str]]] = defaultdict(
-            list
-        )  # source -> [(target, relation_type)]
-        self._reverse_edges: dict[str, list[tuple[str, str]]] = defaultdict(
-            list
-        )  # target -> [(source, relation_type)]
+        self._graph = nx.MultiDiGraph()
+        self._entity_metadata: dict[str, EntityModel] = {}
 
-    def add_entity(self, entity: Entity) -> None:
+    def add_entity(self, entity: EntityModel) -> None:
         """그래프에 엔티티 추가.
 
         Args:
             entity: 추가할 엔티티
         """
-        self._nodes[entity.name] = entity
+        attributes = entity.to_node_attributes()
+        if self._graph.has_node(entity.name):
+            self._graph.nodes[entity.name].update(attributes)
+        else:
+            self._graph.add_node(entity.name, **attributes)
+        self._entity_metadata[entity.name] = entity
 
-    def add_relation(self, relation: Relation) -> None:
+    def add_relation(self, relation: RelationModel) -> None:
         """그래프에 관계 추가.
 
         Args:
             relation: 추가할 관계
         """
-        self._edges[relation.source].append((relation.target, relation.relation_type))
-        self._reverse_edges[relation.target].append(
-            (relation.source, relation.relation_type)
-        )
+        attrs = relation.to_edge_attributes()
+        attrs["model"] = relation
+        self._graph.add_edge(relation.source, relation.target, **attrs)
 
     def has_entity(self, name: str) -> bool:
         """엔티티 존재 여부 확인.
@@ -57,7 +59,7 @@ class KnowledgeGraph:
         Returns:
             존재 여부
         """
-        return name in self._nodes
+        return self._graph.has_node(name)
 
     def has_relation(self, source: str, target: str) -> bool:
         """관계 존재 여부 확인.
@@ -69,11 +71,9 @@ class KnowledgeGraph:
         Returns:
             관계 존재 여부
         """
-        if source not in self._edges:
-            return False
-        return any(t == target for t, _ in self._edges[source])
+        return self._graph.has_edge(source, target)
 
-    def get_entity(self, name: str) -> Entity | None:
+    def get_entity(self, name: str) -> EntityModel | None:
         """엔티티 조회.
 
         Args:
@@ -82,7 +82,7 @@ class KnowledgeGraph:
         Returns:
             엔티티 객체 또는 None
         """
-        return self._nodes.get(name)
+        return self._entity_metadata.get(name)
 
     def get_neighbors(self, name: str) -> list[str]:
         """노드의 이웃 노드 조회 (나가는 엣지).
@@ -93,11 +93,11 @@ class KnowledgeGraph:
         Returns:
             이웃 노드 이름 리스트
         """
-        if name not in self._edges:
+        if not self._graph.has_node(name):
             return []
-        return [target for target, _ in self._edges[name]]
+        return list(self._graph.successors(name))
 
-    def get_relations_for_entity(self, name: str) -> list[Relation]:
+    def get_relations_for_entity(self, name: str) -> list[RelationModel]:
         """엔티티와 관련된 모든 관계 조회.
 
         Args:
@@ -106,17 +106,16 @@ class KnowledgeGraph:
         Returns:
             관계 리스트
         """
-        relations = []
+        if not self._graph.has_node(name):
+            return []
 
-        # Outgoing relations
-        if name in self._edges:
-            for target, rel_type in self._edges[name]:
-                relations.append(Relation(source=name, target=target, relation_type=rel_type))
+        relations: list[RelationModel] = []
 
-        # Incoming relations
-        if name in self._reverse_edges:
-            for source, rel_type in self._reverse_edges[name]:
-                relations.append(Relation(source=source, target=name, relation_type=rel_type))
+        for _, target, data in self._graph.out_edges(name, data=True):
+            relations.append(self._relation_from_edge(name, target, data))
+
+        for source, _, data in self._graph.in_edges(name, data=True):
+            relations.append(self._relation_from_edge(source, name, data))
 
         return relations
 
@@ -126,7 +125,7 @@ class KnowledgeGraph:
         Returns:
             노드 개수
         """
-        return len(self._nodes)
+        return self._graph.number_of_nodes()
 
     def get_edge_count(self) -> int:
         """엣지 개수 조회.
@@ -134,20 +133,17 @@ class KnowledgeGraph:
         Returns:
             엣지 개수
         """
-        total = 0
-        for edges in self._edges.values():
-            total += len(edges)
-        return total
+        return self._graph.number_of_edges()
 
-    def get_all_entities(self) -> list[Entity]:
+    def get_all_entities(self) -> list[EntityModel]:
         """모든 엔티티 조회.
 
         Returns:
             엔티티 리스트
         """
-        return list(self._nodes.values())
+        return list(self._entity_metadata.values())
 
-    def get_entities_by_type(self, entity_type: str) -> list[Entity]:
+    def get_entities_by_type(self, entity_type: str) -> list[EntityModel]:
         """특정 타입의 엔티티 조회.
 
         Args:
@@ -156,7 +152,64 @@ class KnowledgeGraph:
         Returns:
             해당 타입의 엔티티 리스트
         """
-        return [e for e in self._nodes.values() if e.entity_type == entity_type]
+        return [e for e in self._entity_metadata.values() if e.entity_type == entity_type]
+
+    def get_isolated_entities(self) -> list[EntityModel]:
+        """엣지가 연결되지 않은 엔티티 목록."""
+        isolated = []
+        for node in self._graph.nodes():
+            if self._graph.degree(node) == 0:
+                entity = self._entity_metadata.get(node)
+                if entity:
+                    isolated.append(entity)
+        return isolated
+
+    def get_sample_entities(self, limit: int = 5) -> list[dict]:
+        """엔티티 샘플을 직렬화."""
+        samples = []
+        for entity in list(self._entity_metadata.values())[:limit]:
+            samples.append(
+                {
+                    "name": entity.name,
+                    "entity_type": entity.entity_type,
+                    "provenance": entity.provenance,
+                    "confidence": entity.confidence,
+                }
+            )
+        return samples
+
+    def get_sample_relations(self, limit: int = 5) -> list[dict]:
+        """관계 샘플 직렬화."""
+        samples = []
+        for source, target, data in list(self._graph.edges(data=True))[:limit]:
+            relation = self._relation_from_edge(source, target, data)
+            samples.append(
+                {
+                    "source": relation.source,
+                    "target": relation.target,
+                    "relation_type": relation.relation_type,
+                    "provenance": relation.provenance,
+                    "confidence": relation.confidence,
+                }
+            )
+        return samples
+
+    @staticmethod
+    def _relation_from_edge(source: str, target: str, data: dict) -> RelationModel:
+        """NetworkX 엣지 데이터에서 RelationModel 복원."""
+        model = data.get("model")
+        if isinstance(model, RelationModel):
+            return model
+
+        attributes = data.get("attributes") or {}
+        return RelationModel(
+            source=source,
+            target=target,
+            relation_type=data.get("relation_type", "unknown"),
+            confidence=data.get("confidence", 1.0),
+            provenance=data.get("provenance", "unknown"),
+            attributes=attributes,
+        )
 
 
 class KnowledgeGraphGenerator:
@@ -166,11 +219,23 @@ class KnowledgeGraphGenerator:
     그래프를 탐색하여 다양한 유형의 질문을 생성합니다.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        relation_augmenter: RelationAugmenterPort | None = None,
+        low_confidence_threshold: float = 0.6,
+    ):
         """Initialize knowledge graph generator."""
         self._graph = KnowledgeGraph()
         self._extractor = EntityExtractor()
         self._document_chunks: dict[str, str] = {}  # entity_name -> source_text
+        self._build_metrics: dict[str, int] = {
+            "documents_processed": 0,
+            "entities_processed": 0,
+            "entities_added": 0,
+            "relations_added": 0,
+        }
+        self._relation_augmenter = relation_augmenter
+        self._low_confidence_threshold = low_confidence_threshold
 
     def build_graph(self, documents: list[str]) -> None:
         """문서에서 지식 그래프 구축.
@@ -178,20 +243,39 @@ class KnowledgeGraphGenerator:
         Args:
             documents: 문서 리스트
         """
-        for doc in documents:
+        self._build_metrics = {
+            "documents_processed": len(documents),
+            "entities_processed": 0,
+            "entities_added": 0,
+            "relations_added": 0,
+        }
+
+        for doc_index, doc in enumerate(documents):
+            doc_id = f"doc-{doc_index}"
             # Extract entities from document
             entities = self._extractor.extract_entities(doc)
+            self._build_metrics["entities_processed"] += len(entities)
 
             # Add entities to graph
             for entity in entities:
-                if not self._graph.has_entity(entity.name):
-                    self._graph.add_entity(entity)
-                    self._document_chunks[entity.name] = doc
+                entity_model = self._to_entity_model(entity, doc_id)
+                if not self._graph.has_entity(entity_model.name):
+                    self._graph.add_entity(entity_model)
+                    self._document_chunks[entity_model.name] = doc
+                    self._build_metrics["entities_added"] += 1
 
             # Extract and add relations
             relations = self._extractor.extract_relations(doc, entities)
+            relations = self._maybe_augment_relations(doc, entities, relations)
             for relation in relations:
-                self._graph.add_relation(relation)
+                relation_model = self._to_relation_model(relation)
+                if not (
+                    self._graph.has_entity(relation_model.source)
+                    and self._graph.has_entity(relation_model.target)
+                ):
+                    continue
+                self._graph.add_relation(relation_model)
+                self._build_metrics["relations_added"] += 1
 
     def get_graph(self) -> KnowledgeGraph:
         """지식 그래프 조회.
@@ -308,6 +392,7 @@ class KnowledgeGraphGenerator:
             "generator_type": "knowledge_graph",
             "num_entities": self._graph.get_node_count(),
             "num_relations": self._graph.get_edge_count(),
+            "build_metrics": self._build_metrics.copy(),
         }
 
         return Dataset(
@@ -327,6 +412,11 @@ class KnowledgeGraphGenerator:
             "num_entities": self._graph.get_node_count(),
             "num_relations": self._graph.get_edge_count(),
             "entity_types": self._get_entity_type_counts(),
+            "build_metrics": self._build_metrics.copy(),
+            "relation_types": self._get_relation_type_counts(),
+            "isolated_entities": [e.name for e in self._graph.get_isolated_entities()],
+            "sample_entities": self._graph.get_sample_entities(),
+            "sample_relations": self._graph.get_sample_relations(),
         }
 
     def generate_questions_by_type(
@@ -415,7 +505,7 @@ class KnowledgeGraphGenerator:
 
         return test_cases
 
-    def _generate_simple_question(self, entity: Entity) -> tuple[str, str]:
+    def _generate_simple_question(self, entity: EntityModel) -> tuple[str, str]:
         """단일 엔티티에 대한 질문 생성.
 
         Args:
@@ -496,7 +586,7 @@ class KnowledgeGraphGenerator:
         return question, context
 
     def _generate_comparison_question(
-        self, e1: Entity, e2: Entity
+        self, e1: EntityModel, e2: EntityModel
     ) -> tuple[str, str]:
         """비교 질문 생성.
 
@@ -563,3 +653,79 @@ class KnowledgeGraphGenerator:
         for entity in self._graph.get_all_entities():
             counts[entity.entity_type] += 1
         return dict(counts)
+
+    def _get_relation_type_counts(self) -> dict[str, int]:
+        """관계 타입별 개수."""
+        counts = defaultdict(int)
+        for entity in self._graph.get_all_entities():
+            relations = self._graph.get_relations_for_entity(entity.name)
+            for relation in relations:
+                if relation.source == entity.name:
+                    counts[relation.relation_type] += 1
+        return dict(counts)
+
+    @staticmethod
+    def _to_entity_model(entity: ExtractedEntity, document_id: str) -> EntityModel:
+        """추출된 엔티티를 정규화."""
+        return EntityModel(
+            name=entity.name,
+            entity_type=entity.entity_type,
+            attributes=entity.attributes,
+            provenance=entity.provenance,
+            confidence=entity.confidence,
+            source_document_id=document_id,
+        )
+
+    @staticmethod
+    def _to_relation_model(relation: ExtractedRelation) -> RelationModel:
+        """추출된 관계를 정규화."""
+        return RelationModel(
+            source=relation.source,
+            target=relation.target,
+            relation_type=relation.relation_type,
+            provenance=relation.provenance,
+            confidence=relation.confidence,
+            attributes={"evidence": relation.evidence} if relation.evidence else {},
+        )
+
+    def get_build_metrics(self) -> dict[str, int]:
+        """그래프 구축 시 수집한 기본 통계."""
+        return self._build_metrics.copy()
+
+    def _maybe_augment_relations(
+        self,
+        document_text: str,
+        entities: list[ExtractedEntity],
+        relations: list[ExtractedRelation],
+    ) -> list[ExtractedRelation]:
+        """LLM 보강기로 저신뢰 관계 보완."""
+        deduped = self._deduplicate_relations(relations)
+        if not self._relation_augmenter:
+            return deduped
+
+        low_conf_relations = [
+            relation for relation in deduped if relation.confidence < self._low_confidence_threshold
+        ]
+        if not low_conf_relations:
+            return deduped
+
+        augmented = self._relation_augmenter.augment_relations(
+            document_text=document_text,
+            entities=entities,
+            low_confidence_relations=low_conf_relations,
+        )
+        if not augmented:
+            return deduped
+
+        return self._deduplicate_relations(deduped + augmented)
+
+    @staticmethod
+    def _deduplicate_relations(relations: list[ExtractedRelation]) -> list[ExtractedRelation]:
+        """중복 관계 제거 (높은 confidence 우선)."""
+        best: dict[tuple[str, str, str], ExtractedRelation] = {}
+        for relation in relations:
+            key = (relation.source, relation.target, relation.relation_type)
+            current = best.get(key)
+            if not current or relation.confidence > current.confidence:
+                best[key] = relation
+        return list(best.values())

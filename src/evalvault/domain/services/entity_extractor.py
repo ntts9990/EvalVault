@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from typing import Final
 
 
 @dataclass
@@ -11,6 +12,8 @@ class Entity:
     name: str
     entity_type: str  # organization, product, money, period, coverage, etc.
     attributes: dict[str, str]
+    confidence: float = 1.0
+    provenance: str = "regex"
 
 
 @dataclass
@@ -20,6 +23,9 @@ class Relation:
     source: str
     target: str
     relation_type: str  # provides, has_coverage, has_amount, has_period, etc.
+    confidence: float = 1.0
+    provenance: str = "regex"
+    evidence: str | None = None
 
 
 class EntityExtractor:
@@ -100,6 +106,14 @@ class EntityExtractor:
         r"\d+일",
     ]
 
+    ENTITY_CONFIDENCE: Final[dict[str, float]] = {
+        "organization": 0.95,
+        "product": 0.9,
+        "coverage": 0.85,
+        "money": 0.8,
+        "period": 0.8,
+    }
+
     def __init__(self):
         """Initialize entity extractor."""
         # Compile patterns for efficiency
@@ -129,6 +143,8 @@ class EntityExtractor:
                 name=match.group(),
                 entity_type="organization",
                 attributes={"domain": "insurance"},
+                confidence=self.ENTITY_CONFIDENCE["organization"],
+                provenance="regex",
             )
             entities.append(entity)
 
@@ -138,6 +154,8 @@ class EntityExtractor:
                 name=match.group(),
                 entity_type="product",
                 attributes={"category": "insurance_product"},
+                confidence=self.ENTITY_CONFIDENCE["product"],
+                provenance="regex",
             )
             entities.append(entity)
 
@@ -147,6 +165,8 @@ class EntityExtractor:
                 name=match.group(),
                 entity_type="coverage",
                 attributes={"type": "benefit"},
+                confidence=self.ENTITY_CONFIDENCE["coverage"],
+                provenance="regex",
             )
             entities.append(entity)
 
@@ -156,6 +176,8 @@ class EntityExtractor:
                 name=match.group(),
                 entity_type="money",
                 attributes={"unit": "KRW"},
+                confidence=self.ENTITY_CONFIDENCE["money"],
+                provenance="regex",
             )
             entities.append(entity)
 
@@ -165,19 +187,20 @@ class EntityExtractor:
                 name=match.group(),
                 entity_type="period",
                 attributes={"type": "duration"},
+                confidence=self.ENTITY_CONFIDENCE["period"],
+                provenance="regex",
             )
             entities.append(entity)
 
         # Remove duplicates while preserving order
-        seen = set()
-        unique_entities = []
+        deduped: dict[tuple[str, str], Entity] = {}
         for entity in entities:
             key = (entity.name, entity.entity_type)
-            if key not in seen:
-                seen.add(key)
-                unique_entities.append(entity)
+            current = deduped.get(key)
+            if not current or entity.confidence > current.confidence:
+                deduped[key] = entity
 
-        return unique_entities
+        return list(deduped.values())
 
     def extract_relations(self, text: str, entities: list[Entity]) -> list[Relation]:
         """엔티티 간 관계 추출.
@@ -245,6 +268,14 @@ class EntityExtractor:
 
         return relations
 
+    @staticmethod
+    def _calc_confidence(distance: int, max_distance: int) -> float:
+        """거리 기반 신뢰도 계산."""
+        if distance <= 0:
+            return 0.95
+        normalized = max(0.0, min(1.0, 1 - distance / max_distance))
+        return 0.4 + 0.6 * normalized
+
     def _extract_provides_relations(
         self,
         text: str,
@@ -263,12 +294,19 @@ class EntityExtractor:
 
                 if org_pos != -1 and product_pos != -1:
                     distance = abs(org_pos - product_pos)
-                    # If they appear within 50 characters
-                    if distance < 50:
+                    # If they appear within 60 characters
+                    if distance < 60:
+                        confidence = self._calc_confidence(distance, 60)
+                        evidence_start = min(org_pos, product_pos)
+                        evidence_end = max(org_pos, product_pos) + len(product.name)
+                        evidence = text[evidence_start:evidence_end]
                         relation = Relation(
                             source=org.name,
                             target=product.name,
                             relation_type="provides",
+                            confidence=confidence,
+                            provenance="regex",
+                            evidence=evidence,
                         )
                         relations.append(relation)
 
@@ -290,16 +328,20 @@ class EntityExtractor:
                 coverage_pos = text.find(coverage.name)
 
                 if product_pos != -1 and coverage_pos != -1:
-                    # Check if "보장" appears between them
                     min_pos = min(product_pos, coverage_pos)
                     max_pos = max(product_pos, coverage_pos)
                     between_text = text[min_pos:max_pos + len(coverage.name)]
 
-                    if "보장" in between_text or max_pos - min_pos < 50:
+                    if "보장" in between_text or max_pos - min_pos < 60:
+                        distance = max_pos - min_pos
+                        confidence = self._calc_confidence(distance, 60)
                         relation = Relation(
                             source=product.name,
                             target=coverage.name,
                             relation_type="has_coverage",
+                            confidence=confidence,
+                            provenance="regex",
+                            evidence=between_text,
                         )
                         relations.append(relation)
 
@@ -321,12 +363,18 @@ class EntityExtractor:
 
                 if coverage_pos != -1 and amount_pos != -1:
                     distance = abs(coverage_pos - amount_pos)
-                    # If they appear within 30 characters
-                    if distance < 30:
+                    if distance < 40:
+                        confidence = self._calc_confidence(distance, 40)
+                        evidence_start = min(coverage_pos, amount_pos)
+                        evidence_end = max(coverage_pos + len(coverage.name), amount_pos + len(amount.name))
+                        evidence = text[evidence_start:evidence_end]
                         relation = Relation(
                             source=coverage.name,
                             target=amount.name,
                             relation_type="has_amount",
+                            confidence=confidence,
+                            provenance="regex",
+                            evidence=evidence,
                         )
                         relations.append(relation)
 
@@ -348,12 +396,18 @@ class EntityExtractor:
 
                 if source_pos != -1 and period_pos != -1:
                     distance = abs(source_pos - period_pos)
-                    # If they appear within 40 characters
-                    if distance < 40:
+                    if distance < 50:
+                        confidence = self._calc_confidence(distance, 50)
+                        evidence_start = min(source_pos, period_pos)
+                        evidence_end = max(source_pos + len(source.name), period_pos + len(period.name))
+                        evidence = text[evidence_start:evidence_end]
                         relation = Relation(
                             source=source.name,
                             target=period.name,
                             relation_type="has_period",
+                            confidence=confidence,
+                            provenance="regex",
+                            evidence=evidence,
                         )
                         relations.append(relation)
 
