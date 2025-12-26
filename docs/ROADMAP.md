@@ -1,6 +1,6 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2025-12-24
+> Last Updated: 2025-12-26
 > Current Version: 0.3.0
 > Status: Phase 6 Complete (Advanced Features)
 
@@ -296,3 +296,31 @@ src/evalvault/
 | StoragePort | SQLiteAdapter | ✅ Complete |
 | StoragePort | PostgreSQLAdapter | ✅ Complete |
 | EvaluatorPort | RagasEvaluator | ✅ Complete |
+
+---
+
+## Quality Standards (SLA)
+
+### Metric Thresholds
+
+| Metric | Minimum | Target | Excellent |
+|--------|---------|--------|-----------|
+| Faithfulness | 0.60 | 0.80 | 0.90 |
+| Answer Relevancy | 0.65 | 0.80 | 0.90 |
+| Context Precision | 0.60 | 0.75 | 0.85 |
+| Context Recall | 0.60 | 0.80 | 0.90 |
+| Factual Correctness | 0.70 | 0.85 | 0.95 |
+| Semantic Similarity | 0.70 | 0.85 | 0.95 |
+
+### System Requirements
+
+- **Throughput**: 100 test cases / 5 minutes
+- **Result Storage**: Dual storage (SQLite + Langfuse)
+- **Reproducibility**: Deterministic results (temperature=0)
+
+---
+
+## References
+
+- [Ragas Documentation](https://docs.ragas.io/)
+- [Langfuse Documentation](https://langfuse.com/docs)

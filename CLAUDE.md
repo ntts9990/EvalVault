@@ -16,6 +16,8 @@ Input (CSV/Excel/JSON) → Ragas Evaluation → Langfuse Trace/Score → Analysi
 - `answer_relevancy` - 답변이 질문과 관련있는지
 - `context_precision` - 검색된 컨텍스트의 정밀도
 - `context_recall` - 필요한 정보가 검색되었는지
+- `factual_correctness` - ground_truth 대비 사실적 정확성
+- `semantic_similarity` - 답변과 ground_truth 간 의미적 유사도
 
 ## Architecture
 
@@ -24,8 +26,10 @@ Input (CSV/Excel/JSON) → Ragas Evaluation → Langfuse Trace/Score → Analysi
 ```
 src/evalvault/
 ├── domain/
-│   ├── entities/         # TestCase, Dataset, EvaluationRun, MetricScore
-│   └── services/         # RagasEvaluator
+│   ├── entities/         # TestCase, Dataset, EvaluationRun, MetricScore, Experiment
+│   ├── services/         # RagasEvaluator, TestsetGenerator, KGGenerator, ExperimentManager
+│   ├── metrics/          # InsuranceTermAccuracy (custom metrics)
+│   └── prompts/          # Korean, English, Japanese, Chinese prompt templates
 ├── ports/
 │   ├── inbound/          # EvaluatorPort
 │   └── outbound/         # LLMPort, DatasetPort, StoragePort, TrackerPort
@@ -33,21 +37,27 @@ src/evalvault/
 │   ├── inbound/          # CLI (Typer)
 │   └── outbound/
 │       ├── dataset/      # CSV, Excel, JSON loaders
-│       ├── llm/          # OpenAIAdapter
-│       ├── storage/      # (미구현 - Phase 5 예정)
-│       └── tracker/      # LangfuseAdapter
-└── config/               # Settings (pydantic-settings)
+│       ├── llm/          # OpenAI, Azure OpenAI, Anthropic, Ollama adapters
+│       ├── storage/      # SQLite, PostgreSQL adapters
+│       └── tracker/      # Langfuse, MLflow adapters
+├── utils/                # LanguageDetector
+└── config/               # Settings, ModelConfig (pydantic-settings)
 ```
 
 ### Port/Adapter 구현 현황
 
 | Port | Adapter | Status |
 |------|---------|--------|
-| LLMPort | OpenAIAdapter | ✅ 구현됨 |
-| DatasetPort | CSV/Excel/JSON Loaders | ✅ 구현됨 |
-| TrackerPort | LangfuseAdapter | ✅ 구현됨 |
-| StoragePort | - | ⏳ 미구현 (Phase 5) |
-| EvaluatorPort | RagasEvaluator | ✅ 구현됨 |
+| LLMPort | OpenAIAdapter | ✅ Complete |
+| LLMPort | OllamaAdapter | ✅ Complete |
+| LLMPort | AzureOpenAIAdapter | ✅ Complete |
+| LLMPort | AnthropicAdapter | ✅ Complete |
+| DatasetPort | CSV/Excel/JSON Loaders | ✅ Complete |
+| TrackerPort | LangfuseAdapter | ✅ Complete |
+| TrackerPort | MLflowAdapter | ✅ Complete |
+| StoragePort | SQLiteAdapter | ✅ Complete |
+| StoragePort | PostgreSQLAdapter | ✅ Complete |
+| EvaluatorPort | RagasEvaluator | ✅ Complete |
 
 ## External Services Configuration
 
@@ -162,51 +172,31 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 
 ## Current Implementation Status
 
-| Component | Status | Unit Tests | Integration Tests |
-|-----------|--------|------------|-------------------|
-| Domain Entities | ✅ Complete | 19 | - |
-| Port Interfaces | ✅ Complete | 24 | - |
-| Data Loaders | ✅ Complete | 21 | 8 |
-| RagasEvaluator | ✅ Complete | 7 | 6 |
-| OpenAIAdapter | ✅ Complete | 4 | - |
-| LangfuseAdapter | ✅ Complete | 18 | 5 |
-| CLI | ✅ Complete | 7 | - |
+> Phase 1-6 모두 완료. 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| Domain Entities | ✅ Complete | TestCase, Dataset, EvaluationRun, Experiment |
+| Port Interfaces | ✅ Complete | LLM, Dataset, Storage, Tracker, Evaluator |
+| Data Loaders | ✅ Complete | CSV, Excel, JSON |
+| RagasEvaluator | ✅ Complete | 6 metrics (Ragas v1.0) |
+| LLM Adapters | ✅ Complete | OpenAI, Ollama, Azure, Anthropic |
+| Storage Adapters | ✅ Complete | SQLite, PostgreSQL |
+| Tracker Adapters | ✅ Complete | Langfuse, MLflow |
+| CLI | ✅ Complete | run, metrics, config, history, compare, export, generate |
+| Testset Generation | ✅ Complete | Basic + Knowledge Graph |
+| Experiment Management | ✅ Complete | A/B testing, comparison |
 
 **Test Summary:**
-- Unit Tests: 100
-- Integration Tests: 18
-- **Total: 118 tests passing**
+- Unit Tests: 354
+- Integration Tests: 26
+- **Total: 380 tests passing**
 
-## Roadmap
+## Documentation
 
-### Phase 1-3: Core System (Completed)
-- [x] Domain Entities (TestCase, Dataset, EvaluationRun, MetricScore)
-- [x] Port Interfaces (LLMPort, DatasetPort, StoragePort, TrackerPort, EvaluatorPort)
-- [x] Data Loaders (CSV, Excel, JSON)
-- [x] RagasEvaluator with async evaluation (4 metrics)
-- [x] OpenAI Adapter (LangChain integration)
-- [x] Langfuse Adapter (trace/score logging)
-- [x] CLI Interface (run, metrics, config commands)
-- [x] Configuration via pydantic-settings
-- [ ] ~~StorageAdapter~~ → Phase 5로 이동
-
-### Phase 4: Foundation Enhancement (P0 - Next)
-- [ ] Language detection utility (`langdetect`)
-- [ ] Korean prompt customization for Ragas
-- [ ] FactualCorrectness metric
-- [ ] SemanticSimilarity metric
-- [ ] Azure OpenAI Adapter (선택)
-- [ ] Anthropic Claude Adapter (선택)
-
-### Phase 5: Storage & Domain (P1)
-- [ ] SQLite storage adapter (StoragePort 구현)
-- [ ] Evaluation history 조회/비교 기능
-- [ ] InsuranceTermAccuracy metric
-- [ ] Basic Testset Generation
-
-### Phase 6: Advanced Features (P2)
-- [ ] Knowledge Graph-based testset generation
-- [ ] Experiment management system
-- [ ] Multilingual prompt expansion
-- [ ] PostgreSQL storage adapter (선택)
-- [ ] MLflow Tracker adapter (선택)
+| Document | Description |
+|----------|-------------|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 설치, 설정, 메트릭 설명, 문제 해결 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal Architecture 상세 설명 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 로드맵, 현재 상태, 품질 기준 (SLA) |
+| [docs/KG_IMPROVEMENT_PLAN.md](docs/KG_IMPROVEMENT_PLAN.md) | Knowledge Graph 개선 계획 |

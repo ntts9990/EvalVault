@@ -140,7 +140,12 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ## 문서
 
-**[상세 사용자 가이드](docs/USER_GUIDE.md)** - 설치, 설정, 메트릭 설명, 문제 해결 등
+| 문서 | 설명 |
+|-----|------|
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | 설치, 설정, 메트릭 설명, 문제 해결 |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal Architecture 상세 설명 |
+| [ROADMAP.md](docs/ROADMAP.md) | 개발 로드맵, 현재 상태, 품질 기준 (SLA) |
+| [KG_IMPROVEMENT_PLAN.md](docs/KG_IMPROVEMENT_PLAN.md) | Knowledge Graph 개선 계획 |
 
 ## 아키텍처
 
