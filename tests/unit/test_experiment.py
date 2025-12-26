@@ -1,11 +1,12 @@
 """Tests for Experiment entity and ExperimentManager service."""
 
-import pytest
 from datetime import datetime
 from unittest.mock import Mock
 
-from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+import pytest
+
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
 from evalvault.domain.services.experiment_manager import (
     ExperimentManager,
     MetricComparison,
@@ -362,7 +363,7 @@ class TestExperimentManager:
     def test_list_experiments_by_status(self, mock_storage):
         """상태별 실험 목록 조회 테스트."""
         manager = ExperimentManager(mock_storage)
-        exp1 = manager.create_experiment(name="Draft Experiment")
+        manager.create_experiment(name="Draft Experiment")
         exp2 = manager.create_experiment(name="Running Experiment")
         exp2.status = "running"
         exp3 = manager.create_experiment(name="Completed Experiment")

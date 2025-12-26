@@ -213,14 +213,10 @@ class SQLiteStorageAdapter:
                         cost_usd=result_row[4],
                         trace_id=result_row[5],
                         started_at=(
-                            datetime.fromisoformat(result_row[6])
-                            if result_row[6]
-                            else None
+                            datetime.fromisoformat(result_row[6]) if result_row[6] else None
                         ),
                         finished_at=(
-                            datetime.fromisoformat(result_row[7])
-                            if result_row[7]
-                            else None
+                            datetime.fromisoformat(result_row[7]) if result_row[7] else None
                         ),
                         question=result_row[8],
                         answer=result_row[9],
@@ -236,9 +232,7 @@ class SQLiteStorageAdapter:
                 dataset_version=run_row[2],
                 model_name=run_row[3],
                 started_at=datetime.fromisoformat(run_row[4]),
-                finished_at=(
-                    datetime.fromisoformat(run_row[5]) if run_row[5] else None
-                ),
+                finished_at=(datetime.fromisoformat(run_row[5]) if run_row[5] else None),
                 total_tokens=run_row[6],
                 total_cost_usd=run_row[7],
                 results=results,

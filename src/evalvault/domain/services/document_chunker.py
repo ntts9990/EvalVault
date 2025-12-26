@@ -69,7 +69,7 @@ class DocumentChunker:
                 # Start new chunk with overlap
                 if self.overlap > 0 and current_chunk:
                     # Take last `overlap` characters as start of new chunk
-                    overlap_text = current_chunk[-self.overlap:]
+                    overlap_text = current_chunk[-self.overlap :]
                     current_chunk = overlap_text + " " + sentence
                 else:
                     current_chunk = sentence

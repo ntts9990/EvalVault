@@ -16,10 +16,11 @@ For tests requiring API keys:
 """
 
 import json
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
@@ -27,11 +28,9 @@ from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
     MetricScore,
-    TestCase,
     TestCaseResult,
 )
 from evalvault.domain.services.evaluator import RagasEvaluator
-from tests.integration.conftest import get_test_model
 
 
 class TestE2EFixturePaths:
@@ -78,9 +77,7 @@ class TestE2EFixturePaths:
 class TestFormatConsistency(TestE2EFixturePaths):
     """모든 형식이 동일한 데이터를 로드하는지 검증."""
 
-    def test_korean_all_formats_load_same_data(
-        self, korean_json, korean_csv, korean_xlsx
-    ):
+    def test_korean_all_formats_load_same_data(self, korean_json, korean_csv, korean_xlsx):
         """Korean 데이터셋이 모든 형식에서 동일하게 로드되는지 검증."""
         # Load all formats
         json_dataset = get_loader(korean_json).load(korean_json)
@@ -106,9 +103,7 @@ class TestFormatConsistency(TestE2EFixturePaths):
             assert json_tc.answer == csv_tc.answer == xlsx_tc.answer
             assert json_tc.ground_truth == csv_tc.ground_truth == xlsx_tc.ground_truth
 
-    def test_english_all_formats_load_same_data(
-        self, english_json, english_csv, english_xlsx
-    ):
+    def test_english_all_formats_load_same_data(self, english_json, english_csv, english_xlsx):
         """English 데이터셋이 모든 형식에서 동일하게 로드되는지 검증."""
         json_dataset = get_loader(english_json).load(english_json)
         csv_dataset = get_loader(english_csv).load(english_csv)
@@ -121,9 +116,7 @@ class TestFormatConsistency(TestE2EFixturePaths):
         xlsx_ids = {tc.id for tc in xlsx_dataset}
         assert json_ids == csv_ids == xlsx_ids
 
-    def test_ragas_format_consistency_across_formats(
-        self, korean_json, korean_csv, korean_xlsx
-    ):
+    def test_ragas_format_consistency_across_formats(self, korean_json, korean_csv, korean_xlsx):
         """Ragas 형식 변환이 모든 형식에서 일관되는지 검증."""
         json_dataset = get_loader(korean_json).load(korean_json)
         csv_dataset = get_loader(korean_csv).load(korean_csv)
@@ -447,6 +440,7 @@ class TestCLIIntegrationE2E(TestE2EFixturePaths):
     def test_cli_run_with_json_dataset(self, korean_json):
         """CLI run 명령 JSON 데이터셋 테스트."""
         from typer.testing import CliRunner
+
         from evalvault.adapters.inbound.cli import app
 
         runner = CliRunner()
@@ -460,6 +454,7 @@ class TestCLIIntegrationE2E(TestE2EFixturePaths):
     def test_cli_metrics_command(self):
         """CLI metrics 명령 테스트."""
         from typer.testing import CliRunner
+
         from evalvault.adapters.inbound.cli import app
 
         runner = CliRunner()
@@ -471,6 +466,7 @@ class TestCLIIntegrationE2E(TestE2EFixturePaths):
     def test_cli_config_command(self):
         """CLI config 명령 테스트."""
         from typer.testing import CliRunner
+
         from evalvault.adapters.inbound.cli import app
 
         runner = CliRunner()

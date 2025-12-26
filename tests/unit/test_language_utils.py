@@ -1,7 +1,5 @@
 """Unit tests for language detection utilities."""
 
-import pytest
-
 from evalvault.utils.language import LanguageDetector
 
 
@@ -57,7 +55,9 @@ class TestLanguageDetector:
 
     def test_detect_with_confidence_english(self):
         """Test detecting with confidence scores for English."""
-        text = "This is a comprehensive insurance policy document with detailed coverage information."
+        text = (
+            "This is a comprehensive insurance policy document with detailed coverage information."
+        )
         results = LanguageDetector.detect_with_confidence(text)
 
         assert len(results) > 0
@@ -120,7 +120,7 @@ class TestLanguageDetector:
             "This is an insurance document.",
             "Another English document.",
             "Hi",  # Very short, might be unknown
-            "",    # Empty
+            "",  # Empty
             "English text again.",
         ]
         result = LanguageDetector.detect_dataset_language(texts)

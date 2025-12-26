@@ -27,7 +27,7 @@ class EntityModel(BaseModel):
         return value or {}
 
     @model_validator(mode="after")
-    def set_canonical_name(self) -> "EntityModel":
+    def set_canonical_name(self) -> EntityModel:
         """canonical_name이 없으면 기본값을 채운다."""
         if not self.canonical_name:
             self.canonical_name = self._normalize(self.name)
@@ -69,7 +69,7 @@ class RelationModel(BaseModel):
         return value or {}
 
     @model_validator(mode="after")
-    def validate_source_target(self) -> "RelationModel":
+    def validate_source_target(self) -> RelationModel:
         """source와 target이 동일하면 예외."""
         if self.source == self.target:
             msg = "source와 target은 동일할 수 없습니다."

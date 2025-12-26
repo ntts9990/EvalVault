@@ -26,17 +26,15 @@
     - LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST: Langfuse 설정
 """
 
-import asyncio
 import json
-import os
-import pytest
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from evalvault.config.settings import Settings
-from evalvault.domain.entities import Dataset, TestCase
+import pytest
 
+from evalvault.config.settings import Settings
+from evalvault.domain.entities import Dataset
 
 # ============================================================================
 # Test Fixtures
@@ -269,9 +267,7 @@ class TestFullWorkflow:
         # 개별 결과 출력
         print("\n  Results by test case:")
         for result in run.results:
-            scores = ", ".join(
-                f"{m.name}={m.score:.2f}" for m in result.metrics
-            )
+            scores = ", ".join(f"{m.name}={m.score:.2f}" for m in result.metrics)
             # Check if all metrics passed their thresholds
             all_passed = all(m.score >= (m.threshold or 0.7) for m in result.metrics)
             status = "✓" if all_passed else "✗"
@@ -374,7 +370,7 @@ class TestFullWorkflow:
         )
 
         assert run is not None
-        print(f"  ✓ Evaluation completed")
+        print("  ✓ Evaluation completed")
         print(f"  ✓ Run ID: {run.run_id}")
 
         # Log to Langfuse
@@ -432,6 +428,7 @@ class TestFullWorkflow:
         print("=" * 60)
 
         from typer.testing import CliRunner
+
         from evalvault.adapters.inbound.cli import app
 
         runner = CliRunner()
@@ -476,7 +473,9 @@ class TestFullWorkflow:
 
         if TestFullWorkflow._kg_result:
             kg = TestFullWorkflow._kg_result
-            print(f"    4. ✓ KG Generation ({len(kg.get_all_entities())} entities, {kg.get_edge_count()} relations)")
+            print(
+                f"    4. ✓ KG Generation ({len(kg.get_all_entities())} entities, {kg.get_edge_count()} relations)"
+            )
         else:
             print("    4. ⊘ KG Generation (not run)")
 
@@ -497,14 +496,6 @@ class TestQuickSanityCheck:
 
     def test_imports(self):
         """모든 주요 모듈 import 테스트."""
-        from evalvault.config.settings import Settings
-        from evalvault.domain.entities import Dataset, TestCase, EvaluationRun
-        from evalvault.domain.services.evaluator import RagasEvaluator
-        from evalvault.domain.services.kg_generator import KnowledgeGraphGenerator
-        from evalvault.adapters.outbound.dataset import get_loader
-        from evalvault.adapters.outbound.llm import get_llm_adapter
-        from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-        from evalvault.ports.outbound.llm_port import LLMPort, ThinkingConfig
 
         print("\n  ✓ All major modules imported successfully")
 
@@ -512,7 +503,7 @@ class TestQuickSanityCheck:
         """Settings 로딩 테스트."""
         settings = Settings()
         assert settings is not None
-        print(f"\n  ✓ Settings loaded")
+        print("\n  ✓ Settings loaded")
         print(f"    - LLM Provider: {settings.llm_provider}")
         print(f"    - OpenAI Model: {settings.openai_model}")
 

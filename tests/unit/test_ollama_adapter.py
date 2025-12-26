@@ -7,12 +7,13 @@
   - 운영 임베딩: qwen3-embedding:8b
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from evalvault.adapters.outbound.llm import OllamaAdapter, get_llm_adapter
+from evalvault.adapters.outbound.llm.ollama_adapter import ThinkingTokenTrackingAsyncOpenAI
 from evalvault.config.settings import Settings
-from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter, ThinkingTokenTrackingAsyncOpenAI
-from evalvault.adapters.outbound.llm import get_llm_adapter, OllamaAdapter
 
 
 class TestOllamaAdapter:
@@ -43,9 +44,7 @@ class TestOllamaAdapter:
 
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
-    def test_adapter_initialization_dev(
-        self, mock_embeddings, mock_llm_factory, dev_settings
-    ):
+    def test_adapter_initialization_dev(self, mock_embeddings, mock_llm_factory, dev_settings):
         """개발 환경 어댑터 초기화 테스트."""
         adapter = OllamaAdapter(dev_settings)
 
@@ -56,9 +55,7 @@ class TestOllamaAdapter:
 
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
-    def test_adapter_initialization_prod(
-        self, mock_embeddings, mock_llm_factory, prod_settings
-    ):
+    def test_adapter_initialization_prod(self, mock_embeddings, mock_llm_factory, prod_settings):
         """운영 환경 어댑터 초기화 테스트."""
         adapter = OllamaAdapter(prod_settings)
 
@@ -106,9 +103,7 @@ class TestOllamaAdapter:
 
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
-    def test_get_and_reset_token_usage(
-        self, mock_embeddings, mock_llm_factory, dev_settings
-    ):
+    def test_get_and_reset_token_usage(self, mock_embeddings, mock_llm_factory, dev_settings):
         """토큰 사용량 조회 및 리셋 테스트."""
         adapter = OllamaAdapter(dev_settings)
 
@@ -123,9 +118,7 @@ class TestOllamaAdapter:
 
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
-    def test_thinking_client_initialization(
-        self, mock_embeddings, mock_llm_factory, prod_settings
-    ):
+    def test_thinking_client_initialization(self, mock_embeddings, mock_llm_factory, prod_settings):
         """ThinkingTokenTrackingAsyncOpenAI가 올바르게 초기화되는지 테스트."""
         adapter = OllamaAdapter(prod_settings)
 
@@ -151,10 +144,7 @@ class TestOllamaAdapter:
         mock_response.usage.total_tokens = 30
 
         # Create a spy on the completions.create method
-        original_create = adapter._client.chat.completions._completions.create
-        adapter._client.chat.completions._completions.create = AsyncMock(
-            return_value=mock_response
-        )
+        adapter._client.chat.completions._completions.create = AsyncMock(return_value=mock_response)
 
         # Call the method
         await adapter._client.chat.completions.create(
@@ -185,9 +175,7 @@ class TestOllamaAdapter:
         mock_response.usage.total_tokens = 30
 
         # Create a spy on the completions.create method
-        adapter._client.chat.completions._completions.create = AsyncMock(
-            return_value=mock_response
-        )
+        adapter._client.chat.completions._completions.create = AsyncMock(return_value=mock_response)
 
         # Call the method without extra_body
         await adapter._client.chat.completions.create(
@@ -199,10 +187,9 @@ class TestOllamaAdapter:
         # extra_body should not contain think_level
         if "extra_body" in call_kwargs:
             # If extra_body exists, it should be empty or not contain think_level
-            assert (
-                "options" not in call_kwargs["extra_body"]
-                or "think_level" not in call_kwargs["extra_body"].get("options", {})
-            )
+            assert "options" not in call_kwargs["extra_body"] or "think_level" not in call_kwargs[
+                "extra_body"
+            ].get("options", {})
 
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
     @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")

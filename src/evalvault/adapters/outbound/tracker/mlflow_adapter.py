@@ -89,9 +89,7 @@ class MLflowAdapter(TrackerPort):
             "output": output_data,
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(span_data, f, default=str)
             self._mlflow.log_artifact(f.name, f"spans/{name}")
 
@@ -146,9 +144,7 @@ class MLflowAdapter(TrackerPort):
             raise ValueError(f"Run not found: {trace_id}")
 
         if artifact_type == "json":
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".json", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
                 json.dump(data, f, default=str)
                 self._mlflow.log_artifact(f.name, f"artifacts/{name}")
 
@@ -217,8 +213,7 @@ class MLflowAdapter(TrackerPort):
                 "all_passed": result.all_passed,
                 "tokens_used": result.tokens_used,
                 "metrics": [
-                    {"name": m.name, "score": m.score, "passed": m.passed}
-                    for m in result.metrics
+                    {"name": m.name, "score": m.score, "passed": m.passed} for m in result.metrics
                 ],
             }
             results_data.append(result_dict)

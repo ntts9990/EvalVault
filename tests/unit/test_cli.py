@@ -1,7 +1,6 @@
 """Tests for CLI interface."""
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
 
@@ -11,13 +10,12 @@ from typer.testing import CliRunner
 from evalvault.adapters.inbound.cli import app
 from evalvault.domain.entities import (
     Dataset,
-    TestCase,
     EvaluationRun,
-    TestCaseResult,
     MetricScore,
+    TestCase,
+    TestCaseResult,
 )
 from tests.unit.conftest import get_test_model
-
 
 runner = CliRunner()
 
@@ -129,9 +127,7 @@ class TestCLIRun:
         test_file.write_text("id,question,answer,contexts\n")
 
         # Run command
-        result = runner.invoke(
-            app, ["run", str(test_file), "--metrics", "faithfulness"]
-        )
+        result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
 
         # Assert
         assert result.exit_code == 0

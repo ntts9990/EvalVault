@@ -1,10 +1,10 @@
 """Tests for Ragas evaluator service."""
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from evalvault.domain.entities import Dataset, TestCase, EvaluationRun, MetricType
+import pytest
+
+from evalvault.domain.entities import Dataset, EvaluationRun, TestCase
 from evalvault.domain.services.evaluator import RagasEvaluator, TestCaseEvalResult
 from evalvault.ports.outbound.llm_port import LLMPort
 from tests.unit.conftest import get_test_model
@@ -72,9 +72,7 @@ class TestRagasEvaluator:
         }
 
     @pytest.mark.asyncio
-    async def test_evaluate_returns_evaluation_run(
-        self, sample_dataset, mock_llm, thresholds
-    ):
+    async def test_evaluate_returns_evaluation_run(self, sample_dataset, mock_llm, thresholds):
         """evaluate 메서드가 EvaluationRun을 반환하는지 테스트."""
         evaluator = RagasEvaluator()
 
@@ -90,9 +88,7 @@ class TestRagasEvaluator:
             ),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -114,9 +110,7 @@ class TestRagasEvaluator:
             assert result.results[1].tokens_used == 120
 
     @pytest.mark.asyncio
-    async def test_evaluate_aggregates_scores_correctly(
-        self, sample_dataset, mock_llm, thresholds
-    ):
+    async def test_evaluate_aggregates_scores_correctly(self, sample_dataset, mock_llm, thresholds):
         """평가 결과가 올바르게 집계되는지 테스트."""
         evaluator = RagasEvaluator()
 
@@ -125,9 +119,7 @@ class TestRagasEvaluator:
             "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.5}, tokens_used=80),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -159,9 +151,7 @@ class TestRagasEvaluator:
             "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -178,9 +168,7 @@ class TestRagasEvaluator:
             assert result.duration_seconds >= 0
 
     @pytest.mark.asyncio
-    async def test_evaluate_with_multiple_metrics(
-        self, sample_dataset, mock_llm, thresholds
-    ):
+    async def test_evaluate_with_multiple_metrics(self, sample_dataset, mock_llm, thresholds):
         """여러 메트릭을 동시에 평가할 수 있는지 테스트."""
         evaluator = RagasEvaluator()
 
@@ -203,9 +191,7 @@ class TestRagasEvaluator:
             ),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -223,9 +209,7 @@ class TestRagasEvaluator:
             assert tc1_result.get_metric("context_precision").score == 0.8
 
     @pytest.mark.asyncio
-    async def test_evaluate_applies_thresholds(
-        self, sample_dataset, mock_llm, thresholds
-    ):
+    async def test_evaluate_applies_thresholds(self, sample_dataset, mock_llm, thresholds):
         """임계값이 올바르게 적용되는지 테스트."""
         evaluator = RagasEvaluator()
 
@@ -236,9 +220,7 @@ class TestRagasEvaluator:
 
         custom_thresholds = {"faithfulness": 0.8}
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -254,9 +236,7 @@ class TestRagasEvaluator:
             assert result.results[1].all_passed is False
 
     @pytest.mark.asyncio
-    async def test_evaluate_stores_thresholds_in_run(
-        self, sample_dataset, mock_llm, thresholds
-    ):
+    async def test_evaluate_stores_thresholds_in_run(self, sample_dataset, mock_llm, thresholds):
         """임계값이 EvaluationRun에 저장되는지 테스트."""
         evaluator = RagasEvaluator()
 
@@ -265,9 +245,7 @@ class TestRagasEvaluator:
             "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(

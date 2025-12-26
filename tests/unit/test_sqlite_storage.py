@@ -1,6 +1,5 @@
 """Unit tests for SQLite storage adapter."""
 
-import json
 import sqlite3
 import tempfile
 from datetime import datetime
@@ -51,9 +50,7 @@ def sample_run():
             TestCaseResult(
                 test_case_id="tc-001",
                 metrics=[
-                    MetricScore(
-                        name="faithfulness", score=0.85, threshold=0.7, reason="Good"
-                    ),
+                    MetricScore(name="faithfulness", score=0.85, threshold=0.7, reason="Good"),
                     MetricScore(
                         name="answer_relevancy",
                         score=0.90,
@@ -75,9 +72,7 @@ def sample_run():
             TestCaseResult(
                 test_case_id="tc-002",
                 metrics=[
-                    MetricScore(
-                        name="faithfulness", score=0.75, threshold=0.7, reason="OK"
-                    ),
+                    MetricScore(name="faithfulness", score=0.75, threshold=0.7, reason="OK"),
                     MetricScore(
                         name="answer_relevancy",
                         score=0.80,
@@ -109,14 +104,12 @@ class TestSQLiteStorageAdapter:
             SQLiteStorageAdapter,
         )
 
-        adapter = SQLiteStorageAdapter(db_path=temp_db)
+        SQLiteStorageAdapter(db_path=temp_db)
 
         # Verify tables exist
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = [row[0] for row in cursor.fetchall()]
         conn.close()
 
@@ -148,9 +141,7 @@ class TestSQLiteStorageAdapter:
         assert row[6] == 1000  # total_tokens
         assert row[7] == 0.05  # total_cost_usd
 
-    def test_save_run_stores_test_case_results(
-        self, storage_adapter, sample_run, temp_db
-    ):
+    def test_save_run_stores_test_case_results(self, storage_adapter, sample_run, temp_db):
         """Test that save_run stores test case results."""
         storage_adapter.save_run(sample_run)
 

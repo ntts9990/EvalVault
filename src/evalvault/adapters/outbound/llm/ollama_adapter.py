@@ -50,15 +50,14 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
 
     def _create_tracking_chat(self) -> Any:
         """Create a chat wrapper that tracks token usage and injects thinking params."""
-        original_completions = self._original_chat.completions
         think_level = self._think_level
 
         class ThinkingTrackingCompletions:
-            def __init__(inner_self, completions: Any, tracker: TokenUsage):
+            def __init__(inner_self, completions: Any, tracker: TokenUsage):  # noqa: N805
                 inner_self._completions = completions
                 inner_self._tracker = tracker
 
-            async def create(inner_self, **kwargs: Any) -> Any:
+            async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
                 # Inject thinking parameters if configured
                 if think_level is not None:
                     # Ollama expects thinking params in extra_body.options
@@ -81,11 +80,9 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 return response
 
         class ThinkingTrackingChat:
-            def __init__(inner_self, chat: Any, tracker: TokenUsage):
+            def __init__(inner_self, chat: Any, tracker: TokenUsage):  # noqa: N805
                 inner_self._chat = chat
-                inner_self.completions = ThinkingTrackingCompletions(
-                    chat.completions, tracker
-                )
+                inner_self.completions = ThinkingTrackingCompletions(chat.completions, tracker)
 
         return ThinkingTrackingChat(self._original_chat, self._usage_tracker)
 
@@ -119,9 +116,7 @@ class OllamaAdapter(LLMPort):
         self._token_usage = TokenUsage()
 
         # Create HTTP client with custom timeout for Ollama
-        http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(self._timeout, connect=30.0)
-        )
+        http_client = httpx.AsyncClient(timeout=httpx.Timeout(self._timeout, connect=30.0))
 
         # Create OpenAI-compatible client pointing to Ollama
         # Ollama doesn't require a real API key
@@ -145,9 +140,7 @@ class OllamaAdapter(LLMPort):
         self._embedding_client = AsyncOpenAI(
             api_key="ollama",
             base_url=f"{self._base_url}/v1",
-            http_client=httpx.AsyncClient(
-                timeout=httpx.Timeout(self._timeout, connect=30.0)
-            ),
+            http_client=httpx.AsyncClient(timeout=httpx.Timeout(self._timeout, connect=30.0)),
         )
 
         # Create Ragas embeddings using OpenAI-compatible API

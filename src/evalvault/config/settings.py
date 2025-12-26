@@ -67,9 +67,7 @@ class Settings(BaseSettings):
     azure_embedding_deployment: str | None = Field(
         default=None, description="Azure embedding deployment name"
     )
-    azure_api_version: str = Field(
-        default="2024-02-15-preview", description="Azure API version"
-    )
+    azure_api_version: str = Field(default="2024-02-15-preview", description="Azure API version")
 
     # Anthropic Configuration (optional)
     anthropic_api_key: str | None = Field(default=None, description="Anthropic API key")
@@ -85,7 +83,9 @@ class Settings(BaseSettings):
     # Langfuse Configuration (optional)
     langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
     langfuse_secret_key: str | None = Field(default=None, description="Langfuse secret key")
-    langfuse_host: str = Field(default="https://cloud.langfuse.com", description="Langfuse host URL")
+    langfuse_host: str = Field(
+        default="https://cloud.langfuse.com", description="Langfuse host URL"
+    )
 
     # MLflow Configuration (optional)
     mlflow_tracking_uri: str | None = Field(default=None, description="MLflow tracking server URI")
@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     postgres_connection_string: str | None = Field(
         default=None, description="PostgreSQL connection string (overrides other postgres settings)"
     )
+
 
 # Global settings instance (lazy initialization)
 _settings: Settings | None = None

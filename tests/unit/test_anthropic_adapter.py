@@ -97,11 +97,10 @@ class TestAnthropicAdapter:
     @pytest.fixture
     def mock_ragas_llm_factory(self):
         """Mock Ragas llm_factory and Anthropic client."""
-        with patch(
-            "evalvault.adapters.outbound.llm.anthropic_adapter.llm_factory"
-        ) as mock_llm, patch(
-            "anthropic.AsyncAnthropic"
-        ) as mock_anthropic:
+        with (
+            patch("evalvault.adapters.outbound.llm.anthropic_adapter.llm_factory") as mock_llm,
+            patch("anthropic.AsyncAnthropic") as mock_anthropic,
+        ):
             mock_instance = MagicMock()
             mock_instance.generate = MagicMock()
             mock_instance.agenerate = MagicMock()
@@ -112,11 +111,12 @@ class TestAnthropicAdapter:
     @pytest.fixture
     def mock_ragas_embeddings(self):
         """Mock Ragas OpenAI embeddings and AsyncOpenAI client."""
-        with patch(
-            "evalvault.adapters.outbound.llm.anthropic_adapter.OpenAIEmbeddingsWithLegacy"
-        ) as mock_emb, patch(
-            "evalvault.adapters.outbound.llm.anthropic_adapter.AsyncOpenAI"
-        ) as mock_client:
+        with (
+            patch(
+                "evalvault.adapters.outbound.llm.anthropic_adapter.OpenAIEmbeddingsWithLegacy"
+            ) as mock_emb,
+            patch("evalvault.adapters.outbound.llm.anthropic_adapter.AsyncOpenAI") as mock_client,
+        ):
             mock_instance = MagicMock()
             mock_emb.return_value = mock_instance
             mock_client_instance = MagicMock()
@@ -137,7 +137,9 @@ class TestAnthropicAdapter:
         assert adapter is not None
         assert adapter.get_model_name() == "claude-3-5-sonnet-20241022"
 
-    def test_get_model_name(self, anthropic_settings, mock_ragas_llm_factory, mock_ragas_embeddings):
+    def test_get_model_name(
+        self, anthropic_settings, mock_ragas_llm_factory, mock_ragas_embeddings
+    ):
         """get_model_name이 올바른 모델명을 반환하는지 테스트."""
         adapter = AnthropicAdapter(anthropic_settings)
         assert adapter.get_model_name() == "claude-3-5-sonnet-20241022"

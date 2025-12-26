@@ -1,13 +1,12 @@
 """OpenAI LLM adapter for Ragas evaluation."""
 
-import asyncio
 import threading
 from dataclasses import dataclass, field
 from typing import Any
 
 from openai import AsyncOpenAI
-from ragas.llms import llm_factory
 from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
+from ragas.llms import llm_factory
 
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
@@ -84,14 +83,13 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
 
     def _create_tracking_chat(self) -> Any:
         """Create a chat wrapper that tracks token usage."""
-        original_completions = self._original_chat.completions
 
         class TrackingCompletions:
-            def __init__(inner_self, completions: Any, tracker: TokenUsage):
+            def __init__(inner_self, completions: Any, tracker: TokenUsage):  # noqa: N805
                 inner_self._completions = completions
                 inner_self._tracker = tracker
 
-            async def create(inner_self, **kwargs: Any) -> Any:
+            async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
                 response = await inner_self._completions.create(**kwargs)
                 # Extract usage from response
                 if hasattr(response, "usage") and response.usage:
@@ -103,7 +101,7 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
                 return response
 
         class TrackingChat:
-            def __init__(inner_self, chat: Any, tracker: TokenUsage):
+            def __init__(inner_self, chat: Any, tracker: TokenUsage):  # noqa: N805
                 inner_self._chat = chat
                 inner_self.completions = TrackingCompletions(chat.completions, tracker)
 

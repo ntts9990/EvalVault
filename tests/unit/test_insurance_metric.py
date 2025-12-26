@@ -104,10 +104,7 @@ class TestInsuranceTermAccuracy:
     def test_multiple_contexts_aggregation(self, metric):
         """Test that metric aggregates terms from multiple contexts."""
         answer = "보험금은 1억원이고, 보험료는 5만원입니다."
-        contexts = [
-            "보험금은 1억원입니다.",
-            "보험료는 50,000원입니다."
-        ]
+        contexts = ["보험금은 1억원입니다.", "보험료는 50,000원입니다."]
 
         accuracy = metric._calculate_accuracy(answer, contexts)
         assert accuracy == 1.0  # Both terms found across contexts
@@ -123,8 +120,14 @@ class TestInsuranceTermAccuracy:
     def test_common_insurance_terms_in_dictionary(self, metric):
         """Test that common insurance terms are in dictionary."""
         expected_terms = [
-            "보험금", "보험료", "피보험자", "보험계약자",
-            "면책기간", "보장내용", "해지환급금", "특약"
+            "보험금",
+            "보험료",
+            "피보험자",
+            "보험계약자",
+            "면책기간",
+            "보장내용",
+            "해지환급금",
+            "특약",
         ]
 
         for term in expected_terms:

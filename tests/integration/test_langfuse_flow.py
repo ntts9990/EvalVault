@@ -4,17 +4,17 @@ Tests marked with @pytest.mark.requires_langfuse require Langfuse credentials.
 These tests are designed for self-hosted Langfuse instances.
 """
 
-import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.domain.entities import (
     EvaluationRun,
-    TestCaseResult,
     MetricScore,
+    TestCaseResult,
 )
-from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
-from evalvault.ports.outbound.tracker_port import TrackerPort
 from tests.integration.conftest import get_test_model
 
 
@@ -75,9 +75,7 @@ class TestLangfuseFlowWithMock:
         )
 
     @patch("evalvault.adapters.outbound.tracker.langfuse_adapter.Langfuse")
-    def test_log_evaluation_run_creates_trace(
-        self, mock_langfuse_cls, sample_evaluation_run
-    ):
+    def test_log_evaluation_run_creates_trace(self, mock_langfuse_cls, sample_evaluation_run):
         """log_evaluation_run이 trace를 생성하는지 테스트."""
         # Setup mock for Langfuse v3 start_span() API
         mock_langfuse = MagicMock()
@@ -102,9 +100,7 @@ class TestLangfuseFlowWithMock:
         assert "output" in update_call[1]
 
     @patch("evalvault.adapters.outbound.tracker.langfuse_adapter.Langfuse")
-    def test_log_evaluation_run_logs_scores(
-        self, mock_langfuse_cls, sample_evaluation_run
-    ):
+    def test_log_evaluation_run_logs_scores(self, mock_langfuse_cls, sample_evaluation_run):
         """log_evaluation_run이 점수를 로깅하는지 테스트."""
         mock_langfuse = MagicMock()
         mock_span = MagicMock()
@@ -155,9 +151,7 @@ class TestLangfuseFlowWithMock:
         )
 
         # Log score
-        adapter.log_score(
-            trace_id=trace_id, name="faithfulness", value=0.9, comment="Good"
-        )
+        adapter.log_score(trace_id=trace_id, name="faithfulness", value=0.9, comment="Good")
 
         # End trace
         adapter.end_trace(trace_id)

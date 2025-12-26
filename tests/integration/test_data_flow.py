@@ -3,14 +3,15 @@
 These tests verify the complete data loading pipeline works correctly.
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
+
 from evalvault.adapters.outbound.dataset import (
-    get_loader,
     CSVDatasetLoader,
     ExcelDatasetLoader,
     JSONDatasetLoader,
+    get_loader,
 )
 from evalvault.domain.entities import Dataset, TestCase
 

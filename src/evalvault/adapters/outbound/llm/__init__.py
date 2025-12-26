@@ -44,8 +44,7 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
         return AnthropicAdapter(settings)
     else:
         raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. "
-            f"Supported: openai, ollama, azure, anthropic"
+            f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, azure, anthropic"
         )
 
 

@@ -106,9 +106,7 @@ class JSONDatasetLoader(BaseDatasetLoader):
             tc_required = ["id", "question", "answer", "contexts"]
             tc_missing = [field for field in tc_required if field not in tc_data]
             if tc_missing:
-                raise ValueError(
-                    f"Test case {idx}: missing required field '{tc_missing[0]}'"
-                )
+                raise ValueError(f"Test case {idx}: missing required field '{tc_missing[0]}'")
 
             test_case = TestCase(
                 id=str(tc_data["id"]),
@@ -125,9 +123,7 @@ class JSONDatasetLoader(BaseDatasetLoader):
         raw_thresholds = data.get("thresholds", {})
         for metric_name, threshold_value in raw_thresholds.items():
             if not isinstance(threshold_value, (int, float)):
-                raise ValueError(
-                    f"Invalid threshold value for '{metric_name}': must be a number"
-                )
+                raise ValueError(f"Invalid threshold value for '{metric_name}': must be a number")
             if not 0.0 <= threshold_value <= 1.0:
                 raise ValueError(
                     f"Invalid threshold value for '{metric_name}': must be between 0.0 and 1.0"

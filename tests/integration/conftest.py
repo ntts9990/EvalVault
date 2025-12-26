@@ -1,10 +1,10 @@
 """Integration test fixtures and configuration."""
 
 import os
-import pytest
-import shutil
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 # Load .env file for integration tests
 from dotenv import load_dotenv
@@ -37,19 +37,17 @@ def _add_timestamp_to_path(path_str: str) -> str:
 
 def pytest_configure(config):
     """Configure custom pytest markers and add timestamps to report filenames."""
-    config.addinivalue_line(
-        "markers", "requires_openai: marks tests that require OpenAI API key"
-    )
+    config.addinivalue_line("markers", "requires_openai: marks tests that require OpenAI API key")
     config.addinivalue_line(
         "markers", "requires_langfuse: marks tests that require Langfuse credentials"
     )
 
     # Add timestamp suffix to HTML report filename
-    if hasattr(config.option, 'htmlpath') and config.option.htmlpath:
+    if hasattr(config.option, "htmlpath") and config.option.htmlpath:
         config.option.htmlpath = _add_timestamp_to_path(config.option.htmlpath)
 
     # Add timestamp suffix to JUnit XML report filename
-    if hasattr(config.option, 'xmlpath') and config.option.xmlpath:
+    if hasattr(config.option, "xmlpath") and config.option.xmlpath:
         config.option.xmlpath = _add_timestamp_to_path(config.option.xmlpath)
 
 
@@ -62,9 +60,7 @@ def has_openai_key():
 @pytest.fixture
 def has_langfuse_keys():
     """Check if Langfuse credentials are available."""
-    return bool(
-        os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")
-    )
+    return bool(os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"))
 
 
 @pytest.fixture(scope="session")
@@ -93,14 +89,11 @@ def e2e_results_path():
 def pytest_runtest_setup(item):
     """Skip tests based on required credentials."""
     # Check for requires_openai marker
-    if item.get_closest_marker("requires_openai"):
-        if not os.environ.get("OPENAI_API_KEY"):
-            pytest.skip("Requires OPENAI_API_KEY environment variable")
+    if item.get_closest_marker("requires_openai") and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("Requires OPENAI_API_KEY environment variable")
 
     # Check for requires_langfuse marker
-    if item.get_closest_marker("requires_langfuse"):
-        if not (
-            os.environ.get("LANGFUSE_PUBLIC_KEY")
-            and os.environ.get("LANGFUSE_SECRET_KEY")
-        ):
-            pytest.skip("Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY")
+    if item.get_closest_marker("requires_langfuse") and not (
+        os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")
+    ):
+        pytest.skip("Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY")

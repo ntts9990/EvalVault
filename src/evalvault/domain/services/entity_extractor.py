@@ -330,7 +330,7 @@ class EntityExtractor:
                 if product_pos != -1 and coverage_pos != -1:
                     min_pos = min(product_pos, coverage_pos)
                     max_pos = max(product_pos, coverage_pos)
-                    between_text = text[min_pos:max_pos + len(coverage.name)]
+                    between_text = text[min_pos : max_pos + len(coverage.name)]
 
                     if "보장" in between_text or max_pos - min_pos < 60:
                         distance = max_pos - min_pos
@@ -366,7 +366,9 @@ class EntityExtractor:
                     if distance < 40:
                         confidence = self._calc_confidence(distance, 40)
                         evidence_start = min(coverage_pos, amount_pos)
-                        evidence_end = max(coverage_pos + len(coverage.name), amount_pos + len(amount.name))
+                        evidence_end = max(
+                            coverage_pos + len(coverage.name), amount_pos + len(amount.name)
+                        )
                         evidence = text[evidence_start:evidence_end]
                         relation = Relation(
                             source=coverage.name,
@@ -399,7 +401,9 @@ class EntityExtractor:
                     if distance < 50:
                         confidence = self._calc_confidence(distance, 50)
                         evidence_start = min(source_pos, period_pos)
-                        evidence_end = max(source_pos + len(source.name), period_pos + len(period.name))
+                        evidence_end = max(
+                            source_pos + len(source.name), period_pos + len(period.name)
+                        )
                         evidence = text[evidence_start:evidence_end]
                         relation = Relation(
                             source=source.name,

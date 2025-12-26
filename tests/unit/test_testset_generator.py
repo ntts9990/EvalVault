@@ -16,7 +16,9 @@ class TestDocumentChunker:
     def test_chunk_by_sentences(self):
         """Test chunking document by sentences."""
         chunker = DocumentChunker(chunk_size=100, overlap=0)
-        document = "이것은 첫 번째 문장입니다. 이것은 두 번째 문장입니다. 이것은 세 번째 문장입니다."
+        document = (
+            "이것은 첫 번째 문장입니다. 이것은 두 번째 문장입니다. 이것은 세 번째 문장입니다."
+        )
 
         chunks = chunker.chunk(document)
         assert len(chunks) > 0

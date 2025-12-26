@@ -32,9 +32,7 @@ class BasicTestsetGenerator:
         """Initialize basic testset generator."""
         pass
 
-    def _chunk_documents(
-        self, documents: list[str], config: GenerationConfig
-    ) -> list[str]:
+    def _chunk_documents(self, documents: list[str], config: GenerationConfig) -> list[str]:
         """Chunk documents into smaller segments.
 
         Args:
@@ -81,9 +79,7 @@ class BasicTestsetGenerator:
         template_idx = index % len(templates)
         return templates[template_idx]
 
-    def generate(
-        self, documents: list[str], config: GenerationConfig
-    ) -> Dataset:
+    def generate(self, documents: list[str], config: GenerationConfig) -> Dataset:
         """Generate testset from documents.
 
         Args:

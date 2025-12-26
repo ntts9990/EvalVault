@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ragas import SingleTurnSample
+
 try:  # Ragas >=0.2.0
     from ragas.metrics.collections import (
         AnswerRelevancy,
         ContextPrecision,
         ContextRecall,
-        Faithfulness,
         FactualCorrectness,
+        Faithfulness,
         SemanticSimilarity,
     )
 except ImportError:  # pragma: no cover - fallback for older Ragas versions
@@ -18,8 +19,8 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
         AnswerRelevancy,
         ContextPrecision,
         ContextRecall,
-        Faithfulness,
         FactualCorrectness,
+        Faithfulness,
         SemanticSimilarity,
     )
 
@@ -171,9 +172,7 @@ class RagasEvaluator:
         total_tokens = 0
         total_cost = 0.0
         for test_case in dataset.test_cases:
-            eval_result = eval_results_by_test_case.get(
-                test_case.id, TestCaseEvalResult(scores={})
-            )
+            eval_result = eval_results_by_test_case.get(test_case.id, TestCaseEvalResult(scores={}))
 
             metric_scores = []
             for metric_name in metrics:
@@ -284,7 +283,9 @@ class RagasEvaluator:
                         metric.name,
                         ["user_input", "response", "retrieved_contexts"],
                     )
-                    kwargs = {k: v for k, v in all_args.items() if k in required_args and v is not None}
+                    kwargs = {
+                        k: v for k, v in all_args.items() if k in required_args and v is not None
+                    }
                     result = await metric.ascore(**kwargs)
                 elif hasattr(metric, "single_turn_ascore"):
                     # Legacy Ragas <0.4 API
@@ -303,9 +304,7 @@ class RagasEvaluator:
 
             # Track end time and calculate latency
             test_case_finished_at = datetime.now()
-            latency_ms = int(
-                (test_case_finished_at - test_case_started_at).total_seconds() * 1000
-            )
+            latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
 
             # Get token usage for this test case
             test_case_prompt_tokens = 0
@@ -370,9 +369,7 @@ class RagasEvaluator:
 
             # Track end time and calculate latency
             test_case_finished_at = datetime.now()
-            latency_ms = int(
-                (test_case_finished_at - test_case_started_at).total_seconds() * 1000
-            )
+            latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
 
             results[test_case.id] = TestCaseEvalResult(
                 scores=scores,

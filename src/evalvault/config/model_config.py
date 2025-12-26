@@ -17,9 +17,7 @@ from pydantic import BaseModel, Field
 class LLMConfig(BaseModel):
     """LLM 모델 설정."""
 
-    provider: Literal["openai", "ollama"] = Field(
-        description="LLM provider: 'openai' or 'ollama'"
-    )
+    provider: Literal["openai", "ollama"] = Field(description="LLM provider: 'openai' or 'ollama'")
     model: str = Field(description="Model name")
     options: dict | None = Field(
         default=None, description="Provider-specific options (e.g., think_level)"
@@ -107,8 +105,7 @@ def load_model_config(config_path: Path | str | None = None) -> ModelConfig:
 
     if config_path is None:
         raise FileNotFoundError(
-            "Model config file not found. "
-            "Create 'config/models.yaml' or 'evalvault.yaml'"
+            "Model config file not found. Create 'config/models.yaml' or 'evalvault.yaml'"
         )
 
     config_path = Path(config_path)

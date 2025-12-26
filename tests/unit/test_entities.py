@@ -1,14 +1,14 @@
 """Tests for domain entities."""
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
 
 from evalvault.domain.entities import (
     Dataset,
-    TestCase,
     EvaluationRun,
     MetricScore,
-    MetricType,
+    TestCase,
     TestCaseResult,
 )
 
@@ -192,9 +192,7 @@ class TestEvaluationRun:
 
     def test_pass_rate_empty(self):
         """결과 없을 때 pass_rate=0."""
-        run = EvaluationRun(
-            dataset_name="test", dataset_version="1.0.0", model_name="gpt-4o"
-        )
+        run = EvaluationRun(dataset_name="test", dataset_version="1.0.0", model_name="gpt-4o")
         assert run.pass_rate == 0.0
 
     def test_duration_seconds(self):

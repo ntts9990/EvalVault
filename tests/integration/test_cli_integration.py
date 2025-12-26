@@ -7,13 +7,11 @@
 """
 
 import pytest
-from pathlib import Path
 from typer.testing import CliRunner
 
 from evalvault.adapters.inbound.cli import app
-from evalvault.config.settings import Settings, apply_profile, reset_settings
 from evalvault.config.model_config import reset_model_config
-
+from evalvault.config.settings import Settings, apply_profile, reset_settings
 
 runner = CliRunner()
 

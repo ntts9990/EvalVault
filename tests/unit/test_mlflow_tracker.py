@@ -23,16 +23,16 @@ def mock_mlflow_module():
     mock_mlflow.log_artifact = MagicMock()
 
     # Add mlflow to sys.modules to make import work
-    sys.modules['mlflow'] = mock_mlflow
+    sys.modules["mlflow"] = mock_mlflow
 
     yield mock_mlflow
 
     # Cleanup
-    if 'mlflow' in sys.modules:
-        del sys.modules['mlflow']
+    if "mlflow" in sys.modules:
+        del sys.modules["mlflow"]
     # Clear adapter module cache to force reimport
-    if 'evalvault.adapters.outbound.tracker.mlflow_adapter' in sys.modules:
-        del sys.modules['evalvault.adapters.outbound.tracker.mlflow_adapter']
+    if "evalvault.adapters.outbound.tracker.mlflow_adapter" in sys.modules:
+        del sys.modules["evalvault.adapters.outbound.tracker.mlflow_adapter"]
 
 
 class TestMLflowAdapterInitialization:
@@ -186,7 +186,9 @@ class TestMLflowAdapterSpanManagement:
 
     @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.tempfile.NamedTemporaryFile")
     @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json")
-    def test_add_span_with_input_and_output(self, mock_json, mock_tempfile, adapter, mock_mlflow_module):
+    def test_add_span_with_input_and_output(
+        self, mock_json, mock_tempfile, adapter, mock_mlflow_module
+    ):
         """Test adding a span with input and output data."""
         # Setup temp file mock
         mock_file = MagicMock()
@@ -284,7 +286,8 @@ class TestMLflowAdapterScoreLogging:
 
         # Check that comment was truncated
         comment_calls = [
-            call_args for call_args in mock_mlflow_module.log_param.call_args_list
+            call_args
+            for call_args in mock_mlflow_module.log_param.call_args_list
             if len(call_args[0]) > 0 and call_args[0][0] == "metric_comment"
         ]
         assert len(comment_calls) == 1
@@ -531,6 +534,4 @@ class TestMLflowAdapterTrackerPortCompliance:
             port_params = [p for p in port_sig.parameters if p != "self"]
             adapter_params = [p for p in adapter_sig.parameters if p != "self"]
 
-            assert (
-                port_params == adapter_params
-            ), f"Method {method_name} signature mismatch"
+            assert port_params == adapter_params, f"Method {method_name} signature mismatch"

@@ -1,7 +1,6 @@
 """PostgreSQL storage adapter for evaluation results."""
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import psycopg
@@ -226,9 +225,7 @@ class PostgreSQLStorageAdapter:
                         question=result_row["question"],
                         answer=result_row["answer"],
                         contexts=(
-                            json.loads(result_row["contexts"])
-                            if result_row["contexts"]
-                            else None
+                            json.loads(result_row["contexts"]) if result_row["contexts"] else None
                         ),
                         ground_truth=result_row["ground_truth"],
                     )
@@ -301,13 +298,10 @@ class PostgreSQLStorageAdapter:
             삭제 성공 여부
         """
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM evaluation_runs WHERE run_id = %s", (run_id,)
-            )
+            cursor = conn.execute("DELETE FROM evaluation_runs WHERE run_id = %s", (run_id,))
             deleted = cursor.rowcount > 0
             conn.commit()
             return deleted
-
 
     # Experiment 관련 메서드 (TODO: 구현 필요)
 

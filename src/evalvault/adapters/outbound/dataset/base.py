@@ -103,7 +103,7 @@ class BaseDatasetLoader(ABC):
         Returns:
             List of context strings
         """
-        if not contexts_str or (isinstance(contexts_str, float) and str(contexts_str) == 'nan'):
+        if not contexts_str or (isinstance(contexts_str, float) and str(contexts_str) == "nan"):
             return []
 
         contexts_str = str(contexts_str).strip()

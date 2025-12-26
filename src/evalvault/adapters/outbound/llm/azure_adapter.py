@@ -4,8 +4,8 @@ import threading
 from dataclasses import dataclass, field
 
 from openai import AsyncAzureOpenAI
-from ragas.llms import llm_factory
 from ragas.embeddings.base import embedding_factory
+from ragas.llms import llm_factory
 
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort

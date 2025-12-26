@@ -155,10 +155,7 @@ class TestEntityExtractor:
 
         assert len(relations) > 0
         # Should find relation between company and product
-        assert any(
-            r.source == "삼성생명" and r.target == "종신보험"
-            for r in relations
-        )
+        assert any(r.source == "삼성생명" and r.target == "종신보험" for r in relations)
 
     def test_extract_relations_coverage(self, extractor):
         """Test extracting relations for coverage/benefits."""
@@ -178,10 +175,7 @@ class TestEntityExtractor:
 
         assert len(relations) > 0
         # Should find relation between coverage and amount
-        assert any(
-            "보험금" in r.source or "보험금" in r.target
-            for r in relations
-        )
+        assert any("보험금" in r.source or "보험금" in r.target for r in relations)
 
     def test_extract_relations_period(self, extractor):
         """Test extracting relations involving periods."""

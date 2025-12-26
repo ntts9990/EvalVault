@@ -10,7 +10,11 @@ import networkx as nx
 from evalvault.domain.entities import Dataset, EntityModel, RelationModel, TestCase
 from evalvault.domain.services.entity_extractor import (
     Entity as ExtractedEntity,
+)
+from evalvault.domain.services.entity_extractor import (
     EntityExtractor,
+)
+from evalvault.domain.services.entity_extractor import (
     Relation as ExtractedRelation,
 )
 from evalvault.ports.outbound.relation_augmenter_port import RelationAugmenterPort
@@ -521,9 +525,7 @@ class KnowledgeGraphGenerator:
         # Generate questions based on entity type and relations
         if entity.entity_type == "organization":
             if any(r.relation_type == "provides" for r in relations):
-                products = [
-                    r.target for r in relations if r.relation_type == "provides"
-                ]
+                products = [r.target for r in relations if r.relation_type == "provides"]
                 if products:
                     question = f"{entity.name}에서 제공하는 보험 상품은 무엇인가요?"
                 else:
@@ -585,9 +587,7 @@ class KnowledgeGraphGenerator:
 
         return question, context
 
-    def _generate_comparison_question(
-        self, e1: EntityModel, e2: EntityModel
-    ) -> tuple[str, str]:
+    def _generate_comparison_question(self, e1: EntityModel, e2: EntityModel) -> tuple[str, str]:
         """비교 질문 생성.
 
         Args:

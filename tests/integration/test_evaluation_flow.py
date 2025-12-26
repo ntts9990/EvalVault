@@ -4,17 +4,17 @@ These tests verify the complete evaluation pipeline.
 Tests marked with @pytest.mark.requires_openai require OPENAI_API_KEY.
 """
 
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, AsyncMock, patch
-from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from evalvault.domain.entities import (
     Dataset,
-    TestCase,
     EvaluationRun,
-    TestCaseResult,
     MetricScore,
+    TestCase,
+    TestCaseResult,
 )
 from evalvault.domain.services.evaluator import RagasEvaluator, TestCaseEvalResult
 from evalvault.ports.outbound.llm_port import LLMPort
@@ -87,9 +87,7 @@ class TestEvaluationFlowWithMock:
             ),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -127,9 +125,7 @@ class TestEvaluationFlowWithMock:
             "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.5}),  # Fail
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(
@@ -154,9 +150,7 @@ class TestEvaluationFlowWithMock:
             "tc-002": TestCaseEvalResult(scores={"faithfulness": 0.8}),
         }
 
-        with patch.object(
-            evaluator, "_evaluate_with_ragas", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = mock_results
 
             result = await evaluator.evaluate(

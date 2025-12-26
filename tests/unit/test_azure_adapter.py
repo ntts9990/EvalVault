@@ -1,7 +1,8 @@
 """Tests for Azure OpenAI LLM adapter."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter, TokenUsage
 from evalvault.config.settings import Settings
@@ -83,7 +84,9 @@ class TestAzureOpenAIAdapter:
         with patch("evalvault.adapters.outbound.llm.azure_adapter.embedding_factory") as mock:
             yield mock
 
-    def test_init_validates_endpoint(self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_init_validates_endpoint(
+        self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """AZURE_ENDPOINT가 없으면 ValueError가 발생하는지 테스트."""
         settings = Settings()  # No Azure config
         with pytest.raises(ValueError, match="AZURE_ENDPOINT"):
@@ -95,7 +98,9 @@ class TestAzureOpenAIAdapter:
         with pytest.raises(ValueError, match="AZURE_API_KEY"):
             AzureOpenAIAdapter(settings)
 
-    def test_init_validates_deployment(self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_init_validates_deployment(
+        self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """AZURE_DEPLOYMENT가 없으면 ValueError가 발생하는지 테스트."""
         settings = Settings(
             azure_endpoint="https://test.openai.azure.com",
@@ -104,12 +109,16 @@ class TestAzureOpenAIAdapter:
         with pytest.raises(ValueError, match="AZURE_DEPLOYMENT"):
             AzureOpenAIAdapter(settings)
 
-    def test_get_model_name(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_get_model_name(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """get_model_name이 올바른 모델명을 반환하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         assert adapter.get_model_name() == "azure/gpt-4"
 
-    def test_as_ragas_llm(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_as_ragas_llm(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """as_ragas_llm이 Ragas LLM 인스턴스를 반환하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         ragas_llm = adapter.as_ragas_llm()
@@ -117,13 +126,17 @@ class TestAzureOpenAIAdapter:
         assert hasattr(ragas_llm, "generate")
         assert hasattr(ragas_llm, "agenerate")
 
-    def test_as_ragas_embeddings(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_as_ragas_embeddings(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """as_ragas_embeddings이 Ragas 임베딩 인스턴스를 반환하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         embeddings = adapter.as_ragas_embeddings()
         assert embeddings is not None
 
-    def test_as_ragas_embeddings_without_deployment(self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_as_ragas_embeddings_without_deployment(
+        self, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """임베딩 배포가 없을 때 ValueError가 발생하는지 테스트."""
         settings = Settings(
             azure_api_key="test-key",
@@ -135,7 +148,9 @@ class TestAzureOpenAIAdapter:
         with pytest.raises(ValueError, match="Azure embedding deployment not configured"):
             adapter.as_ragas_embeddings()
 
-    def test_token_usage_tracking(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_token_usage_tracking(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """토큰 사용량 추적이 올바르게 동작하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
 
@@ -145,14 +160,18 @@ class TestAzureOpenAIAdapter:
         usage = adapter.get_token_usage()
         assert usage == (100, 50, 150)
 
-    def test_reset_token_usage(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_reset_token_usage(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """토큰 사용량 리셋이 동작하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         adapter._token_usage.add(100, 50, 150)
         adapter.reset_token_usage()
         assert adapter.get_token_usage() == (0, 0, 0)
 
-    def test_get_and_reset_token_usage(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_get_and_reset_token_usage(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """get_and_reset_token_usage가 값을 반환하고 리셋하는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         adapter._token_usage.add(100, 50, 150)
@@ -161,7 +180,9 @@ class TestAzureOpenAIAdapter:
         assert usage == (100, 50, 150)
         assert adapter.get_token_usage() == (0, 0, 0)
 
-    def test_llm_port_compliance(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_llm_port_compliance(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """LLMPort 인터페이스를 올바르게 구현했는지 테스트."""
         adapter = AzureOpenAIAdapter(azure_settings)
         assert hasattr(adapter, "get_model_name")
@@ -169,9 +190,11 @@ class TestAzureOpenAIAdapter:
         assert callable(adapter.get_model_name)
         assert callable(adapter.as_ragas_llm)
 
-    def test_azure_client_creation(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_azure_client_creation(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """Azure OpenAI 클라이언트가 올바른 설정으로 생성되는지 테스트."""
-        adapter = AzureOpenAIAdapter(azure_settings)
+        AzureOpenAIAdapter(azure_settings)
 
         # Verify AsyncAzureOpenAI was called with correct parameters
         mock_azure_client.assert_called_once_with(
@@ -180,9 +203,11 @@ class TestAzureOpenAIAdapter:
             api_version="2024-02-15-preview",
         )
 
-    def test_ragas_llm_factory_call(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_ragas_llm_factory_call(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """Ragas llm_factory가 올바른 파라미터로 호출되는지 테스트."""
-        adapter = AzureOpenAIAdapter(azure_settings)
+        AzureOpenAIAdapter(azure_settings)
 
         # Verify llm_factory was called with correct parameters
         mock_ragas_llm.assert_called_once_with(
@@ -193,9 +218,11 @@ class TestAzureOpenAIAdapter:
             api_version="2024-02-15-preview",
         )
 
-    def test_ragas_embeddings_creation(self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings):
+    def test_ragas_embeddings_creation(
+        self, azure_settings, mock_azure_client, mock_ragas_llm, mock_ragas_embeddings
+    ):
         """Ragas Azure 임베딩이 올바른 파라미터로 생성되는지 테스트."""
-        adapter = AzureOpenAIAdapter(azure_settings)
+        AzureOpenAIAdapter(azure_settings)
 
         # Verify embedding_factory was called with correct parameters
         # Note: client is the AsyncAzureOpenAI instance, we can't easily check it

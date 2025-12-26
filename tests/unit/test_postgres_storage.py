@@ -1,9 +1,8 @@
 """Unit tests for PostgreSQL storage adapter."""
 
-import json
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,9 +32,7 @@ def sample_run():
             TestCaseResult(
                 test_case_id="tc-001",
                 metrics=[
-                    MetricScore(
-                        name="faithfulness", score=0.85, threshold=0.7, reason="Good"
-                    ),
+                    MetricScore(name="faithfulness", score=0.85, threshold=0.7, reason="Good"),
                     MetricScore(
                         name="answer_relevancy",
                         score=0.90,
@@ -57,9 +54,7 @@ def sample_run():
             TestCaseResult(
                 test_case_id="tc-002",
                 metrics=[
-                    MetricScore(
-                        name="faithfulness", score=0.75, threshold=0.7, reason="OK"
-                    ),
+                    MetricScore(name="faithfulness", score=0.75, threshold=0.7, reason="OK"),
                     MetricScore(
                         name="answer_relevancy",
                         score=0.80,
@@ -117,7 +112,7 @@ class TestPostgreSQLStorageAdapter:
         )
 
         with patch("builtins.open", MagicMock()):
-            adapter = PostgreSQLStorageAdapter(
+            PostgreSQLStorageAdapter(
                 host="localhost",
                 port=5432,
                 database="test_db",
@@ -367,7 +362,7 @@ class TestPostgreSQLStorageAdapter:
                 started_at=datetime(2025, 1, 1, 10, 0, 0),
             )
 
-            runs = adapter.list_runs(dataset_name="insurance-qa")
+            adapter.list_runs(dataset_name="insurance-qa")
 
             # Verify SQL was called with dataset filter
             assert mock_connection.execute.called
@@ -393,7 +388,7 @@ class TestPostgreSQLStorageAdapter:
                 started_at=datetime(2025, 1, 1, 10, 0, 0),
             )
 
-            runs = adapter.list_runs(model_name="gpt-5-nano")
+            adapter.list_runs(model_name="gpt-5-nano")
 
             # Verify SQL was called
             assert mock_connection.execute.called
@@ -492,9 +487,7 @@ class TestPostgreSQLStorageAdapter:
 
         # All port methods should be present in adapter
         for method_name in port_methods:
-            assert method_name in adapter_methods or hasattr(
-                PostgreSQLStorageAdapter, method_name
-            )
+            assert method_name in adapter_methods or hasattr(PostgreSQLStorageAdapter, method_name)
 
     def test_save_run_with_no_results(self, mock_psycopg, mock_connection):
         """Test saving a run with no test case results."""

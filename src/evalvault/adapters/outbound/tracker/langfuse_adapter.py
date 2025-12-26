@@ -219,7 +219,8 @@ class LangfuseAdapter(TrackerPort):
         metric_summary = {}
         for metric_name in run.metrics_evaluated:
             passed_count = sum(
-                1 for r in run.results
+                1
+                for r in run.results
                 if r.get_metric(metric_name) and r.get_metric(metric_name).passed
             )
             avg_score = run.get_avg_score(metric_name)
@@ -254,7 +255,9 @@ class LangfuseAdapter(TrackerPort):
                 "passed": run.passed_test_cases,
                 "failed": run.total_test_cases - run.passed_test_cases,
                 "pass_rate": round(run.pass_rate, 4),
-                "duration_seconds": round(run.duration_seconds, 2) if run.duration_seconds else None,
+                "duration_seconds": round(run.duration_seconds, 2)
+                if run.duration_seconds
+                else None,
                 "total_tokens": run.total_tokens,
             },
             "metrics": metric_summary,
@@ -430,7 +433,8 @@ class LangfuseAdapter(TrackerPort):
         if run.total_tokens > 0:
             # Calculate total prompt and completion tokens
             total_prompt_tokens = sum(
-                r.tokens_used // 2 for r in run.results  # Approximate if not tracked
+                r.tokens_used // 2
+                for r in run.results  # Approximate if not tracked
             )
             total_completion_tokens = run.total_tokens - total_prompt_tokens
 
@@ -441,7 +445,10 @@ class LangfuseAdapter(TrackerPort):
                     name="ragas-evaluation",
                     as_type="generation",
                     model=run.model_name,
-                    input={"metrics": run.metrics_evaluated, "total_test_cases": run.total_test_cases},
+                    input={
+                        "metrics": run.metrics_evaluated,
+                        "total_test_cases": run.total_test_cases,
+                    },
                     output={"total_tokens": run.total_tokens},
                     usage_details={
                         "input": total_prompt_tokens,

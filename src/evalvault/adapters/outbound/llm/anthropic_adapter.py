@@ -86,11 +86,11 @@ class ThinkingTokenTrackingAsyncAnthropic:
         thinking_budget = self._thinking_budget
 
         class ThinkingTrackingMessages:
-            def __init__(inner_self, messages: Any, tracker: TokenUsage):
+            def __init__(inner_self, messages: Any, tracker: TokenUsage):  # noqa: N805
                 inner_self._messages = messages
                 inner_self._tracker = tracker
 
-            async def create(inner_self, **kwargs: Any) -> Any:
+            async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
                 # Inject extended thinking parameters if configured
                 if thinking_budget is not None and "thinking" not in kwargs:
                     kwargs["thinking"] = {

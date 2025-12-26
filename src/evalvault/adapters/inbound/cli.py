@@ -5,7 +5,7 @@ import base64
 import json
 from datetime import datetime
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import typer
@@ -125,9 +125,7 @@ def run(
     # Validate metrics
     invalid_metrics = [m for m in metric_list if m not in AVAILABLE_METRICS]
     if invalid_metrics:
-        console.print(
-            f"[red]Error:[/red] Invalid metrics: {', '.join(invalid_metrics)}"
-        )
+        console.print(f"[red]Error:[/red] Invalid metrics: {', '.join(invalid_metrics)}")
         console.print(f"Available metrics: {', '.join(AVAILABLE_METRICS)}")
         raise typer.Exit(1)
 
@@ -237,7 +235,7 @@ def _display_results(result, verbose: bool = False):
   Total Test Cases: {result.total_test_cases}
   Passed: [green]{result.passed_test_cases}[/green]
   Failed: [red]{result.total_test_cases - result.passed_test_cases}[/red]
-  Pass Rate: {'[green]' if result.pass_rate >= 0.7 else '[red]'}{result.pass_rate:.1%}[/]
+  Pass Rate: {"[green]" if result.pass_rate >= 0.7 else "[red]"}{result.pass_rate:.1%}[/]
 """
     console.print(Panel(summary, title="Evaluation Results", border_style="blue"))
 
@@ -468,10 +466,10 @@ def metrics():
     )
 
     console.print(table)
+    console.print("\n[dim]Use --metrics flag with 'run' command to specify metrics.[/dim]")
     console.print(
-        "\n[dim]Use --metrics flag with 'run' command to specify metrics.[/dim]"
+        "[dim]Example: evalvault run data.csv --metrics faithfulness,answer_relevancy[/dim]\n"
     )
-    console.print("[dim]Example: evalvault run data.csv --metrics faithfulness,answer_relevancy[/dim]\n")
 
 
 @app.command("langfuse-dashboard")
@@ -507,7 +505,9 @@ def langfuse_dashboard(
         console.print("[yellow]No traces found for the given event_type.[/yellow]")
         return
 
-    table = Table(title=f"Langfuse Traces ({event_type})", show_header=True, header_style="bold cyan")
+    table = Table(
+        title=f"Langfuse Traces ({event_type})", show_header=True, header_style="bold cyan"
+    )
     table.add_column("Trace ID")
     table.add_column("Dataset")
     table.add_column("Model")
@@ -765,7 +765,7 @@ def _fetch_langfuse_traces(
         "limit": limit,
         "orderBy": {"createdAt": "desc"},
     }
-    auth = base64.b64encode(f"{public_key}:{secret_key}".encode("utf-8")).decode("utf-8")
+    auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode("utf-8")
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -949,7 +949,9 @@ def generate(
 
             # Show graph statistics
             stats = generator.get_statistics()
-            console.print(f"[dim]Knowledge Graph: {stats['num_entities']} entities, {stats['num_relations']} relations[/dim]")
+            console.print(
+                f"[dim]Knowledge Graph: {stats['num_entities']} entities, {stats['num_relations']} relations[/dim]"
+            )
 
             dataset = generator.generate_dataset(
                 num_questions=num_questions,
@@ -1509,27 +1511,27 @@ def experiment_summary(
         console.print(f"Status: [{summary['status']}]{summary['status']}[/{summary['status']}]")
         console.print(f"Created: {summary['created_at']}")
 
-        if summary['description']:
+        if summary["description"]:
             console.print(f"\n[bold]Description:[/bold]\n{summary['description']}")
 
-        if summary['hypothesis']:
+        if summary["hypothesis"]:
             console.print(f"\n[bold]Hypothesis:[/bold]\n{summary['hypothesis']}")
 
-        if summary['metrics_to_compare']:
-            console.print(f"\n[bold]Metrics to Compare:[/bold]")
+        if summary["metrics_to_compare"]:
+            console.print("\n[bold]Metrics to Compare:[/bold]")
             console.print(f"  {', '.join(summary['metrics_to_compare'])}")
 
-        console.print(f"\n[bold]Groups:[/bold]")
-        for group_name, group_data in summary['groups'].items():
+        console.print("\n[bold]Groups:[/bold]")
+        for group_name, group_data in summary["groups"].items():
             console.print(f"\n  [cyan]{group_name}[/cyan]")
-            if group_data['description']:
+            if group_data["description"]:
                 console.print(f"    Description: {group_data['description']}")
             console.print(f"    Runs: {group_data['num_runs']}")
-            if group_data['run_ids']:
-                for run_id in group_data['run_ids']:
+            if group_data["run_ids"]:
+                for run_id in group_data["run_ids"]:
                     console.print(f"      - {run_id}")
 
-        if summary['conclusion']:
+        if summary["conclusion"]:
             console.print(f"\n[bold]Conclusion:[/bold]\n{summary['conclusion']}")
 
         console.print()

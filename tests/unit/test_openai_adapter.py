@@ -1,8 +1,8 @@
 """Tests for OpenAI LLM adapter."""
 
-import os
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
 from evalvault.config.settings import Settings
@@ -15,8 +15,12 @@ class TestOpenAIAdapter:
     @pytest.fixture(autouse=True)
     def mock_ragas_deps(self):
         """Mock Ragas dependencies to avoid actual API calls."""
-        with patch("evalvault.adapters.outbound.llm.openai_adapter.llm_factory") as mock_llm, \
-             patch("evalvault.adapters.outbound.llm.openai_adapter.RagasOpenAIEmbeddings") as mock_embed:
+        with (
+            patch("evalvault.adapters.outbound.llm.openai_adapter.llm_factory") as mock_llm,
+            patch(
+                "evalvault.adapters.outbound.llm.openai_adapter.RagasOpenAIEmbeddings"
+            ) as mock_embed,
+        ):
             mock_llm.return_value = MagicMock()
             mock_embed.return_value = MagicMock()
             yield

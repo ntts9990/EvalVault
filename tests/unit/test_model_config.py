@@ -9,20 +9,17 @@
   - OpenAI 임베딩: text-embedding-3-small
 """
 
-import pytest
-import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 from evalvault.config.model_config import (
+    EmbeddingConfig,
+    LLMConfig,
     ModelConfig,
     ProfileConfig,
-    LLMConfig,
-    EmbeddingConfig,
     load_model_config,
-    get_model_config,
-    reset_model_config,
 )
 
 

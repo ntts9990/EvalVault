@@ -70,8 +70,7 @@ class ExcelDatasetLoader(BaseDatasetLoader):
         except ImportError as e:
             if engine == "xlrd":
                 raise ValueError(
-                    "xlrd package is required for .xls files. "
-                    "Install it with: pip install xlrd"
+                    "xlrd package is required for .xls files. Install it with: pip install xlrd"
                 ) from e
             raise
         except Exception as e:

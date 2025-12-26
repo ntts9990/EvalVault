@@ -1,7 +1,7 @@
 """Tests for Langfuse tracker adapter."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -51,7 +51,7 @@ class TestLangfuseAdapterInitialization:
 
     def test_initialization_default_host(self, mock_langfuse):
         """Test adapter initialization with default host."""
-        adapter = LangfuseAdapter(
+        LangfuseAdapter(
             public_key="pk-test",
             secret_key="sk-test",
         )
@@ -91,9 +91,7 @@ class TestStartTrace:
         assert trace_id == "trace-456"
         langfuse_adapter._client.start_span.assert_called_once_with(name="evaluation-run")
         # update_trace should be called to set trace-level name and metadata
-        mock_span.update_trace.assert_called_once_with(
-            name="evaluation-run", metadata=metadata
-        )
+        mock_span.update_trace.assert_called_once_with(name="evaluation-run", metadata=metadata)
 
 
 class TestAddSpan:

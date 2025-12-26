@@ -1,7 +1,5 @@
 """Unit tests for prompt customization."""
 
-import pytest
-
 from evalvault.domain.prompts.base import PromptTemplate
 from evalvault.domain.prompts.english import EnglishPrompts
 from evalvault.domain.prompts.korean import KoreanPrompts
@@ -174,9 +172,9 @@ class TestJapanesePrompts:
 
         # Check if the prompt contains Hiragana, Katakana, or Kanji characters
         has_japanese = any(
-            "\u3040" <= char <= "\u309F"  # Hiragana
-            or "\u30A0" <= char <= "\u30FF"  # Katakana
-            or "\u4E00" <= char <= "\u9FFF"  # Kanji
+            "\u3040" <= char <= "\u309f"  # Hiragana
+            or "\u30a0" <= char <= "\u30ff"  # Katakana
+            or "\u4e00" <= char <= "\u9fff"  # Kanji
             for char in faithfulness
         )
         assert has_japanese, "Japanese prompts should contain Japanese characters"
@@ -247,7 +245,7 @@ class TestChinesePrompts:
         faithfulness = prompts.get_faithfulness_prompt()
 
         # Check if the prompt contains Chinese characters (CJK Unified Ideographs)
-        has_chinese = any("\u4E00" <= char <= "\u9FFF" for char in faithfulness)
+        has_chinese = any("\u4e00" <= char <= "\u9fff" for char in faithfulness)
         assert has_chinese, "Chinese prompts should contain Chinese characters"
 
     def test_chinese_prompts_contain_chinese_keywords(self):

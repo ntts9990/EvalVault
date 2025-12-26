@@ -163,9 +163,7 @@ class ExperimentManager:
 
             # 개선율 계산 (최저 대비 최고)
             improvement = (
-                ((best_score - worst_score) / worst_score) * 100
-                if worst_score > 0
-                else 0.0
+                ((best_score - worst_score) / worst_score) * 100 if worst_score > 0 else 0.0
             )
 
             comparisons.append(
@@ -240,9 +238,7 @@ class ExperimentManager:
         experiment.add_group(group_name, description)
         self._storage.update_experiment(experiment)
 
-    def add_run_to_experiment_group(
-        self, experiment_id: str, group_name: str, run_id: str
-    ) -> None:
+    def add_run_to_experiment_group(self, experiment_id: str, group_name: str, run_id: str) -> None:
         """실험 그룹에 평가 실행 추가.
 
         Args:
