@@ -96,19 +96,24 @@ class TestAnthropicAdapter:
 
     @pytest.fixture
     def mock_ragas_llm_factory(self):
-        """Mock Ragas llm_factory."""
-        with patch("evalvault.adapters.outbound.llm.anthropic_adapter.llm_factory") as mock_llm:
+        """Mock Ragas llm_factory and Anthropic client."""
+        with patch(
+            "evalvault.adapters.outbound.llm.anthropic_adapter.llm_factory"
+        ) as mock_llm, patch(
+            "anthropic.AsyncAnthropic"
+        ) as mock_anthropic:
             mock_instance = MagicMock()
             mock_instance.generate = MagicMock()
             mock_instance.agenerate = MagicMock()
             mock_llm.return_value = mock_instance
+            mock_anthropic.return_value = MagicMock()
             yield mock_llm
 
     @pytest.fixture
     def mock_ragas_embeddings(self):
         """Mock Ragas OpenAI embeddings and AsyncOpenAI client."""
         with patch(
-            "evalvault.adapters.outbound.llm.anthropic_adapter.RagasOpenAIEmbeddings"
+            "evalvault.adapters.outbound.llm.anthropic_adapter.OpenAIEmbeddingsWithLegacy"
         ) as mock_emb, patch(
             "evalvault.adapters.outbound.llm.anthropic_adapter.AsyncOpenAI"
         ) as mock_client:
@@ -142,12 +147,13 @@ class TestAnthropicAdapter:
         adapter = AnthropicAdapter(anthropic_settings)
         ragas_llm = adapter.as_ragas_llm()
         assert ragas_llm is not None
-        # Verify llm_factory was called with correct parameters
-        mock_ragas_llm_factory.assert_called_once_with(
-            model="claude-3-5-sonnet-20241022",
-            provider="anthropic",
-            api_key="test-anthropic-key",
-        )
+        # Verify llm_factory was called with correct parameters (Ragas 0.4.x API)
+        mock_ragas_llm_factory.assert_called_once()
+        call_kwargs = mock_ragas_llm_factory.call_args[1]
+        assert call_kwargs["model"] == "claude-3-5-sonnet-20241022"
+        assert call_kwargs["provider"] == "anthropic"
+        assert "client" in call_kwargs  # client is required in Ragas 0.4.x
+        assert "max_tokens" in call_kwargs
 
     def test_as_ragas_embeddings_with_openai_fallback(
         self, anthropic_settings, mock_ragas_llm_factory, mock_ragas_embeddings
@@ -259,3 +265,62 @@ class TestAnthropicAdapter:
         assert "Embeddings not available" in error_message
         assert "Anthropic doesn't provide embeddings" in error_message
         assert "OPENAI_API_KEY" in error_message
+
+    def test_thinking_config_disabled_by_default(
+        self, anthropic_settings, mock_ragas_llm_factory, mock_ragas_embeddings
+    ):
+        """기본적으로 extended thinking이 비활성화되어 있는지 테스트."""
+        adapter = AnthropicAdapter(anthropic_settings)
+        config = adapter.get_thinking_config()
+
+        assert config.enabled is False
+        assert config.budget_tokens is None
+        assert config.think_level is None
+        assert adapter.supports_thinking() is False
+        assert adapter.get_thinking_budget() is None
+
+    def test_thinking_config_enabled_with_budget(
+        self, mock_ragas_llm_factory, mock_ragas_embeddings
+    ):
+        """anthropic_thinking_budget 설정 시 extended thinking이 활성화되는지 테스트."""
+        settings = Settings(
+            anthropic_api_key="test-key",
+            anthropic_model="claude-3-5-sonnet-20241022",
+            anthropic_thinking_budget=10000,
+            openai_api_key="test-openai-key",
+        )
+        adapter = AnthropicAdapter(settings)
+        config = adapter.get_thinking_config()
+
+        assert config.enabled is True
+        assert config.budget_tokens == 10000
+        assert config.think_level is None
+        assert adapter.supports_thinking() is True
+        assert adapter.get_thinking_budget() == 10000
+
+    def test_thinking_config_to_anthropic_param(
+        self, mock_ragas_llm_factory, mock_ragas_embeddings
+    ):
+        """ThinkingConfig가 Anthropic API 파라미터로 변환되는지 테스트."""
+        settings = Settings(
+            anthropic_api_key="test-key",
+            anthropic_model="claude-3-5-sonnet-20241022",
+            anthropic_thinking_budget=15000,
+            openai_api_key="test-openai-key",
+        )
+        adapter = AnthropicAdapter(settings)
+        config = adapter.get_thinking_config()
+
+        anthropic_param = config.to_anthropic_param()
+        assert anthropic_param is not None
+        assert anthropic_param["type"] == "enabled"
+        assert anthropic_param["budget_tokens"] == 15000
+
+    def test_thinking_config_disabled_returns_none_param(
+        self, anthropic_settings, mock_ragas_llm_factory, mock_ragas_embeddings
+    ):
+        """Extended thinking 비활성화 시 to_anthropic_param이 None 반환하는지 테스트."""
+        adapter = AnthropicAdapter(anthropic_settings)
+        config = adapter.get_thinking_config()
+
+        assert config.to_anthropic_param() is None

@@ -20,7 +20,7 @@ from evalvault.adapters.outbound.llm.openai_adapter import (
     TokenUsage,
 )
 from evalvault.config.settings import Settings
-from evalvault.ports.outbound.llm_port import LLMPort
+from evalvault.ports.outbound.llm_port import LLMPort, ThinkingConfig
 
 
 class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
@@ -237,3 +237,15 @@ class OllamaAdapter(LLMPort):
             Thinking level (e.g., 'medium') or None
         """
         return self._think_level
+
+    def get_thinking_config(self) -> ThinkingConfig:
+        """Get thinking/reasoning configuration for this adapter.
+
+        Returns:
+            ThinkingConfig with Ollama thinking settings
+        """
+        return ThinkingConfig(
+            enabled=self._think_level is not None,
+            budget_tokens=None,  # Not used for Ollama
+            think_level=self._think_level,
+        )

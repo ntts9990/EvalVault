@@ -77,6 +77,10 @@ class Settings(BaseSettings):
         default="claude-3-5-sonnet-20241022",
         description="Anthropic Claude model to use for evaluation",
     )
+    anthropic_thinking_budget: int | None = Field(
+        default=None,
+        description="Token budget for extended thinking (e.g., 10000). None to disable.",
+    )
 
     # Langfuse Configuration (optional)
     langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")

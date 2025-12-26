@@ -204,6 +204,58 @@ class TestOllamaAdapter:
                 or "think_level" not in call_kwargs["extra_body"].get("options", {})
             )
 
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
+    def test_thinking_config_disabled_by_default(
+        self, mock_embeddings, mock_llm_factory, dev_settings
+    ):
+        """기본적으로 thinking이 비활성화되어 있는지 테스트."""
+        adapter = OllamaAdapter(dev_settings)
+        config = adapter.get_thinking_config()
+
+        assert config.enabled is False
+        assert config.budget_tokens is None
+        assert config.think_level is None
+        assert adapter.supports_thinking() is False
+
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
+    def test_thinking_config_enabled_with_think_level(
+        self, mock_embeddings, mock_llm_factory, prod_settings
+    ):
+        """think_level 설정 시 thinking이 활성화되는지 테스트."""
+        adapter = OllamaAdapter(prod_settings)
+        config = adapter.get_thinking_config()
+
+        assert config.enabled is True
+        assert config.budget_tokens is None
+        assert config.think_level == "medium"
+        assert adapter.supports_thinking() is True
+
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
+    def test_thinking_config_to_ollama_options(
+        self, mock_embeddings, mock_llm_factory, prod_settings
+    ):
+        """ThinkingConfig가 Ollama options으로 변환되는지 테스트."""
+        adapter = OllamaAdapter(prod_settings)
+        config = adapter.get_thinking_config()
+
+        ollama_options = config.to_ollama_options()
+        assert ollama_options is not None
+        assert ollama_options["think_level"] == "medium"
+
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.llm_factory")
+    @patch("evalvault.adapters.outbound.llm.ollama_adapter.RagasOpenAIEmbeddings")
+    def test_thinking_config_disabled_returns_none_options(
+        self, mock_embeddings, mock_llm_factory, dev_settings
+    ):
+        """Thinking 비활성화 시 to_ollama_options이 None 반환하는지 테스트."""
+        adapter = OllamaAdapter(dev_settings)
+        config = adapter.get_thinking_config()
+
+        assert config.to_ollama_options() is None
+
 
 class TestGetLLMAdapter:
     """get_llm_adapter 팩토리 함수 테스트."""
