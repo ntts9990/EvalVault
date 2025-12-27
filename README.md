@@ -5,8 +5,31 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Ragas](https://img.shields.io/badge/Ragas-v1.0-green.svg)](https://docs.ragas.io/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.md)
+[![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](.pre-commit-config.yaml)
 
 ---
+
+## Overview (English)
+
+EvalVault is an end-to-end evaluation harness for Retrieval-Augmented Generation (RAG)
+systems. It plugs into structured datasets, runs Ragas v1.0 metrics, and ships results to
+SQLite or Langfuse for longitudinal tracking.
+
+### Highlights
+
+- Batteries-included Typer CLI for running, comparing, and exporting evaluation runs
+- Profile-driven model wiring with OpenAI and Ollama defaults
+- Optional Langfuse integration for trace-level inspection
+- Dataset loaders for JSON, CSV, and Excel sources
+
+### Quick Start (EN)
+
+```bash
+uv pip install -e ".[dev]"
+cp .env.example .env
+evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
+```
 
 ## 핵심 기능
 

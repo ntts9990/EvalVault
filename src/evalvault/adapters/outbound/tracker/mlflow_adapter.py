@@ -52,7 +52,7 @@ class MLflowAdapter(TrackerPort):
         # Log metadata as MLflow parameters (only primitive types)
         if metadata:
             for key, value in metadata.items():
-                if isinstance(value, (str, int, float, bool)):
+                if isinstance(value, str | int | float | bool):
                     self._mlflow.log_param(key, value)
 
         self._active_runs[trace_id] = run

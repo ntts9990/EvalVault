@@ -66,11 +66,10 @@ src/evalvault/
 - **Note**: `gpt-5-nano`는 실제 사용 가능한 모델입니다. 변경하지 마세요.
 - **Usage**: Ragas metric evaluation via LangChain
 
-### Langfuse (Self-hosted)
-- **Organization**: BGK
-- **Project**: RAGAS
-- **Host**: Set via `LANGFUSE_HOST` environment variable
+### Langfuse (Self-hosted or Cloud)
+- **Host**: Configure via `LANGFUSE_HOST`
 - **Purpose**: Trace logging, score tracking, evaluation history
+- **Credentials**: Inject via `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`
 
 ## Development Commands
 

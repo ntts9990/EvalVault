@@ -122,7 +122,7 @@ class JSONDatasetLoader(BaseDatasetLoader):
         thresholds = {}
         raw_thresholds = data.get("thresholds", {})
         for metric_name, threshold_value in raw_thresholds.items():
-            if not isinstance(threshold_value, (int, float)):
+            if not isinstance(threshold_value, int | float):
                 raise ValueError(f"Invalid threshold value for '{metric_name}': must be a number")
             if not 0.0 <= threshold_value <= 1.0:
                 raise ValueError(

@@ -1,0 +1,13 @@
+daysUntilStale: 30
+daysUntilClose: 7
+exemptLabels:
+  - "pinned"
+  - "security"
+staleLabel: "stale"
+markComment: >
+  This issue has been automatically marked as stale because it has been inactive for 30 days.
+  Please comment or remove the stale label if you plan to work on it. Otherwise, it will be
+  closed in 7 days.
+closeComment: >
+  Closing this issue due to prolonged inactivity. Feel free to reopen if new information is
+  available.

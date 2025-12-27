@@ -526,7 +526,7 @@ def langfuse_dashboard(
             trace.get("id", "unknown"),
             str(dataset_name),
             str(model_name),
-            f"{pass_rate:.2f}" if isinstance(pass_rate, (int, float)) else "N/A",
+            f"{pass_rate:.2f}" if isinstance(pass_rate, int | float) else "N/A",
             str(total_cases) if total_cases is not None else "N/A",
             created_at,
         )
