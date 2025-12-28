@@ -1,0 +1,140 @@
+{
+  "version": "1.0.0",
+  "language": "ko",
+  "domain": "insurance",
+  "description": "보험 도메인 한국어 용어 사전",
+  "terms": {
+    "보험료": {
+      "definition": "보험계약에 따라 계약자가 보험자에게 납입하는 금액",
+      "aliases": ["보험 요금", "월 보험료", "납입보험료"],
+      "category": "payment",
+      "importance": "high"
+    },
+    "보험금": {
+      "definition": "보험사고 발생 시 보험자가 피보험자에게 지급하는 금액",
+      "aliases": ["보장금", "지급보험금", "보험 보상금"],
+      "category": "benefit",
+      "importance": "high"
+    },
+    "보장금액": {
+      "definition": "보험계약에서 보장하는 최대 금액",
+      "aliases": ["가입금액", "보험가입금액", "보장한도"],
+      "category": "coverage",
+      "importance": "high"
+    },
+    "보험기간": {
+      "definition": "보험계약의 효력이 지속되는 기간",
+      "aliases": ["계약기간", "보장기간"],
+      "category": "duration",
+      "importance": "high"
+    },
+    "납입기간": {
+      "definition": "보험료를 납입해야 하는 기간",
+      "aliases": ["보험료 납입기간", "납부기간"],
+      "category": "duration",
+      "importance": "medium"
+    },
+    "피보험자": {
+      "definition": "보험사고의 대상이 되는 사람",
+      "aliases": ["보험 대상자", "가입자"],
+      "category": "party",
+      "importance": "high"
+    },
+    "계약자": {
+      "definition": "보험계약을 체결하고 보험료를 납입할 의무가 있는 사람",
+      "aliases": ["보험계약자", "가입자"],
+      "category": "party",
+      "importance": "high"
+    },
+    "수익자": {
+      "definition": "보험금을 수령할 권리가 있는 사람",
+      "aliases": ["보험금 수령인", "수령자"],
+      "category": "party",
+      "importance": "medium"
+    },
+    "면책기간": {
+      "definition": "보험가입 후 보장이 시작되지 않는 기간",
+      "aliases": ["대기기간", "보장제외기간"],
+      "category": "exclusion",
+      "importance": "medium"
+    },
+    "갱신형": {
+      "definition": "일정 기간마다 보험료가 재산정되는 보험 형태",
+      "aliases": ["갱신형 보험", "갱신계약"],
+      "category": "type",
+      "importance": "medium"
+    },
+    "비갱신형": {
+      "definition": "보험기간 동안 보험료가 변동되지 않는 보험 형태",
+      "aliases": ["비갱신형 보험", "비갱신계약"],
+      "category": "type",
+      "importance": "medium"
+    },
+    "실손보험": {
+      "definition": "실제 발생한 의료비를 보장하는 보험",
+      "aliases": ["실손의료보험", "실비보험"],
+      "category": "product",
+      "importance": "high"
+    },
+    "종신보험": {
+      "definition": "피보험자가 사망할 때까지 보장하는 보험",
+      "aliases": ["종신생명보험"],
+      "category": "product",
+      "importance": "high"
+    },
+    "정기보험": {
+      "definition": "일정 기간 동안만 보장하는 보험",
+      "aliases": ["정기생명보험", "기간보험"],
+      "category": "product",
+      "importance": "medium"
+    },
+    "해지환급금": {
+      "definition": "보험계약 해지 시 돌려받는 금액",
+      "aliases": ["해약환급금", "환급금"],
+      "category": "benefit",
+      "importance": "medium"
+    },
+    "특약": {
+      "definition": "주계약에 추가로 가입하는 보장 항목",
+      "aliases": ["특별약관", "추가보장"],
+      "category": "coverage",
+      "importance": "medium"
+    },
+    "주계약": {
+      "definition": "보험계약의 기본이 되는 계약",
+      "aliases": ["기본계약", "본계약"],
+      "category": "coverage",
+      "importance": "medium"
+    },
+    "고지의무": {
+      "definition": "계약자가 보험가입 시 중요한 사항을 알려야 하는 의무",
+      "aliases": ["알릴의무", "통지의무"],
+      "category": "obligation",
+      "importance": "high"
+    },
+    "면책사유": {
+      "definition": "보험사가 보험금 지급 책임을 지지 않는 사유",
+      "aliases": ["면책조항", "보장제외사유"],
+      "category": "exclusion",
+      "importance": "high"
+    },
+    "보험증권": {
+      "definition": "보험계약 체결을 증명하는 문서",
+      "aliases": ["증권", "보험계약증서"],
+      "category": "document",
+      "importance": "medium"
+    }
+  },
+  "categories": {
+    "payment": "납입 관련",
+    "benefit": "보장/급부 관련",
+    "coverage": "보장범위 관련",
+    "duration": "기간 관련",
+    "party": "계약 당사자",
+    "exclusion": "면책/제외 관련",
+    "type": "보험 유형",
+    "product": "보험 상품",
+    "obligation": "의무 관련",
+    "document": "문서 관련"
+  }
+}
