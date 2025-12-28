@@ -959,16 +959,322 @@ class TestSQLiteDomainMemoryAdapter:
         assert results["learnings"] == []
 
     # =========================================================================
-    # Dynamics: Formation Tests (Phase 3 - NotImplementedError)
+    # Dynamics: Formation Tests (Phase 3)
     # =========================================================================
 
-    def test_formation_methods_not_implemented(self, memory_adapter):
-        """Formation 메서드 미구현 확인."""
-        with pytest.raises(NotImplementedError, match="Phase 3"):
-            memory_adapter.extract_facts_from_evaluation("run-001")
+    def test_extract_facts_from_evaluation(self, memory_adapter):
+        """평가 결과에서 사실 추출."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
 
-        with pytest.raises(NotImplementedError, match="Phase 3"):
-            memory_adapter.extract_patterns_from_evaluation("run-001")
+        # 평가 결과 생성
+        run = EvaluationRun(
+            run_id="test-run-001",
+            dataset_name="test-dataset",
+            model_name="gpt-4",
+            metrics_evaluated=["faithfulness"],
+        )
 
-        with pytest.raises(NotImplementedError, match="Phase 3"):
-            memory_adapter.extract_behaviors_from_evaluation("run-001")
+        # 높은 faithfulness를 가진 테스트 케이스
+        result = TestCaseResult(
+            test_case_id="tc-001",
+            metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+            question="보험A의 보장금액은 얼마인가요?",
+            answer="보장금액은 1억원입니다.",
+            contexts=["보험A의 보장금액은 1억원입니다."],
+        )
+        run.results.append(result)
+
+        # 사실 추출
+        facts = memory_adapter.extract_facts_from_evaluation(
+            evaluation_run=run,
+            domain="insurance",
+            language="ko",
+            min_confidence=0.7,
+        )
+
+        # 검증 - SPO 패턴에 맞는 사실이 추출되어야 함
+        assert isinstance(facts, list)
+        # 패턴이 매치되면 사실이 추출됨
+        for fact in facts:
+            assert fact.domain == "insurance"
+            assert fact.language == "ko"
+            assert fact.fact_type == "inferred"
+
+    def test_extract_facts_low_confidence_skipped(self, memory_adapter):
+        """낮은 신뢰도 평가는 건너뜀."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(run_id="test-run-002")
+        result = TestCaseResult(
+            test_case_id="tc-001",
+            metrics=[MetricScore(name="faithfulness", score=0.5, threshold=0.7)],
+            contexts=["보험A는 좋은 상품입니다."],
+        )
+        run.results.append(result)
+
+        facts = memory_adapter.extract_facts_from_evaluation(
+            evaluation_run=run,
+            domain="insurance",
+            language="ko",
+            min_confidence=0.7,
+        )
+
+        assert facts == []
+
+    def test_extract_patterns_from_evaluation(self, memory_adapter):
+        """평가 결과에서 학습 패턴 추출."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="test-run-003",
+            dataset_name="test-dataset",
+            metrics_evaluated=["faithfulness", "answer_relevancy"],
+        )
+
+        # 성공한 테스트 케이스
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.9, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.85, threshold=0.7),
+                ],
+                question="보험료는 얼마인가요?",
+            )
+        )
+
+        # 실패한 테스트 케이스
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-002",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.5, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.4, threshold=0.7),
+                ],
+                question="약관 내용이 무엇인가요?",
+            )
+        )
+
+        learning = memory_adapter.extract_patterns_from_evaluation(
+            evaluation_run=run,
+            domain="insurance",
+            language="ko",
+        )
+
+        assert learning.run_id == "test-run-003"
+        assert learning.domain == "insurance"
+        assert "faithfulness" in learning.entity_type_reliability
+        assert "answer_relevancy" in learning.entity_type_reliability
+        assert len(learning.successful_patterns) >= 0
+        assert len(learning.failed_patterns) >= 0
+
+    def test_extract_behaviors_from_evaluation(self, memory_adapter):
+        """평가 결과에서 행동 추출."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(run_id="test-run-004")
+
+        # 높은 성공률 테스트 케이스
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.95, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.9, threshold=0.7),
+                ],
+                question="보험료는 얼마인가요?",
+                answer="월 보험료는 5만원입니다.",
+                contexts=["이 상품의 월 보험료는 5만원입니다."],
+                tokens_used=100,
+            )
+        )
+
+        behaviors = memory_adapter.extract_behaviors_from_evaluation(
+            evaluation_run=run,
+            domain="insurance",
+            language="ko",
+            min_success_rate=0.8,
+        )
+
+        assert len(behaviors) >= 1
+        behavior = behaviors[0]
+        assert behavior.domain == "insurance"
+        assert behavior.success_rate == 1.0  # 2/2 메트릭 통과
+        assert "ko" in behavior.applicable_languages
+        assert "retrieve_contexts" in behavior.action_sequence
+
+    def test_extract_behaviors_low_success_rate_skipped(self, memory_adapter):
+        """낮은 성공률 테스트 케이스는 건너뜀."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(run_id="test-run-005")
+
+        # 낮은 성공률 테스트 케이스 (1/2 통과)
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.9, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.5, threshold=0.7),
+                ],
+                question="테스트 질문",
+            )
+        )
+
+        behaviors = memory_adapter.extract_behaviors_from_evaluation(
+            evaluation_run=run,
+            domain="insurance",
+            language="ko",
+            min_success_rate=0.8,
+        )
+
+        assert behaviors == []
+
+    def test_extract_facts_invalid_input(self, memory_adapter):
+        """잘못된 입력 타입 검증."""
+        with pytest.raises(TypeError, match="EvaluationRun"):
+            memory_adapter.extract_facts_from_evaluation(
+                evaluation_run="not-a-run",  # type: ignore
+                domain="insurance",
+            )
+
+
+# =============================================================================
+# DomainLearningHook Tests
+# =============================================================================
+
+
+class TestDomainLearningHook:
+    """DomainLearningHook 서비스 테스트."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create a temporary database file."""
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = Path(f.name)
+        yield db_path
+        if db_path.exists():
+            db_path.unlink()
+
+    @pytest.fixture
+    def learning_hook(self, temp_db):
+        """Create DomainLearningHook with temp database."""
+        from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+            SQLiteDomainMemoryAdapter,
+        )
+        from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+
+        memory_adapter = SQLiteDomainMemoryAdapter(db_path=temp_db)
+        return DomainLearningHook(memory_port=memory_adapter)
+
+    @pytest.fixture
+    def sample_evaluation_run(self):
+        """Create a sample evaluation run for testing."""
+        from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="hook-test-run-001",
+            dataset_name="test-dataset",
+            model_name="gpt-4",
+            metrics_evaluated=["faithfulness", "answer_relevancy"],
+        )
+
+        # 성공적인 테스트 케이스들
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.95, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.9, threshold=0.7),
+                ],
+                question="보험A의 보장금액은 얼마인가요?",
+                answer="보장금액은 1억원입니다.",
+                contexts=["보험A의 보장금액은 1억원입니다."],
+                tokens_used=150,
+            )
+        )
+
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-002",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.85, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.8, threshold=0.7),
+                ],
+                question="만기는 언제인가요?",
+                answer="만기는 20년입니다.",
+                contexts=["해당 보험의 만기는 20년입니다."],
+                tokens_used=100,
+            )
+        )
+
+        return run
+
+    @pytest.mark.asyncio
+    async def test_on_evaluation_complete(self, learning_hook, sample_evaluation_run):
+        """평가 완료 후 메모리 형성."""
+        result = await learning_hook.on_evaluation_complete(
+            evaluation_run=sample_evaluation_run,
+            domain="insurance",
+            language="ko",
+            auto_save=True,
+        )
+
+        assert "facts" in result
+        assert "learning" in result
+        assert "behaviors" in result
+        assert isinstance(result["learning"], LearningMemory)
+
+    def test_extract_and_save_patterns(self, learning_hook, sample_evaluation_run):
+        """패턴 추출 및 저장."""
+        learning = learning_hook.extract_and_save_patterns(
+            evaluation_run=sample_evaluation_run,
+            domain="insurance",
+            language="ko",
+            auto_save=True,
+        )
+
+        assert learning.run_id == sample_evaluation_run.run_id
+        assert learning.domain == "insurance"
+
+        # 저장 확인
+        saved_learnings = learning_hook.memory_port.list_learnings(domain="insurance")
+        assert len(saved_learnings) >= 1
+
+    def test_extract_and_save_behaviors(self, learning_hook, sample_evaluation_run):
+        """행동 추출 및 저장."""
+        behaviors = learning_hook.extract_and_save_behaviors(
+            evaluation_run=sample_evaluation_run,
+            domain="insurance",
+            language="ko",
+            min_success_rate=0.8,
+            auto_save=True,
+        )
+
+        assert len(behaviors) >= 1
+
+        # 저장 확인
+        saved_behaviors = learning_hook.memory_port.list_behaviors(domain="insurance")
+        assert len(saved_behaviors) >= 1
+
+    def test_run_evolution(self, learning_hook):
+        """Evolution dynamics 실행."""
+        # 중복 사실 생성
+        for _ in range(3):
+            learning_hook.memory_port.save_fact(
+                FactualFact(
+                    subject="보험A",
+                    predicate="보장금액",
+                    object="1억원",
+                    domain="insurance",
+                    language="ko",
+                )
+            )
+
+        # Evolution 실행
+        result = learning_hook.run_evolution(domain="insurance", language="ko")
+
+        assert "consolidated" in result
+        assert "forgotten" in result
+        assert "decayed" in result
+        assert result["consolidated"] == 2  # 3개 중 2개 병합

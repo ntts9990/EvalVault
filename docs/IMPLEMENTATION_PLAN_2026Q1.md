@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.2.0
+> **Document Version**: 2.3.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Phase 2 Complete
+> **Status**: Phase 3 Complete
 
 ---
 
@@ -26,9 +26,9 @@
 | Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete |
 | Dynamics: Evolution | 1 week | 12h | Must Have | ✅ Complete |
 | Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
+| Dynamics: Formation | 1 week | 16h | Must Have | ✅ Complete |
 | Config & Multi-language | 1.5 weeks | 16h | Should Have | Pending |
-| Learning Integration | 1.5 weeks | 20h | Should Have | Pending |
-| **Total** | **7 weeks** | **84h** | | |
+| **Total** | **7 weeks** | **80h** | | |
 
 ---
 
@@ -1203,10 +1203,11 @@ Phase 2: ✅ 완료 (Evolution + Retrieval)
 ├── memory_evolution_log 로깅
 └── 14 new unit tests (총 54 tests)
 
-Phase 3: Formation + Learning Integration (진행 예정)
-├── extract_*_from_evaluation 메서드
-├── DomainLearningHook 구현
-└── RagasEvaluator/EntityExtractor 통합
+Phase 3: ✅ 완료 (Formation + Learning Integration)
+├── extract_facts/patterns/behaviors_from_evaluation 메서드
+├── DomainLearningHook 서비스 구현
+├── DomainLearningHookPort 인터페이스 정의
+└── 9 new unit tests (총 63 tests)
 
 Phase 4: Config & Multi-language
 ├── Config schema (YAML)
@@ -1246,3 +1247,74 @@ Phase 5: Forms 확장 (Planar/Hierarchical)
 - `test_hybrid_search_returns_all_layers`
 - `test_search_learnings_finds_pattern`
 - `test_hybrid_search_empty_results`
+
+### C.8 Phase 3 완료 상세
+
+**구현 파일**:
+- `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` - Formation 메서드 추가
+- `src/evalvault/ports/outbound/domain_memory_port.py` - Formation 메서드 시그니처 업데이트
+- `src/evalvault/ports/inbound/learning_hook_port.py` - DomainLearningHookPort 인터페이스 (NEW)
+- `src/evalvault/domain/services/domain_learning_hook.py` - DomainLearningHook 서비스 (NEW)
+
+**테스트 파일**:
+- `tests/unit/test_domain_memory.py` - 63 tests (54 Phase 2 + 9 Phase 3)
+
+**Formation 테스트**:
+- `test_extract_facts_from_evaluation`
+- `test_extract_facts_filters_by_confidence`
+- `test_extract_facts_deduplicates`
+- `test_extract_patterns_from_evaluation`
+- `test_extract_behaviors_from_evaluation`
+- `test_extract_behaviors_filters_by_success_rate`
+
+**DomainLearningHook 테스트**:
+- `test_domain_learning_hook_on_evaluation_complete`
+- `test_domain_learning_hook_extract_and_save_facts`
+- `test_domain_learning_hook_run_evolution`
+
+**Formation 메서드 구현**:
+```python
+def extract_facts_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+    min_confidence: float = 0.7,
+) -> list[FactualFact]:
+    """평가 결과에서 사실 추출
+    - faithfulness >= min_confidence인 결과에서 추출
+    - SPO 트리플 패턴 매칭 (한국어/영어)
+    - 중복 사실 자동 병합
+    """
+
+def extract_patterns_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+) -> LearningMemory:
+    """평가 결과에서 학습 패턴 추출
+    - 성공/실패 패턴 추출
+    - 엔티티/관계 타입별 신뢰도 계산
+    """
+
+def extract_behaviors_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+    min_success_rate: float = 0.8,
+) -> list[BehaviorEntry]:
+    """평가 결과에서 재사용 가능한 행동 추출
+    - 높은 성공률 테스트 케이스에서 행동 패턴 추출
+    - Metacognitive Reuse 개념 적용
+    """
+```
+
+**DomainLearningHook 서비스**:
+```python
+class DomainLearningHook:
+    """평가 완료 후 도메인 메모리 형성을 담당하는 서비스
+
+    Formation dynamics 조율:
+    - on_evaluation_complete: 평가 후 메모리 형성 (facts, patterns, behaviors)
+    - run_evolution: Evolution dynamics 실행 (consolidate, forget, decay)
+    """
+```

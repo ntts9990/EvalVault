@@ -9,9 +9,11 @@ Based on "Memory in the Age of AI Agents: A Survey" framework:
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from evalvault.domain.entities.memory import (
     BehaviorEntry,
@@ -20,6 +22,9 @@ from evalvault.domain.entities.memory import (
     FactualFact,
     LearningMemory,
 )
+
+if TYPE_CHECKING:
+    from evalvault.domain.entities.result import EvaluationRun
 
 
 class SQLiteDomainMemoryAdapter:
@@ -1238,23 +1243,432 @@ class SQLiteDomainMemoryAdapter:
             conn.close()
 
     # =========================================================================
-    # Dynamics: Formation - Phase 3 (Not Implemented)
+    # Dynamics: Formation - Phase 3
     # =========================================================================
 
     def extract_facts_from_evaluation(
-        self, run_id: str, min_confidence: float = 0.7
+        self,
+        evaluation_run: EvaluationRun,
+        domain: str,
+        language: str = "ko",
+        min_confidence: float = 0.7,
     ) -> list[FactualFact]:
-        """평가 결과에서 사실을 추출합니다. (Phase 3)"""
-        raise NotImplementedError("extract_facts_from_evaluation will be implemented in Phase 3")
+        """평가 결과에서 사실을 추출합니다.
 
-    def extract_patterns_from_evaluation(self, run_id: str) -> LearningMemory:
-        """평가 결과에서 학습 패턴을 추출합니다. (Phase 3)"""
-        raise NotImplementedError("extract_patterns_from_evaluation will be implemented in Phase 3")
+        높은 faithfulness 점수를 가진 테스트 케이스의 contexts에서
+        SPO 트리플을 추출합니다.
+
+        Args:
+            evaluation_run: 평가 실행 결과
+            domain: 도메인
+            language: 언어 코드
+            min_confidence: 최소 faithfulness 점수
+
+        Returns:
+            추출된 FactualFact 리스트
+        """
+        from evalvault.domain.entities.result import EvaluationRun as EvalRun
+
+        if not isinstance(evaluation_run, EvalRun):
+            raise TypeError("evaluation_run must be an EvaluationRun instance")
+
+        extracted_facts: list[FactualFact] = []
+
+        for result in evaluation_run.results:
+            # faithfulness 점수 확인
+            faithfulness_metric = result.get_metric("faithfulness")
+            if not faithfulness_metric or faithfulness_metric.score < min_confidence:
+                continue
+
+            # contexts에서 사실 추출
+            if result.contexts:
+                for context in result.contexts:
+                    facts = self._extract_spo_from_text(
+                        text=context,
+                        domain=domain,
+                        language=language,
+                        verification_score=faithfulness_metric.score,
+                        source_id=result.test_case_id,
+                    )
+                    extracted_facts.extend(facts)
+
+        # 중복 제거 (동일 SPO 트리플)
+        unique_facts = self._deduplicate_facts(extracted_facts)
+
+        return unique_facts
+
+    def _extract_spo_from_text(
+        self,
+        text: str,
+        domain: str,
+        language: str,
+        verification_score: float,
+        source_id: str,
+    ) -> list[FactualFact]:
+        """텍스트에서 SPO 트리플을 추출합니다.
+
+        간단한 규칙 기반 추출:
+        - 한국어: "X은/는 Y이다", "X의 Y은/는 Z이다" 패턴
+        - 영어: "X is Y", "X has Y" 패턴
+        """
+        facts: list[FactualFact] = []
+
+        if language == "ko":
+            # 한국어 패턴: "X의 Y은/는 Z이다", "X은/는 Y이다"
+            patterns = [
+                # "X의 Y은/는 Z이다" 패턴
+                (
+                    r"([가-힣A-Za-z0-9\s]+)의\s+([가-힣A-Za-z0-9\s]+)[은는이가]\s+"
+                    r"([가-힣A-Za-z0-9\s,]+)(?:이다|입니다|이며|합니다|됩니다)"
+                ),
+                # "X은/는 Y이다" 패턴
+                (
+                    r"([가-힣A-Za-z0-9\s]+)[은는이가]\s+"
+                    r"([가-힣A-Za-z0-9\s,]+)(?:이다|입니다|이며|합니다|됩니다)"
+                ),
+            ]
+        else:
+            # 영어 패턴
+            patterns = [
+                r"([A-Za-z0-9\s]+)\s+is\s+([A-Za-z0-9\s,]+)",
+                r"([A-Za-z0-9\s]+)\s+has\s+([A-Za-z0-9\s,]+)",
+                r"([A-Za-z0-9\s]+)\s+provides\s+([A-Za-z0-9\s,]+)",
+            ]
+
+        for pattern in patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                if len(match) >= 2:
+                    subject = match[0].strip()
+                    if len(match) == 3:
+                        predicate = match[1].strip()
+                        obj = match[2].strip()
+                    else:
+                        predicate = "is" if language == "en" else "은/는"
+                        obj = match[1].strip()
+
+                    # 최소 길이 필터
+                    if len(subject) < 2 or len(obj) < 2:
+                        continue
+
+                    fact = FactualFact(
+                        subject=subject[:100],  # 길이 제한
+                        predicate=predicate[:50],
+                        object=obj[:200],
+                        domain=domain,
+                        language=language,
+                        fact_type="inferred",
+                        verification_score=verification_score,
+                        verification_count=1,
+                        source_document_ids=[source_id],
+                    )
+                    facts.append(fact)
+
+        return facts
+
+    def _deduplicate_facts(self, facts: list[FactualFact]) -> list[FactualFact]:
+        """동일한 SPO 트리플을 가진 사실들을 병합합니다."""
+        seen: dict[tuple[str, str, str], FactualFact] = {}
+
+        for fact in facts:
+            key = (fact.subject, fact.predicate, fact.object)
+            if key in seen:
+                # 기존 사실과 병합
+                existing = seen[key]
+                existing.verification_count += 1
+                existing.verification_score = (
+                    existing.verification_score + fact.verification_score
+                ) / 2
+                if fact.source_document_ids:
+                    for sid in fact.source_document_ids:
+                        if sid not in existing.source_document_ids:
+                            existing.source_document_ids.append(sid)
+            else:
+                seen[key] = fact
+
+        return list(seen.values())
+
+    def extract_patterns_from_evaluation(
+        self,
+        evaluation_run: EvaluationRun,
+        domain: str,
+        language: str = "ko",
+    ) -> LearningMemory:
+        """평가 결과에서 학습 패턴을 추출합니다.
+
+        메트릭별 점수 분포, 성공/실패 패턴을 분석하여 LearningMemory를 생성합니다.
+
+        Args:
+            evaluation_run: 평가 실행 결과
+            domain: 도메인
+            language: 언어 코드
+
+        Returns:
+            추출된 LearningMemory
+        """
+        from evalvault.domain.entities.result import EvaluationRun as EvalRun
+
+        if not isinstance(evaluation_run, EvalRun):
+            raise TypeError("evaluation_run must be an EvaluationRun instance")
+
+        # 메트릭별 점수 집계
+        metric_scores: dict[str, list[float]] = {}
+        successful_patterns: list[str] = []
+        failed_patterns: list[str] = []
+
+        for result in evaluation_run.results:
+            is_success = result.all_passed
+
+            # 메트릭별 점수 수집
+            for metric in result.metrics:
+                if metric.name not in metric_scores:
+                    metric_scores[metric.name] = []
+                metric_scores[metric.name].append(metric.score)
+
+            # 성공/실패 패턴 수집 (질문 기반)
+            if result.question:
+                pattern = self._extract_question_pattern(result.question, language)
+                if pattern:
+                    if is_success:
+                        if pattern not in successful_patterns:
+                            successful_patterns.append(pattern)
+                    elif pattern not in failed_patterns:
+                        failed_patterns.append(pattern)
+
+        # 메트릭별 평균 점수 계산 (entity_type_reliability로 사용)
+        entity_type_reliability: dict[str, float] = {}
+        for metric_name, scores in metric_scores.items():
+            if scores:
+                entity_type_reliability[metric_name] = sum(scores) / len(scores)
+
+        # faithfulness를 메트릭별로 분석
+        faithfulness_by_entity_type: dict[str, float] = {}
+        if "faithfulness" in metric_scores:
+            faithfulness_by_entity_type["overall"] = sum(metric_scores["faithfulness"]) / len(
+                metric_scores["faithfulness"]
+            )
+
+        learning = LearningMemory(
+            run_id=evaluation_run.run_id,
+            domain=domain,
+            language=language,
+            entity_type_reliability=entity_type_reliability,
+            relation_type_reliability={},
+            failed_patterns=failed_patterns[:20],
+            successful_patterns=successful_patterns[:20],
+            faithfulness_by_entity_type=faithfulness_by_entity_type,
+        )
+
+        return learning
+
+    def _extract_question_pattern(self, question: str, language: str) -> str | None:
+        """질문에서 패턴(키워드)을 추출합니다."""
+        if language == "ko":
+            stopwords = {
+                "은",
+                "는",
+                "이",
+                "가",
+                "을",
+                "를",
+                "의",
+                "에",
+                "에서",
+                "로",
+                "으로",
+                "와",
+                "과",
+            }
+            tokens = re.findall(r"[가-힣]+", question)
+            keywords = [t for t in tokens if t not in stopwords and len(t) >= 2]
+        else:
+            stopwords = {
+                "the",
+                "a",
+                "an",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "being",
+                "have",
+                "has",
+                "had",
+                "do",
+                "does",
+                "did",
+                "will",
+                "would",
+                "could",
+                "should",
+                "may",
+                "might",
+                "must",
+                "shall",
+                "can",
+                "what",
+                "which",
+                "who",
+                "whom",
+                "this",
+                "that",
+                "these",
+                "those",
+                "it",
+                "its",
+            }
+            tokens = re.findall(r"[A-Za-z]+", question.lower())
+            keywords = [t for t in tokens if t not in stopwords and len(t) >= 3]
+
+        if keywords:
+            return " ".join(keywords[:5])
+        return None
 
     def extract_behaviors_from_evaluation(
-        self, run_id: str, min_success_rate: float = 0.8
+        self,
+        evaluation_run: EvaluationRun,
+        domain: str,
+        language: str = "ko",
+        min_success_rate: float = 0.8,
     ) -> list[BehaviorEntry]:
-        """평가 결과에서 재사용 가능한 행동을 추출합니다. (Phase 3)"""
-        raise NotImplementedError(
-            "extract_behaviors_from_evaluation will be implemented in Phase 3"
-        )
+        """평가 결과에서 재사용 가능한 행동을 추출합니다.
+
+        높은 성공률을 가진 질문-응답 패턴에서 재사용 가능한 행동을 추출합니다.
+
+        Args:
+            evaluation_run: 평가 실행 결과
+            domain: 도메인
+            language: 언어 코드
+            min_success_rate: 최소 성공률 (메트릭 통과 비율)
+
+        Returns:
+            추출된 BehaviorEntry 리스트
+        """
+        from evalvault.domain.entities.result import EvaluationRun as EvalRun
+
+        if not isinstance(evaluation_run, EvalRun):
+            raise TypeError("evaluation_run must be an EvaluationRun instance")
+
+        behaviors: list[BehaviorEntry] = []
+
+        for result in evaluation_run.results:
+            if not result.metrics:
+                continue
+
+            passed_count = sum(1 for m in result.metrics if m.passed)
+            success_rate = passed_count / len(result.metrics)
+
+            if success_rate < min_success_rate:
+                continue
+
+            if not result.question:
+                continue
+
+            trigger_pattern = self._create_trigger_pattern(result.question, language)
+            if not trigger_pattern:
+                continue
+
+            action_sequence = self._extract_action_sequence(
+                answer=result.answer or "",
+                contexts=result.contexts or [],
+                language=language,
+            )
+
+            description = self._generate_behavior_description(
+                question=result.question,
+                success_rate=success_rate,
+                language=language,
+            )
+
+            behavior = BehaviorEntry(
+                description=description,
+                trigger_pattern=trigger_pattern,
+                action_sequence=action_sequence,
+                success_rate=success_rate,
+                token_savings=result.tokens_used // 2 if result.tokens_used else 0,
+                applicable_languages=[language],
+                domain=domain,
+            )
+            behaviors.append(behavior)
+
+        return behaviors
+
+    def _create_trigger_pattern(self, question: str, language: str) -> str | None:
+        """질문에서 트리거 regex 패턴을 생성합니다."""
+        if language == "ko":
+            nouns = re.findall(r"([가-힣]{2,})", question)
+            stopwords = {"것", "수", "때", "이", "등", "그", "저", "이것", "저것"}
+            nouns = [n for n in nouns if n not in stopwords][:3]
+
+            if nouns:
+                return "|".join(nouns)
+        else:
+            words = re.findall(r"\b[A-Za-z]{4,}\b", question)
+            stopwords = {"what", "which", "where", "when", "how", "does", "have", "this", "that"}
+            keywords = [w.lower() for w in words if w.lower() not in stopwords][:3]
+
+            if keywords:
+                return "|".join(keywords)
+
+        return None
+
+    def _extract_action_sequence(
+        self,
+        answer: str,
+        contexts: list[str],
+        language: str,
+    ) -> list[str]:
+        """응답 전략에서 행동 시퀀스를 추출합니다."""
+        actions: list[str] = []
+
+        if contexts:
+            actions.append("retrieve_contexts")
+
+        if language == "ko":
+            if "원" in answer or "억" in answer or "만" in answer:
+                actions.append("extract_monetary_value")
+            if "%" in answer or "퍼센트" in answer:
+                actions.append("extract_percentage")
+            if any(c in answer for c in ["년", "월", "일", "개월"]):
+                actions.append("extract_date_duration")
+        else:
+            if "$" in answer or "dollar" in answer.lower():
+                actions.append("extract_monetary_value")
+            if "%" in answer or "percent" in answer.lower():
+                actions.append("extract_percentage")
+
+        actions.append("generate_response")
+        return actions
+
+    def _generate_behavior_description(
+        self,
+        question: str,
+        success_rate: float,
+        language: str,
+    ) -> str:
+        """행동 설명을 생성합니다."""
+        if language == "ko":
+            if "얼마" in question:
+                q_type = "금액 조회"
+            elif "무엇" in question or "어떤" in question:
+                q_type = "정의/설명 조회"
+            elif "어떻게" in question:
+                q_type = "절차/방법 조회"
+            elif "언제" in question:
+                q_type = "시기/기간 조회"
+            else:
+                q_type = "일반 조회"
+        else:
+            q_lower = question.lower()
+            if "how much" in q_lower:
+                q_type = "Amount inquiry"
+            elif "what is" in q_lower or "what are" in q_lower:
+                q_type = "Definition inquiry"
+            elif "how to" in q_lower or "how do" in q_lower:
+                q_type = "Process inquiry"
+            else:
+                q_type = "General inquiry"
+
+        return f"{q_type} (success: {success_rate:.0%})"

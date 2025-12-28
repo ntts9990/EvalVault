@@ -6,7 +6,7 @@ Based on "Memory in the Age of AI Agents: A Survey" framework:
 - Dynamics: Formation, Evolution, Retrieval strategies
 """
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from evalvault.domain.entities.memory import (
     BehaviorEntry,
@@ -15,6 +15,9 @@ from evalvault.domain.entities.memory import (
     FactualFact,
     LearningMemory,
 )
+
+if TYPE_CHECKING:
+    from evalvault.domain.entities.result import EvaluationRun
 
 
 class DomainMemoryPort(Protocol):
@@ -496,63 +499,67 @@ class DomainMemoryPort(Protocol):
 
     def extract_facts_from_evaluation(
         self,
-        run_id: str,
+        evaluation_run: "EvaluationRun",
+        domain: str,
+        language: str = "ko",
         min_confidence: float = 0.7,
     ) -> list[FactualFact]:
         """평가 결과에서 사실을 추출합니다.
 
-        높은 신뢰도의 평가 결과에서 검증된 사실을 자동 추출합니다.
+        높은 신뢰도의 평가 결과(faithfulness >= min_confidence)에서
+        contexts의 SPO 트리플을 자동 추출합니다.
 
         Args:
-            run_id: 평가 run ID
-            min_confidence: 최소 신뢰도 임계값
+            evaluation_run: 평가 실행 결과
+            domain: 도메인 (예: 'insurance')
+            language: 언어 코드 (기본: 'ko')
+            min_confidence: 최소 faithfulness 점수
 
         Returns:
             추출된 FactualFact 리스트
-
-        Raises:
-            NotImplementedError: Phase 3에서 구현 예정
         """
         ...
 
     def extract_patterns_from_evaluation(
         self,
-        run_id: str,
+        evaluation_run: "EvaluationRun",
+        domain: str,
+        language: str = "ko",
     ) -> LearningMemory:
         """평가 결과에서 학습 패턴을 추출합니다.
 
-        평가 결과에서 성공/실패 패턴, 엔티티 타입별 신뢰도를 학습합니다.
+        평가 결과에서 성공/실패 패턴, 메트릭별 점수 분포를 학습합니다.
 
         Args:
-            run_id: 평가 run ID
+            evaluation_run: 평가 실행 결과
+            domain: 도메인
+            language: 언어 코드
 
         Returns:
             추출된 LearningMemory
-
-        Raises:
-            NotImplementedError: Phase 3에서 구현 예정
         """
         ...
 
     def extract_behaviors_from_evaluation(
         self,
-        run_id: str,
+        evaluation_run: "EvaluationRun",
+        domain: str,
+        language: str = "ko",
         min_success_rate: float = 0.8,
     ) -> list[BehaviorEntry]:
         """평가 결과에서 재사용 가능한 행동을 추출합니다.
 
         Metacognitive Reuse 개념을 구현하여, 성공적인 평가에서
-        재사용 가능한 행동 패턴을 추출합니다.
+        재사용 가능한 질문-응답 패턴을 추출합니다.
 
         Args:
-            run_id: 평가 run ID
-            min_success_rate: 최소 성공률 임계값
+            evaluation_run: 평가 실행 결과
+            domain: 도메인
+            language: 언어 코드
+            min_success_rate: 최소 성공률 임계값 (전체 메트릭 통과율)
 
         Returns:
             추출된 BehaviorEntry 리스트
-
-        Raises:
-            NotImplementedError: Phase 3에서 구현 예정
         """
         ...
 
