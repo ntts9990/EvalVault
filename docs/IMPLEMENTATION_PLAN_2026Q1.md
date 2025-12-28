@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.3.0
+> **Document Version**: 2.4.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Phase 3 Complete
+> **Status**: Phase 4 Complete
 
 ---
 
@@ -27,7 +27,7 @@
 | Dynamics: Evolution | 1 week | 12h | Must Have | ✅ Complete |
 | Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
 | Dynamics: Formation | 1 week | 16h | Must Have | ✅ Complete |
-| Config & Multi-language | 1.5 weeks | 16h | Should Have | Pending |
+| Config & Multi-language | 1.5 weeks | 16h | Should Have | ✅ Complete |
 | **Total** | **7 weeks** | **80h** | | |
 
 ---
@@ -1209,10 +1209,12 @@ Phase 3: ✅ 완료 (Formation + Learning Integration)
 ├── DomainLearningHookPort 인터페이스 정의
 └── 9 new unit tests (총 63 tests)
 
-Phase 4: Config & Multi-language
-├── Config schema (YAML)
-├── CLI domain init/list
-└── 다국어 terms_dictionary
+Phase 4: ✅ 완료 (Config & Multi-language)
+├── DomainMemoryConfig Pydantic 모델
+├── config/domains/{domain}/memory.yaml 스키마
+├── CLI: domain init/list/show/terms 명령어
+├── 다국어 terms_dictionary (ko/en)
+└── 33 new unit tests (총 96 tests)
 
 Phase 5: Forms 확장 (Planar/Hierarchical)
 ├── KG 통합
@@ -1318,3 +1320,67 @@ class DomainLearningHook:
     - run_evolution: Evolution dynamics 실행 (consolidate, forget, decay)
     """
 ```
+
+### C.9 Phase 4 완료 상세
+
+**구현 파일**:
+- `src/evalvault/config/domain_config.py` - DomainMemoryConfig Pydantic 모델 (NEW)
+- `src/evalvault/config/__init__.py` - 도메인 설정 모듈 export 추가
+- `src/evalvault/adapters/inbound/cli.py` - domain 서브커맨드 추가
+- `config/domains/insurance/memory.yaml` - 보험 도메인 설정 (NEW)
+- `config/domains/insurance/terms_dictionary_ko.json` - 한국어 용어사전 (NEW)
+- `config/domains/insurance/terms_dictionary_en.json` - 영어 용어사전 (NEW)
+
+**테스트 파일**:
+- `tests/unit/test_domain_config.py` - 33 tests (NEW)
+
+**Pydantic 모델**:
+- `LanguageConfig` - 언어별 리소스 경로
+- `FactualConfig` - Factual layer 설정
+- `ExperientialConfig` - Experiential layer 설정
+- `WorkingConfig` - Working layer 설정
+- `LearningConfig` - 학습 관련 설정
+- `DomainMetadata` - 도메인 메타데이터
+- `DomainMemoryConfig` - 전체 도메인 메모리 설정
+
+**CLI 명령어**:
+```bash
+evalvault domain init <domain> [--languages ko,en] [--description "..."]
+evalvault domain list
+evalvault domain show <domain>
+evalvault domain terms <domain> [--language ko] [--limit 10]
+```
+
+**용어사전 구조**:
+```json
+{
+  "version": "1.0.0",
+  "language": "ko",
+  "domain": "insurance",
+  "terms": {
+    "보험료": {
+      "definition": "...",
+      "aliases": ["...", "..."],
+      "category": "payment",
+      "importance": "high"
+    }
+  },
+  "categories": {
+    "payment": "납입 관련"
+  }
+}
+```
+
+**테스트 클래스**:
+- `TestLanguageConfig` - 언어 설정 테스트
+- `TestFactualConfig` - Factual layer 테스트
+- `TestExperientialConfig` - Experiential layer 테스트
+- `TestWorkingConfig` - Working layer 테스트
+- `TestLearningConfig` - 학습 설정 테스트
+- `TestDomainMetadata` - 메타데이터 테스트
+- `TestDomainMemoryConfig` - 전체 설정 테스트
+- `TestGenerateDomainTemplate` - 템플릿 생성 테스트
+- `TestSaveAndLoadDomainConfig` - 저장/로드 테스트
+- `TestListDomains` - 도메인 목록 테스트
+- `TestYAMLSerializationRoundtrip` - YAML 직렬화 테스트
+- `TestTermsDictionaryFormat` - 용어사전 형식 테스트

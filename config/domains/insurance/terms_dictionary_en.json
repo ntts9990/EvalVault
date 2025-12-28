@@ -1,0 +1,160 @@
+{
+  "version": "1.0.0",
+  "language": "en",
+  "domain": "insurance",
+  "description": "Insurance domain English terminology dictionary",
+  "terms": {
+    "premium": {
+      "definition": "The amount paid by the policyholder to the insurer for coverage",
+      "aliases": ["insurance premium", "monthly premium", "policy premium"],
+      "category": "payment",
+      "importance": "high",
+      "korean": "보험료"
+    },
+    "benefit": {
+      "definition": "The amount paid by the insurer to the insured upon occurrence of an insured event",
+      "aliases": ["insurance benefit", "claim payment", "payout"],
+      "category": "benefit",
+      "importance": "high",
+      "korean": "보험금"
+    },
+    "coverage amount": {
+      "definition": "The maximum amount guaranteed by the insurance policy",
+      "aliases": ["sum insured", "face amount", "coverage limit"],
+      "category": "coverage",
+      "importance": "high",
+      "korean": "보장금액"
+    },
+    "policy term": {
+      "definition": "The period during which the insurance policy remains in effect",
+      "aliases": ["insurance period", "coverage period", "term"],
+      "category": "duration",
+      "importance": "high",
+      "korean": "보험기간"
+    },
+    "payment period": {
+      "definition": "The period during which premiums must be paid",
+      "aliases": ["premium payment period", "contribution period"],
+      "category": "duration",
+      "importance": "medium",
+      "korean": "납입기간"
+    },
+    "insured": {
+      "definition": "The person covered by the insurance policy",
+      "aliases": ["insured person", "life insured"],
+      "category": "party",
+      "importance": "high",
+      "korean": "피보험자"
+    },
+    "policyholder": {
+      "definition": "The person who owns the insurance policy and pays the premiums",
+      "aliases": ["policy owner", "contract holder"],
+      "category": "party",
+      "importance": "high",
+      "korean": "계약자"
+    },
+    "beneficiary": {
+      "definition": "The person entitled to receive the insurance benefit",
+      "aliases": ["benefit recipient", "payee"],
+      "category": "party",
+      "importance": "medium",
+      "korean": "수익자"
+    },
+    "waiting period": {
+      "definition": "The period after policy inception during which coverage is not provided",
+      "aliases": ["elimination period", "exclusion period"],
+      "category": "exclusion",
+      "importance": "medium",
+      "korean": "면책기간"
+    },
+    "renewable": {
+      "definition": "Insurance type where premiums are recalculated at regular intervals",
+      "aliases": ["renewable policy", "renewable term"],
+      "category": "type",
+      "importance": "medium",
+      "korean": "갱신형"
+    },
+    "non-renewable": {
+      "definition": "Insurance type where premiums remain fixed throughout the policy term",
+      "aliases": ["level premium", "guaranteed premium"],
+      "category": "type",
+      "importance": "medium",
+      "korean": "비갱신형"
+    },
+    "health insurance": {
+      "definition": "Insurance that covers actual medical expenses incurred",
+      "aliases": ["medical insurance", "indemnity insurance"],
+      "category": "product",
+      "importance": "high",
+      "korean": "실손보험"
+    },
+    "whole life insurance": {
+      "definition": "Insurance that provides coverage for the entire lifetime of the insured",
+      "aliases": ["permanent life insurance", "whole life"],
+      "category": "product",
+      "importance": "high",
+      "korean": "종신보험"
+    },
+    "term insurance": {
+      "definition": "Insurance that provides coverage for a specified period only",
+      "aliases": ["term life insurance", "temporary insurance"],
+      "category": "product",
+      "importance": "medium",
+      "korean": "정기보험"
+    },
+    "surrender value": {
+      "definition": "The amount refunded when canceling an insurance policy",
+      "aliases": ["cash value", "cancellation refund"],
+      "category": "benefit",
+      "importance": "medium",
+      "korean": "해지환급금"
+    },
+    "rider": {
+      "definition": "Additional coverage attached to the main policy",
+      "aliases": ["endorsement", "supplementary coverage", "add-on"],
+      "category": "coverage",
+      "importance": "medium",
+      "korean": "특약"
+    },
+    "main policy": {
+      "definition": "The basic contract of the insurance policy",
+      "aliases": ["base policy", "primary coverage"],
+      "category": "coverage",
+      "importance": "medium",
+      "korean": "주계약"
+    },
+    "duty of disclosure": {
+      "definition": "The obligation of the policyholder to disclose material facts at the time of application",
+      "aliases": ["disclosure requirement", "material disclosure"],
+      "category": "obligation",
+      "importance": "high",
+      "korean": "고지의무"
+    },
+    "exclusion": {
+      "definition": "Circumstances under which the insurer is not liable to pay benefits",
+      "aliases": ["exclusion clause", "coverage exclusion"],
+      "category": "exclusion",
+      "importance": "high",
+      "korean": "면책사유"
+    },
+    "policy document": {
+      "definition": "A document certifying the conclusion of an insurance contract",
+      "aliases": ["insurance certificate", "policy certificate"],
+      "category": "document",
+      "importance": "medium",
+      "korean": "보험증권"
+    }
+  },
+  "categories": {
+    "payment": "Payment related",
+    "benefit": "Benefits/Claims related",
+    "coverage": "Coverage scope related",
+    "duration": "Duration related",
+    "party": "Contract parties",
+    "exclusion": "Exclusions related",
+    "type": "Insurance types",
+    "product": "Insurance products",
+    "obligation": "Obligations related",
+    "document": "Documents related"
+  }
+}

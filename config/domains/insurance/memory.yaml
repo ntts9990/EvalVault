@@ -1,0 +1,46 @@
+# Insurance Domain Memory Configuration
+# EvalVault Domain Memory Layering System
+# Version: 1.0.0
+
+metadata:
+  domain: insurance
+  version: "1.0.0"
+  supported_languages:
+    - ko
+    - en
+  default_language: ko
+  description: "보험 도메인 메모리 설정 - 한국어/영어 지원"
+
+# Factual Layer - 정적, 검증된 도메인 지식
+factual:
+  glossary:
+    ko: terms_dictionary_ko.json
+    en: terms_dictionary_en.json
+  regulatory_rules:
+    ko: rules_ko.md
+    en: rules_en.md
+  shared:
+    company_info: companies.json
+
+# Experiential Layer - 학습된 패턴
+experiential:
+  reliability_scores:
+    ko: reliability_ko.json
+    en: reliability_en.json
+  failure_modes: failures.json
+  behavior_handbook: behaviors.json
+
+# Working Layer - 런타임 컨텍스트
+working:
+  run_cache: "${RUN_DIR}/memory.db"
+  kg_binding: null
+  max_cache_size_mb: 100
+
+# Learning Configuration - 자동 학습 설정
+learning:
+  enabled: true
+  min_confidence_to_store: 0.6
+  behavior_extraction: true
+  auto_apply: true
+  decay_rate: 0.95
+  forget_threshold_days: 90
