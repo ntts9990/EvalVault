@@ -656,7 +656,7 @@ class TestCLIRunEdgeCases:
         )
         assert result.exit_code == 0
         assert output_file.exists()
-        data = json.loads(output_file.read_text())
+        data = json.loads(output_file.read_text(encoding="utf-8"))
         assert "results" in data
 
     @patch("evalvault.adapters.inbound.cli.get_loader")
@@ -1151,7 +1151,7 @@ class TestCLIGenerate:
         )
         assert result.exit_code == 0
         assert output_file.exists()
-        data = json.loads(output_file.read_text())
+        data = json.loads(output_file.read_text(encoding="utf-8"))
         assert "test_cases" in data
 
     def test_generate_knowledge_graph_method(self, tmp_path):
