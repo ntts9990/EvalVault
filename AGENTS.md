@@ -4,10 +4,10 @@
 EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, services, and metrics, `src/evalvault/ports` define contracts, and `src/evalvault/adapters` wire Typer CLI, LLM, storage, and tracing integrations. Runtime profiles and secrets live in `config/` (notably `models.yaml`) plus `.env`, while datasets sit in `data/` and curated fixtures in `tests/fixtures/`. Docs that clarify architecture and roadmap live under `docs/`, and automation helpers remain in `scripts/`. Mirror production modules with tests in `tests/unit`, `tests/integration`, and `tests/e2e_data` to preserve coverage.
 
 ## Build, Test, and Development Commands
-- `uv pip install -e ".[dev]"`: install runtime plus dev tooling on Python 3.12.
-- `evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness`: smoke-test the CLI; extend with `--profile dev` or `--langfuse`.
-- `pytest tests -v`: primary suite; target `tests/integration/test_e2e_scenarios.py` only when external APIs are configured.
-- `ruff check src/ tests/ && ruff format src/ tests/`: keep style/lint errors out of CI (line length 100).
+- `uv sync --extra dev`: install runtime plus dev tooling on Python 3.12.
+- `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness`: smoke-test the CLI; extend with `--profile dev` or `--langfuse`.
+- `uv run pytest tests -v`: primary suite; target `tests/integration/test_e2e_scenarios.py` only when external APIs are configured.
+- `uv run ruff check src/ tests/ && uv run ruff format src/ tests/`: keep style/lint errors out of CI (line length 100).
 - `docker compose -f docker-compose.langfuse.yml up`: optional Langfuse playground for tracing comparisons.
 
 ## Coding Style & Naming Conventions

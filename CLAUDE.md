@@ -74,33 +74,39 @@ src/evalvault/
 ## Development Commands
 
 ```bash
-# Install dependencies
-uv pip install -e ".[dev]"
+# Install dependencies (uv sync 사용 필수)
+uv sync --extra dev
 
-# Run all tests
-pytest tests/
+# Run all tests (항상 uv run 사용)
+uv run pytest tests/
 
 # Run unit tests only
-pytest tests/unit/
+uv run pytest tests/unit/
 
 # Run integration tests only
-pytest tests/integration/
+uv run pytest tests/integration/
 
 # Run with verbose output
-pytest tests/ -v --tb=short
+uv run pytest tests/ -v --tb=short
 
 # Skip tests requiring API keys
-pytest tests/ -v -m "not requires_openai and not requires_langfuse"
+uv run pytest tests/ -v -m "not requires_openai and not requires_langfuse"
 
 # Lint
-ruff check src/
-ruff format src/
+uv run ruff check src/
+uv run ruff format src/
 
-# CLI usage
-evalvault run data.csv --metrics faithfulness,answer_relevancy
-evalvault metrics
-evalvault config
+# Add dependencies
+uv add <package>           # 런타임 의존성
+uv add --dev <package>     # 개발 의존성
+
+# CLI usage (uv run 사용)
+uv run evalvault run data.csv --metrics faithfulness,answer_relevancy
+uv run evalvault metrics
+uv run evalvault config
 ```
+
+> **Note**: 모든 Python 명령어는 `uv run`을 통해 실행해야 가상환경이 올바르게 적용됩니다.
 
 ## Development Practices
 

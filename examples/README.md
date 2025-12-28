@@ -22,10 +22,10 @@ Knowledge Graph 기반 테스트셋 생성 데모입니다.
 cd /path/to/EvalVault
 
 # 의존성 설치 (최초 1회)
-uv pip install -e ".[dev]"
+uv sync --extra dev
 
 # 데모 실행
-python examples/kg_generator_demo.py
+uv run python examples/kg_generator_demo.py
 ```
 
 **예상 출력:**

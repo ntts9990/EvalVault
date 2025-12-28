@@ -55,7 +55,7 @@ uv pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
-uv pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 ## 첫 평가 실행
@@ -190,10 +190,13 @@ EvalVault/
 ## 개발
 
 ```bash
-pytest tests/ -v
-pytest tests/integration/test_e2e_scenarios.py -v   # 외부 API 필요
-ruff check src/ tests/
-ruff format src/ tests/
+# 테스트 (항상 uv run 사용)
+uv run pytest tests/ -v
+uv run pytest tests/integration/test_e2e_scenarios.py -v   # 외부 API 필요
+
+# 린트 & 포맷팅
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ## 커뮤니티 & PSF 멤버십
