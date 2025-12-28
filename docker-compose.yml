@@ -1,0 +1,58 @@
+# EvalVault Docker Compose Configuration
+# Full stack: EvalVault CLI + PostgreSQL
+
+services:
+  # PostgreSQL database for evaluation storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: evalvault-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-evalvault}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evalvault}  # CHANGEME in production
+      POSTGRES_DB: ${POSTGRES_DB:-evalvault}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evalvault}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # EvalVault CLI service (for batch evaluations)
+  evalvault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evalvault-cli
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # OpenAI configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-nano}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      # PostgreSQL connection
+      EVALVAULT_DB_HOST: postgres
+      EVALVAULT_DB_PORT: 5432
+      EVALVAULT_DB_NAME: ${POSTGRES_DB:-evalvault}
+      EVALVAULT_DB_USER: ${POSTGRES_USER:-evalvault}
+      EVALVAULT_DB_PASSWORD: ${POSTGRES_PASSWORD:-evalvault}
+      # Langfuse (optional)
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    # Override default command for interactive use
+    # docker compose run evalvault run data.json --metrics faithfulness
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+    driver: local
