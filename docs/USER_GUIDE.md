@@ -669,7 +669,7 @@ cat .env | grep OPENAI_API_KEY
 **해결 방법**:
 1. 메트릭 수 줄이기: `--metrics faithfulness`
 2. 테스트케이스 수 줄이기
-3. 더 빠른 모델 사용: `OPENAI_MODEL=gpt-3.5-turbo`
+3. 더 빠른 모델 사용: `OPENAI_MODEL=gpt-5-nano`
 
 #### 4. Langfuse 연결 실패
 
