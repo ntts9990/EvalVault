@@ -182,6 +182,7 @@ class TestFullWorkflow:
         # 클래스 변수에 저장
         TestFullWorkflow._loaded_dataset = dataset
 
+    @pytest.mark.requires_openai
     def test_02_llm_adapter_initialization(self, settings):
         """2. LLM Adapter 초기화 테스트."""
         print("\n" + "=" * 60)
