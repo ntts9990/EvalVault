@@ -1278,3 +1278,536 @@ class TestDomainLearningHook:
         assert "forgotten" in result
         assert "decayed" in result
         assert result["consolidated"] == 2  # 3개 중 2개 병합
+
+
+# =============================================================================
+# Phase 5: Planar Form (KG Integration) Tests
+# =============================================================================
+
+
+class TestPhase5PlanarForm:
+    """Phase 5 Planar Form (KG Integration) 테스트."""
+
+    @pytest.fixture
+    def memory_adapter(self):
+        """Create SQLiteDomainMemoryAdapter with temp database."""
+        from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+            SQLiteDomainMemoryAdapter,
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = Path(f.name)
+
+        adapter = SQLiteDomainMemoryAdapter(db_path=db_path)
+        yield adapter
+
+        if db_path.exists():
+            db_path.unlink()
+
+    def test_link_fact_to_kg(self, memory_adapter):
+        """사실을 KG 엔티티에 연결."""
+        fact = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            domain="insurance",
+            language="ko",
+        )
+        memory_adapter.save_fact(fact)
+
+        # KG에 연결
+        memory_adapter.link_fact_to_kg(
+            fact_id=fact.fact_id,
+            kg_entity_id="insurance_product_001",
+            kg_relation_type="coverage",
+        )
+
+        # 연결 확인
+        retrieved = memory_adapter.get_fact(fact.fact_id)
+        assert retrieved.kg_entity_id == "insurance_product_001"
+        assert retrieved.kg_relation_type == "coverage"
+
+    def test_link_fact_to_kg_not_found(self, memory_adapter):
+        """존재하지 않는 사실에 연결 시 에러."""
+        with pytest.raises(KeyError, match="Fact not found"):
+            memory_adapter.link_fact_to_kg(
+                fact_id="nonexistent",
+                kg_entity_id="entity1",
+            )
+
+    def test_get_facts_by_kg_entity(self, memory_adapter):
+        """KG 엔티티로 사실 조회."""
+        # 동일 KG 엔티티에 연결된 여러 사실 생성
+        facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                kg_entity_id="entity_001",
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보험료",
+                object="10만원",
+                domain="insurance",
+                kg_entity_id="entity_001",
+            ),
+            FactualFact(
+                subject="보험B",
+                predicate="보장금액",
+                object="2억원",
+                domain="insurance",
+                kg_entity_id="entity_002",
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
+
+        # entity_001로 조회
+        results = memory_adapter.get_facts_by_kg_entity("entity_001")
+        assert len(results) == 2
+        assert all(r.subject == "보험A" for r in results)
+
+    def test_get_facts_by_kg_entity_with_domain_filter(self, memory_adapter):
+        """KG 엔티티 조회 - 도메인 필터."""
+        fact = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            domain="insurance",
+            kg_entity_id="entity_001",
+        )
+        memory_adapter.save_fact(fact)
+
+        # 다른 도메인으로 조회
+        results = memory_adapter.get_facts_by_kg_entity("entity_001", domain="medical")
+        assert len(results) == 0
+
+        # 같은 도메인으로 조회
+        results = memory_adapter.get_facts_by_kg_entity("entity_001", domain="insurance")
+        assert len(results) == 1
+
+    def test_import_kg_as_facts(self, memory_adapter):
+        """KG를 사실로 변환하여 저장."""
+        entities = [
+            ("보험A", "InsuranceProduct", {"coverage": "1억원"}),
+            ("보험B", "InsuranceProduct", {"coverage": "2억원"}),
+        ]
+        relations = [
+            ("보험A", "보장", "사망보장", 0.9),
+            ("보험B", "제공", "입원비", 0.85),
+        ]
+
+        result = memory_adapter.import_kg_as_facts(
+            entities=entities,
+            relations=relations,
+            domain="insurance",
+            language="ko",
+        )
+
+        assert result["entities_imported"] == 2
+        assert result["relations_imported"] == 2
+
+        # 엔티티 사실 확인
+        facts = memory_adapter.list_facts(domain="insurance")
+        # 2 entities (is_a) + 2 attributes (has_coverage) + 2 relations = 6
+        assert len(facts) >= 4
+
+    def test_import_kg_as_facts_no_duplicates(self, memory_adapter):
+        """KG 중복 임포트 방지."""
+        entities = [("보험A", "InsuranceProduct", {})]
+        relations = []
+
+        # 첫 번째 임포트
+        result1 = memory_adapter.import_kg_as_facts(
+            entities=entities, relations=relations, domain="insurance"
+        )
+        assert result1["entities_imported"] == 1
+
+        # 두 번째 임포트 (중복)
+        result2 = memory_adapter.import_kg_as_facts(
+            entities=entities, relations=relations, domain="insurance"
+        )
+        assert result2["entities_imported"] == 0  # 중복으로 스킵
+
+    def test_export_facts_as_kg(self, memory_adapter):
+        """사실을 KG 형태로 내보내기."""
+        # 엔티티 사실 저장
+        facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="is_a",
+                object="InsuranceProduct",
+                domain="insurance",
+                verification_score=0.9,
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="has_coverage",
+                object="1억원",
+                domain="insurance",
+                verification_score=0.9,
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="provides",
+                object="사망보장",
+                domain="insurance",
+                verification_score=0.85,
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
+
+        # KG로 내보내기
+        entities, relations = memory_adapter.export_facts_as_kg(
+            domain="insurance",
+            min_confidence=0.5,
+        )
+
+        assert len(entities) == 1  # 보험A
+        assert entities[0][0] == "보험A"
+        assert entities[0][1] == "InsuranceProduct"
+        assert entities[0][2].get("coverage") == "1억원"
+
+        assert len(relations) == 1  # provides 관계
+        assert relations[0][0] == "보험A"
+        assert relations[0][1] == "사망보장"
+        assert relations[0][2] == "provides"
+
+    def test_export_facts_as_kg_with_confidence_filter(self, memory_adapter):
+        """KG 내보내기 - 신뢰도 필터."""
+        facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="is_a",
+                object="InsuranceProduct",
+                domain="insurance",
+                verification_score=0.9,
+            ),
+            FactualFact(
+                subject="보험B",
+                predicate="is_a",
+                object="InsuranceProduct",
+                domain="insurance",
+                verification_score=0.3,  # 낮은 신뢰도
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
+
+        # 높은 신뢰도 필터
+        entities, relations = memory_adapter.export_facts_as_kg(
+            domain="insurance",
+            min_confidence=0.8,
+        )
+
+        assert len(entities) == 1  # 보험A만
+
+
+# =============================================================================
+# Phase 5: Hierarchical Form (Summary Layers) Tests
+# =============================================================================
+
+
+class TestPhase5HierarchicalForm:
+    """Phase 5 Hierarchical Form (Summary Layers) 테스트."""
+
+    @pytest.fixture
+    def memory_adapter(self):
+        """Create SQLiteDomainMemoryAdapter with temp database."""
+        from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+            SQLiteDomainMemoryAdapter,
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = Path(f.name)
+
+        adapter = SQLiteDomainMemoryAdapter(db_path=db_path)
+        yield adapter
+
+        if db_path.exists():
+            db_path.unlink()
+
+    def test_create_summary_fact(self, memory_adapter):
+        """여러 사실을 요약하는 상위 사실 생성."""
+        # 하위 사실들 생성
+        child_facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                verification_score=0.9,
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보험료",
+                object="10만원",
+                domain="insurance",
+                verification_score=0.8,
+            ),
+        ]
+        for f in child_facts:
+            memory_adapter.save_fact(f)
+
+        child_ids = [f.fact_id for f in child_facts]
+
+        # 요약 사실 생성
+        summary = memory_adapter.create_summary_fact(
+            child_fact_ids=child_ids,
+            summary_subject="보험A",
+            summary_predicate="요약",
+            summary_object="보장금액 1억원, 보험료 10만원",
+            domain="insurance",
+            language="ko",
+        )
+
+        assert summary.abstraction_level == 1  # 0 + 1
+        assert abs(summary.verification_score - 0.85) < 0.001  # 평균
+        assert len(summary.child_fact_ids) == 2
+
+    def test_create_summary_fact_empty_children(self, memory_adapter):
+        """빈 자식 목록으로 요약 생성 시 에러."""
+        with pytest.raises(ValueError, match="child_fact_ids cannot be empty"):
+            memory_adapter.create_summary_fact(
+                child_fact_ids=[],
+                summary_subject="A",
+                summary_predicate="B",
+                summary_object="C",
+                domain="insurance",
+            )
+
+    def test_create_summary_fact_nonexistent_child(self, memory_adapter):
+        """존재하지 않는 자식 ID로 요약 생성 시 에러."""
+        with pytest.raises(KeyError, match="Child fact not found"):
+            memory_adapter.create_summary_fact(
+                child_fact_ids=["nonexistent"],
+                summary_subject="A",
+                summary_predicate="B",
+                summary_object="C",
+                domain="insurance",
+            )
+
+    def test_get_facts_by_level(self, memory_adapter):
+        """특정 추상화 레벨의 사실 조회."""
+        # 레벨 0 사실 생성
+        level0_facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                abstraction_level=0,
+            ),
+            FactualFact(
+                subject="보험B",
+                predicate="보장금액",
+                object="2억원",
+                domain="insurance",
+                abstraction_level=0,
+            ),
+        ]
+        for f in level0_facts:
+            memory_adapter.save_fact(f)
+
+        # 레벨 0 조회
+        results = memory_adapter.get_facts_by_level(
+            abstraction_level=0,
+            domain="insurance",
+        )
+        assert len(results) == 2
+
+        # 레벨 1 조회 (없음)
+        results = memory_adapter.get_facts_by_level(
+            abstraction_level=1,
+            domain="insurance",
+        )
+        assert len(results) == 0
+
+    def test_get_fact_hierarchy(self, memory_adapter):
+        """사실의 전체 계층 구조 조회."""
+        # 하위 사실들
+        child_facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보험료",
+                object="10만원",
+                domain="insurance",
+            ),
+        ]
+        for f in child_facts:
+            memory_adapter.save_fact(f)
+
+        child_ids = [f.fact_id for f in child_facts]
+
+        # 요약 사실 생성
+        summary = memory_adapter.create_summary_fact(
+            child_fact_ids=child_ids,
+            summary_subject="보험A",
+            summary_predicate="요약",
+            summary_object="상품 요약",
+            domain="insurance",
+        )
+
+        # 계층 구조 조회
+        hierarchy = memory_adapter.get_fact_hierarchy(summary.fact_id)
+
+        assert hierarchy["fact"].fact_id == summary.fact_id
+        assert hierarchy["parent"] is None  # 최상위
+        assert len(hierarchy["children"]) == 2
+        assert len(hierarchy["ancestors"]) == 0
+        assert len(hierarchy["descendants"]) == 2
+
+    def test_get_fact_hierarchy_child_perspective(self, memory_adapter):
+        """자식 사실 관점에서 계층 구조 조회."""
+        # 자식 사실
+        child = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            domain="insurance",
+        )
+        memory_adapter.save_fact(child)
+
+        # 부모 요약 생성
+        parent = memory_adapter.create_summary_fact(
+            child_fact_ids=[child.fact_id],
+            summary_subject="보험A",
+            summary_predicate="요약",
+            summary_object="상품 요약",
+            domain="insurance",
+        )
+
+        # 자식 관점에서 계층 조회
+        hierarchy = memory_adapter.get_fact_hierarchy(child.fact_id)
+
+        assert hierarchy["fact"].fact_id == child.fact_id
+        assert hierarchy["parent"] is not None
+        assert hierarchy["parent"].fact_id == parent.fact_id
+        assert len(hierarchy["ancestors"]) == 1
+        assert len(hierarchy["children"]) == 0
+
+    def test_get_child_facts(self, memory_adapter):
+        """특정 사실의 자식들 조회."""
+        # 자식 사실들
+        children = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                verification_score=0.9,
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보험료",
+                object="10만원",
+                domain="insurance",
+                verification_score=0.8,
+            ),
+        ]
+        for f in children:
+            memory_adapter.save_fact(f)
+
+        child_ids = [f.fact_id for f in children]
+
+        # 요약 생성
+        summary = memory_adapter.create_summary_fact(
+            child_fact_ids=child_ids,
+            summary_subject="보험A",
+            summary_predicate="요약",
+            summary_object="상품 요약",
+            domain="insurance",
+        )
+
+        # 자식 조회
+        child_facts = memory_adapter.get_child_facts(summary.fact_id)
+
+        assert len(child_facts) == 2
+        # 성공률 내림차순 정렬
+        assert child_facts[0].verification_score >= child_facts[1].verification_score
+
+    def test_multi_level_hierarchy(self, memory_adapter):
+        """다중 레벨 계층 구조."""
+        # 레벨 0 사실들
+        level0 = [
+            FactualFact(
+                subject=f"상품{i}",
+                predicate="보장금액",
+                object=f"{i}억원",
+                domain="insurance",
+            )
+            for i in range(4)
+        ]
+        for f in level0:
+            memory_adapter.save_fact(f)
+
+        # 레벨 1 요약 (2개씩 그룹화)
+        summary1a = memory_adapter.create_summary_fact(
+            child_fact_ids=[level0[0].fact_id, level0[1].fact_id],
+            summary_subject="그룹A",
+            summary_predicate="요약",
+            summary_object="상품 0,1",
+            domain="insurance",
+        )
+        summary1b = memory_adapter.create_summary_fact(
+            child_fact_ids=[level0[2].fact_id, level0[3].fact_id],
+            summary_subject="그룹B",
+            summary_predicate="요약",
+            summary_object="상품 2,3",
+            domain="insurance",
+        )
+
+        # 레벨 2 메타 요약
+        meta_summary = memory_adapter.create_summary_fact(
+            child_fact_ids=[summary1a.fact_id, summary1b.fact_id],
+            summary_subject="전체",
+            summary_predicate="메타요약",
+            summary_object="모든 상품",
+            domain="insurance",
+        )
+
+        assert meta_summary.abstraction_level == 2
+
+        # 계층 조회
+        hierarchy = memory_adapter.get_fact_hierarchy(meta_summary.fact_id)
+        assert len(hierarchy["children"]) == 2  # 레벨 1 요약들
+        assert len(hierarchy["descendants"]) == 6  # 레벨 1 2개 + 레벨 0 4개
+
+    def test_is_summary_and_is_linked_to_kg(self, memory_adapter):
+        """FactualFact 엔티티의 Phase 5 헬퍼 메서드."""
+        # 일반 사실
+        fact = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            domain="insurance",
+        )
+        assert fact.is_summary() is False
+        assert fact.is_linked_to_kg() is False
+
+        # 요약 사실
+        summary_fact = FactualFact(
+            subject="요약",
+            predicate="요약",
+            object="요약내용",
+            abstraction_level=1,
+        )
+        assert summary_fact.is_summary() is True
+
+        # KG 연결 사실
+        kg_fact = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            kg_entity_id="entity_001",
+        )
+        assert kg_fact.is_linked_to_kg() is True
