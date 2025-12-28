@@ -7,7 +7,7 @@
 [![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
 [![Ragas](https://img.shields.io/badge/Ragas-v1.0-green.svg)](https://docs.ragas.io/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.md)
-[![PSF Supporting Member](https://img.shields.io/badge/PSF-Supporting%20Member-3776AB?style=for-the-badge&logo=python&logoColor=FFD343)](https://www.python.org/psf/membership/)
+[![PSF Supporting Member](https://img.shields.io/badge/PSF-Supporting%20Member-3776AB?logo=python&logoColor=FFD343)](https://www.python.org/psf/membership/)
 
 Prefer Korean docs? Read the [한국어 README](docs/README.ko.md).
 
