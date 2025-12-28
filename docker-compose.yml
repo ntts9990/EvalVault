@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evalvault}  # CHANGEME in production
       POSTGRES_DB: ${POSTGRES_DB:-evalvault}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"  # Use 5433 to avoid conflict with local PostgreSQL
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
