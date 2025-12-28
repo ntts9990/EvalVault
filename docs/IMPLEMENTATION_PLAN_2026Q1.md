@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.0.0
+> **Document Version**: 2.1.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Final
+> **Status**: Phase 1 Complete
 
 ---
 
@@ -21,12 +21,14 @@
 
 ### 리소스 요약
 
-| Phase | Duration | Effort | Priority |
-|-------|----------|--------|----------|
-| Factual Memory Store | 2 weeks | 24h | Must Have |
-| Config & Multi-language | 1.5 weeks | 16h | Must Have |
-| Learning Integration | 1.5 weeks | 20h | Should Have |
-| **Total** | **5 weeks** | **60h** | |
+| Phase | Duration | Effort | Priority | Status |
+|-------|----------|--------|----------|--------|
+| Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete |
+| Config & Multi-language | 1.5 weeks | 16h | Must Have | Pending |
+| Learning Integration | 1.5 weeks | 20h | Should Have | Pending |
+| Dynamics: Evolution | 1 week | 12h | Should Have | Pending |
+| Dynamics: Retrieval | 1 week | 12h | Should Have | Pending |
+| **Total** | **7 weeks** | **84h** | | |
 
 ---
 
@@ -1010,7 +1012,175 @@ config/
 
 ## Appendix B: References
 
-- **Agent Memory Survey**: Forms×Functions 가이드라인
+- **Agent Memory Survey**: Forms×Functions×Dynamics 프레임워크
 - **Metacognitive Reuse**: Behavior Handbook 개념
 - **Scaling Agent Systems**: 멀티에이전트 오버헤드 분석
 - **LatentMAS**: Hidden state 공유 연구
+
+---
+
+## Appendix C: Dynamics Roadmap
+
+> "Memory in the Age of AI Agents: A Survey" 논문의 Forms×Functions×Dynamics 프레임워크 기반
+
+### C.1 Phase 1 완료 항목
+
+| 컴포넌트 | 파일 | 테스트 |
+|---------|------|--------|
+| Domain Entities | `src/evalvault/domain/entities/memory.py` | 21 tests |
+| DomainMemoryPort | `src/evalvault/ports/outbound/domain_memory_port.py` | - |
+| SQLiteDomainMemoryAdapter | `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` | 19 tests |
+| Schema | `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` | - |
+| **Total** | | **40 tests** |
+
+### C.2 Dynamics: Evolution (Phase 2)
+
+메모리 진화 전략 - 통합, 업데이트, 망각
+
+```python
+# 구현 예정 메서드 (DomainMemoryPort)
+
+def consolidate_facts(domain: str, language: str) -> int:
+    """유사한 사실들을 통합 (동일 SPO 트리플 병합)"""
+
+def resolve_conflict(fact1: FactualFact, fact2: FactualFact) -> FactualFact:
+    """충돌하는 사실 해결 (타임스탬프, 검증 횟수 기반)"""
+
+def forget_obsolete(
+    domain: str,
+    max_age_days: int = 90,
+    min_verification_count: int = 1,
+    min_verification_score: float = 0.3
+) -> int:
+    """오래되거나 신뢰도 낮은 메모리 삭제"""
+
+def decay_verification_scores(domain: str, decay_rate: float = 0.95) -> int:
+    """시간에 따른 검증 점수 감소"""
+```
+
+#### Evolution 태스크
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| consolidate_facts 구현 | 3h | Must |
+| resolve_conflict 구현 | 2h | Must |
+| forget_obsolete 구현 | 3h | Should |
+| decay_verification_scores 구현 | 2h | Could |
+| Evolution 단위 테스트 | 2h | Must |
+| **Total** | **12h** | |
+
+### C.3 Dynamics: Retrieval (Phase 2)
+
+메모리 검색 전략 - 하이브리드 검색
+
+```python
+# 구현 예정 메서드 (DomainMemoryPort)
+
+def search_facts(
+    query: str,
+    domain: str | None = None,
+    language: str | None = None,
+    limit: int = 10
+) -> list[FactualFact]:
+    """키워드 기반 사실 검색 (subject, predicate, object 매칭)"""
+
+def search_behaviors(
+    context: str,
+    domain: str,
+    language: str,
+    limit: int = 5
+) -> list[BehaviorEntry]:
+    """컨텍스트 기반 행동 검색 (trigger_pattern 매칭)"""
+
+def hybrid_search(
+    query: str,
+    domain: str,
+    language: str,
+    fact_weight: float = 0.5,
+    behavior_weight: float = 0.3,
+    learning_weight: float = 0.2,
+    limit: int = 10
+) -> dict[str, list]:
+    """하이브리드 메모리 검색 (Factual + Behavior + Learning)"""
+```
+
+#### Retrieval 태스크
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| search_facts 구현 (FTS5) | 4h | Must |
+| search_behaviors 구현 | 3h | Must |
+| hybrid_search 구현 | 3h | Should |
+| Retrieval 단위 테스트 | 2h | Must |
+| **Total** | **12h** | |
+
+### C.4 Dynamics: Formation (Phase 3)
+
+메모리 형성 전략 - 평가에서 자동 추출
+
+```python
+# 구현 예정 메서드 (DomainMemoryPort)
+
+def extract_facts_from_evaluation(
+    run_id: str,
+    min_confidence: float = 0.7
+) -> list[FactualFact]:
+    """평가 결과에서 사실 자동 추출"""
+
+def extract_patterns_from_evaluation(run_id: str) -> LearningMemory:
+    """평가 결과에서 학습 패턴 추출"""
+
+def extract_behaviors_from_evaluation(
+    run_id: str,
+    min_success_rate: float = 0.8
+) -> list[BehaviorEntry]:
+    """평가 결과에서 재사용 가능한 행동 추출 (Metacognitive Reuse)"""
+```
+
+#### Formation 태스크
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| extract_facts_from_evaluation 구현 | 4h | Should |
+| extract_patterns_from_evaluation 구현 | 4h | Should |
+| extract_behaviors_from_evaluation 구현 | 4h | Should |
+| StoragePort 통합 (run_id 조회) | 2h | Must |
+| Formation 단위 테스트 | 2h | Must |
+| **Total** | **16h** | |
+
+### C.5 Forms 확장 계획
+
+| Form | Phase | 설명 |
+|------|-------|------|
+| **Flat** | ✅ Phase 1 | SQLite 테이블 기반 (현재 구현) |
+| **Planar** | Phase 4 | Knowledge Graph 통합 (기존 KG 시스템 연동) |
+| **Hierarchical** | Phase 5 | 요약 계층 추가 (원본 + 요약본 다층 구조) |
+
+### C.6 구현 우선순위 (업데이트)
+
+```
+Phase 1: ✅ 완료
+├── Domain Entities (FactualFact, LearningMemory, DomainMemoryContext, BehaviorEntry)
+├── DomainMemoryPort interface (Dynamics 확장 포인트 포함)
+├── SQLiteDomainMemoryAdapter (기본 CRUD)
+└── 40 unit tests
+
+Phase 2: Evolution + Retrieval (진행 예정)
+├── consolidate_facts, resolve_conflict, forget_obsolete
+├── search_facts (FTS5), search_behaviors
+└── hybrid_search
+
+Phase 3: Formation + Learning Integration
+├── extract_*_from_evaluation 메서드
+├── DomainLearningHook 구현
+└── RagasEvaluator/EntityExtractor 통합
+
+Phase 4: Config & Multi-language
+├── Config schema (YAML)
+├── CLI domain init/list
+└── 다국어 terms_dictionary
+
+Phase 5: Forms 확장 (Planar/Hierarchical)
+├── KG 통합
+└── 요약 계층
+```
