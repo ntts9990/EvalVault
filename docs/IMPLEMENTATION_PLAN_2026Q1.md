@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.1.0
+> **Document Version**: 2.2.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Phase 1 Complete
+> **Status**: Phase 2 Complete
 
 ---
 
@@ -24,10 +24,10 @@
 | Phase | Duration | Effort | Priority | Status |
 |-------|----------|--------|----------|--------|
 | Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete |
-| Config & Multi-language | 1.5 weeks | 16h | Must Have | Pending |
+| Dynamics: Evolution | 1 week | 12h | Must Have | ✅ Complete |
+| Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
+| Config & Multi-language | 1.5 weeks | 16h | Should Have | Pending |
 | Learning Integration | 1.5 weeks | 20h | Should Have | Pending |
-| Dynamics: Evolution | 1 week | 12h | Should Have | Pending |
-| Dynamics: Retrieval | 1 week | 12h | Should Have | Pending |
 | **Total** | **7 weeks** | **84h** | | |
 
 ---
@@ -1033,18 +1033,26 @@ config/
 | Schema | `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` | - |
 | **Total** | | **40 tests** |
 
-### C.2 Dynamics: Evolution (Phase 2)
+### C.2 Dynamics: Evolution (Phase 2) - ✅ Complete
 
 메모리 진화 전략 - 통합, 업데이트, 망각
 
 ```python
-# 구현 예정 메서드 (DomainMemoryPort)
+# 구현 완료 메서드 (SQLiteDomainMemoryAdapter)
 
 def consolidate_facts(domain: str, language: str) -> int:
-    """유사한 사실들을 통합 (동일 SPO 트리플 병합)"""
+    """유사한 사실들을 통합 (동일 SPO 트리플 병합)
+    - 중복 SPO 사실 자동 감지
+    - verification_score 평균화, verification_count 합산
+    - source_document_ids 병합
+    - memory_evolution_log에 기록
+    """
 
 def resolve_conflict(fact1: FactualFact, fact2: FactualFact) -> FactualFact:
-    """충돌하는 사실 해결 (타임스탬프, 검증 횟수 기반)"""
+    """충돌하는 사실 해결
+    - 우선순위: verification_score * log(count+1) * recency_factor
+    - 패자를 'contradictory' 타입으로 마킹
+    """
 
 def forget_obsolete(
     domain: str,
@@ -1052,29 +1060,34 @@ def forget_obsolete(
     min_verification_count: int = 1,
     min_verification_score: float = 0.3
 ) -> int:
-    """오래되거나 신뢰도 낮은 메모리 삭제"""
+    """오래되거나 신뢰도 낮은 메모리 삭제
+    - 조건: (age > max_days AND count < min_count) OR score < min_score
+    """
 
 def decay_verification_scores(domain: str, decay_rate: float = 0.95) -> int:
-    """시간에 따른 검증 점수 감소"""
+    """시간에 따른 검증 점수 감소
+    - 7일 이상 검증되지 않은 사실에 적용
+    - 최소 점수 0.1 유지
+    """
 ```
 
-#### Evolution 태스크
+#### Evolution 태스크 - ✅ 완료
 
-| Task | Effort | Priority |
-|------|--------|----------|
-| consolidate_facts 구현 | 3h | Must |
-| resolve_conflict 구현 | 2h | Must |
-| forget_obsolete 구현 | 3h | Should |
-| decay_verification_scores 구현 | 2h | Could |
-| Evolution 단위 테스트 | 2h | Must |
-| **Total** | **12h** | |
+| Task | Effort | Status |
+|------|--------|--------|
+| consolidate_facts 구현 | 3h | ✅ |
+| resolve_conflict 구현 | 2h | ✅ |
+| forget_obsolete 구현 | 3h | ✅ |
+| decay_verification_scores 구현 | 2h | ✅ |
+| Evolution 단위 테스트 (8 tests) | 2h | ✅ |
+| **Total** | **12h** | ✅ |
 
-### C.3 Dynamics: Retrieval (Phase 2)
+### C.3 Dynamics: Retrieval (Phase 2) - ✅ Complete
 
-메모리 검색 전략 - 하이브리드 검색
+메모리 검색 전략 - FTS5 기반 하이브리드 검색
 
 ```python
-# 구현 예정 메서드 (DomainMemoryPort)
+# 구현 완료 메서드 (SQLiteDomainMemoryAdapter)
 
 def search_facts(
     query: str,
@@ -1082,7 +1095,11 @@ def search_facts(
     language: str | None = None,
     limit: int = 10
 ) -> list[FactualFact]:
-    """키워드 기반 사실 검색 (subject, predicate, object 매칭)"""
+    """FTS5 기반 사실 검색
+    - facts_fts 가상 테이블 사용
+    - BM25 랭킹으로 관련도 정렬
+    - 도메인/언어 필터링 지원
+    """
 
 def search_behaviors(
     context: str,
@@ -1090,7 +1107,11 @@ def search_behaviors(
     language: str,
     limit: int = 5
 ) -> list[BehaviorEntry]:
-    """컨텍스트 기반 행동 검색 (trigger_pattern 매칭)"""
+    """컨텍스트 기반 행동 검색
+    - FTS5 + trigger_pattern regex 매칭 결합
+    - 성공률 기준 정렬
+    - 언어 적용 가능성 필터링
+    """
 
 def hybrid_search(
     query: str,
@@ -1101,18 +1122,28 @@ def hybrid_search(
     learning_weight: float = 0.2,
     limit: int = 10
 ) -> dict[str, list]:
-    """하이브리드 메모리 검색 (Factual + Behavior + Learning)"""
+    """하이브리드 메모리 검색
+    - facts, behaviors, learnings 동시 검색
+    - 각 레이어별 결과 반환
+    """
 ```
 
-#### Retrieval 태스크
+**Schema 업데이트 (FTS5)**:
+- `facts_fts` 가상 테이블 (subject, predicate, object 인덱싱)
+- `behaviors_fts` 가상 테이블 (description, trigger_pattern 인덱싱)
+- 자동 동기화 트리거 (INSERT/UPDATE/DELETE)
 
-| Task | Effort | Priority |
-|------|--------|----------|
-| search_facts 구현 (FTS5) | 4h | Must |
-| search_behaviors 구현 | 3h | Must |
-| hybrid_search 구현 | 3h | Should |
-| Retrieval 단위 테스트 | 2h | Must |
-| **Total** | **12h** | |
+#### Retrieval 태스크 - ✅ 완료
+
+| Task | Effort | Status |
+|------|--------|--------|
+| FTS5 스키마 추가 | 1h | ✅ |
+| search_facts 구현 | 3h | ✅ |
+| search_behaviors 구현 | 3h | ✅ |
+| hybrid_search 구현 | 2h | ✅ |
+| _search_learnings 구현 | 1h | ✅ |
+| Retrieval 단위 테스트 (6 tests) | 2h | ✅ |
+| **Total** | **12h** | ✅ |
 
 ### C.4 Dynamics: Formation (Phase 3)
 
@@ -1165,12 +1196,14 @@ Phase 1: ✅ 완료
 ├── SQLiteDomainMemoryAdapter (기본 CRUD)
 └── 40 unit tests
 
-Phase 2: Evolution + Retrieval (진행 예정)
-├── consolidate_facts, resolve_conflict, forget_obsolete
-├── search_facts (FTS5), search_behaviors
-└── hybrid_search
+Phase 2: ✅ 완료 (Evolution + Retrieval)
+├── Evolution: consolidate_facts, resolve_conflict, forget_obsolete, decay_verification_scores
+├── Retrieval: search_facts (FTS5), search_behaviors, hybrid_search
+├── FTS5 스키마 (facts_fts, behaviors_fts) + 자동 동기화 트리거
+├── memory_evolution_log 로깅
+└── 14 new unit tests (총 54 tests)
 
-Phase 3: Formation + Learning Integration
+Phase 3: Formation + Learning Integration (진행 예정)
 ├── extract_*_from_evaluation 메서드
 ├── DomainLearningHook 구현
 └── RagasEvaluator/EntityExtractor 통합
@@ -1184,3 +1217,32 @@ Phase 5: Forms 확장 (Planar/Hierarchical)
 ├── KG 통합
 └── 요약 계층
 ```
+
+### C.7 Phase 2 완료 상세
+
+**구현 파일**:
+- `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` - Evolution/Retrieval 메서드 추가
+- `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` - FTS5 가상 테이블 추가
+
+**테스트 파일**:
+- `tests/unit/test_domain_memory.py` - 54 tests (40 Phase 1 + 14 Phase 2)
+
+**Evolution 테스트**:
+- `test_consolidate_facts_merges_duplicates`
+- `test_consolidate_facts_no_duplicates`
+- `test_resolve_conflict_selects_higher_priority`
+- `test_forget_obsolete_deletes_low_score_facts`
+- `test_forget_obsolete_no_matching_facts`
+- `test_decay_verification_scores`
+- `test_decay_verification_scores_invalid_rate`
+- `test_decay_verification_scores_recent_facts_unchanged`
+
+**Retrieval 테스트**:
+- `test_search_facts_by_keyword`
+- `test_search_facts_empty_query`
+- `test_search_facts_korean_text`
+- `test_search_behaviors_by_context`
+- `test_search_behaviors_success_rate_ordering`
+- `test_hybrid_search_returns_all_layers`
+- `test_search_learnings_finds_pattern`
+- `test_hybrid_search_empty_results`

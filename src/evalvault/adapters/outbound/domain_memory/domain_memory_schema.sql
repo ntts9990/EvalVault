@@ -127,3 +127,62 @@ CREATE TABLE IF NOT EXISTS memory_evolution_log (
 CREATE INDEX IF NOT EXISTS idx_evolution_log_operation ON memory_evolution_log(operation);
 CREATE INDEX IF NOT EXISTS idx_evolution_log_target ON memory_evolution_log(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_evolution_log_performed_at ON memory_evolution_log(performed_at DESC);
+
+-- =========================================================================
+-- Full-Text Search (FTS5) - Phase 2 Retrieval Dynamics
+-- =========================================================================
+
+-- Facts FTS5 virtual table for keyword search
+CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(
+    fact_id UNINDEXED,
+    subject,
+    predicate,
+    object,
+    content='factual_facts',
+    content_rowid='rowid'
+);
+
+-- Triggers to keep FTS5 index synchronized with factual_facts
+CREATE TRIGGER IF NOT EXISTS facts_fts_insert AFTER INSERT ON factual_facts BEGIN
+    INSERT INTO facts_fts(rowid, fact_id, subject, predicate, object)
+    VALUES (NEW.rowid, NEW.fact_id, NEW.subject, NEW.predicate, NEW.object);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_fts_delete AFTER DELETE ON factual_facts BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, fact_id, subject, predicate, object)
+    VALUES ('delete', OLD.rowid, OLD.fact_id, OLD.subject, OLD.predicate, OLD.object);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_fts_update AFTER UPDATE ON factual_facts BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, fact_id, subject, predicate, object)
+    VALUES ('delete', OLD.rowid, OLD.fact_id, OLD.subject, OLD.predicate, OLD.object);
+    INSERT INTO facts_fts(rowid, fact_id, subject, predicate, object)
+    VALUES (NEW.rowid, NEW.fact_id, NEW.subject, NEW.predicate, NEW.object);
+END;
+
+-- Behaviors FTS5 virtual table for context-based search
+CREATE VIRTUAL TABLE IF NOT EXISTS behaviors_fts USING fts5(
+    behavior_id UNINDEXED,
+    description,
+    trigger_pattern,
+    content='behavior_entries',
+    content_rowid='rowid'
+);
+
+-- Triggers to keep behaviors FTS5 index synchronized
+CREATE TRIGGER IF NOT EXISTS behaviors_fts_insert AFTER INSERT ON behavior_entries BEGIN
+    INSERT INTO behaviors_fts(rowid, behavior_id, description, trigger_pattern)
+    VALUES (NEW.rowid, NEW.behavior_id, NEW.description, NEW.trigger_pattern);
+END;
+
+CREATE TRIGGER IF NOT EXISTS behaviors_fts_delete AFTER DELETE ON behavior_entries BEGIN
+    INSERT INTO behaviors_fts(behaviors_fts, rowid, behavior_id, description, trigger_pattern)
+    VALUES ('delete', OLD.rowid, OLD.behavior_id, OLD.description, OLD.trigger_pattern);
+END;
+
+CREATE TRIGGER IF NOT EXISTS behaviors_fts_update AFTER UPDATE ON behavior_entries BEGIN
+    INSERT INTO behaviors_fts(behaviors_fts, rowid, behavior_id, description, trigger_pattern)
+    VALUES ('delete', OLD.rowid, OLD.behavior_id, OLD.description, OLD.trigger_pattern);
+    INSERT INTO behaviors_fts(rowid, behavior_id, description, trigger_pattern)
+    VALUES (NEW.rowid, NEW.behavior_id, NEW.description, NEW.trigger_pattern);
+END;

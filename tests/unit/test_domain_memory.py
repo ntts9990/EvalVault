@@ -572,35 +572,395 @@ class TestSQLiteDomainMemoryAdapter:
         assert stats["facts"] == 2
 
     # =========================================================================
-    # Dynamics Tests (Phase 2-3 - NotImplementedError)
+    # Dynamics: Evolution Tests (Phase 2)
     # =========================================================================
 
-    def test_evolution_methods_not_implemented(self, memory_adapter):
-        """Evolution 메서드 미구현 확인."""
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.consolidate_facts("insurance", "ko")
+    def test_consolidate_facts_merges_duplicates(self, memory_adapter):
+        """중복 사실 통합."""
+        # 동일한 SPO 트리플을 가진 여러 사실 생성
+        facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                language="ko",
+                verification_score=0.8,
+                verification_count=1,
+                source_document_ids=["doc1"],
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                language="ko",
+                verification_score=0.9,
+                verification_count=2,
+                source_document_ids=["doc2"],
+            ),
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                language="ko",
+                verification_score=0.7,
+                verification_count=1,
+                source_document_ids=["doc3"],
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
 
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            fact1 = FactualFact(subject="A", predicate="B", object="C")
-            fact2 = FactualFact(subject="A", predicate="B", object="D")
-            memory_adapter.resolve_conflict(fact1, fact2)
+        # 초기 상태 확인
+        initial_facts = memory_adapter.list_facts(domain="insurance")
+        assert len(initial_facts) == 3
 
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.forget_obsolete("insurance")
+        # 통합 실행
+        consolidated = memory_adapter.consolidate_facts("insurance", "ko")
+        assert consolidated == 2  # 2개가 병합됨
 
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.decay_verification_scores("insurance")
+        # 통합 후 상태 확인
+        remaining_facts = memory_adapter.list_facts(domain="insurance")
+        assert len(remaining_facts) == 1
 
-    def test_retrieval_methods_not_implemented(self, memory_adapter):
-        """Retrieval 메서드 미구현 확인."""
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.search_facts("query")
+        merged_fact = remaining_facts[0]
+        assert merged_fact.verification_count == 4  # 1 + 2 + 1
+        # 평균 점수: (0.8 + 0.9 + 0.7) / 3 = 0.8
+        assert merged_fact.verification_score == pytest.approx(0.8, rel=0.01)
 
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.search_behaviors("context", "insurance", "ko")
+    def test_consolidate_facts_no_duplicates(self, memory_adapter):
+        """중복 없는 경우 통합."""
+        facts = [
+            FactualFact(
+                subject="A", predicate="P1", object="O1", domain="insurance", language="ko"
+            ),
+            FactualFact(
+                subject="B", predicate="P2", object="O2", domain="insurance", language="ko"
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
 
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            memory_adapter.hybrid_search("query", "insurance", "ko")
+        consolidated = memory_adapter.consolidate_facts("insurance", "ko")
+        assert consolidated == 0
+
+    def test_resolve_conflict_selects_higher_priority(self, memory_adapter):
+        """충돌 해결 - 높은 우선순위 선택."""
+        from datetime import datetime, timedelta
+
+        # 높은 신뢰도, 많은 검증 횟수, 최근 검증
+        fact1 = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="1억원",
+            verification_score=0.9,
+            verification_count=10,
+            last_verified=datetime.now(),
+        )
+        # 낮은 신뢰도, 적은 검증 횟수, 오래된 검증
+        fact2 = FactualFact(
+            subject="보험A",
+            predicate="보장금액",
+            object="2억원",
+            verification_score=0.5,
+            verification_count=2,
+            last_verified=datetime.now() - timedelta(days=60),
+        )
+
+        memory_adapter.save_fact(fact1)
+        memory_adapter.save_fact(fact2)
+
+        winner = memory_adapter.resolve_conflict(fact1, fact2)
+        assert winner.fact_id == fact1.fact_id
+
+        # 패자가 contradictory로 마킹되었는지 확인
+        loser = memory_adapter.get_fact(fact2.fact_id)
+        assert loser.fact_type == "contradictory"
+
+    def test_forget_obsolete_deletes_low_score_facts(self, memory_adapter):
+        """저신뢰 사실 삭제."""
+        facts = [
+            FactualFact(
+                subject="A",
+                predicate="P",
+                object="O1",
+                domain="insurance",
+                verification_score=0.2,  # 낮은 점수
+            ),
+            FactualFact(
+                subject="B",
+                predicate="P",
+                object="O2",
+                domain="insurance",
+                verification_score=0.8,  # 높은 점수
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
+
+        deleted = memory_adapter.forget_obsolete(
+            domain="insurance",
+            min_verification_score=0.3,
+        )
+        assert deleted == 1
+
+        remaining = memory_adapter.list_facts(domain="insurance")
+        assert len(remaining) == 1
+        assert remaining[0].subject == "B"
+
+    def test_forget_obsolete_no_matching_facts(self, memory_adapter):
+        """삭제 대상 없음."""
+        fact = FactualFact(
+            subject="A",
+            predicate="P",
+            object="O",
+            domain="insurance",
+            verification_score=0.9,
+            verification_count=10,
+        )
+        memory_adapter.save_fact(fact)
+
+        deleted = memory_adapter.forget_obsolete(domain="insurance")
+        assert deleted == 0
+
+    def test_decay_verification_scores(self, memory_adapter):
+        """검증 점수 감소."""
+        from datetime import datetime, timedelta
+
+        # 10일 전 검증된 사실
+        old_verified = datetime.now() - timedelta(days=10)
+        fact = FactualFact(
+            subject="A",
+            predicate="P",
+            object="O",
+            domain="insurance",
+            verification_score=0.8,
+            created_at=old_verified,
+            last_verified=old_verified,
+        )
+        memory_adapter.save_fact(fact)
+
+        # 점수 감소 적용
+        decayed = memory_adapter.decay_verification_scores(domain="insurance", decay_rate=0.9)
+        assert decayed == 1
+
+        updated = memory_adapter.get_fact(fact.fact_id)
+        assert updated.verification_score == pytest.approx(0.72)  # 0.8 * 0.9
+
+    def test_decay_verification_scores_invalid_rate(self, memory_adapter):
+        """잘못된 감소율."""
+        with pytest.raises(ValueError, match="decay_rate must be between"):
+            memory_adapter.decay_verification_scores("insurance", decay_rate=1.5)
+
+    def test_decay_verification_scores_recent_facts_unchanged(self, memory_adapter):
+        """최근 사실은 감소 안함."""
+        # 최근 검증된 사실
+        fact = FactualFact(
+            subject="A",
+            predicate="P",
+            object="O",
+            domain="insurance",
+            verification_score=0.8,
+        )
+        memory_adapter.save_fact(fact)
+
+        decayed = memory_adapter.decay_verification_scores("insurance", decay_rate=0.9)
+        assert decayed == 0
+
+    # =========================================================================
+    # Dynamics: Retrieval Tests (Phase 2)
+    # =========================================================================
+
+    def test_search_facts_by_keyword(self, memory_adapter):
+        """키워드로 사실 검색."""
+        facts = [
+            FactualFact(
+                subject="보험A",
+                predicate="보장금액",
+                object="1억원",
+                domain="insurance",
+                language="ko",
+            ),
+            FactualFact(
+                subject="보험B",
+                predicate="만기",
+                object="10년",
+                domain="insurance",
+                language="ko",
+            ),
+            FactualFact(
+                subject="의료A",
+                predicate="진료비",
+                object="100만원",
+                domain="medical",
+                language="ko",
+            ),
+        ]
+        for f in facts:
+            memory_adapter.save_fact(f)
+
+        # 검색 실행
+        results = memory_adapter.search_facts("보험", domain="insurance")
+        assert len(results) == 2
+
+        # 도메인 필터링
+        results = memory_adapter.search_facts("보험", domain="medical")
+        assert len(results) == 0
+
+    def test_search_facts_empty_query(self, memory_adapter):
+        """빈 쿼리 검색."""
+        fact = FactualFact(subject="A", predicate="P", object="O")
+        memory_adapter.save_fact(fact)
+
+        results = memory_adapter.search_facts("")
+        assert len(results) == 0
+
+    def test_search_facts_korean_text(self, memory_adapter):
+        """한글 텍스트 검색."""
+        fact = FactualFact(
+            subject="삼성화재",
+            predicate="보험종류",
+            object="종신보험",
+            domain="insurance",
+            language="ko",
+        )
+        memory_adapter.save_fact(fact)
+
+        results = memory_adapter.search_facts("삼성화재", language="ko")
+        assert len(results) == 1
+        assert results[0].subject == "삼성화재"
+
+    def test_search_behaviors_by_context(self, memory_adapter):
+        """컨텍스트로 행동 검색."""
+        behaviors = [
+            BehaviorEntry(
+                description="보험 용어 처리",
+                trigger_pattern=r"보험|보장",
+                domain="insurance",
+                success_rate=0.9,
+            ),
+            BehaviorEntry(
+                description="약관 분석",
+                trigger_pattern=r"약관|조항",
+                domain="insurance",
+                success_rate=0.8,
+            ),
+        ]
+        for b in behaviors:
+            memory_adapter.save_behavior(b)
+
+        # trigger_pattern 매칭
+        results = memory_adapter.search_behaviors(
+            context="이 보험의 보장 범위는 무엇인가요?",
+            domain="insurance",
+            language="ko",
+        )
+        assert len(results) >= 1
+        assert any(b.description == "보험 용어 처리" for b in results)
+
+    def test_search_behaviors_success_rate_ordering(self, memory_adapter):
+        """행동 검색 결과 성공률 정렬."""
+        behaviors = [
+            BehaviorEntry(
+                description="낮은 성공률",
+                trigger_pattern=r"테스트",
+                domain="insurance",
+                success_rate=0.5,
+            ),
+            BehaviorEntry(
+                description="높은 성공률",
+                trigger_pattern=r"테스트",
+                domain="insurance",
+                success_rate=0.95,
+            ),
+        ]
+        for b in behaviors:
+            memory_adapter.save_behavior(b)
+
+        results = memory_adapter.search_behaviors(
+            context="테스트 컨텍스트", domain="insurance", language="ko"
+        )
+        assert len(results) == 2
+        assert results[0].success_rate >= results[1].success_rate
+
+    def test_hybrid_search_returns_all_layers(self, memory_adapter):
+        """하이브리드 검색 - 모든 레이어 결과."""
+        # Factual layer
+        fact = FactualFact(
+            subject="보험A", predicate="종류", object="종신보험", domain="insurance", language="ko"
+        )
+        memory_adapter.save_fact(fact)
+
+        # Behavior layer
+        behavior = BehaviorEntry(
+            description="보험 분석",
+            trigger_pattern=r"보험",
+            domain="insurance",
+            success_rate=0.9,
+        )
+        memory_adapter.save_behavior(behavior)
+
+        # Learning layer
+        learning = LearningMemory(
+            run_id="run-001",
+            domain="insurance",
+            language="ko",
+            successful_patterns=["보험 패턴 성공"],
+        )
+        memory_adapter.save_learning(learning)
+
+        # 하이브리드 검색
+        results = memory_adapter.hybrid_search(
+            query="보험",
+            domain="insurance",
+            language="ko",
+        )
+
+        assert "facts" in results
+        assert "behaviors" in results
+        assert "learnings" in results
+        assert len(results["facts"]) >= 1
+        assert len(results["behaviors"]) >= 1
+        # learnings 검색은 LIKE 패턴 기반으로 결과가 없을 수 있음
+        assert isinstance(results["learnings"], list)
+
+    def test_search_learnings_finds_pattern(self, memory_adapter):
+        """학습 패턴 검색."""
+        learning = LearningMemory(
+            run_id="run-001",
+            domain="insurance",
+            language="ko",
+            successful_patterns=["entity extraction success"],
+            failed_patterns=["context retrieval failed"],
+        )
+        memory_adapter.save_learning(learning)
+
+        # _search_learnings 내부 메서드 테스트
+        results = memory_adapter._search_learnings(
+            query="extraction",
+            domain="insurance",
+            language="ko",
+        )
+        assert len(results) == 1
+        assert results[0].run_id == "run-001"
+
+    def test_hybrid_search_empty_results(self, memory_adapter):
+        """하이브리드 검색 - 결과 없음."""
+        results = memory_adapter.hybrid_search(
+            query="존재하지않는키워드",
+            domain="nonexistent",
+            language="ko",
+        )
+
+        assert results["facts"] == []
+        assert results["behaviors"] == []
+        assert results["learnings"] == []
+
+    # =========================================================================
+    # Dynamics: Formation Tests (Phase 3 - NotImplementedError)
+    # =========================================================================
 
     def test_formation_methods_not_implemented(self, memory_adapter):
         """Formation 메서드 미구현 확인."""

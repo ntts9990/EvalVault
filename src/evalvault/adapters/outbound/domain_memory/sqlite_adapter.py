@@ -629,16 +629,192 @@ class SQLiteDomainMemoryAdapter:
             conn.close()
 
     # =========================================================================
-    # Dynamics: Evolution - Phase 2 (Not Implemented)
+    # Dynamics: Evolution - Phase 2
     # =========================================================================
 
     def consolidate_facts(self, domain: str, language: str) -> int:
-        """유사한 사실들을 통합합니다. (Phase 2)"""
-        raise NotImplementedError("consolidate_facts will be implemented in Phase 2")
+        """유사한 사실들을 통합합니다.
+
+        동일한 SPO 트리플을 가진 사실들을 병합하고,
+        verification_score와 verification_count를 집계합니다.
+
+        Args:
+            domain: 도메인
+            language: 언어
+
+        Returns:
+            통합된 사실 수 (삭제된 중복 수)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # 동일한 SPO 트리플을 가진 중복 사실 찾기
+            cursor.execute(
+                """
+                SELECT subject, predicate, object, GROUP_CONCAT(fact_id) as fact_ids,
+                       COUNT(*) as cnt
+                FROM factual_facts
+                WHERE domain = ? AND language = ?
+                GROUP BY subject, predicate, object
+                HAVING cnt > 1
+                """,
+                (domain, language),
+            )
+            duplicates = cursor.fetchall()
+
+            consolidated_count = 0
+
+            for row in duplicates:
+                subject, predicate, obj, fact_ids_str, count = row
+                fact_ids = fact_ids_str.split(",")
+
+                # 모든 중복 사실 조회
+                cursor.execute(
+                    f"""
+                    SELECT fact_id, verification_score, verification_count,
+                           source_document_ids, created_at, last_verified
+                    FROM factual_facts
+                    WHERE fact_id IN ({",".join(["?"] * len(fact_ids))})
+                    ORDER BY verification_score DESC, verification_count DESC
+                    """,
+                    fact_ids,
+                )
+                facts_data = cursor.fetchall()
+
+                # 가장 신뢰도 높은 사실을 기준으로 병합
+                primary_id = facts_data[0][0]
+                total_score = sum(f[1] for f in facts_data) / len(facts_data)
+                total_count = sum(f[2] for f in facts_data)
+
+                # 모든 source_document_ids 병합
+                all_sources: set[str] = set()
+                for f in facts_data:
+                    if f[3]:
+                        sources = json.loads(f[3])
+                        all_sources.update(sources)
+
+                # 가장 최근 last_verified 사용
+                latest_verified = max(f[5] for f in facts_data if f[5])
+
+                # 기본 사실 업데이트
+                cursor.execute(
+                    """
+                    UPDATE factual_facts
+                    SET verification_score = ?,
+                        verification_count = ?,
+                        source_document_ids = ?,
+                        last_verified = ?
+                    WHERE fact_id = ?
+                    """,
+                    (
+                        min(total_score, 1.0),
+                        total_count,
+                        json.dumps(list(all_sources)),
+                        latest_verified,
+                        primary_id,
+                    ),
+                )
+
+                # 중복 사실 삭제
+                other_ids = [fid for fid in fact_ids if fid != primary_id]
+                if other_ids:
+                    cursor.execute(
+                        f"""
+                        DELETE FROM factual_facts
+                        WHERE fact_id IN ({",".join(["?"] * len(other_ids))})
+                        """,
+                        other_ids,
+                    )
+                    consolidated_count += len(other_ids)
+
+                    # Evolution 로그 기록
+                    self._log_evolution(
+                        cursor,
+                        "consolidate",
+                        "fact",
+                        primary_id,
+                        {"merged_ids": other_ids, "new_score": total_score},
+                    )
+
+            conn.commit()
+            return consolidated_count
+        finally:
+            conn.close()
+
+    def _log_evolution(
+        self,
+        cursor: sqlite3.Cursor,
+        operation: str,
+        target_type: str,
+        target_id: str,
+        details: dict,
+    ) -> None:
+        """Evolution 로그를 기록합니다."""
+        cursor.execute(
+            """
+            INSERT INTO memory_evolution_log (operation, target_type, target_id, details)
+            VALUES (?, ?, ?, ?)
+            """,
+            (operation, target_type, target_id, json.dumps(details)),
+        )
 
     def resolve_conflict(self, fact1: FactualFact, fact2: FactualFact) -> FactualFact:
-        """충돌하는 사실을 해결합니다. (Phase 2)"""
-        raise NotImplementedError("resolve_conflict will be implemented in Phase 2")
+        """충돌하는 사실을 해결합니다.
+
+        두 사실이 동일한 subject-predicate를 가지지만 다른 object를 가질 때,
+        verification_score, verification_count, last_verified를 기반으로 우선순위 결정.
+
+        Args:
+            fact1: 첫 번째 사실
+            fact2: 두 번째 사실
+
+        Returns:
+            해결된 FactualFact (더 신뢰도 높은 사실)
+        """
+        # 점수 계산: verification_score * log(verification_count + 1) * recency_factor
+        from math import log
+
+        def calculate_priority(fact: FactualFact) -> float:
+            base_score = fact.verification_score
+            count_factor = log(fact.verification_count + 1) + 1
+            recency_days = (datetime.now() - (fact.last_verified or fact.created_at)).days
+            recency_factor = 1.0 / (1 + recency_days / 30)  # 30일 기준 감소
+            return base_score * count_factor * recency_factor
+
+        priority1 = calculate_priority(fact1)
+        priority2 = calculate_priority(fact2)
+
+        winner = fact1 if priority1 >= priority2 else fact2
+        loser = fact2 if priority1 >= priority2 else fact1
+
+        # 패자의 fact_type을 "contradictory"로 마킹
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE factual_facts SET fact_type = 'contradictory'
+                WHERE fact_id = ?
+                """,
+                (loser.fact_id,),
+            )
+            self._log_evolution(
+                cursor,
+                "resolve_conflict",
+                "fact",
+                winner.fact_id,
+                {
+                    "loser_id": loser.fact_id,
+                    "winner_priority": priority1 if priority1 >= priority2 else priority2,
+                    "loser_priority": priority2 if priority1 >= priority2 else priority1,
+                },
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return winner
 
     def forget_obsolete(
         self,
@@ -647,15 +823,155 @@ class SQLiteDomainMemoryAdapter:
         min_verification_count: int = 1,
         min_verification_score: float = 0.3,
     ) -> int:
-        """오래되거나 신뢰도 낮은 메모리를 삭제합니다. (Phase 2)"""
-        raise NotImplementedError("forget_obsolete will be implemented in Phase 2")
+        """오래되거나 신뢰도 낮은 메모리를 삭제합니다.
+
+        다음 조건 중 하나를 만족하면 삭제:
+        - last_verified가 max_age_days보다 오래됨 AND verification_count < min_verification_count
+        - verification_score < min_verification_score
+
+        Args:
+            domain: 도메인
+            max_age_days: 최대 경과 일수
+            min_verification_count: 최소 검증 횟수
+            min_verification_score: 최소 검증 점수
+
+        Returns:
+            삭제된 메모리 수
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cutoff_date = datetime.now().isoformat()
+
+            # 삭제 대상 사실 조회 (로깅용)
+            cursor.execute(
+                """
+                SELECT fact_id FROM factual_facts
+                WHERE domain = ?
+                AND (
+                    (julianday(?) - julianday(last_verified) > ?
+                     AND verification_count < ?)
+                    OR verification_score < ?
+                )
+                """,
+                (
+                    domain,
+                    cutoff_date,
+                    max_age_days,
+                    min_verification_count,
+                    min_verification_score,
+                ),
+            )
+            to_delete = [row[0] for row in cursor.fetchall()]
+
+            if not to_delete:
+                return 0
+
+            # Evolution 로그 기록
+            for fact_id in to_delete:
+                self._log_evolution(
+                    cursor,
+                    "forget",
+                    "fact",
+                    fact_id,
+                    {
+                        "max_age_days": max_age_days,
+                        "min_verification_count": min_verification_count,
+                        "min_verification_score": min_verification_score,
+                    },
+                )
+
+            # 삭제 실행
+            cursor.execute(
+                """
+                DELETE FROM factual_facts
+                WHERE domain = ?
+                AND (
+                    (julianday(?) - julianday(last_verified) > ?
+                     AND verification_count < ?)
+                    OR verification_score < ?
+                )
+                """,
+                (
+                    domain,
+                    cutoff_date,
+                    max_age_days,
+                    min_verification_count,
+                    min_verification_score,
+                ),
+            )
+            deleted_count = cursor.rowcount
+            conn.commit()
+            return deleted_count
+        finally:
+            conn.close()
 
     def decay_verification_scores(self, domain: str, decay_rate: float = 0.95) -> int:
-        """시간에 따라 검증 점수를 감소시킵니다. (Phase 2)"""
-        raise NotImplementedError("decay_verification_scores will be implemented in Phase 2")
+        """시간에 따라 검증 점수를 감소시킵니다.
+
+        오래 검증되지 않은 사실의 신뢰도를 점진적으로 낮춥니다.
+        7일 이상 검증되지 않은 사실에 decay_rate를 적용합니다.
+
+        Args:
+            domain: 도메인
+            decay_rate: 감소율 (0.0-1.0)
+
+        Returns:
+            업데이트된 사실 수
+        """
+        if not 0.0 <= decay_rate <= 1.0:
+            raise ValueError("decay_rate must be between 0.0 and 1.0")
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # 7일 이상 검증되지 않은 사실 조회
+            min_days_since_verified = 7
+            cutoff_date = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                SELECT fact_id, verification_score
+                FROM factual_facts
+                WHERE domain = ?
+                AND julianday(?) - julianday(last_verified) > ?
+                AND verification_score > 0.1
+                """,
+                (domain, cutoff_date, min_days_since_verified),
+            )
+            to_decay = cursor.fetchall()
+
+            if not to_decay:
+                return 0
+
+            # 점수 감소 적용
+            for fact_id, current_score in to_decay:
+                new_score = max(current_score * decay_rate, 0.1)  # 최소 0.1 유지
+                cursor.execute(
+                    """
+                    UPDATE factual_facts
+                    SET verification_score = ?
+                    WHERE fact_id = ?
+                    """,
+                    (new_score, fact_id),
+                )
+                self._log_evolution(
+                    cursor,
+                    "decay",
+                    "fact",
+                    fact_id,
+                    {"old_score": current_score, "new_score": new_score, "decay_rate": decay_rate},
+                )
+
+            conn.commit()
+            return len(to_decay)
+        finally:
+            conn.close()
 
     # =========================================================================
-    # Dynamics: Retrieval - Phase 2 (Not Implemented)
+    # Dynamics: Retrieval - Phase 2
     # =========================================================================
 
     def search_facts(
@@ -665,8 +981,86 @@ class SQLiteDomainMemoryAdapter:
         language: str | None = None,
         limit: int = 10,
     ) -> list[FactualFact]:
-        """키워드 기반 사실 검색. (Phase 2)"""
-        raise NotImplementedError("search_facts will be implemented in Phase 2")
+        """키워드 기반 사실 검색 (FTS5).
+
+        subject, predicate, object 필드에서 키워드 매칭을 수행합니다.
+
+        Args:
+            query: 검색 쿼리
+            domain: 도메인 필터 (선택)
+            language: 언어 필터 (선택)
+            limit: 최대 결과 수
+
+        Returns:
+            관련 FactualFact 리스트 (관련도 내림차순)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # FTS5 검색 쿼리 생성 (특수문자 이스케이프)
+            fts_query = self._prepare_fts_query(query)
+
+            if not fts_query:
+                return []
+
+            # FTS5 검색으로 fact_id 조회
+            cursor.execute(
+                """
+                SELECT fact_id, bm25(facts_fts) as rank
+                FROM facts_fts
+                WHERE facts_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (fts_query, limit * 3),  # 필터링 여유분 확보
+            )
+            fts_results = cursor.fetchall()
+
+            if not fts_results:
+                return []
+
+            fact_ids = [row[0] for row in fts_results]
+
+            # 도메인/언어 필터와 함께 상세 정보 조회
+            placeholders = ",".join(["?"] * len(fact_ids))
+            query_sql = f"""
+                SELECT fact_id, subject, predicate, object, language, domain,
+                       fact_type, verification_score, verification_count,
+                       source_document_ids, created_at, last_verified
+                FROM factual_facts
+                WHERE fact_id IN ({placeholders})
+            """
+            params: list = list(fact_ids)
+
+            if domain:
+                query_sql += " AND domain = ?"
+                params.append(domain)
+            if language:
+                query_sql += " AND language = ?"
+                params.append(language)
+
+            query_sql += " ORDER BY verification_score DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query_sql, params)
+            return [self._row_to_fact(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def _prepare_fts_query(self, query: str) -> str:
+        """FTS5 쿼리를 위한 문자열 전처리."""
+        import re
+
+        # 특수문자 제거 및 공백 정규화
+        query = re.sub(r"[^\w\s가-힣]", " ", query)
+        tokens = query.split()
+
+        if not tokens:
+            return ""
+
+        # OR 검색으로 연결 (부분 일치 지원)
+        return " OR ".join(f'"{token}"*' for token in tokens if token)
 
     def search_behaviors(
         self,
@@ -675,8 +1069,94 @@ class SQLiteDomainMemoryAdapter:
         language: str,
         limit: int = 5,
     ) -> list[BehaviorEntry]:
-        """컨텍스트 기반 행동 검색. (Phase 2)"""
-        raise NotImplementedError("search_behaviors will be implemented in Phase 2")
+        """컨텍스트 기반 행동 검색.
+
+        현재 평가 컨텍스트에 적용 가능한 행동을 검색합니다.
+        trigger_pattern 매칭과 성공률을 고려합니다.
+
+        Args:
+            context: 현재 컨텍스트 (질문, 문서 등)
+            domain: 도메인
+            language: 언어
+            limit: 최대 결과 수
+
+        Returns:
+            적용 가능한 BehaviorEntry 리스트 (성공률 내림차순)
+        """
+        import re
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # FTS5로 description/trigger_pattern에서 키워드 검색
+            fts_query = self._prepare_fts_query(context)
+
+            results: list[BehaviorEntry] = []
+
+            if fts_query:
+                cursor.execute(
+                    """
+                    SELECT behavior_id
+                    FROM behaviors_fts
+                    WHERE behaviors_fts MATCH ?
+                    LIMIT ?
+                    """,
+                    (fts_query, limit * 3),
+                )
+                fts_ids = [row[0] for row in cursor.fetchall()]
+
+                if fts_ids:
+                    placeholders = ",".join(["?"] * len(fts_ids))
+                    cursor.execute(
+                        f"""
+                        SELECT behavior_id, description, trigger_pattern, action_sequence,
+                               success_rate, token_savings, applicable_languages, domain,
+                               last_used, use_count, created_at
+                        FROM behavior_entries
+                        WHERE behavior_id IN ({placeholders})
+                        AND domain = ?
+                        ORDER BY success_rate DESC
+                        """,
+                        [*fts_ids, domain],
+                    )
+                    results = [self._row_to_behavior(row) for row in cursor.fetchall()]
+
+            # 추가: trigger_pattern regex 매칭
+            cursor.execute(
+                """
+                SELECT behavior_id, description, trigger_pattern, action_sequence,
+                       success_rate, token_savings, applicable_languages, domain,
+                       last_used, use_count, created_at
+                FROM behavior_entries
+                WHERE domain = ?
+                AND trigger_pattern IS NOT NULL
+                AND trigger_pattern != ''
+                ORDER BY success_rate DESC
+                """,
+                (domain,),
+            )
+            all_behaviors = [self._row_to_behavior(row) for row in cursor.fetchall()]
+
+            # regex 매칭으로 추가 결과 수집
+            for behavior in all_behaviors:
+                if behavior in results:
+                    continue
+                if not behavior.is_applicable(language):
+                    continue
+                try:
+                    if re.search(behavior.trigger_pattern, context, re.IGNORECASE):
+                        results.append(behavior)
+                except re.error:
+                    continue
+
+            # 언어 필터링 및 성공률 정렬
+            results = [b for b in results if b.is_applicable(language)]
+            results = sorted(results, key=lambda b: b.success_rate, reverse=True)
+
+            return results[:limit]
+        finally:
+            conn.close()
 
     def hybrid_search(
         self,
@@ -688,8 +1168,74 @@ class SQLiteDomainMemoryAdapter:
         learning_weight: float = 0.2,
         limit: int = 10,
     ) -> dict[str, list]:
-        """하이브리드 메모리 검색. (Phase 2)"""
-        raise NotImplementedError("hybrid_search will be implemented in Phase 2")
+        """하이브리드 메모리 검색.
+
+        Factual, Experiential, Behavior 레이어에서 통합 검색을 수행합니다.
+
+        Args:
+            query: 검색 쿼리
+            domain: 도메인
+            language: 언어
+            fact_weight: Factual 레이어 가중치 (미래 랭킹용)
+            behavior_weight: Behavior 레이어 가중치 (미래 랭킹용)
+            learning_weight: Learning 레이어 가중치 (미래 랭킹용)
+            limit: 레이어당 최대 결과 수
+
+        Returns:
+            {"facts": [...], "behaviors": [...], "learnings": [...]}
+        """
+        # 각 레이어에서 검색 수행
+        facts = self.search_facts(query, domain=domain, language=language, limit=limit)
+        behaviors = self.search_behaviors(query, domain=domain, language=language, limit=limit)
+        learnings = self._search_learnings(query, domain=domain, language=language, limit=limit)
+
+        return {
+            "facts": facts,
+            "behaviors": behaviors,
+            "learnings": learnings,
+        }
+
+    def _search_learnings(
+        self,
+        query: str,
+        domain: str | None = None,
+        language: str | None = None,
+        limit: int = 10,
+    ) -> list[LearningMemory]:
+        """학습 메모리 검색 (패턴 매칭 기반).
+
+        failed_patterns, successful_patterns에서 키워드 검색.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # JSON 필드에서 LIKE 검색
+            query_sql = """
+                SELECT learning_id, run_id, domain, language,
+                       entity_type_reliability, relation_type_reliability,
+                       failed_patterns, successful_patterns,
+                       faithfulness_by_entity_type, timestamp
+                FROM learning_memories
+                WHERE (failed_patterns LIKE ? OR successful_patterns LIKE ?)
+            """
+            search_pattern = f"%{query}%"
+            params: list = [search_pattern, search_pattern]
+
+            if domain:
+                query_sql += " AND domain = ?"
+                params.append(domain)
+            if language:
+                query_sql += " AND language = ?"
+                params.append(language)
+
+            query_sql += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query_sql, params)
+            return [self._row_to_learning(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
 
     # =========================================================================
     # Dynamics: Formation - Phase 3 (Not Implemented)
