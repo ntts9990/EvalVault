@@ -460,7 +460,9 @@ class TestTermsDictionaryFormat:
 
     def test_terms_dictionary_roundtrip(self):
         """용어사전 JSON 직렬화/역직렬화."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
             terms_dict = {
                 "version": "1.0.0",
                 "language": "ko",
