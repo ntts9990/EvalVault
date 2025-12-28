@@ -46,7 +46,7 @@ class SQLiteDomainMemoryAdapter:
     def _init_db(self) -> None:
         """Initialize database schema."""
         schema_path = Path(__file__).parent / "domain_memory_schema.sql"
-        with open(schema_path) as f:
+        with open(schema_path, encoding="utf-8") as f:
             schema_sql = f.read()
 
         conn = sqlite3.connect(self.db_path)
