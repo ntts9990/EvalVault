@@ -50,13 +50,22 @@ jobs:
           # Check if there's a new version to release (based on conventional commits)
           NEXT_VERSION=$(uv run semantic-release version --print 2>/dev/null || echo "")
 
-          if [ -n "$NEXT_VERSION" ] && [ "$NEXT_VERSION" != "$CURRENT_VERSION" ]; then
-            echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "Next version will be: $NEXT_VERSION"
+          # Check if tag already exists
+          if [ -n "$NEXT_VERSION" ]; then
+            if git rev-parse "v${NEXT_VERSION}" >/dev/null 2>&1; then
+              echo "Tag v${NEXT_VERSION} already exists, skipping release"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+            elif [ "$NEXT_VERSION" != "$CURRENT_VERSION" ]; then
+              echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              echo "Next version will be: $NEXT_VERSION"
+            else
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "No new version to release (current: $CURRENT_VERSION)"
+            fi
           else
             echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "No new version to release (current: $CURRENT_VERSION)"
+            echo "No version determined by semantic-release"
           fi
 
       - name: Create release tag
