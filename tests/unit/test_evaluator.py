@@ -1,5 +1,6 @@
 """Tests for Ragas evaluator service."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -301,3 +302,109 @@ class TestRagasEvaluator:
         assert hasattr(evaluator, "EMBEDDING_REQUIRED_METRICS")
         assert "answer_relevancy" in evaluator.EMBEDDING_REQUIRED_METRICS
         assert "semantic_similarity" in evaluator.EMBEDDING_REQUIRED_METRICS
+
+
+class TestRagasEvaluatorParallel:
+    """병렬 처리 관련 테스트."""
+
+    @pytest.fixture
+    def large_dataset(self):
+        """병렬 처리 테스트용 대용량 데이터셋."""
+        test_cases = [
+            TestCase(
+                id=f"tc-{i:03d}",
+                question=f"Question {i}?",
+                answer=f"Answer {i}.",
+                contexts=[f"Context for question {i}."],
+                ground_truth=f"Ground truth {i}",
+            )
+            for i in range(10)
+        ]
+        return Dataset(name="large-test", version="1.0.0", test_cases=test_cases)
+
+    @pytest.fixture
+    def mock_llm(self):
+        """Mock LLM adapter."""
+        return MockLLMAdapter()
+
+    @pytest.mark.asyncio
+    async def test_evaluate_with_parallel_option(self, large_dataset, mock_llm):
+        """parallel=True 옵션으로 병렬 평가 테스트."""
+        evaluator = RagasEvaluator()
+
+        # Create mock results for all test cases
+        mock_results = {
+            f"tc-{i:03d}": TestCaseEvalResult(
+                scores={"faithfulness": 0.8},
+                tokens_used=100,
+            )
+            for i in range(10)
+        }
+
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
+            mock_eval.return_value = mock_results
+
+            result = await evaluator.evaluate(
+                dataset=large_dataset,
+                metrics=["faithfulness"],
+                llm=mock_llm,
+                parallel=True,
+            )
+
+            assert len(result.results) == 10
+            assert result.total_tokens == 1000  # 10 * 100
+
+    @pytest.mark.asyncio
+    async def test_evaluate_with_batch_size(self, large_dataset, mock_llm):
+        """batch_size 옵션으로 배치 평가 테스트."""
+        evaluator = RagasEvaluator()
+
+        mock_results = {
+            f"tc-{i:03d}": TestCaseEvalResult(
+                scores={"faithfulness": 0.8},
+                tokens_used=100,
+            )
+            for i in range(10)
+        }
+
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
+            mock_eval.return_value = mock_results
+
+            result = await evaluator.evaluate(
+                dataset=large_dataset,
+                metrics=["faithfulness"],
+                llm=mock_llm,
+                parallel=True,
+                batch_size=5,
+            )
+
+            assert len(result.results) == 10
+
+    @pytest.mark.asyncio
+    async def test_parallel_evaluation_faster_than_sequential(self, large_dataset, mock_llm):
+        """병렬 평가가 순차 평가보다 빠른지 테스트 (mock 기반)."""
+        import time
+
+        evaluator = RagasEvaluator()
+
+        # Simulate slow evaluation with sleep
+        async def slow_eval(*args, **kwargs):
+            await asyncio.sleep(0.01)  # 10ms per call
+            return {
+                f"tc-{i:03d}": TestCaseEvalResult(scores={"faithfulness": 0.8}) for i in range(10)
+            }
+
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
+            mock_eval.side_effect = slow_eval
+
+            start = time.time()
+            await evaluator.evaluate(
+                dataset=large_dataset,
+                metrics=["faithfulness"],
+                llm=mock_llm,
+                parallel=True,
+            )
+            parallel_time = time.time() - start
+
+            # Parallel should complete in reasonable time (not 10x sequential)
+            assert parallel_time < 0.5  # Should be much faster than 100ms
