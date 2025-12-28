@@ -21,6 +21,71 @@
 
 ## 전략적 발전 방향
 
+### 래퍼 탈피 기준에 따른 방향 검증
+
+EvalVault가 단순 실행기에서 평가 OS로 도약하려면 **① 메트릭 엔진 독립성, ② 지식/데이터 레이어 내재화, ③ 운영 자동화와 피드백 루프**라는 세 가지 축을 동시에 만족해야 합니다. 현재 전략과의 적합성을 아래와 같이 점검했습니다.
+
+- **방향 1 (도메인 특화)**: 메트릭 독립성을 확보하는 정면 돌파 방향이라 강하게 정렬되지만, `DomainMetric`을 RAGAS 점수와 별도로 저장·서빙하지 않으면 여전히 “RAGAS + α” 인식에서 벗어나기 어렵습니다.
+- **방향 2 (자동화/CI)**: 운영 자동화를 다루기 때문에 ③과 정렬되나, 현재 로드맵만으로는 “EvalVault 없이도 GitHub Actions + RAGAS로 가능”하다는 반론을 막기 어렵습니다. 파이프라인 DSL과 결과 정책 엔진을 결합해야 실질 차별화가 생깁니다.
+- **방향 3 (인사이트)**: 피드백 루프 강화를 담당하며 ③을 보강하지만, 실패 분석 로직이 여전히 RAGAS 출력에만 의존하면 독창성이 모호해집니다.
+- **방향 4/5 (KG·오케스트레이션)**: 지식 레이어와 실행 레이어를 모두 내재화하므로 ②와 ③을 동시에 충족시킬 수 있는 핵심 축입니다. KG를 테스트셋 생성에만 쓰면 가치가 제한되므로 “KG 기반 메트릭/감사”까지 범위를 넓혀야 합니다.
+
+따라서 **방향성 자체는 옳지만, “고유 신호 생성(메트릭·데이터·인사이트)”을 구체적으로 달성하는 실행 항목이 부족**합니다. 아래 실천 과제로 공백을 메우면 “RAGAS 래퍼” 인식에서 확실히 벗어날 수 있습니다.
+
+### 래퍼 탈피를 위한 핵심 실천 과제
+
+1. **메트릭 엔진 독립화 프로그램 (Metric Independence Program)**
+   - `evalvault-core` 메트릭 런타임을 정의하고 RAGAS는 단순 어댑터로 하향합니다. 모든 메트릭은 `MetricPort`를 통해 동일하게 수집·버전 관리하고, Langfuse/SQLite 스키마에 `metric_family` 필드를 추가해 “EvalVault 산출물”을 명시합니다.
+   - 도메인 메트릭 결과를 RAGAS 스코어와 별도 채널로 저장해 추후 정책 엔진이 특정 가족(metric_family)에만 임계값을 걸 수 있게 만듭니다.
+   - 1차 목표: Insurance/Legal/Medical 3종 공통 스펙 달성, 2차 목표: Zero-RAGAS run(모든 메트릭이 EvalVault 네이티브) 제공.
+
+2. **도메인 인텔리전스 킷 (Domain Intelligence Kits)**
+   - `config/domains/<domain>` 아래에 용어 사전, 엔티티 추출 파이프라인, KG 템플릿, 테스트셋 시드 프롬프트를 패키지로 정의합니다.
+   - `evalvault domain init legal` 명령으로 킷을 설치하고, `generate`/`run`/`analyze` 명령이 도메인 컨텍스트를 자동 로드해 “설정이 제품을 규정”하도록 만듭니다.
+   - 도메인 킷 배포 시, 최소 10개의 추천 쿼리 패턴과 실패 유형 분류기를 포함해 단순 점수 이상의 가치를 제공합니다.
+
+3. **인사이트 엔진 가시성과 감사(Audit) 기능 강화**
+   - 평가 결과를 `issue taxonomy`로 재분류해 “몇 건의 회수 가능 리스크, 어떤 문서에서 발생했는지”까지 보고하는 감사 뷰를 기본 제공합니다.
+   - KG·로그·메트릭을 엮는 `InsightGraph`를 정의해 실패 케이스의 원인 경로를 추적하고, 동일 원인 반복 시 재발 알림을 내립니다.
+   - SLA: 실패 원인 분류 정확도 80% 이상, 개선 제안 자동 생성률 90% 이상을 목표로 설정합니다.
+
+4. **파이프라인/정책 엔진으로 운영 자동화 차별화**
+   - 파이프라인 정의 YAML에 `policies` 섹션을 추가해 “metric_family=domain/insurance.critical < 0.92면 배포 차단” 같은 규칙을 선언적으로 작성할 수 있게 합니다.
+   - 정책이 트리거될 때 Langfuse/Slack에 동일한 포맷의 알림을 주고, 재실행·스킵 등 조치 명령을 CLI/REST로 지원해 DevOps 도구와 차별화된 경험을 제공합니다.
+   - CI/CD 템플릿 외에도 “데이터셋 업데이트 감지 → 자동 평가 → 정책 검증”까지 이어지는 end-to-end 예제를 `scripts/pipelines/`에 포함합니다.
+
+### 대안 포지셔닝 제안
+
+현 로드맵을 그대로 추진하되, 메시지를 **"EvalVault = Domain Evaluation OS"**로 고정하거나, 더 과감하게는 **"EvalVault = Trust Graph Builder"**로 재정의하는 두 가지 대안을 고려할 수 있습니다. 후자의 경우 KG 고도화를 선행 과제로 끌어올리고, 모든 메트릭·인사이트가 KG를 축으로 돌아간다는 내러티브를 강조하면 “래퍼”라는 인식에서 가장 빠르게 벗어날 수 있습니다.
+
+### 최신 연구·오픈소스 기반 효과성 점검
+
+#### 최근 논문이 제시하는 우선순위
+
+- **RAGTruth (EMNLP 2023)**: Retrieval 증거가 있어도 모델이 상충 정보를 할루시네이션하는 케이스의 70% 이상이 *도메인 표현* 오류라는 결과를 제시했습니다. Domain Intelligence Kits처럼 “용어/규정 정합성”을 1급 메트릭으로 승격시키지 않으면 범용 점수만으론 품질을 설명할 수 없습니다.
+- **Prometheus·G-Eval 계열 LLM-as-a-judge 연구 (ACL 2023~2024)**: LLM 기반 평가가 사람과 0.8 이상의 상관을 가지려면 *프롬프트 내 근거 추적*과 *체계적 루브릭*이 필수라고 지적합니다. Metric Independence Program에 근거 스키마(예: claim, evidence, verdict)를 포함시켜야 RAGAS 점수와 명확히 구분됩니다.
+- **Needle In A Haystack (OpenAI, 2024)·Jina RAG-Bench (2024)**: 장문에서의 검색 심도와 latency/비용 트레이드오프가 가장 큰 실패 요인이라는 데이터를 제공했습니다. KG·파이프라인 전략을 “커버리지-지연 동시 추적”으로 재정의하지 않으면 사용자의 체감 문제(느리고 일정치 않은 평가)와 맞지 않습니다.
+
+#### 오픈소스 경쟁 제품 비교
+
+- **Arize Phoenix + TruLens 1.0**: 트레이싱과 메트릭 관측을 거의 실시간으로 시각화하며, 사용자들은 “디버깅 리치 UI”를 주요 가치로 인식합니다. EvalVault는 Langfuse 통합만으로는 차별화가 어렵기 때문에 KG 중심 감사 뷰와 정책 엔진처럼 *고유 데이터 모델*을 앞세워야 합니다.
+- **DeepEval 1.0 / LangSmith Evaluate / Promptfoo**: `deepeval test`, `langsmith evaluate`, `promptfoo test` 형태의 **테스트 스위트 CLI**를 제공하고 GitHub Actions 템플릿을 번들합니다. 사용자가 즉시 원하는 기능은 “명령 한 번으로 회귀 테스트를 재현”하는 것이므로 `evalvault test <suite>` 명령과 정책 결과(통과/차단)를 PR 코멘트로 남기는 경험을 최우선으로 구현해야 합니다.
+- **LlamaIndex Observability·Guardrails AI**: 최신 버전은 **시나리오 기반 실패 분석**을 제공하며, 단순 평균 점수를 넘어 “어떤 Retrieval 단계가 문제인지”를 자동 분류합니다. InsightGraph를 시나리오 라벨(예: Retrieval Miss, Context Drift, Domain Rule Violation)과 연결하지 않으면 동일 수준에 머물게 됩니다.
+
+#### 사용자 체감 가치 기준 상의 즉시 실행 항목
+
+1. **도메인/시나리오 우선 테스트 스위트**: `tests/e2e_data/domain/<domain>/<scenario>.json` 형태로 RAGTruth·Needle형 시나리오를 내장하고, `evalvault test --suite needle --domain insurance` 명령을 제공해 “한 줄로 재현 가능한 회귀 테스트”를 구현합니다.
+2. **근거 중심 메트릭 스키마**: MetricPort 출력에 `claim_id`, `evidence_span`, `verdict`를 포함시켜 G-Eval/Prometheus 류 연구에서 제시한 traceability 요구를 충족시키고, Langfuse·Phoenix 모두에 동일하게 전송합니다.
+3. **정책·알림 일체화**: DeepEval·Promptfoo의 CI 템플릿보다 앞서 나가려면 `policies` DSL을 실서비스 예제(“Needle 평균 <= 0.7이면 배포 차단”)와 함께 GitHub Actions/Prefect 파이프라인 케이스로 제공해야 합니다.
+4. **KG 기반 감사 뷰 베타**: TruLens·Phoenix는 그래프형 원인 추적을 제공하지 않으므로, KG를 중심으로 한 InsightGraph 미리보기(실패 케이스가 어떤 엔티티·관계에서 반복되는지)를 0.1 버전으로라도 노출하면 “고유 신호”를 즉시 전달할 수 있습니다.
+
+#### 논문별 시사점 통합
+
+- **LatentMAS (docs/2511.20639v2.pdf)**: 텍스트 대신 최종 레이어 은닉 상태와 KV 캐시를 공유해 9개 벤치마크에서 최대 14.6% 정확도 향상·83.7% 토큰 절감을 달성했습니다. EvalVault는 Metric/Insight 에이전트 사이에 “latent evidence bus”를 도입해 LLM 호출을 줄이고, Langfuse/SQLite 스키마에 latent checksum을 기록해 감사 가시성을 높입니다.
+- **Towards a Science of Scaling Agent Systems (docs/2512.08296v2.pdf)**: 단일 에이전트 정확도 45% 이상이면 협업 이득이 음수로 바뀌고, 툴 호출이 많은 작업일수록 오버헤드가 치명적이라는 정량 법칙을 제시합니다. CLI에 “coordination profiler”를 추가해 실행별 툴 호출·토큰 예산·성공률을 수집하고, 정책 DSL이 자동으로 단일 에이전트 경고/차단을 트리거하도록 합니다.
+- **Memory in the Age of AI Agents (docs/2512.13564v1.pdf)**: 메모리를 형태(토큰·파라메트릭·잠재) × 기능(팩추얼·경험·워킹)으로 구조화했습니다. 도메인 인텔리전스 킷을 이 삼각형에 맞춰 `config/domains/<domain>/memory.yaml`로 나누고, KG·행동 로그·툴 호출을 공유 메모리 계층으로 묶어 “Trust Graph Builder” 메시지를 강화합니다.
+- **Adaptation of Agentic AI (docs/2512.16301v2.pdf)**: A1/A2/T1/T2(에이전트/도구 × 시그널 출처) 프레임을 통해 어떤 컴포넌트를 학습/튜닝해야 하는지 명확히 했습니다. EvalVault의 MetricPort·Dataset Generator·KG Analyzer·Policy Engine을 이 프레임에 매핑해 투자 우선순위를 문서화하고, 릴리스 노트와 CLI 도움말에서 “어떤 계층을 조정할 수 있는지”를 안내합니다.
+
 ### 방향 1: 도메인 특화 플랫폼으로 진화
 
 **목표**: RAGAS는 범용 도구, EvalVault는 도메인 특화 평가 플랫폼

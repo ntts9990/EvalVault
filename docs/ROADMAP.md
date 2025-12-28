@@ -23,6 +23,152 @@ EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습�
 
 ---
 
+## Phase 8: Domain Memory Layering (Target: 2026 Q1)
+
+> **Status**: Planning
+> **Priority**: 🔥 High
+> **Effort**: ~50h / 4 weeks
+
+EvalVault의 현재 아키텍처(순차적 평가 파이프라인)에 맞는 실질적인 개선 사항입니다.
+
+### 목표
+
+평가 결과에서 학습하여 엔티티 추출과 지식 그래프 생성의 정확도를 향상시킵니다.
+
+### 핵심 개념
+
+Agent Memory Survey의 Forms×Functions 가이드라인을 도입해 도메인 지식을 세 계층으로 구성합니다:
+
+| 계층 | 목적 | 예시 |
+|------|------|------|
+| **Factual** | 검증된 정적 사실 | 용어 사전, 규정 문서 |
+| **Experiential** | 평가에서 학습한 패턴 | 엔티티 타입별 신뢰도, 실패 패턴 |
+| **Working** | 현재 실행 컨텍스트 | 세션 캐시, 활성 KG 바인딩 |
+
+### 구현 계획
+
+#### Phase 8.1: Factual Memory Store (Week 1-2)
+
+```
+src/evalvault/domain/entities/memory.py
+├── FactualFact (검증된 사실 엔티티)
+├── LearningMemory (학습된 패턴)
+└── DomainMemoryContext (워킹 메모리)
+
+src/evalvault/ports/outbound/domain_memory_port.py
+└── DomainMemoryPort (store_fact, query_facts, record_learning)
+
+src/evalvault/adapters/outbound/domain_memory/
+└── sqlite_adapter.py (SQLite 기반 메모리 저장소)
+```
+
+#### Phase 8.2: Config Extension (Week 2-3)
+
+```yaml
+# config/domains/insurance/memory.yaml
+factual:
+  glossary: terms_dictionary.json
+  regulatory_rules: rules.md
+  languages: ["ko", "en"]  # 다국어 지원
+experiential:
+  reliability_scores: reliability.json
+  failure_modes: failures.json
+working:
+  run_cache: ${RUN_DIR}/memory.db
+  kg_binding: kg://insurance
+```
+
+**CLI 확장:**
+```bash
+evalvault domain init <domain>      # 도메인 설정 초기화
+evalvault domain list               # 등록된 도메인 목록
+evalvault run ... --memory-layer working  # 특정 계층만 로드
+```
+
+#### Phase 8.3: Learning Integration (Week 3-4)
+
+**DomainLearningHook 프로토콜** (결합도 최소화):
+```python
+class DomainLearningHook(Protocol):
+    """평가 결과에서 학습하는 훅 인터페이스"""
+    def on_evaluation_complete(self, run: EvaluationRun) -> LearningMemory:
+        """평가 완료 시 패턴 학습"""
+        ...
+
+    def apply_learning(self, extractor: EntityExtractor) -> None:
+        """학습된 패턴을 추출기에 적용"""
+        ...
+```
+
+### 성공 지표
+
+| 지표 | Baseline | 목표 |
+|------|----------|------|
+| Entity Extraction Accuracy | 현재 측정 필요 | +10% |
+| 도메인 온보딩 시간 | 수동 설정 | CLI 자동화 |
+| 반복 실수율 | 측정 필요 | -30% |
+
+---
+
+## Future: Agent System Integration
+
+> **Status**: Research / Deferred
+> **Prerequisite**: 멀티에이전트 아키텍처 도입
+
+현재 EvalVault는 **순차적 평가 파이프라인**입니다. 아래 기능들은 **진정한 멀티에이전트 시스템** 도입 후에 의미가 있습니다.
+
+### 전제 조건: Agent Architecture
+
+```
+현재 구조 (에이전트 없음):
+  Dataset → RagasEvaluator → Results
+
+미래 구조 (에이전트 시스템):
+  Dataset → [Planner Agent] → [Metric Agents] → [Insight Agent] → Results
+                  ↑                    ↑                ↑
+                  └────────────────────┴────────────────┘
+                           Agent Coordination
+```
+
+### Coordination Profiler & Policy Guard
+
+**전제**: 프로파일링할 에이전트 간 조율이 존재해야 함
+
+- **목표**: Scaling Agent Systems 논문 기반, 멀티에이전트 오버헤드 정량화
+- **CLI 스펙** (미래):
+  ```bash
+  evalvault profile <dataset_path> \
+    --agents single|centralized|decentralized \
+    --max-calls 1000 \
+    --emit-policy
+  ```
+- **baseline_score 정의**: 동일 데이터셋에 대해 단일 에이전트 재실행 결과
+- **우선순위**: Agent Architecture 도입 후 1.5 스프린트
+
+### Latent Evidence Bus
+
+**전제**: 에이전트 간 hidden state 공유가 필요해야 함
+
+- **목표**: LatentMAS 스타일 KV cache / hidden state 공유
+- **API 제약**:
+  - OpenAI/Anthropic/Azure API: hidden state 미노출 → **불가능**
+  - HuggingFace/vLLM 로컬 모델: **가능** (별도 어댑터 필요)
+- **현실적 범위**:
+  - Q1: Anthropic Extended Thinking 캡처만 (API 기반)
+  - 이후: HuggingFace/vLLM 직접 통합 연구
+- **우선순위**: Agent Architecture + 로컬 모델 인프라 확보 후
+
+### 로드맵
+
+```
+2026 Q1: Domain Memory Layering (현재 시스템에 적용)
+2026 Q2: Agent Architecture 설계 및 프로토타입
+2026 Q3: Coordination Profiler (에이전트 시스템에 적용)
+2026 Q4: Latent Evidence Bus 연구 (로컬 모델 기반)
+```
+
+---
+
 ## Completed Phases
 
 ### Phase 1-3: Core System ✅
@@ -221,9 +367,9 @@ evalvault generate <documents> -n <num> -o <output>
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| Unit Tests | 339 | Domain, ports, adapters, services |
+| Unit Tests | 431 | Domain, ports, adapters, services |
 | Integration Tests | 26 | End-to-end flows |
-| **Total** | **365** | All passing |
+| **Total** | **457** | All passing |
 
 ### Test Files
 ```
@@ -235,7 +381,7 @@ tests/
 │   ├── test_langfuse_tracker.py  # 18 tests
 │   ├── test_openai_adapter.py    # 4 tests
 │   ├── test_ports.py             # 24 tests
-│   ├── test_cli.py               # 7 tests
+│   ├── test_cli.py               # 58 tests
 │   ├── test_insurance_metric.py  # 18 tests
 │   ├── test_sqlite_storage.py    # 18 tests
 │   ├── test_testset_generator.py # 16 tests

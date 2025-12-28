@@ -1083,23 +1083,26 @@ def get_loader(file_path: str | Path) -> BaseDatasetLoader:
 
 **적용:**
 - 테스트셋 생성 방법: `BasicTestsetGenerator` vs `KnowledgeGraphGenerator`
-- 프롬프트 언어: `KoreanPrompt`, `EnglishPrompt`, `JapanesePrompt`, `ChinesePrompt`
+- 데이터셋 로더: `CSVDatasetLoader` vs `JSONDatasetLoader` vs `ExcelDatasetLoader`
 
 **예시:**
 ```python
 # Strategy 인터페이스
-class PromptTemplate(ABC):
+class BaseDatasetLoader(ABC):
     @abstractmethod
-    def format(self, **kwargs) -> str: ...
+    def load(self, file_path: Path) -> Dataset: ...
+
+    @abstractmethod
+    def supports(self, file_path: Path) -> bool: ...
 
 # 전략 구현
-class KoreanPrompt(PromptTemplate):
-    def format(self, **kwargs) -> str:
-        return f"질문: {kwargs['question']}"
+class CSVDatasetLoader(BaseDatasetLoader):
+    def supports(self, file_path: Path) -> bool:
+        return file_path.suffix.lower() == ".csv"
 
-class EnglishPrompt(PromptTemplate):
-    def format(self, **kwargs) -> str:
-        return f"Question: {kwargs['question']}"
+class JSONDatasetLoader(BaseDatasetLoader):
+    def supports(self, file_path: Path) -> bool:
+        return file_path.suffix.lower() == ".json"
 ```
 
 #### 5.1.4 Repository Pattern (저장소 패턴)
