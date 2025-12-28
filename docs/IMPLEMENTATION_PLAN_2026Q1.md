@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.0.0
+> **Document Version**: 2.3.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Final
+> **Status**: Phase 3 Complete
 
 ---
 
@@ -21,12 +21,14 @@
 
 ### 리소스 요약
 
-| Phase | Duration | Effort | Priority |
-|-------|----------|--------|----------|
-| Factual Memory Store | 2 weeks | 24h | Must Have |
-| Config & Multi-language | 1.5 weeks | 16h | Must Have |
-| Learning Integration | 1.5 weeks | 20h | Should Have |
-| **Total** | **5 weeks** | **60h** | |
+| Phase | Duration | Effort | Priority | Status |
+|-------|----------|--------|----------|--------|
+| Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete |
+| Dynamics: Evolution | 1 week | 12h | Must Have | ✅ Complete |
+| Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
+| Dynamics: Formation | 1 week | 16h | Must Have | ✅ Complete |
+| Config & Multi-language | 1.5 weeks | 16h | Should Have | Pending |
+| **Total** | **7 weeks** | **80h** | | |
 
 ---
 
@@ -1010,7 +1012,309 @@ config/
 
 ## Appendix B: References
 
-- **Agent Memory Survey**: Forms×Functions 가이드라인
+- **Agent Memory Survey**: Forms×Functions×Dynamics 프레임워크
 - **Metacognitive Reuse**: Behavior Handbook 개념
 - **Scaling Agent Systems**: 멀티에이전트 오버헤드 분석
 - **LatentMAS**: Hidden state 공유 연구
+
+---
+
+## Appendix C: Dynamics Roadmap
+
+> "Memory in the Age of AI Agents: A Survey" 논문의 Forms×Functions×Dynamics 프레임워크 기반
+
+### C.1 Phase 1 완료 항목
+
+| 컴포넌트 | 파일 | 테스트 |
+|---------|------|--------|
+| Domain Entities | `src/evalvault/domain/entities/memory.py` | 21 tests |
+| DomainMemoryPort | `src/evalvault/ports/outbound/domain_memory_port.py` | - |
+| SQLiteDomainMemoryAdapter | `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` | 19 tests |
+| Schema | `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` | - |
+| **Total** | | **40 tests** |
+
+### C.2 Dynamics: Evolution (Phase 2) - ✅ Complete
+
+메모리 진화 전략 - 통합, 업데이트, 망각
+
+```python
+# 구현 완료 메서드 (SQLiteDomainMemoryAdapter)
+
+def consolidate_facts(domain: str, language: str) -> int:
+    """유사한 사실들을 통합 (동일 SPO 트리플 병합)
+    - 중복 SPO 사실 자동 감지
+    - verification_score 평균화, verification_count 합산
+    - source_document_ids 병합
+    - memory_evolution_log에 기록
+    """
+
+def resolve_conflict(fact1: FactualFact, fact2: FactualFact) -> FactualFact:
+    """충돌하는 사실 해결
+    - 우선순위: verification_score * log(count+1) * recency_factor
+    - 패자를 'contradictory' 타입으로 마킹
+    """
+
+def forget_obsolete(
+    domain: str,
+    max_age_days: int = 90,
+    min_verification_count: int = 1,
+    min_verification_score: float = 0.3
+) -> int:
+    """오래되거나 신뢰도 낮은 메모리 삭제
+    - 조건: (age > max_days AND count < min_count) OR score < min_score
+    """
+
+def decay_verification_scores(domain: str, decay_rate: float = 0.95) -> int:
+    """시간에 따른 검증 점수 감소
+    - 7일 이상 검증되지 않은 사실에 적용
+    - 최소 점수 0.1 유지
+    """
+```
+
+#### Evolution 태스크 - ✅ 완료
+
+| Task | Effort | Status |
+|------|--------|--------|
+| consolidate_facts 구현 | 3h | ✅ |
+| resolve_conflict 구현 | 2h | ✅ |
+| forget_obsolete 구현 | 3h | ✅ |
+| decay_verification_scores 구현 | 2h | ✅ |
+| Evolution 단위 테스트 (8 tests) | 2h | ✅ |
+| **Total** | **12h** | ✅ |
+
+### C.3 Dynamics: Retrieval (Phase 2) - ✅ Complete
+
+메모리 검색 전략 - FTS5 기반 하이브리드 검색
+
+```python
+# 구현 완료 메서드 (SQLiteDomainMemoryAdapter)
+
+def search_facts(
+    query: str,
+    domain: str | None = None,
+    language: str | None = None,
+    limit: int = 10
+) -> list[FactualFact]:
+    """FTS5 기반 사실 검색
+    - facts_fts 가상 테이블 사용
+    - BM25 랭킹으로 관련도 정렬
+    - 도메인/언어 필터링 지원
+    """
+
+def search_behaviors(
+    context: str,
+    domain: str,
+    language: str,
+    limit: int = 5
+) -> list[BehaviorEntry]:
+    """컨텍스트 기반 행동 검색
+    - FTS5 + trigger_pattern regex 매칭 결합
+    - 성공률 기준 정렬
+    - 언어 적용 가능성 필터링
+    """
+
+def hybrid_search(
+    query: str,
+    domain: str,
+    language: str,
+    fact_weight: float = 0.5,
+    behavior_weight: float = 0.3,
+    learning_weight: float = 0.2,
+    limit: int = 10
+) -> dict[str, list]:
+    """하이브리드 메모리 검색
+    - facts, behaviors, learnings 동시 검색
+    - 각 레이어별 결과 반환
+    """
+```
+
+**Schema 업데이트 (FTS5)**:
+- `facts_fts` 가상 테이블 (subject, predicate, object 인덱싱)
+- `behaviors_fts` 가상 테이블 (description, trigger_pattern 인덱싱)
+- 자동 동기화 트리거 (INSERT/UPDATE/DELETE)
+
+#### Retrieval 태스크 - ✅ 완료
+
+| Task | Effort | Status |
+|------|--------|--------|
+| FTS5 스키마 추가 | 1h | ✅ |
+| search_facts 구현 | 3h | ✅ |
+| search_behaviors 구현 | 3h | ✅ |
+| hybrid_search 구현 | 2h | ✅ |
+| _search_learnings 구현 | 1h | ✅ |
+| Retrieval 단위 테스트 (6 tests) | 2h | ✅ |
+| **Total** | **12h** | ✅ |
+
+### C.4 Dynamics: Formation (Phase 3)
+
+메모리 형성 전략 - 평가에서 자동 추출
+
+```python
+# 구현 예정 메서드 (DomainMemoryPort)
+
+def extract_facts_from_evaluation(
+    run_id: str,
+    min_confidence: float = 0.7
+) -> list[FactualFact]:
+    """평가 결과에서 사실 자동 추출"""
+
+def extract_patterns_from_evaluation(run_id: str) -> LearningMemory:
+    """평가 결과에서 학습 패턴 추출"""
+
+def extract_behaviors_from_evaluation(
+    run_id: str,
+    min_success_rate: float = 0.8
+) -> list[BehaviorEntry]:
+    """평가 결과에서 재사용 가능한 행동 추출 (Metacognitive Reuse)"""
+```
+
+#### Formation 태스크
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| extract_facts_from_evaluation 구현 | 4h | Should |
+| extract_patterns_from_evaluation 구현 | 4h | Should |
+| extract_behaviors_from_evaluation 구현 | 4h | Should |
+| StoragePort 통합 (run_id 조회) | 2h | Must |
+| Formation 단위 테스트 | 2h | Must |
+| **Total** | **16h** | |
+
+### C.5 Forms 확장 계획
+
+| Form | Phase | 설명 |
+|------|-------|------|
+| **Flat** | ✅ Phase 1 | SQLite 테이블 기반 (현재 구현) |
+| **Planar** | Phase 4 | Knowledge Graph 통합 (기존 KG 시스템 연동) |
+| **Hierarchical** | Phase 5 | 요약 계층 추가 (원본 + 요약본 다층 구조) |
+
+### C.6 구현 우선순위 (업데이트)
+
+```
+Phase 1: ✅ 완료
+├── Domain Entities (FactualFact, LearningMemory, DomainMemoryContext, BehaviorEntry)
+├── DomainMemoryPort interface (Dynamics 확장 포인트 포함)
+├── SQLiteDomainMemoryAdapter (기본 CRUD)
+└── 40 unit tests
+
+Phase 2: ✅ 완료 (Evolution + Retrieval)
+├── Evolution: consolidate_facts, resolve_conflict, forget_obsolete, decay_verification_scores
+├── Retrieval: search_facts (FTS5), search_behaviors, hybrid_search
+├── FTS5 스키마 (facts_fts, behaviors_fts) + 자동 동기화 트리거
+├── memory_evolution_log 로깅
+└── 14 new unit tests (총 54 tests)
+
+Phase 3: ✅ 완료 (Formation + Learning Integration)
+├── extract_facts/patterns/behaviors_from_evaluation 메서드
+├── DomainLearningHook 서비스 구현
+├── DomainLearningHookPort 인터페이스 정의
+└── 9 new unit tests (총 63 tests)
+
+Phase 4: Config & Multi-language
+├── Config schema (YAML)
+├── CLI domain init/list
+└── 다국어 terms_dictionary
+
+Phase 5: Forms 확장 (Planar/Hierarchical)
+├── KG 통합
+└── 요약 계층
+```
+
+### C.7 Phase 2 완료 상세
+
+**구현 파일**:
+- `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` - Evolution/Retrieval 메서드 추가
+- `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` - FTS5 가상 테이블 추가
+
+**테스트 파일**:
+- `tests/unit/test_domain_memory.py` - 54 tests (40 Phase 1 + 14 Phase 2)
+
+**Evolution 테스트**:
+- `test_consolidate_facts_merges_duplicates`
+- `test_consolidate_facts_no_duplicates`
+- `test_resolve_conflict_selects_higher_priority`
+- `test_forget_obsolete_deletes_low_score_facts`
+- `test_forget_obsolete_no_matching_facts`
+- `test_decay_verification_scores`
+- `test_decay_verification_scores_invalid_rate`
+- `test_decay_verification_scores_recent_facts_unchanged`
+
+**Retrieval 테스트**:
+- `test_search_facts_by_keyword`
+- `test_search_facts_empty_query`
+- `test_search_facts_korean_text`
+- `test_search_behaviors_by_context`
+- `test_search_behaviors_success_rate_ordering`
+- `test_hybrid_search_returns_all_layers`
+- `test_search_learnings_finds_pattern`
+- `test_hybrid_search_empty_results`
+
+### C.8 Phase 3 완료 상세
+
+**구현 파일**:
+- `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` - Formation 메서드 추가
+- `src/evalvault/ports/outbound/domain_memory_port.py` - Formation 메서드 시그니처 업데이트
+- `src/evalvault/ports/inbound/learning_hook_port.py` - DomainLearningHookPort 인터페이스 (NEW)
+- `src/evalvault/domain/services/domain_learning_hook.py` - DomainLearningHook 서비스 (NEW)
+
+**테스트 파일**:
+- `tests/unit/test_domain_memory.py` - 63 tests (54 Phase 2 + 9 Phase 3)
+
+**Formation 테스트**:
+- `test_extract_facts_from_evaluation`
+- `test_extract_facts_filters_by_confidence`
+- `test_extract_facts_deduplicates`
+- `test_extract_patterns_from_evaluation`
+- `test_extract_behaviors_from_evaluation`
+- `test_extract_behaviors_filters_by_success_rate`
+
+**DomainLearningHook 테스트**:
+- `test_domain_learning_hook_on_evaluation_complete`
+- `test_domain_learning_hook_extract_and_save_facts`
+- `test_domain_learning_hook_run_evolution`
+
+**Formation 메서드 구현**:
+```python
+def extract_facts_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+    min_confidence: float = 0.7,
+) -> list[FactualFact]:
+    """평가 결과에서 사실 추출
+    - faithfulness >= min_confidence인 결과에서 추출
+    - SPO 트리플 패턴 매칭 (한국어/영어)
+    - 중복 사실 자동 병합
+    """
+
+def extract_patterns_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+) -> LearningMemory:
+    """평가 결과에서 학습 패턴 추출
+    - 성공/실패 패턴 추출
+    - 엔티티/관계 타입별 신뢰도 계산
+    """
+
+def extract_behaviors_from_evaluation(
+    evaluation_run: EvaluationRun,
+    domain: str,
+    language: str = "ko",
+    min_success_rate: float = 0.8,
+) -> list[BehaviorEntry]:
+    """평가 결과에서 재사용 가능한 행동 추출
+    - 높은 성공률 테스트 케이스에서 행동 패턴 추출
+    - Metacognitive Reuse 개념 적용
+    """
+```
+
+**DomainLearningHook 서비스**:
+```python
+class DomainLearningHook:
+    """평가 완료 후 도메인 메모리 형성을 담당하는 서비스
+
+    Formation dynamics 조율:
+    - on_evaluation_complete: 평가 후 메모리 형성 (facts, patterns, behaviors)
+    - run_evolution: Evolution dynamics 실행 (consolidate, forget, decay)
+    """
+```
