@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from evalvault.config.settings import Settings
 from evalvault.domain.entities import Dataset
 
@@ -426,8 +427,9 @@ class TestFullWorkflow:
         print("7. CLI Commands Test")
         print("=" * 60)
 
-        from evalvault.adapters.inbound.cli import app
         from typer.testing import CliRunner
+
+        from evalvault.adapters.inbound.cli import app
 
         runner = CliRunner()
 

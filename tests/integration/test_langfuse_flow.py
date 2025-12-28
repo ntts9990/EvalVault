@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.domain.entities import (
     EvaluationRun,
     MetricScore,
     TestCaseResult,
 )
-
 from tests.integration.conftest import get_test_model
 
 

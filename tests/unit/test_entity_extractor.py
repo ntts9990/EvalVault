@@ -1,6 +1,7 @@
 """Unit tests for entity extractor."""
 
 import pytest
+
 from evalvault.domain.services.entity_extractor import (
     Entity,
     EntityExtractor,

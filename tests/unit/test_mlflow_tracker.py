@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 
 

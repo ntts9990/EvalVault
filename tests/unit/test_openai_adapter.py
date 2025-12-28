@@ -3,9 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
 from evalvault.config.settings import Settings
-
 from tests.unit.conftest import get_test_model
 
 

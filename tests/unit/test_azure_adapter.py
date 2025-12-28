@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter, TokenUsage
 from evalvault.config.settings import Settings
 

@@ -1,6 +1,7 @@
 """Unit tests for knowledge graph testset generator."""
 
 import pytest
+
 from evalvault.domain.entities import Dataset, EntityModel, RelationModel, TestCase
 from evalvault.domain.services.entity_extractor import Relation
 from evalvault.domain.services.kg_generator import (

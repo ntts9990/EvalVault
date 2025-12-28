@@ -1,6 +1,7 @@
 """Tests for LLMRelationAugmenter."""
 
 import pytest
+
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.domain.services.entity_extractor import Entity, Relation
 from evalvault.ports.outbound.llm_port import LLMPort

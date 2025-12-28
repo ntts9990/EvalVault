@@ -10,6 +10,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from evalvault.adapters.outbound.llm import OllamaAdapter, get_llm_adapter
 from evalvault.adapters.outbound.llm.ollama_adapter import ThinkingTokenTrackingAsyncOpenAI
 from evalvault.config.settings import Settings

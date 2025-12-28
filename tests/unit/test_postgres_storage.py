@@ -5,6 +5,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 
 # Mock psycopg module before importing PostgreSQLStorageAdapter

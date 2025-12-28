@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 
