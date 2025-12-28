@@ -56,7 +56,7 @@ uv pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
-uv pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 ## Run Your First Evaluation
@@ -213,15 +213,15 @@ EvalVault/
 ## Development
 
 ```bash
-# Tests
-pytest tests/ -v
+# Tests (always use uv run)
+uv run pytest tests/ -v
 
 # E2E scenarios (requires external APIs)
-pytest tests/integration/test_e2e_scenarios.py -v
+uv run pytest tests/integration/test_e2e_scenarios.py -v
 
 # Linting & formatting
-ruff check src/ tests/
-ruff format src/ tests/
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ## Community & PSF Membership

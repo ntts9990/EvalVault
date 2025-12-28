@@ -35,12 +35,12 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md) to maintain a w
 4. Write or update tests as needed
 5. Run the test suite:
    ```bash
-   pytest tests/ -v
+   uv run pytest tests/ -v
    ```
 6. Run linting:
    ```bash
-   ruff check src/
-   ruff format src/
+   uv run ruff check src/
+   uv run ruff format src/
    ```
 7. Commit with a clear message
 8. Push and create a Pull Request
@@ -60,7 +60,7 @@ git clone https://github.com/YOUR_USERNAME/EvalVault.git
 cd EvalVault
 
 # Install with development dependencies
-uv pip install -e ".[dev]"
+uv sync --extra dev
 
 # Copy environment configuration
 cp .env.example .env
@@ -70,14 +70,16 @@ cp .env.example .env
 
 ```bash
 # Run all tests (without API keys)
-pytest tests/ -v -m "not requires_openai and not requires_langfuse"
+uv run pytest tests/ -v -m "not requires_openai and not requires_langfuse"
 
 # Run unit tests only
-pytest tests/unit/ -v
+uv run pytest tests/unit/ -v
 
 # Run with coverage
-pytest tests/ --cov=src/evalvault --cov-report=html
+uv run pytest tests/ --cov=src/evalvault --cov-report=html
 ```
+
+> **Note**: Always use `uv run` to ensure the correct virtual environment is activated.
 
 ## Coding Standards
 
