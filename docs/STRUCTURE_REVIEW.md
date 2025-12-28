@@ -1,7 +1,7 @@
 # Project Structure Review
 
 > 작성일: 2025-12-28
-> 상태: 검토 완료
+> 상태: Phase 1-2 적용 완료
 
 이 문서는 EvalVault 저장소의 디렉터리 구성을 분석하고 개선 방안을 제시합니다.
 
@@ -17,10 +17,9 @@ EvalVault/
 │   └── dependabot.yml, stale.yml
 ├── config/                     # 런타임 설정 (YAML)
 │   └── models.yaml
-├── data/                       # 로컬 데이터
-│   ├── datasets/               # 샘플 데이터셋
-│   ├── e2e_results/
-│   └── evaluations.db
+├── data/                       # 로컬 데이터 (gitignore)
+│   ├── e2e_results/            # E2E 테스트 결과
+│   └── evaluations.db          # 로컬 SQLite DB
 ├── docs/                       # 문서
 ├── examples/                   # 예제 코드
 ├── reports/                    # 테스트 리포트 (생성됨)
@@ -33,7 +32,8 @@ EvalVault/
 │   └── utils/
 └── tests/                      # 테스트 스위트
     ├── unit/, integration/
-    ├── fixtures/, e2e_data/
+    └── fixtures/               # 모든 테스트 데이터 통합
+        └── e2e/                # E2E 테스트 픽스처
 ```
 
 ---
@@ -48,7 +48,7 @@ EvalVault/
 | `docs/` | 아키텍처/유저 가이드 | ✅ |
 | `scripts/` | CI 보조 스크립트 | ✅ |
 | `.github/` | 워크플로우, 템플릿 | ✅ |
-| `data/` | 로컬 DB, 샘플 데이터 | ⚠️ evaluations.db가 git 추적됨 |
+| `data/` | 로컬 DB, 테스트 결과 | ✅ gitignore 적용됨 |
 | `examples/` | 데모 스크립트 | ⚠️ README 부재 |
 | `reports/` | 테스트 산출물 | ⚠️ 샘플과 생성물 혼재 |
 
@@ -81,7 +81,7 @@ EvalVault/
 
 ## 4. 권장 조치
 
-### Phase 1: Git 추적 정리 (즉시 적용)
+### Phase 1: Git 추적 정리 ✅ 완료
 
 **.gitignore 추가:**
 ```gitignore
@@ -100,7 +100,7 @@ git rm --cached data/datasets/sample_insurance_qa.*
 git rm --cached reports/kg_stats_report.json
 ```
 
-### Phase 2: 테스트 데이터 통합 (권장)
+### Phase 2: 테스트 데이터 통합 ✅ 완료
 
 1. `tests/e2e_data/*` → `tests/fixtures/e2e/`로 이동
 2. `data/datasets/` 내용 삭제 (tests/fixtures와 중복)
@@ -138,7 +138,7 @@ src/evalvault/
 | 소스 코드 구조 | ✅ 우수 | 유지 |
 | 설정 분리 | ✅ 올바름 | 유지 |
 | 문서 구조 | ✅ 양호 | 유지 |
-| Git 추적 | ❌ 문제 | Phase 1 즉시 적용 |
-| 테스트 데이터 | ⚠️ 중복 | Phase 2 권장 |
+| Git 추적 | ✅ 완료 | Phase 1 적용됨 |
+| 테스트 데이터 | ✅ 통합됨 | Phase 2 적용됨 |
 
-**우선순위**: Phase 1 → Phase 2 → Phase 3
+**남은 작업**: Phase 3 (선택사항) - examples/, reports/ README 추가
