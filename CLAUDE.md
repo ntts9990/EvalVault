@@ -241,9 +241,9 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | Experiment Management | ✅ Complete | A/B testing, comparison |
 
 **Test Summary:**
-- Unit Tests: 339
+- Unit Tests: 431
 - Integration Tests: 26
-- **Total: 365 tests passing**
+- **Total: 457 tests passing**
 
 ## Documentation
 
