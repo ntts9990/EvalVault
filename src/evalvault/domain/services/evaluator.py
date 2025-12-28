@@ -98,6 +98,8 @@ class RagasEvaluator:
         metrics: list[str],
         llm: LLMPort,
         thresholds: dict[str, float] | None = None,
+        parallel: bool = False,
+        batch_size: int = 5,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -106,6 +108,8 @@ class RagasEvaluator:
             metrics: 평가할 메트릭 리스트 (예: ['faithfulness', 'answer_relevancy'])
             llm: LLM 어댑터 (Ragas가 사용)
             thresholds: 메트릭별 임계값 (CLI에서 전달, 없으면 dataset.thresholds 사용)
+            parallel: 병렬 처리 활성화 여부 (기본값: False)
+            batch_size: 병렬 처리 시 배치 크기 (기본값: 5)
 
         Returns:
             평가 결과가 담긴 EvaluationRun

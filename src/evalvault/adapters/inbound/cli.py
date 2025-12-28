@@ -117,6 +117,16 @@ def run(
         "--verbose",
         help="Show detailed output.",
     ),
+    parallel: bool = typer.Option(
+        False,
+        "--parallel",
+        help="Enable parallel evaluation for faster processing.",
+    ),
+    batch_size: int = typer.Option(
+        5,
+        "--batch-size",
+        help="Batch size for parallel evaluation (default: 5).",
+    ),
 ):
     """Run RAG evaluation on a dataset."""
     # Parse metrics
@@ -187,7 +197,10 @@ def run(
         console.print()
 
     # Run evaluation (thresholds resolved from dataset or default 0.7)
-    with console.status("[bold green]Running evaluation..."):
+    status_msg = "[bold green]Running evaluation..."
+    if parallel:
+        status_msg = f"[bold green]Running parallel evaluation (batch_size={batch_size})..."
+    with console.status(status_msg):
         try:
             result = asyncio.run(
                 evaluator.evaluate(
@@ -195,6 +208,8 @@ def run(
                     metrics=metric_list,
                     llm=llm,
                     thresholds=None,  # Let evaluator use dataset.thresholds
+                    parallel=parallel,
+                    batch_size=batch_size,
                 )
             )
         except Exception as e:
