@@ -38,41 +38,54 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Get current version
-        id: current
-        run: |
-          VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Semantic Release
-        id: release
+      - name: Get next version
+        id: version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run semantic-release version
-          NEW_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          if [ "${{ steps.current.outputs.version }}" != "${NEW_VERSION}" ]; then
-            echo "released=true" >> $GITHUB_OUTPUT
+          # Get current version from pyproject.toml
+          CURRENT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+
+          # Check if there's a new version to release (based on conventional commits)
+          NEXT_VERSION=$(uv run semantic-release version --print 2>/dev/null || echo "")
+
+          if [ -n "$NEXT_VERSION" ] && [ "$NEXT_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "Next version will be: $NEXT_VERSION"
           else
-            echo "released=false" >> $GITHUB_OUTPUT
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "No new version to release (current: $CURRENT_VERSION)"
           fi
 
-      - name: Build package
-        if: steps.release.outputs.released == 'true'
-        run: uv build
+      - name: Create release tag
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Build package with new version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          # Update version in pyproject.toml for build (not committed)
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+          uv build
 
       - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
+        if: steps.version.outputs.should_release == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Create GitHub Release
-        if: steps.release.outputs.released == 'true'
+        if: steps.version.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.release.outputs.new_version }}" dist/* \
-            --title "v${{ steps.release.outputs.new_version }}" \
+          VERSION="${{ steps.version.outputs.next_version }}"
+          gh release create "v${VERSION}" dist/* \
+            --title "v${VERSION}" \
             --generate-notes
