@@ -1,22 +1,26 @@
 # EvalVault
 
-> RAG(Retrieval-Augmented Generation) 시스템 품질 평가를 위한 올인원 솔루션
+> An end-to-end evaluation harness for Retrieval-Augmented Generation (RAG) systems.
 
 [![PyPI](https://img.shields.io/pypi/v/evalvault.svg)](https://pypi.org/project/evalvault/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
+[![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
 [![Ragas](https://img.shields.io/badge/Ragas-v1.0-green.svg)](https://docs.ragas.io/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.md)
+[![PSF Supporting Member](https://img.shields.io/badge/PSF-Supporting%20Member-3776AB?style=for-the-badge&logo=python&logoColor=FFD343)](https://www.python.org/psf/membership/)
+
+Prefer Korean docs? Read the [한국어 README](docs/README.ko.md).
 
 ---
 
-## Overview (English)
+## Overview
 
-EvalVault is an end-to-end evaluation harness for Retrieval-Augmented Generation (RAG)
-systems. It plugs into structured datasets, runs Ragas v1.0 metrics, and ships results to
-SQLite or Langfuse for longitudinal tracking.
+EvalVault routes structured datasets through Ragas v1.0 metrics, runs evaluations via a
+Typer CLI, and writes results to SQLite or Langfuse for longitudinal tracking. It targets
+teams that need reproducible RAG scoring across OpenAI, Ollama, or custom profiles with
+minimal wiring.
 
-### Highlights
+## Highlights
 
 - Batteries-included Typer CLI for running, comparing, and exporting evaluation runs
 - Profile-driven model wiring with OpenAI and Ollama defaults
@@ -24,31 +28,30 @@ SQLite or Langfuse for longitudinal tracking.
 - Dataset loaders for JSON, CSV, and Excel sources
 - Cross-platform support (Linux, macOS, Windows)
 
-### Quick Start (EN)
+## Quick Start
 
 ```bash
 uv pip install evalvault
 evalvault run data.json --metrics faithfulness
 ```
 
-## 핵심 기능
+## Key Capabilities
 
-- **6가지 평가 메트릭**: Ragas v1.0 기반 표준화된 RAG 평가
-- **다중 데이터 포맷**: JSON, CSV, Excel 지원
-- **자동 결과 저장**: SQLite (로컬) + Langfuse (클라우드/셀프호스팅)
-- **폐쇄망 지원**: Ollama 기반 로컬 LLM 평가 (프로필 기반 설정)
-- **CLI 인터페이스**: 간편한 명령줄 도구
-- **크로스 플랫폼**: Linux, macOS, Windows 지원
+- Standardized scoring with six Ragas v1.0 metrics
+- JSON/CSV/Excel dataset loaders with versioned metadata
+- Automatic result storage in SQLite (local) and Langfuse (cloud/self-hosted)
+- Air-gapped compatibility through Ollama profiles
+- Cross-platform CLI with thoughtful defaults
 
-## 설치
+## Installation
 
-### PyPI (권장)
+### PyPI (Recommended)
 
 ```bash
 uv pip install evalvault
 ```
 
-### 개발 환경
+### Development Setup
 
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
@@ -56,62 +59,62 @@ cd EvalVault
 uv pip install -e ".[dev]"
 ```
 
-## 빠른 시작
+## Run Your First Evaluation
 
 ```bash
-# 1. 환경 설정
+# 1. Configure secrets
 cp .env.example .env
 echo "OPENAI_API_KEY=sk-your-key" >> .env
 
-# 2. 평가 실행
+# 2. Execute an evaluation
 evalvault run data.json --metrics faithfulness
 
-# 3. 결과 확인
+# 3. Inspect history
 evalvault history
 ```
 
-## 지원 메트릭
+## Supported Metrics
 
-| 메트릭 | 설명 | Ground Truth |
-|--------|------|--------------|
-| `faithfulness` | 답변이 컨텍스트에 충실한지 (환각 감지) | 불필요 |
-| `answer_relevancy` | 답변이 질문과 관련있는지 | 불필요 |
-| `context_precision` | 검색된 컨텍스트의 정밀도 | 필요 |
-| `context_recall` | 필요한 정보가 검색되었는지 | 필요 |
-| `factual_correctness` | 답변이 정답과 사실적으로 일치하는지 | 필요 |
-| `semantic_similarity` | 답변과 정답의 의미적 유사도 | 필요 |
+| Metric | Description | Ground truth |
+|--------|-------------|--------------|
+| `faithfulness` | Detects hallucinations by checking if answers stay within retrieved context | Not required |
+| `answer_relevancy` | Scores how well the answer addresses the user question | Not required |
+| `context_precision` | Measures precision of retrieved passages | Required |
+| `context_recall` | Ensures necessary passages were retrieved | Required |
+| `factual_correctness` | Compares generated answers to known truths | Required |
+| `semantic_similarity` | Semantic overlap between answer and ground truth | Required |
 
-## CLI 명령어
+## CLI Reference
 
 ```bash
-# 평가 실행
+# Run evaluations
 evalvault run data.json --metrics faithfulness,answer_relevancy
 
-# 프로필 지정 (Ollama)
+# Select Ollama profile
 evalvault run data.json --profile dev --metrics faithfulness
 
-# 프로필 지정 (OpenAI)
+# Select OpenAI profile
 evalvault run data.json -p openai --metrics faithfulness
 
-# Langfuse 연동
+# Enable Langfuse tracing
 evalvault run data.json --metrics faithfulness --langfuse
 
-# 히스토리 조회
+# Show run history
 evalvault history --limit 10
 
-# 결과 비교
+# Compare runs
 evalvault compare <run_id1> <run_id2>
 
-# 결과 내보내기
+# Export results
 evalvault export <run_id> -o result.json
 
-# 설정 확인
+# Inspect configuration
 evalvault config
 ```
 
-## 데이터 형식
+## Dataset Formats
 
-### JSON (권장)
+### JSON (recommended)
 
 ```json
 {
@@ -124,135 +127,121 @@ evalvault config
   "test_cases": [
     {
       "id": "tc-001",
-      "question": "보험금은 얼마인가요?",
-      "answer": "1억원입니다.",
-      "contexts": ["사망보험금은 1억원입니다."],
-      "ground_truth": "1억원"
+      "question": "How much is the payout?",
+      "answer": "The payout is 100M KRW.",
+      "contexts": ["Life insurance covers 100M KRW."],
+      "ground_truth": "100M KRW"
     }
   ]
 }
 ```
 
-> **thresholds**: 메트릭별 통과 기준 (0.0~1.0). 미지정 시 기본값 0.7
+> `thresholds` define metric pass criteria (0.0–1.0). Defaults to 0.7 when omitted.
 
 ### CSV
 
 ```csv
 id,question,answer,contexts,ground_truth
-tc-001,"보험금은?","1억원입니다.","[""사망보험금은 1억원""]","1억원"
+tc-001,"How much is the payout?","The payout is 100M KRW.","[""Life insurance covers 100M KRW.""]","100M KRW"
 ```
 
-## 환경 설정
+## Environment Configuration
 
 ```bash
-# .env 파일
+# .env
 
-# OpenAI 설정
+# OpenAI
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5-nano               # 선택 (기본값)
+OPENAI_MODEL=gpt-5-nano
 
-# Ollama 설정 (폐쇄망)
+# Ollama (air-gapped)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_TIMEOUT=120
 
-# Langfuse 연동 (선택)
+# Langfuse (optional)
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-## Ollama 설정 (폐쇄망)
+## Ollama Setup (Air-gapped)
 
-폐쇄망 환경에서 로컬 LLM을 사용하려면 Ollama를 설치해야 합니다.
+1. Install Ollama
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh  # Linux/macOS
+   ```
+2. Download models
+   ```bash
+   ollama pull gemma3:1b
+   ollama pull qwen3-embedding:0.6b
+   ```
+3. Run via a profile
+   ```bash
+   evalvault run data.json --profile dev --metrics faithfulness
+   ```
 
-### 1. Ollama 설치
+## Model Profiles (`config/models.yaml`)
 
-```bash
-# Linux / macOS
-curl -fsSL https://ollama.com/install.sh | sh
+| Profile | LLM | Embedding | Purpose |
+|---------|-----|-----------|---------|
+| `dev` | gemma3:1b (Ollama) | qwen3-embedding:0.6b | Local development |
+| `prod` | gpt-oss-safeguard:20b (Ollama) | qwen3-embedding:8b | Production |
+| `openai` | gpt-5-nano | text-embedding-3-small | External network |
 
-# Windows
-# https://ollama.com/download 에서 설치 파일 다운로드
-```
-
-### 2. 모델 다운로드
-
-```bash
-# 개발용 (dev 프로필)
-ollama pull gemma3:1b
-ollama pull qwen3-embedding:0.6b
-
-# 운영용 (prod 프로필) - 사내 모델 예시
-ollama pull gpt-oss-safeguard:20b
-ollama pull qwen3-embedding:8b
-```
-
-### 3. 프로필로 실행
-
-```bash
-# Ollama dev 프로필 사용
-evalvault run data.json --profile dev --metrics faithfulness
-```
-
-### 모델 프로필 (config/models.yaml)
-
-| 프로필 | LLM | Embedding | 용도 |
-|--------|-----|-----------|------|
-| `dev` | gemma3:1b (Ollama) | qwen3-embedding:0.6b | 개발/테스트 |
-| `prod` | gpt-oss-safeguard:20b (Ollama) | qwen3-embedding:8b | 운영 환경 |
-| `openai` | gpt-5-nano | text-embedding-3-small | 외부망 |
-
-## 아키텍처
+## Architecture Overview
 
 ```
 EvalVault/
-├── config/
-│   └── models.yaml       # 모델 프로필
+├── config/               # Model profiles and runtime config
 ├── src/evalvault/
-│   ├── domain/           # 비즈니스 로직
-│   │   ├── entities/     # TestCase, Dataset, EvaluationRun
-│   │   ├── services/     # RagasEvaluator
-│   │   └── metrics/      # 커스텀 메트릭
-│   ├── ports/            # 인터페이스
-│   │   ├── inbound/      # EvaluatorPort
-│   │   └── outbound/     # LLMPort, StoragePort, TrackerPort
-│   ├── adapters/         # 구현체
-│   │   ├── inbound/      # CLI (Typer)
-│   │   └── outbound/     # OpenAI, Ollama, SQLite, Langfuse
-│   └── config/           # Settings, ModelConfig
-└── .env                  # 환경 변수 (gitignore)
+│   ├── domain/           # Entities, services, metrics
+│   ├── ports/            # Inbound/outbound contracts
+│   ├── adapters/         # CLI, LLM, storage, tracers
+│   └── config/           # Settings + providers
+├── docs/                 # Architecture, user guide, roadmap
+└── tests/                # unit / integration / e2e_data suites
 ```
 
-## 문서
+## Documentation
 
-| 문서 | 설명 |
-|-----|------|
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | 설치, 설정, 메트릭 설명, 문제 해결 |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal Architecture 상세 설명 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 기여 가이드라인 |
+| File | Description |
+|------|-------------|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Installation, configuration, troubleshooting |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal architecture deep dive |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 
-## 개발
+## Development
 
 ```bash
-# 테스트 실행
+# Tests
 pytest tests/ -v
 
-# E2E 테스트 (실제 API 호출)
+# E2E scenarios (requires external APIs)
 pytest tests/integration/test_e2e_scenarios.py -v
 
-# 린트
-ruff check src/
-ruff format src/
+# Linting & formatting
+ruff check src/ tests/
+ruff format src/ tests/
 ```
 
-## 라이선스
+## Community & PSF Membership
 
-Apache 2.0 - See [LICENSE.md](LICENSE.md)
+EvalVault is stewarded by a [Python Software Foundation](https://www.python.org/psf/)
+Supporting Member. We reinvest contributions into open-source tooling and the broader
+Python community.
+
+<p align="left">
+  <a href="https://www.python.org/psf/membership/">
+    <img src="docs/assets/psf-supporting-member.png" alt="PSF Supporting Member badge" width="130" />
+  </a>
+</p>
+
+## License
+
+Apache 2.0 — see [LICENSE.md](LICENSE.md).
 
 ---
 
 <div align="center">
-
-**EvalVault** - RAG 평가의 새로운 기준
-
+  <strong>EvalVault</strong> — raising the bar for dependable RAG evaluation.
 </div>
