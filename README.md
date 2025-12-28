@@ -27,7 +27,7 @@ SQLite or Langfuse for longitudinal tracking.
 ### Quick Start (EN)
 
 ```bash
-pip install evalvault
+uv pip install evalvault
 evalvault run data.json --metrics faithfulness
 ```
 
@@ -45,7 +45,7 @@ evalvault run data.json --metrics faithfulness
 ### PyPI (권장)
 
 ```bash
-pip install evalvault
+uv pip install evalvault
 ```
 
 ### 개발 환경
@@ -53,7 +53,7 @@ pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 ```
 
 ## 빠른 시작
@@ -149,7 +149,7 @@ tc-001,"보험금은?","1억원입니다.","[""사망보험금은 1억원""]","1
 
 # OpenAI 설정
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini              # 선택 (기본값)
+OPENAI_MODEL=gpt-5-nano               # 선택 (기본값)
 
 # Ollama 설정 (폐쇄망)
 OLLAMA_BASE_URL=http://localhost:11434
@@ -200,7 +200,7 @@ evalvault run data.json --profile dev --metrics faithfulness
 |--------|-----|-----------|------|
 | `dev` | gemma3:1b (Ollama) | qwen3-embedding:0.6b | 개발/테스트 |
 | `prod` | gpt-oss-safeguard:20b (Ollama) | qwen3-embedding:8b | 운영 환경 |
-| `openai` | gpt-4o-mini | text-embedding-3-small | 외부망 |
+| `openai` | gpt-5-nano | text-embedding-3-small | 외부망 |
 
 ## 아키텍처
 
