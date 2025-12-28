@@ -303,7 +303,7 @@ class PostgreSQLStorageAdapter:
             conn.commit()
             return deleted
 
-    # Experiment 관련 메서드 (TODO: 구현 필요)
+    # Experiment 관련 메서드
 
     def save_experiment(self, experiment: Experiment) -> str:
         """실험을 저장합니다.
@@ -314,7 +314,45 @@ class PostgreSQLStorageAdapter:
         Returns:
             저장된 experiment의 ID
         """
-        raise NotImplementedError("PostgreSQL experiment storage not implemented yet")
+        with self._get_connection() as conn:
+            # Insert experiment
+            conn.execute(
+                """
+                INSERT INTO experiments (
+                    experiment_id, name, description, hypothesis,
+                    created_at, status, metrics_to_compare, conclusion
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    experiment.experiment_id,
+                    experiment.name,
+                    experiment.description,
+                    experiment.hypothesis,
+                    experiment.created_at,
+                    experiment.status,
+                    json.dumps(experiment.metrics_to_compare),
+                    experiment.conclusion,
+                ),
+            )
+
+            # Insert experiment groups
+            for group in experiment.groups:
+                conn.execute(
+                    """
+                    INSERT INTO experiment_groups (
+                        experiment_id, name, description, run_ids
+                    ) VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        experiment.experiment_id,
+                        group.name,
+                        group.description,
+                        json.dumps(group.run_ids),
+                    ),
+                )
+
+            conn.commit()
+            return experiment.experiment_id
 
     def get_experiment(self, experiment_id: str) -> Experiment:
         """실험을 조회합니다.
@@ -328,7 +366,62 @@ class PostgreSQLStorageAdapter:
         Raises:
             KeyError: 실험을 찾을 수 없는 경우
         """
-        raise NotImplementedError("PostgreSQL experiment storage not implemented yet")
+        from evalvault.domain.entities.experiment import ExperimentGroup
+
+        with self._get_connection() as conn:
+            # Fetch experiment
+            cursor = conn.execute(
+                """
+                SELECT experiment_id, name, description, hypothesis,
+                       created_at, status, metrics_to_compare, conclusion
+                FROM experiments
+                WHERE experiment_id = %s
+                """,
+                (experiment_id,),
+            )
+            exp_row = cursor.fetchone()
+
+            if not exp_row:
+                raise KeyError(f"Experiment not found: {experiment_id}")
+
+            # Fetch groups
+            cursor = conn.execute(
+                """
+                SELECT name, description, run_ids
+                FROM experiment_groups
+                WHERE experiment_id = %s
+                ORDER BY id
+                """,
+                (experiment_id,),
+            )
+            group_rows = cursor.fetchall()
+
+            # Reconstruct groups
+            groups = [
+                ExperimentGroup(
+                    name=g["name"],
+                    description=g["description"] or "",
+                    run_ids=json.loads(g["run_ids"]) if g["run_ids"] else [],
+                )
+                for g in group_rows
+            ]
+
+            # Reconstruct Experiment
+            return Experiment(
+                experiment_id=exp_row["experiment_id"],
+                name=exp_row["name"],
+                description=exp_row["description"] or "",
+                hypothesis=exp_row["hypothesis"] or "",
+                created_at=exp_row["created_at"],
+                status=exp_row["status"],
+                metrics_to_compare=(
+                    json.loads(exp_row["metrics_to_compare"])
+                    if exp_row["metrics_to_compare"]
+                    else []
+                ),
+                conclusion=exp_row["conclusion"],
+                groups=groups,
+            )
 
     def list_experiments(
         self,
@@ -344,7 +437,23 @@ class PostgreSQLStorageAdapter:
         Returns:
             Experiment 객체 리스트
         """
-        raise NotImplementedError("PostgreSQL experiment storage not implemented yet")
+        with self._get_connection() as conn:
+            # Build query with optional filter
+            query = "SELECT experiment_id FROM experiments WHERE 1=1"
+            params = []
+
+            if status:
+                query += " AND status = %s"
+                params.append(status)
+
+            query += " ORDER BY created_at DESC LIMIT %s"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            exp_ids = [row["experiment_id"] for row in cursor.fetchall()]
+
+            # Fetch full experiments
+            return [self.get_experiment(exp_id) for exp_id in exp_ids]
 
     def update_experiment(self, experiment: Experiment) -> None:
         """실험을 업데이트합니다.
@@ -352,4 +461,49 @@ class PostgreSQLStorageAdapter:
         Args:
             experiment: 업데이트할 실험
         """
-        raise NotImplementedError("PostgreSQL experiment storage not implemented yet")
+        with self._get_connection() as conn:
+            # Update experiment
+            conn.execute(
+                """
+                UPDATE experiments SET
+                    name = %s,
+                    description = %s,
+                    hypothesis = %s,
+                    status = %s,
+                    metrics_to_compare = %s,
+                    conclusion = %s
+                WHERE experiment_id = %s
+                """,
+                (
+                    experiment.name,
+                    experiment.description,
+                    experiment.hypothesis,
+                    experiment.status,
+                    json.dumps(experiment.metrics_to_compare),
+                    experiment.conclusion,
+                    experiment.experiment_id,
+                ),
+            )
+
+            # Delete existing groups and re-insert
+            conn.execute(
+                "DELETE FROM experiment_groups WHERE experiment_id = %s",
+                (experiment.experiment_id,),
+            )
+
+            for group in experiment.groups:
+                conn.execute(
+                    """
+                    INSERT INTO experiment_groups (
+                        experiment_id, name, description, run_ids
+                    ) VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        experiment.experiment_id,
+                        group.name,
+                        group.description,
+                        json.dumps(group.run_ids),
+                    ),
+                )
+
+            conn.commit()

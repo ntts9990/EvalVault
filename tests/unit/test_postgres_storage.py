@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.entities.experiment import Experiment
 
 # Mock psycopg module before importing PostgreSQLStorageAdapter
 sys.modules["psycopg"] = MagicMock()
@@ -509,3 +510,191 @@ class TestPostgreSQLStorageAdapter:
 
         run_id = adapter.save_run(run)
         assert run_id == "test-run-003"
+
+
+class TestPostgreSQLExperimentStorage:
+    """Test suite for PostgreSQL Experiment storage methods."""
+
+    @pytest.fixture
+    def sample_experiment(self):
+        """Create a sample Experiment for testing."""
+        exp = Experiment(
+            experiment_id="exp-001",
+            name="Model Comparison",
+            description="Compare GPT-4 vs GPT-3.5",
+            hypothesis="GPT-4 will have higher faithfulness scores",
+            status="running",
+            metrics_to_compare=["faithfulness", "answer_relevancy"],
+        )
+        exp.add_group("control", "GPT-3.5 baseline")
+        exp.add_group("variant_a", "GPT-4 test group")
+        exp.groups[0].run_ids = ["run-001", "run-002"]
+        exp.groups[1].run_ids = ["run-003", "run-004"]
+        return exp
+
+    def test_save_experiment_returns_experiment_id(
+        self, mock_psycopg, mock_connection, sample_experiment
+    ):
+        """Test that save_experiment stores data and returns experiment_id."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        exp_id = adapter.save_experiment(sample_experiment)
+        assert exp_id == "exp-001"
+
+    def test_save_experiment_inserts_experiment_data(
+        self, mock_psycopg, mock_connection, sample_experiment
+    ):
+        """Test that save_experiment correctly inserts experiment data."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        adapter.save_experiment(sample_experiment)
+
+        # Verify execute was called for experiment and groups
+        assert mock_connection.execute.called
+
+    def test_save_experiment_inserts_groups(self, mock_psycopg, mock_connection, sample_experiment):
+        """Test that save_experiment inserts experiment groups."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        adapter.save_experiment(sample_experiment)
+
+        # Should insert 2 groups
+        assert mock_connection.execute.called
+        assert mock_connection.commit.called
+
+    def test_get_experiment_returns_stored_experiment(self, mock_psycopg, mock_connection):
+        """Test that get_experiment retrieves stored Experiment."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_connection.execute.return_value = mock_cursor
+
+        # Mock experiment data
+        mock_cursor.fetchone.return_value = {
+            "experiment_id": "exp-001",
+            "name": "Model Comparison",
+            "description": "Compare models",
+            "hypothesis": "GPT-4 is better",
+            "created_at": datetime(2025, 1, 1, 10, 0, 0),
+            "status": "running",
+            "metrics_to_compare": '["faithfulness"]',
+            "conclusion": None,
+        }
+
+        # Mock groups
+        mock_cursor.fetchall.return_value = [
+            {
+                "name": "control",
+                "description": "Baseline",
+                "run_ids": '["run-001"]',
+            }
+        ]
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        exp = adapter.get_experiment("exp-001")
+
+        assert exp.experiment_id == "exp-001"
+        assert exp.name == "Model Comparison"
+        assert exp.status == "running"
+
+    def test_get_experiment_raises_key_error_for_nonexistent(self, mock_psycopg, mock_connection):
+        """Test that get_experiment raises KeyError for non-existent experiment."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_connection.execute.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = None
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        with pytest.raises(KeyError, match="Experiment not found"):
+            adapter.get_experiment("nonexistent")
+
+    def test_list_experiments_returns_all_experiments(self, mock_psycopg, mock_connection):
+        """Test that list_experiments returns all stored experiments."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_connection.execute.return_value = mock_cursor
+
+        # Mock experiment IDs
+        mock_cursor.fetchall.return_value = [
+            {"experiment_id": "exp-001"},
+            {"experiment_id": "exp-002"},
+        ]
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        with patch.object(adapter, "get_experiment") as mock_get:
+            mock_get.side_effect = lambda eid: Experiment(
+                experiment_id=eid,
+                name=f"Experiment {eid}",
+            )
+
+            experiments = adapter.list_experiments()
+            assert len(experiments) == 2
+
+    def test_list_experiments_filters_by_status(self, mock_psycopg, mock_connection):
+        """Test that list_experiments filters by status."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        mock_cursor = MagicMock()
+        mock_connection.execute.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [{"experiment_id": "exp-001"}]
+
+        with patch.object(adapter, "get_experiment") as mock_get:
+            mock_get.return_value = Experiment(
+                experiment_id="exp-001",
+                name="Test",
+                status="completed",
+            )
+
+            adapter.list_experiments(status="completed")
+            assert mock_connection.execute.called
+
+    def test_update_experiment_updates_data(self, mock_psycopg, mock_connection, sample_experiment):
+        """Test that update_experiment updates experiment data."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        sample_experiment.status = "completed"
+        sample_experiment.conclusion = "GPT-4 performed better"
+
+        adapter.update_experiment(sample_experiment)
+
+        assert mock_connection.execute.called
+        assert mock_connection.commit.called
