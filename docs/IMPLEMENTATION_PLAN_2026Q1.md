@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.4.0
+> **Document Version**: 2.5.0
 > **Created**: 2025-12-28
 > **Last Updated**: 2025-12-28
-> **Status**: Phase 4 Complete
+> **Status**: Phase 5 Complete
 
 ---
 
@@ -28,7 +28,8 @@
 | Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
 | Dynamics: Formation | 1 week | 16h | Must Have | ✅ Complete |
 | Config & Multi-language | 1.5 weeks | 16h | Should Have | ✅ Complete |
-| **Total** | **7 weeks** | **80h** | | |
+| Forms: Planar/Hierarchical | 1 week | 12h | Should Have | ✅ Complete |
+| **Total** | **8 weeks** | **92h** | | |
 
 ---
 
@@ -1184,8 +1185,8 @@ def extract_behaviors_from_evaluation(
 | Form | Phase | 설명 |
 |------|-------|------|
 | **Flat** | ✅ Phase 1 | SQLite 테이블 기반 (현재 구현) |
-| **Planar** | Phase 4 | Knowledge Graph 통합 (기존 KG 시스템 연동) |
-| **Hierarchical** | Phase 5 | 요약 계층 추가 (원본 + 요약본 다층 구조) |
+| **Planar** | ✅ Phase 5 | Knowledge Graph 통합 (기존 KG 시스템 연동) |
+| **Hierarchical** | ✅ Phase 5 | 요약 계층 추가 (원본 + 요약본 다층 구조) |
 
 ### C.6 구현 우선순위 (업데이트)
 
@@ -1216,9 +1217,12 @@ Phase 4: ✅ 완료 (Config & Multi-language)
 ├── 다국어 terms_dictionary (ko/en)
 └── 33 new unit tests (총 96 tests)
 
-Phase 5: Forms 확장 (Planar/Hierarchical)
-├── KG 통합
-└── 요약 계층
+Phase 5: ✅ 완료 (Forms 확장 - Planar/Hierarchical)
+├── Planar Form: KG 통합 (link_fact_to_kg, get_facts_by_kg_entity, import/export_kg_as_facts)
+├── Hierarchical Form: 요약 계층 (create_summary_fact, get_facts_by_level, get_fact_hierarchy)
+├── FactualFact 엔티티 확장 (kg_entity_id, parent_fact_id, abstraction_level)
+├── Schema 업데이트 (fact_kg_bindings, fact_hierarchy 테이블)
+└── 17 new unit tests (총 113 tests)
 ```
 
 ### C.7 Phase 2 완료 상세
@@ -1384,3 +1388,112 @@ evalvault domain terms <domain> [--language ko] [--limit 10]
 - `TestListDomains` - 도메인 목록 테스트
 - `TestYAMLSerializationRoundtrip` - YAML 직렬화 테스트
 - `TestTermsDictionaryFormat` - 용어사전 형식 테스트
+
+### C.10 Phase 5 완료 상세
+
+**구현 파일**:
+- `src/evalvault/domain/entities/memory.py` - FactualFact 엔티티 Phase 5 필드 추가
+- `src/evalvault/ports/outbound/domain_memory_port.py` - Phase 5 메서드 시그니처 추가
+- `src/evalvault/adapters/outbound/domain_memory/sqlite_adapter.py` - Phase 5 메서드 구현
+- `src/evalvault/adapters/outbound/domain_memory/domain_memory_schema.sql` - Phase 5 테이블 추가
+
+**테스트 파일**:
+- `tests/unit/test_domain_memory.py` - 80 tests (63 Phase 1-4 + 17 Phase 5)
+
+**FactualFact 엔티티 확장**:
+```python
+# Phase 5: Planar Form - KG Integration
+kg_entity_id: str | None = None  # 연결된 KG 엔티티 이름
+kg_relation_type: str | None = None  # KG 관계 타입
+
+# Phase 5: Hierarchical Form - Summary Layers
+parent_fact_id: str | None = None  # 부모 사실 ID (요약의 원본)
+abstraction_level: int = 0  # 0=raw, 1=summary, 2=meta-summary
+child_fact_ids: list[str] = field(default_factory=list)
+
+def is_summary(self) -> bool:
+    """요약 사실인지 확인."""
+    return self.abstraction_level > 0
+
+def is_linked_to_kg(self) -> bool:
+    """KG에 연결되어 있는지 확인."""
+    return self.kg_entity_id is not None
+```
+
+**Planar Form (KG Integration) 메서드**:
+```python
+def link_fact_to_kg(fact_id, kg_entity_id, kg_relation_type) -> None:
+    """사실을 Knowledge Graph 엔티티에 연결"""
+
+def get_facts_by_kg_entity(kg_entity_id, domain) -> list[FactualFact]:
+    """특정 KG 엔티티에 연결된 사실들 조회"""
+
+def import_kg_as_facts(entities, relations, domain, language) -> dict:
+    """KG의 엔티티와 관계를 사실로 변환하여 저장"""
+
+def export_facts_as_kg(domain, language, min_confidence) -> tuple:
+    """사실들을 Knowledge Graph 형태로 내보내기"""
+```
+
+**Hierarchical Form (Summary Layers) 메서드**:
+```python
+def create_summary_fact(child_fact_ids, summary_subject, summary_predicate, summary_object, domain, language) -> FactualFact:
+    """여러 사실을 요약하는 상위 사실 생성"""
+
+def get_facts_by_level(abstraction_level, domain, language, limit) -> list[FactualFact]:
+    """특정 추상화 레벨의 사실들 조회"""
+
+def get_fact_hierarchy(fact_id) -> dict:
+    """사실의 전체 계층 구조 조회 (parent, children, ancestors, descendants)"""
+
+def get_child_facts(parent_fact_id) -> list[FactualFact]:
+    """특정 사실의 자식 사실들 조회"""
+```
+
+**Schema 추가 (SQLite)**:
+```sql
+-- KG Entity binding table
+CREATE TABLE IF NOT EXISTS fact_kg_bindings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_id TEXT NOT NULL,
+    kg_entity_id TEXT NOT NULL,
+    kg_relation_type TEXT,
+    binding_confidence REAL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    UNIQUE(fact_id, kg_entity_id)
+);
+
+-- Fact hierarchy table
+CREATE TABLE IF NOT EXISTS fact_hierarchy (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_fact_id TEXT NOT NULL,
+    child_fact_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    FOREIGN KEY (child_fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    UNIQUE(parent_fact_id, child_fact_id)
+);
+```
+
+**Phase 5 테스트 클래스**:
+- `TestPhase5PlanarForm` - KG Integration 테스트 (8 tests)
+  - `test_link_fact_to_kg`
+  - `test_link_fact_to_kg_not_found`
+  - `test_get_facts_by_kg_entity`
+  - `test_get_facts_by_kg_entity_with_domain_filter`
+  - `test_import_kg_as_facts`
+  - `test_import_kg_as_facts_no_duplicates`
+  - `test_export_facts_as_kg`
+  - `test_export_facts_as_kg_with_confidence_filter`
+
+- `TestPhase5HierarchicalForm` - Summary Layers 테스트 (9 tests)
+  - `test_create_summary_fact`
+  - `test_create_summary_fact_empty_children`
+  - `test_create_summary_fact_nonexistent_child`
+  - `test_get_facts_by_level`
+  - `test_get_fact_hierarchy`
+  - `test_get_fact_hierarchy_child_perspective`
+  - `test_get_child_facts`
+  - `test_multi_level_hierarchy`
+  - `test_is_summary_and_is_linked_to_kg`

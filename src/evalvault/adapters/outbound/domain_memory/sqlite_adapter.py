@@ -4,6 +4,7 @@ Based on "Memory in the Age of AI Agents: A Survey" framework:
 - Phase 1: Basic CRUD for Factual, Experiential, Working layers
 - Phase 2: Evolution dynamics (consolidate, forget, decay)
 - Phase 3: Formation dynamics (extraction from evaluations)
+- Phase 5: Forms expansion (Planar/Hierarchical)
 """
 
 from __future__ import annotations
@@ -51,6 +52,16 @@ class SQLiteDomainMemoryAdapter:
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         conn.executescript(schema_sql)
+
+        # Phase 5: Add abstraction_level column if not exists
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(factual_facts)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "abstraction_level" not in columns:
+            cursor.execute(
+                "ALTER TABLE factual_facts ADD COLUMN abstraction_level INTEGER DEFAULT 0"
+            )
+
         conn.commit()
         conn.close()
 
@@ -75,8 +86,8 @@ class SQLiteDomainMemoryAdapter:
                 INSERT OR REPLACE INTO factual_facts (
                     fact_id, subject, predicate, object, language, domain,
                     fact_type, verification_score, verification_count,
-                    source_document_ids, created_at, last_verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_document_ids, created_at, last_verified, abstraction_level
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     fact.fact_id,
@@ -91,8 +102,31 @@ class SQLiteDomainMemoryAdapter:
                     json.dumps(fact.source_document_ids),
                     fact.created_at.isoformat(),
                     fact.last_verified.isoformat() if fact.last_verified else None,
+                    fact.abstraction_level,
                 ),
             )
+
+            # Phase 5: Save KG binding if present
+            if fact.kg_entity_id:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO fact_kg_bindings (
+                        fact_id, kg_entity_id, kg_relation_type
+                    ) VALUES (?, ?, ?)
+                    """,
+                    (fact.fact_id, fact.kg_entity_id, fact.kg_relation_type),
+                )
+
+            # Phase 5: Save hierarchy if parent is set
+            if fact.parent_fact_id:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO fact_hierarchy (parent_fact_id, child_fact_id)
+                    VALUES (?, ?)
+                    """,
+                    (fact.parent_fact_id, fact.fact_id),
+                )
+
             conn.commit()
             return fact.fact_id
         finally:
@@ -108,7 +142,7 @@ class SQLiteDomainMemoryAdapter:
                 """
                 SELECT fact_id, subject, predicate, object, language, domain,
                        fact_type, verification_score, verification_count,
-                       source_document_ids, created_at, last_verified
+                       source_document_ids, created_at, last_verified, abstraction_level
                 FROM factual_facts WHERE fact_id = ?
                 """,
                 (fact_id,),
@@ -118,14 +152,53 @@ class SQLiteDomainMemoryAdapter:
             if not row:
                 raise KeyError(f"Fact not found: {fact_id}")
 
-            return self._row_to_fact(row)
+            return self._row_to_fact(row, cursor)
         finally:
             conn.close()
 
-    def _row_to_fact(self, row: tuple) -> FactualFact:
-        """Convert database row to FactualFact."""
+    def _row_to_fact(self, row: tuple, cursor: sqlite3.Cursor | None = None) -> FactualFact:
+        """Convert database row to FactualFact.
+
+        Args:
+            row: Database row tuple (13 columns including abstraction_level)
+            cursor: Optional cursor for loading related Phase 5 data
+        """
+        fact_id = row[0]
+        abstraction_level = row[12] if len(row) > 12 else 0
+
+        # Phase 5: Load KG binding if cursor provided
+        kg_entity_id = None
+        kg_relation_type = None
+        if cursor:
+            cursor.execute(
+                "SELECT kg_entity_id, kg_relation_type FROM fact_kg_bindings WHERE fact_id = ? LIMIT 1",
+                (fact_id,),
+            )
+            kg_row = cursor.fetchone()
+            if kg_row:
+                kg_entity_id = kg_row[0]
+                kg_relation_type = kg_row[1]
+
+        # Phase 5: Load parent fact if cursor provided
+        parent_fact_id = None
+        child_fact_ids: list[str] = []
+        if cursor:
+            cursor.execute(
+                "SELECT parent_fact_id FROM fact_hierarchy WHERE child_fact_id = ?",
+                (fact_id,),
+            )
+            parent_row = cursor.fetchone()
+            if parent_row:
+                parent_fact_id = parent_row[0]
+
+            cursor.execute(
+                "SELECT child_fact_id FROM fact_hierarchy WHERE parent_fact_id = ?",
+                (fact_id,),
+            )
+            child_fact_ids = [r[0] for r in cursor.fetchall()]
+
         return FactualFact(
-            fact_id=row[0],
+            fact_id=fact_id,
             subject=row[1],
             predicate=row[2],
             object=row[3],
@@ -137,6 +210,11 @@ class SQLiteDomainMemoryAdapter:
             source_document_ids=json.loads(row[9]) if row[9] else [],
             created_at=datetime.fromisoformat(row[10]),
             last_verified=datetime.fromisoformat(row[11]) if row[11] else None,
+            kg_entity_id=kg_entity_id,
+            kg_relation_type=kg_relation_type,
+            parent_fact_id=parent_fact_id,
+            abstraction_level=abstraction_level,
+            child_fact_ids=child_fact_ids,
         )
 
     def list_facts(
@@ -155,7 +233,7 @@ class SQLiteDomainMemoryAdapter:
             query = """
                 SELECT fact_id, subject, predicate, object, language, domain,
                        fact_type, verification_score, verification_count,
-                       source_document_ids, created_at, last_verified
+                       source_document_ids, created_at, last_verified, abstraction_level
                 FROM factual_facts WHERE 1=1
             """
             params: list = []
@@ -213,7 +291,7 @@ class SQLiteDomainMemoryAdapter:
             query = """
                 SELECT fact_id, subject, predicate, object, language, domain,
                        fact_type, verification_score, verification_count,
-                       source_document_ids, created_at, last_verified
+                       source_document_ids, created_at, last_verified, abstraction_level
                 FROM factual_facts
                 WHERE subject = ? AND predicate = ? AND object = ?
             """
@@ -226,7 +304,7 @@ class SQLiteDomainMemoryAdapter:
             cursor.execute(query, params)
             row = cursor.fetchone()
 
-            return self._row_to_fact(row) if row else None
+            return self._row_to_fact(row, cursor) if row else None
         finally:
             conn.close()
 
@@ -1032,7 +1110,7 @@ class SQLiteDomainMemoryAdapter:
             query_sql = f"""
                 SELECT fact_id, subject, predicate, object, language, domain,
                        fact_type, verification_score, verification_count,
-                       source_document_ids, created_at, last_verified
+                       source_document_ids, created_at, last_verified, abstraction_level
                 FROM factual_facts
                 WHERE fact_id IN ({placeholders})
             """
@@ -1672,3 +1750,439 @@ class SQLiteDomainMemoryAdapter:
                 q_type = "General inquiry"
 
         return f"{q_type} (success: {success_rate:.0%})"
+
+    # =========================================================================
+    # Phase 5: Planar Form - KG Integration
+    # =========================================================================
+
+    def link_fact_to_kg(
+        self,
+        fact_id: str,
+        kg_entity_id: str,
+        kg_relation_type: str | None = None,
+    ) -> None:
+        """사실을 Knowledge Graph 엔티티에 연결합니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Verify fact exists
+            cursor.execute("SELECT 1 FROM factual_facts WHERE fact_id = ?", (fact_id,))
+            if not cursor.fetchone():
+                raise KeyError(f"Fact not found: {fact_id}")
+
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO fact_kg_bindings (
+                    fact_id, kg_entity_id, kg_relation_type
+                ) VALUES (?, ?, ?)
+                """,
+                (fact_id, kg_entity_id, kg_relation_type),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_facts_by_kg_entity(
+        self,
+        kg_entity_id: str,
+        domain: str | None = None,
+    ) -> list[FactualFact]:
+        """특정 KG 엔티티에 연결된 사실들을 조회합니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            query = """
+                SELECT f.fact_id, f.subject, f.predicate, f.object, f.language, f.domain,
+                       f.fact_type, f.verification_score, f.verification_count,
+                       f.source_document_ids, f.created_at, f.last_verified, f.abstraction_level
+                FROM factual_facts f
+                INNER JOIN fact_kg_bindings b ON f.fact_id = b.fact_id
+                WHERE b.kg_entity_id = ?
+            """
+            params: list = [kg_entity_id]
+
+            if domain:
+                query += " AND f.domain = ?"
+                params.append(domain)
+
+            query += " ORDER BY f.verification_score DESC"
+
+            cursor.execute(query, params)
+            return [self._row_to_fact(row, cursor) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def import_kg_as_facts(
+        self,
+        entities: list[tuple[str, str, dict]],
+        relations: list[tuple[str, str, str, float]],
+        domain: str,
+        language: str = "ko",
+    ) -> dict[str, int]:
+        """Knowledge Graph의 엔티티와 관계를 사실로 변환하여 저장합니다."""
+        conn = self._get_connection()
+
+        entities_imported = 0
+        relations_imported = 0
+
+        try:
+            # Import entities as facts: (entity_name, "is_a", entity_type)
+            for name, entity_type, attrs in entities:
+                fact = FactualFact(
+                    subject=name,
+                    predicate="is_a",
+                    object=entity_type,
+                    domain=domain,
+                    language=language,
+                    fact_type="verified",
+                    verification_score=1.0,
+                    kg_entity_id=name,
+                    kg_relation_type="entity_definition",
+                )
+
+                # Check if already exists
+                existing = self.find_fact_by_triple(name, "is_a", entity_type, domain)
+                if not existing:
+                    self.save_fact(fact)
+                    entities_imported += 1
+
+                    # Store attributes as additional facts
+                    for attr_key, attr_value in attrs.items():
+                        if attr_value and str(attr_value).strip():
+                            attr_fact = FactualFact(
+                                subject=name,
+                                predicate=f"has_{attr_key}",
+                                object=str(attr_value),
+                                domain=domain,
+                                language=language,
+                                fact_type="verified",
+                                verification_score=1.0,
+                                kg_entity_id=name,
+                            )
+                            self.save_fact(attr_fact)
+
+            # Import relations as facts: (source, relation_type, target)
+            for source, target, relation_type, confidence in relations:
+                fact = FactualFact(
+                    subject=source,
+                    predicate=relation_type,
+                    object=target,
+                    domain=domain,
+                    language=language,
+                    fact_type="verified",
+                    verification_score=confidence,
+                    kg_entity_id=source,
+                    kg_relation_type=relation_type,
+                )
+
+                existing = self.find_fact_by_triple(source, relation_type, target, domain)
+                if not existing:
+                    self.save_fact(fact)
+                    relations_imported += 1
+
+            conn.commit()
+            return {
+                "entities_imported": entities_imported,
+                "relations_imported": relations_imported,
+            }
+        finally:
+            conn.close()
+
+    def export_facts_as_kg(
+        self,
+        domain: str,
+        language: str | None = None,
+        min_confidence: float = 0.5,
+    ) -> tuple[list[tuple[str, str, dict]], list[tuple[str, str, str, float]]]:
+        """사실들을 Knowledge Graph 형태로 내보냅니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Get facts with sufficient confidence
+            query = """
+                SELECT fact_id, subject, predicate, object, language, domain,
+                       fact_type, verification_score, verification_count,
+                       source_document_ids, created_at, last_verified, abstraction_level
+                FROM factual_facts
+                WHERE domain = ? AND verification_score >= ?
+            """
+            params: list = [domain, min_confidence]
+
+            if language:
+                query += " AND language = ?"
+                params.append(language)
+
+            cursor.execute(query, params)
+            facts = [self._row_to_fact(row) for row in cursor.fetchall()]
+
+            # Extract entities from is_a predicates
+            entities: list[tuple[str, str, dict]] = []
+            entity_attrs: dict[str, dict] = {}
+
+            for fact in facts:
+                if fact.predicate == "is_a":
+                    entities.append((fact.subject, fact.object, {}))
+                    entity_attrs[fact.subject] = {}
+                elif fact.predicate.startswith("has_"):
+                    attr_name = fact.predicate[4:]  # Remove "has_" prefix
+                    if fact.subject not in entity_attrs:
+                        entity_attrs[fact.subject] = {}
+                    entity_attrs[fact.subject][attr_name] = fact.object
+
+            # Update entity attributes
+            entities = [(name, etype, entity_attrs.get(name, {})) for name, etype, _ in entities]
+
+            # Extract relations (non is_a and non has_* predicates)
+            relations: list[tuple[str, str, str, float]] = []
+            for fact in facts:
+                if fact.predicate != "is_a" and not fact.predicate.startswith("has_"):
+                    relations.append(
+                        (fact.subject, fact.object, fact.predicate, fact.verification_score)
+                    )
+
+            return entities, relations
+        finally:
+            conn.close()
+
+    # =========================================================================
+    # Phase 5: Hierarchical Form - Summary Layers
+    # =========================================================================
+
+    def create_summary_fact(
+        self,
+        child_fact_ids: list[str],
+        summary_subject: str,
+        summary_predicate: str,
+        summary_object: str,
+        domain: str,
+        language: str = "ko",
+    ) -> FactualFact:
+        """여러 사실을 요약하는 상위 사실을 생성합니다."""
+        if not child_fact_ids:
+            raise ValueError("child_fact_ids cannot be empty")
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Verify all child facts exist and get max abstraction level
+            max_level = 0
+            total_score = 0.0
+            source_ids: list[str] = []
+
+            for child_id in child_fact_ids:
+                cursor.execute(
+                    """
+                    SELECT abstraction_level, verification_score, source_document_ids
+                    FROM factual_facts WHERE fact_id = ?
+                    """,
+                    (child_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    raise KeyError(f"Child fact not found: {child_id}")
+
+                level = row[0] or 0
+                max_level = max(max_level, level)
+                total_score += row[1]
+                if row[2]:
+                    source_ids.extend(json.loads(row[2]))
+
+            # Create summary fact with level = max_child_level + 1
+            summary_fact = FactualFact(
+                subject=summary_subject,
+                predicate=summary_predicate,
+                object=summary_object,
+                domain=domain,
+                language=language,
+                fact_type="verified",
+                verification_score=total_score / len(child_fact_ids),
+                verification_count=len(child_fact_ids),
+                source_document_ids=list(set(source_ids)),
+                abstraction_level=max_level + 1,
+                child_fact_ids=child_fact_ids,
+            )
+
+            # Save summary fact
+            self.save_fact(summary_fact)
+
+            # Create hierarchy relationships
+            for child_id in child_fact_ids:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO fact_hierarchy (parent_fact_id, child_fact_id)
+                    VALUES (?, ?)
+                    """,
+                    (summary_fact.fact_id, child_id),
+                )
+
+            conn.commit()
+            return summary_fact
+        finally:
+            conn.close()
+
+    def get_facts_by_level(
+        self,
+        abstraction_level: int,
+        domain: str | None = None,
+        language: str | None = None,
+        limit: int = 100,
+    ) -> list[FactualFact]:
+        """특정 추상화 레벨의 사실들을 조회합니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            query = """
+                SELECT fact_id, subject, predicate, object, language, domain,
+                       fact_type, verification_score, verification_count,
+                       source_document_ids, created_at, last_verified, abstraction_level
+                FROM factual_facts
+                WHERE abstraction_level = ?
+            """
+            params: list = [abstraction_level]
+
+            if domain:
+                query += " AND domain = ?"
+                params.append(domain)
+            if language:
+                query += " AND language = ?"
+                params.append(language)
+
+            query += " ORDER BY verification_score DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query, params)
+            return [self._row_to_fact(row, cursor) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def get_fact_hierarchy(
+        self,
+        fact_id: str,
+    ) -> dict[str, list[FactualFact] | FactualFact | None]:
+        """사실의 전체 계층 구조를 조회합니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Get the fact itself
+            cursor.execute(
+                """
+                SELECT fact_id, subject, predicate, object, language, domain,
+                       fact_type, verification_score, verification_count,
+                       source_document_ids, created_at, last_verified, abstraction_level
+                FROM factual_facts WHERE fact_id = ?
+                """,
+                (fact_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise KeyError(f"Fact not found: {fact_id}")
+
+            fact = self._row_to_fact(row, cursor)
+
+            # Get parent
+            parent: FactualFact | None = None
+            if fact.parent_fact_id:
+                cursor.execute(
+                    """
+                    SELECT fact_id, subject, predicate, object, language, domain,
+                           fact_type, verification_score, verification_count,
+                           source_document_ids, created_at, last_verified, abstraction_level
+                    FROM factual_facts WHERE fact_id = ?
+                    """,
+                    (fact.parent_fact_id,),
+                )
+                parent_row = cursor.fetchone()
+                if parent_row:
+                    parent = self._row_to_fact(parent_row)
+
+            # Get children
+            children = self.get_child_facts(fact_id)
+
+            # Get all ancestors (traverse up)
+            ancestors: list[FactualFact] = []
+            current_parent_id = fact.parent_fact_id
+            visited = set()
+            while current_parent_id and current_parent_id not in visited:
+                visited.add(current_parent_id)
+                cursor.execute(
+                    """
+                    SELECT fact_id, subject, predicate, object, language, domain,
+                           fact_type, verification_score, verification_count,
+                           source_document_ids, created_at, last_verified, abstraction_level
+                    FROM factual_facts WHERE fact_id = ?
+                    """,
+                    (current_parent_id,),
+                )
+                ancestor_row = cursor.fetchone()
+                if ancestor_row:
+                    ancestor = self._row_to_fact(ancestor_row)
+                    ancestors.append(ancestor)
+                    current_parent_id = ancestor.parent_fact_id
+                else:
+                    break
+
+            # Get all descendants (traverse down recursively)
+            descendants: list[FactualFact] = []
+            queue = list(fact.child_fact_ids)
+            visited_children: set[str] = set()
+            while queue:
+                child_id = queue.pop(0)
+                if child_id in visited_children:
+                    continue
+                visited_children.add(child_id)
+
+                cursor.execute(
+                    """
+                    SELECT fact_id, subject, predicate, object, language, domain,
+                           fact_type, verification_score, verification_count,
+                           source_document_ids, created_at, last_verified, abstraction_level
+                    FROM factual_facts WHERE fact_id = ?
+                    """,
+                    (child_id,),
+                )
+                child_row = cursor.fetchone()
+                if child_row:
+                    child = self._row_to_fact(child_row, cursor)
+                    descendants.append(child)
+                    queue.extend(child.child_fact_ids)
+
+            return {
+                "fact": fact,
+                "parent": parent,
+                "children": children,
+                "ancestors": ancestors,
+                "descendants": descendants,
+            }
+        finally:
+            conn.close()
+
+    def get_child_facts(
+        self,
+        parent_fact_id: str,
+    ) -> list[FactualFact]:
+        """특정 사실의 자식 사실들을 조회합니다."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT f.fact_id, f.subject, f.predicate, f.object, f.language, f.domain,
+                       f.fact_type, f.verification_score, f.verification_count,
+                       f.source_document_ids, f.created_at, f.last_verified, f.abstraction_level
+                FROM factual_facts f
+                INNER JOIN fact_hierarchy h ON f.fact_id = h.child_fact_id
+                WHERE h.parent_fact_id = ?
+                ORDER BY f.verification_score DESC
+                """,
+                (parent_fact_id,),
+            )
+            return [self._row_to_fact(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()

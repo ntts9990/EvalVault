@@ -20,6 +20,10 @@ class FactualFact:
 
     Factual Memory Layer의 기본 단위로, 평가 과정에서 검증된 사실을 저장합니다.
     subject-predicate-object 트리플 형태로 지식을 표현합니다.
+
+    Phase 5 확장:
+    - Planar Form: kg_entity_id로 Knowledge Graph 엔티티와 연결
+    - Hierarchical Form: parent_fact_id와 abstraction_level로 계층 구조 지원
     """
 
     fact_id: str = field(default_factory=lambda: str(uuid4()))
@@ -35,6 +39,15 @@ class FactualFact:
     created_at: datetime = field(default_factory=datetime.now)
     last_verified: datetime | None = None
 
+    # Phase 5: Planar Form - KG Integration
+    kg_entity_id: str | None = None  # 연결된 KG 엔티티 이름
+    kg_relation_type: str | None = None  # KG 관계 타입
+
+    # Phase 5: Hierarchical Form - Summary Layers
+    parent_fact_id: str | None = None  # 부모 사실 ID (요약의 원본)
+    abstraction_level: int = 0  # 0=raw, 1=summary, 2=meta-summary
+    child_fact_ids: list[str] = field(default_factory=list)  # 자식 사실 ID 목록
+
     def __post_init__(self) -> None:
         """검증 및 기본값 설정."""
         if self.verification_score < 0.0 or self.verification_score > 1.0:
@@ -46,6 +59,14 @@ class FactualFact:
     def to_triple(self) -> tuple[str, str, str]:
         """SPO 트리플 형태로 반환."""
         return (self.subject, self.predicate, self.object)
+
+    def is_summary(self) -> bool:
+        """요약 사실인지 확인."""
+        return self.abstraction_level > 0
+
+    def is_linked_to_kg(self) -> bool:
+        """KG에 연결되어 있는지 확인."""
+        return self.kg_entity_id is not None
 
 
 @dataclass

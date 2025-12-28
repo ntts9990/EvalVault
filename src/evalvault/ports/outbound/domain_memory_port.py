@@ -564,6 +564,179 @@ class DomainMemoryPort(Protocol):
         ...
 
     # =========================================================================
+    # Phase 5: Planar Form - KG Integration
+    # =========================================================================
+
+    def link_fact_to_kg(
+        self,
+        fact_id: str,
+        kg_entity_id: str,
+        kg_relation_type: str | None = None,
+    ) -> None:
+        """사실을 Knowledge Graph 엔티티에 연결합니다.
+
+        Args:
+            fact_id: 연결할 사실 ID
+            kg_entity_id: KG 엔티티 이름/ID
+            kg_relation_type: KG 관계 타입 (선택)
+
+        Raises:
+            KeyError: fact_id가 존재하지 않는 경우
+        """
+        ...
+
+    def get_facts_by_kg_entity(
+        self,
+        kg_entity_id: str,
+        domain: str | None = None,
+    ) -> list[FactualFact]:
+        """특정 KG 엔티티에 연결된 사실들을 조회합니다.
+
+        Args:
+            kg_entity_id: KG 엔티티 이름/ID
+            domain: 도메인 필터 (선택)
+
+        Returns:
+            연결된 FactualFact 리스트
+        """
+        ...
+
+    def import_kg_as_facts(
+        self,
+        entities: list[tuple[str, str, dict]],  # (name, entity_type, attributes)
+        relations: list[tuple[str, str, str, float]],  # (source, target, relation_type, confidence)
+        domain: str,
+        language: str = "ko",
+    ) -> dict[str, int]:
+        """Knowledge Graph의 엔티티와 관계를 사실로 변환하여 저장합니다.
+
+        엔티티는 (subject, "is_a", entity_type) 형태로,
+        관계는 (source, relation_type, target) 형태로 저장됩니다.
+
+        Args:
+            entities: 엔티티 리스트 [(name, type, attrs), ...]
+            relations: 관계 리스트 [(source, target, type, confidence), ...]
+            domain: 도메인
+            language: 언어
+
+        Returns:
+            {"entities_imported": N, "relations_imported": N}
+        """
+        ...
+
+    def export_facts_as_kg(
+        self,
+        domain: str,
+        language: str | None = None,
+        min_confidence: float = 0.5,
+    ) -> tuple[list[tuple[str, str, dict]], list[tuple[str, str, str, float]]]:
+        """사실들을 Knowledge Graph 형태로 내보냅니다.
+
+        Args:
+            domain: 도메인
+            language: 언어 필터 (선택)
+            min_confidence: 최소 신뢰도
+
+        Returns:
+            (entities, relations) 튜플
+            - entities: [(name, entity_type, attributes), ...]
+            - relations: [(source, target, relation_type, confidence), ...]
+        """
+        ...
+
+    # =========================================================================
+    # Phase 5: Hierarchical Form - Summary Layers
+    # =========================================================================
+
+    def create_summary_fact(
+        self,
+        child_fact_ids: list[str],
+        summary_subject: str,
+        summary_predicate: str,
+        summary_object: str,
+        domain: str,
+        language: str = "ko",
+    ) -> FactualFact:
+        """여러 사실을 요약하는 상위 사실을 생성합니다.
+
+        자식 사실들의 abstraction_level + 1로 요약 사실을 생성하고,
+        자식 사실들의 parent_fact_id를 업데이트합니다.
+
+        Args:
+            child_fact_ids: 요약할 자식 사실 ID 목록
+            summary_subject: 요약 주어
+            summary_predicate: 요약 술어
+            summary_object: 요약 목적어
+            domain: 도메인
+            language: 언어
+
+        Returns:
+            생성된 요약 FactualFact
+
+        Raises:
+            ValueError: child_fact_ids가 비어있는 경우
+            KeyError: 존재하지 않는 fact_id가 포함된 경우
+        """
+        ...
+
+    def get_facts_by_level(
+        self,
+        abstraction_level: int,
+        domain: str | None = None,
+        language: str | None = None,
+        limit: int = 100,
+    ) -> list[FactualFact]:
+        """특정 추상화 레벨의 사실들을 조회합니다.
+
+        Args:
+            abstraction_level: 추상화 레벨 (0=raw, 1=summary, 2=meta)
+            domain: 도메인 필터 (선택)
+            language: 언어 필터 (선택)
+            limit: 최대 조회 개수
+
+        Returns:
+            해당 레벨의 FactualFact 리스트
+        """
+        ...
+
+    def get_fact_hierarchy(
+        self,
+        fact_id: str,
+    ) -> dict[str, list[FactualFact] | FactualFact | None]:
+        """사실의 전체 계층 구조를 조회합니다.
+
+        Args:
+            fact_id: 조회할 사실 ID
+
+        Returns:
+            {
+                "fact": FactualFact,
+                "parent": FactualFact | None,
+                "children": list[FactualFact],
+                "ancestors": list[FactualFact],  # 최상위까지
+                "descendants": list[FactualFact]  # 최하위까지
+            }
+
+        Raises:
+            KeyError: fact_id가 존재하지 않는 경우
+        """
+        ...
+
+    def get_child_facts(
+        self,
+        parent_fact_id: str,
+    ) -> list[FactualFact]:
+        """특정 사실의 자식 사실들을 조회합니다.
+
+        Args:
+            parent_fact_id: 부모 사실 ID
+
+        Returns:
+            자식 FactualFact 리스트
+        """
+        ...
+
+    # =========================================================================
     # Utility Methods
     # =========================================================================
 

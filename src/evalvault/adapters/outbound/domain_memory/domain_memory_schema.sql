@@ -186,3 +186,45 @@ CREATE TRIGGER IF NOT EXISTS behaviors_fts_update AFTER UPDATE ON behavior_entri
     INSERT INTO behaviors_fts(rowid, behavior_id, description, trigger_pattern)
     VALUES (NEW.rowid, NEW.behavior_id, NEW.description, NEW.trigger_pattern);
 END;
+
+-- =========================================================================
+-- Phase 5: Planar Form - KG Integration
+-- =========================================================================
+
+-- Add KG integration columns to factual_facts (if not exists)
+-- Note: SQLite doesn't support IF NOT EXISTS for ALTER TABLE,
+-- so these are handled programmatically in the adapter
+
+-- KG Entity binding table for explicit KG links
+CREATE TABLE IF NOT EXISTS fact_kg_bindings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_id TEXT NOT NULL,
+    kg_entity_id TEXT NOT NULL,          -- KG 엔티티 이름/ID
+    kg_relation_type TEXT,               -- KG 관계 타입
+    binding_confidence REAL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    UNIQUE(fact_id, kg_entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kg_bindings_fact_id ON fact_kg_bindings(fact_id);
+CREATE INDEX IF NOT EXISTS idx_kg_bindings_kg_entity ON fact_kg_bindings(kg_entity_id);
+CREATE INDEX IF NOT EXISTS idx_kg_bindings_relation_type ON fact_kg_bindings(kg_relation_type);
+
+-- =========================================================================
+-- Phase 5: Hierarchical Form - Summary Layers
+-- =========================================================================
+
+-- Fact hierarchy table for parent-child relationships
+CREATE TABLE IF NOT EXISTS fact_hierarchy (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_fact_id TEXT NOT NULL,
+    child_fact_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    FOREIGN KEY (child_fact_id) REFERENCES factual_facts(fact_id) ON DELETE CASCADE,
+    UNIQUE(parent_fact_id, child_fact_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hierarchy_parent ON fact_hierarchy(parent_fact_id);
+CREATE INDEX IF NOT EXISTS idx_hierarchy_child ON fact_hierarchy(child_fact_id);
