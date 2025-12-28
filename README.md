@@ -90,6 +90,9 @@ evalvault history
 # Run evaluations
 evalvault run data.json --metrics faithfulness,answer_relevancy
 
+# Parallel evaluation (faster for large datasets)
+evalvault run data.json --metrics faithfulness --parallel --batch-size 10
+
 # Select Ollama profile
 evalvault run data.json --profile dev --metrics faithfulness
 

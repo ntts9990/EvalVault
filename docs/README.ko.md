@@ -87,6 +87,7 @@ evalvault history
 
 ```bash
 evalvault run data.json --metrics faithfulness,answer_relevancy
+evalvault run data.json --metrics faithfulness --parallel --batch-size 10  # 병렬 평가
 evalvault run data.json --profile dev --metrics faithfulness    # Ollama
 evalvault run data.json -p openai --metrics faithfulness        # OpenAI
 evalvault run data.json --metrics faithfulness --langfuse       # Langfuse

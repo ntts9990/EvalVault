@@ -102,6 +102,7 @@ uv add --dev <package>     # 개발 의존성
 
 # CLI usage (uv run 사용)
 uv run evalvault run data.csv --metrics faithfulness,answer_relevancy
+uv run evalvault run data.csv --metrics faithfulness --parallel --batch-size 10
 uv run evalvault metrics
 uv run evalvault config
 ```
@@ -226,7 +227,7 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 
 ## Current Implementation Status
 
-> Phase 1-6 모두 완료. 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
+> Phase 1-7 모두 완료. 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -242,9 +243,9 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | Experiment Management | ✅ Complete | A/B testing, comparison |
 
 **Test Summary:**
-- Unit Tests: 354
+- Unit Tests: 364
 - Integration Tests: 26
-- **Total: 380 tests passing**
+- **Total: 390 tests passing**
 
 ## Documentation
 

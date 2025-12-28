@@ -123,11 +123,18 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### 방법 3: Docker (준비 중)
+### 방법 3: Docker
 
 ```bash
-# 추후 지원 예정
-docker run -it evalvault/evalvault:latest
+# Docker Compose로 전체 스택 실행 (PostgreSQL + EvalVault)
+docker compose up -d
+
+# EvalVault CLI 실행
+docker compose run evalvault run data.json --metrics faithfulness
+
+# 또는 직접 빌드
+docker build -t evalvault .
+docker run -it evalvault --help
 ```
 
 ### 설치 확인
@@ -287,6 +294,7 @@ profiles:
 | 명령어 | 설명 | 예시 |
 |--------|------|------|
 | `run` | 평가 실행 | `evalvault run data.json --metrics faithfulness` |
+| `run --parallel` | 병렬 평가 (대규모 데이터셋) | `evalvault run data.json --metrics faithfulness --parallel` |
 | `metrics` | 사용 가능한 메트릭 목록 | `evalvault metrics` |
 | `config` | 현재 설정 확인 | `evalvault config` |
 | `history` | 평가 히스토리 조회 | `evalvault history --limit 10` |
@@ -307,6 +315,12 @@ evalvault run data.json --metrics faithfulness,answer_relevancy,context_precisio
 
 # 예시: 모든 메트릭
 evalvault run data.json --metrics faithfulness,answer_relevancy,context_precision,context_recall,factual_correctness,semantic_similarity
+
+# 예시: 병렬 평가 (대규모 데이터셋에서 빠른 처리)
+evalvault run data.json --metrics faithfulness --parallel
+
+# 예시: 병렬 평가 + 배치 크기 지정
+evalvault run data.json --metrics faithfulness --parallel --batch-size 10
 
 # 예시: 프로필 지정 (Ollama dev 환경)
 evalvault run data.json --profile dev --metrics faithfulness
@@ -667,9 +681,10 @@ cat .env | grep OPENAI_API_KEY
 #### 3. 평가 시간이 너무 오래 걸림
 
 **해결 방법**:
-1. 메트릭 수 줄이기: `--metrics faithfulness`
-2. 테스트케이스 수 줄이기
-3. 더 빠른 모델 사용: `OPENAI_MODEL=gpt-5-nano`
+1. 병렬 평가 활성화: `--parallel --batch-size 10`
+2. 메트릭 수 줄이기: `--metrics faithfulness`
+3. 테스트케이스 수 줄이기
+4. 더 빠른 모델 사용: `OPENAI_MODEL=gpt-5-nano`
 
 #### 4. Langfuse 연결 실패
 
