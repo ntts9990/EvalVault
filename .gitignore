@@ -53,10 +53,15 @@ coverage.xml
 # Test reports
 reports/*.html
 reports/*.xml
+reports/*.json
 reports/assets/
+!reports/.gitkeep
 
 # E2E test results database
-data/e2e_results/*.db
+data/e2e_results/
+
+# Local state data (should not be versioned)
+data/evaluations.db
 
 # Translations
 *.mo
