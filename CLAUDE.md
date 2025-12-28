@@ -117,6 +117,55 @@ evalvault config
 - Korean docstrings allowed for domain-specific comments
 - English for public API documentation
 
+## CI/CD & Release
+
+### GitHub Actions Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| CI | Push/PR to main, develop | Lint, format check, tests on all platforms |
+| Release | Push to main | Automatic versioning and PyPI publish |
+
+### Cross-Platform Testing
+
+CI는 다음 플랫폼에서 테스트를 실행합니다:
+- Ubuntu (Python 3.12, 3.13)
+- macOS (Python 3.12)
+- Windows (Python 3.12)
+
+### Automatic Versioning (python-semantic-release)
+
+Conventional Commits 규칙에 따라 자동으로 버전이 결정됩니다:
+
+| Commit Type | Version Bump | Example |
+|-------------|--------------|---------|
+| `feat:` | Minor (0.x.0) | `feat: Add new metric` → 0.2.0 |
+| `fix:` | Patch (0.0.x) | `fix: Correct calculation` → 0.1.1 |
+| `perf:` | Patch (0.0.x) | `perf: Improve query speed` → 0.1.1 |
+| `chore:`, `docs:`, `ci:`, `test:`, `style:`, `refactor:` | No release | 버전 변경 없음 |
+
+**중요**: `pyproject.toml`의 버전은 자동 업데이트되지 않습니다 (브랜치 보호 규칙). 실제 배포 버전은 git 태그 기반입니다.
+
+### Commit Message Format
+
+```
+<type>(<scope>): <subject>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
+
+**Examples**:
+```bash
+feat(metrics): Add custom insurance accuracy metric
+fix(cli): Handle empty dataset gracefully
+docs: Update installation guide
+chore(deps): Bump ragas to 1.0.5
+```
+
 ## Environment Variables
 
 Create `.env` file (copy from `.env.example`):
