@@ -52,7 +52,6 @@ dependencies = [
     "xlrd",      # For reading .xls files (Excel 97-2003)
     "chardet",   # For automatic encoding detection in CSV files
     "structlog",
-    "langdetect", # For language detection (Phase 4)
 ]
 
 [project.urls]

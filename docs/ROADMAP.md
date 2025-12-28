@@ -47,24 +47,12 @@ EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습�
 
 | Task | Description | Status | Files |
 |------|-------------|--------|-------|
-| TASK-4.1 | Language Detection Utility | ✅ DONE | `src/evalvault/utils/language.py` |
-| TASK-4.2 | Korean Prompt Customization | ✅ DONE | `src/evalvault/domain/prompts/` |
 | TASK-4.3 | FactualCorrectness Metric | ✅ DONE | `evaluator.py`, `settings.py` |
 | TASK-4.4 | SemanticSimilarity Metric | ✅ DONE | `evaluator.py`, `settings.py` |
 | TASK-4.5a | Azure OpenAI Adapter | ✅ DONE | `src/evalvault/adapters/outbound/llm/azure_adapter.py` |
 | TASK-4.5b | Anthropic Claude Adapter | ✅ DONE | `src/evalvault/adapters/outbound/llm/anthropic_adapter.py` |
 
 #### Implemented Features
-
-**Language Detection** (`src/evalvault/utils/language.py`) - *Optional, not used by default*:
-- `LanguageDetector.detect(text)` - 단일 텍스트 언어 감지
-- `LanguageDetector.detect_with_confidence(text)` - 신뢰도와 함께 감지
-- `LanguageDetector.detect_dataset_language(texts)` - 데이터셋 주요 언어 감지
-
-**Multilingual Prompts** (`src/evalvault/domain/prompts/`) - *Optional, not used by default*:
-- 기본값: Ragas 프레임워크 원본 프롬프트 사용
-- 향후 CLI `--language` 옵션으로 커스텀 프롬프트 선택 가능 (미구현)
-- 지원 언어: English, Korean, Japanese, Chinese
 
 **New Metrics**:
 - `factual_correctness` - ground_truth 대비 사실적 정확성
@@ -117,7 +105,6 @@ EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습�
 |------|-------------|--------|-------|
 | TASK-6.1 | Knowledge Graph Testset Generation | ✅ DONE | `kg_generator.py`, `entity_extractor.py` |
 | TASK-6.2 | Experiment Management System | ✅ DONE | `experiment.py`, `experiment_manager.py` |
-| TASK-6.3 | Multilingual Prompt Expansion | ✅ DONE | `japanese.py`, `chinese.py` |
 | TASK-6.4 | PostgreSQL Storage Adapter | ✅ DONE | `postgres_adapter.py` |
 | TASK-6.5 | MLflow Tracker Adapter | ✅ DONE | `mlflow_adapter.py` |
 | TASK-6.6 | Azure OpenAI Adapter | ✅ DONE | `azure_adapter.py` |
@@ -141,10 +128,6 @@ EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습�
 - `Experiment`, `ExperimentGroup` 엔티티
 - A/B 테스트 그룹 비교
 - 메트릭 통계 분석 및 결과 요약
-
-**Multilingual Prompts** (`src/evalvault/domain/prompts/`):
-- `JapanesePromptTemplate` - 일본어 평가 프롬프트
-- `ChinesePromptTemplate` - 중국어 평가 프롬프트
 
 **PostgreSQL Adapter** (`src/evalvault/adapters/outbound/storage/postgres_adapter.py`):
 - asyncpg 기반 비동기 PostgreSQL 지원
@@ -238,9 +221,9 @@ evalvault generate <documents> -n <num> -o <output>
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| Unit Tests | 364 | Domain, ports, adapters, services |
+| Unit Tests | 339 | Domain, ports, adapters, services |
 | Integration Tests | 26 | End-to-end flows |
-| **Total** | **390** | All passing |
+| **Total** | **365** | All passing |
 
 ### Test Files
 ```
@@ -253,8 +236,6 @@ tests/
 │   ├── test_openai_adapter.py    # 4 tests
 │   ├── test_ports.py             # 24 tests
 │   ├── test_cli.py               # 7 tests
-│   ├── test_language_utils.py    # 12 tests
-│   ├── test_prompts.py           # 32 tests (including Japanese, Chinese)
 │   ├── test_insurance_metric.py  # 18 tests
 │   ├── test_sqlite_storage.py    # 18 tests
 │   ├── test_testset_generator.py # 16 tests
@@ -324,8 +305,7 @@ src/evalvault/
 ├── domain/
 │   ├── entities/         # TestCase, Dataset, EvaluationRun, MetricScore, Experiment
 │   ├── services/         # RagasEvaluator, TestsetGenerator, KGGenerator, ExperimentManager
-│   ├── metrics/          # InsuranceTermAccuracy (custom metrics)
-│   └── prompts/          # Korean, English, Japanese, Chinese prompt templates
+│   └── metrics/          # InsuranceTermAccuracy (custom metrics)
 ├── ports/
 │   ├── inbound/          # EvaluatorPort
 │   └── outbound/         # LLMPort, DatasetPort, StoragePort, TrackerPort
@@ -336,7 +316,6 @@ src/evalvault/
 │       ├── llm/          # OpenAI, Azure OpenAI, Anthropic adapters
 │       ├── storage/      # SQLite, PostgreSQL adapters
 │       └── tracker/      # Langfuse, MLflow adapters
-├── utils/                # LanguageDetector
 └── config/               # Settings (pydantic-settings)
 ```
 

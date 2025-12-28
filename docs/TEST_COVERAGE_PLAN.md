@@ -14,7 +14,7 @@
   55–95%로 편차가 큼. 멀티홉/비교 질문 로직과 relation augmentation 경로 필요.
 - **Langfuse/Storage/LLM 어댑터**: LangfuseAdapter, SQLite/PostgreSQL adapter, Anthropic /
   OpenAI 어댑터의 API 래핑 함수 다수가 0%. 외부 의존성을 모킹해 검증해야 함.
-- **기타**: `LanguageDetector`, `settings.apply_profile`, `ExperimentManager` 등도 80% 미만.
+- **기타**: `settings.apply_profile`, `ExperimentManager` 등도 80% 미만.
 
 ## 2. 목표
 
@@ -64,12 +64,10 @@
     `get_thinking_config` 등 단순 getter를 smoke 테스트.
 - **완료 조건**: 각 어댑터 모듈 70% 이상, 특히 현재 0% 영역 제거.
 
-### 3.5 Config, Utils, Metrics
+### 3.5 Config, Metrics
 
 - `config/settings.apply_profile`, `config/model_config.load_model_config`:
   - `.env`/`config/models.yaml` 샘플을 fixture로 생성하여 프로필 적용 경로를 테스트.
-- `LanguageDetector`:
-  - 다양한 텍스트 입력으로 `detect`와 `detect_with_confidence`의 분기 검증.
 - `InsuranceTermAccuracy`, `EntityExtractor`, `Dataset.get_threshold`: 간단한 단위 테스트 추가.
 
 ## 4. 이터레이션 타임라인
@@ -78,7 +76,7 @@
 |--------|------|-----------|--------|
 | 1주차 | CLI + Dataset Loaders | Core maintainers + QA | `tests/unit/adapters/test_cli.py`, `tests/unit/adapters/test_dataset_loaders.py` |
 | 2주차 | KG Generator + Experiment Manager | Domain 팀 | `tests/unit/domain/kg/test_generator.py`, `tests/unit/domain/test_experiment_manager.py` |
-| 3주차 | Langfuse/Storage/LLM + Config/Utils | Infra 팀 | `tests/unit/adapters/test_langfuse.py`, `tests/unit/adapters/test_sqlite.py`, `tests/unit/config/test_settings.py` 등 |
+| 3주차 | Langfuse/Storage/LLM + Config | Infra 팀 | `tests/unit/adapters/test_langfuse.py`, `tests/unit/adapters/test_sqlite.py`, `tests/unit/config/test_settings.py` 등 |
 
 각 스프린트 종료 시 `pytest --cov` 리포트를 공유하고, 0% 함수가 남아 있으면 백로그에 이슈를
 등록합니다.

@@ -28,8 +28,7 @@ src/evalvault/
 ├── domain/
 │   ├── entities/         # TestCase, Dataset, EvaluationRun, MetricScore, Experiment
 │   ├── services/         # RagasEvaluator, TestsetGenerator, KGGenerator, ExperimentManager
-│   ├── metrics/          # InsuranceTermAccuracy (custom metrics)
-│   └── prompts/          # Korean, English, Japanese, Chinese prompt templates
+│   └── metrics/          # InsuranceTermAccuracy (custom metrics)
 ├── ports/
 │   ├── inbound/          # EvaluatorPort
 │   └── outbound/         # LLMPort, DatasetPort, StoragePort, TrackerPort
@@ -40,7 +39,6 @@ src/evalvault/
 │       ├── llm/          # OpenAI, Azure OpenAI, Anthropic, Ollama adapters
 │       ├── storage/      # SQLite, PostgreSQL adapters
 │       └── tracker/      # Langfuse, MLflow adapters
-├── utils/                # LanguageDetector
 └── config/               # Settings, ModelConfig (pydantic-settings)
 ```
 
@@ -243,9 +241,9 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | Experiment Management | ✅ Complete | A/B testing, comparison |
 
 **Test Summary:**
-- Unit Tests: 364
+- Unit Tests: 339
 - Integration Tests: 26
-- **Total: 390 tests passing**
+- **Total: 365 tests passing**
 
 ## Documentation
 
