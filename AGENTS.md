@@ -19,6 +19,17 @@ Place focused unit specs in `tests/unit`, adapter/infrastructure checks in `test
 ## Commit & Pull Request Guidelines
 History shows Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`); keep the subject under ~72 chars and call out the subsystem (`feat(metrics): ...`). Each PR must link the issue, note user impact, enumerate new CLI flags or config keys, and paste the latest `pytest`/`ruff` summary. Attach screenshots or Langfuse run IDs for UX or tracing tweaks, and explicitly flag breaking schema/profile changes in both the PR body and affected docs.
 
+### Automatic Versioning (python-semantic-release)
+main 브랜치에 머지되면 Conventional Commits 규칙에 따라 자동으로 버전이 결정되고 PyPI에 배포됩니다:
+- `feat:` → Minor version bump (0.x.0)
+- `fix:`, `perf:` → Patch version bump (0.0.x)
+- `docs:`, `chore:`, `ci:`, `test:`, `style:`, `refactor:` → No release
+
+**주의**: `pyproject.toml`의 버전은 자동 업데이트되지 않음. 실제 배포 버전은 git 태그 기반.
+
+## CI/CD Pipeline
+CI는 Ubuntu, macOS, Windows에서 Python 3.12/3.13으로 테스트를 실행합니다. PR 머지 전 모든 테스트와 린트가 통과해야 합니다. main 브랜치 푸시 시 Release 워크플로우가 자동으로 버전 태그 생성, PyPI 배포, GitHub Release 생성을 수행합니다.
+
 ## Security & Configuration Tips
 Do not commit `.env`; copy `.env.example`, inject `OPENAI_API_KEY` or Ollama host values locally, and keep profile overrides in `config/models.yaml`. Supply Langfuse keys via environment variables (or the provided Compose file) and scrub customer data from fixtures before attaching them to issues.
 

@@ -88,18 +88,38 @@ pytest tests/ --cov=src/evalvault --cov-report=html
 - Maximum line length: 100 characters
 - Use [ruff](https://github.com/astral-sh/ruff) for linting and formatting
 
-### Commit Messages
+### Commit Messages (Conventional Commits)
 
-Use clear, descriptive commit messages:
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation only
-- `style:` Formatting, no code change
-- `refactor:` Code restructuring
-- `test:` Adding/updating tests
-- `chore:` Maintenance tasks
+We use [Conventional Commits](https://www.conventionalcommits.org/) with automatic versioning:
 
-Example: `feat: Add support for custom evaluation metrics`
+| Type | Description | Version Impact |
+|------|-------------|----------------|
+| `feat:` | New feature | Minor (0.x.0) |
+| `fix:` | Bug fix | Patch (0.0.x) |
+| `perf:` | Performance improvement | Patch (0.0.x) |
+| `docs:` | Documentation only | No release |
+| `style:` | Formatting, no code change | No release |
+| `refactor:` | Code restructuring | No release |
+| `test:` | Adding/updating tests | No release |
+| `chore:` | Maintenance tasks | No release |
+| `ci:` | CI/CD changes | No release |
+| `build:` | Build system changes | No release |
+
+**Format**: `<type>(<scope>): <subject>`
+
+**Examples**:
+```bash
+feat(metrics): Add custom insurance accuracy metric
+fix(cli): Handle empty dataset gracefully
+docs: Update installation guide
+chore(deps): Bump ragas to 1.0.5
+```
+
+**Important**: When your PR is merged to `main`, the Release workflow automatically:
+1. Analyzes commits to determine version bump
+2. Creates a git tag (e.g., v1.0.1)
+3. Publishes to PyPI
+4. Creates a GitHub Release
 
 ### Documentation
 

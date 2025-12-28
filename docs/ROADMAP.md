@@ -1,8 +1,8 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2025-12-26
-> Current Version: 0.3.0
-> Status: Phase 6 Complete (Advanced Features)
+> Last Updated: 2025-12-28
+> Current Version: 1.0.0
+> Status: Phase 6 Complete + OSS Release
 
 ---
 
@@ -256,7 +256,39 @@ tests/
 | 0.1.0 | 2024-12-24 | Phase 3 Complete - Core System |
 | 0.2.0 | 2024-12-24 | Phase 5 Complete - Storage & Domain |
 | 0.3.0 | 2025-12-24 | Phase 6 Complete - Advanced Features |
-| 1.0.0 | TBD | Production Release |
+| 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화 |
+
+---
+
+## CI/CD & Release
+
+### Cross-Platform CI
+
+| Platform | Python | Status |
+|----------|--------|--------|
+| Ubuntu | 3.12, 3.13 | ✅ |
+| macOS | 3.12 | ✅ |
+| Windows | 3.12 | ✅ |
+
+### Automatic Versioning (python-semantic-release)
+
+main 브랜치에 머지되면 Conventional Commits 규칙에 따라 자동으로 버전이 결정되고 PyPI에 배포됩니다:
+
+| Commit Type | Version Bump | Example |
+|-------------|--------------|---------|
+| `feat:` | Minor (0.x.0) | `feat: Add new metric` |
+| `fix:`, `perf:` | Patch (0.0.x) | `fix: Correct calculation` |
+| Other | No release | `docs:`, `chore:`, `ci:`, etc. |
+
+### Release Workflow
+
+1. PR 생성 → CI 테스트 (Ubuntu, macOS, Windows)
+2. PR 머지 → main 브랜치 푸시
+3. Release 워크플로우 실행:
+   - Conventional Commits 분석
+   - 버전 태그 생성 (예: v1.0.1)
+   - PyPI 배포
+   - GitHub Release 생성
 
 ---
 
