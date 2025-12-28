@@ -54,3 +54,29 @@ CREATE TABLE IF NOT EXISTS metric_scores (
 
 CREATE INDEX IF NOT EXISTS idx_scores_result_id ON metric_scores(result_id);
 CREATE INDEX IF NOT EXISTS idx_scores_name ON metric_scores(name);
+
+-- Experiments table for A/B testing
+CREATE TABLE IF NOT EXISTS experiments (
+    experiment_id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    hypothesis TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    metrics_to_compare JSONB,  -- JSON array of metric names
+    conclusion TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_experiments_status ON experiments(status);
+CREATE INDEX IF NOT EXISTS idx_experiments_created_at ON experiments(created_at DESC);
+
+-- Experiment groups table
+CREATE TABLE IF NOT EXISTS experiment_groups (
+    id SERIAL PRIMARY KEY,
+    experiment_id UUID NOT NULL REFERENCES experiments(experiment_id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    run_ids JSONB  -- JSON array of run_id strings
+);
+
+CREATE INDEX IF NOT EXISTS idx_groups_experiment_id ON experiment_groups(experiment_id);
