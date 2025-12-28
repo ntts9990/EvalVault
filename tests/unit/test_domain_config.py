@@ -460,6 +460,7 @@ class TestTermsDictionaryFormat:
 
     def test_terms_dictionary_roundtrip(self):
         """용어사전 JSON 직렬화/역직렬화."""
+        # Create temp file, write, then close before reading (Windows compatibility)
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False, encoding="utf-8"
         ) as f:
@@ -477,12 +478,12 @@ class TestTermsDictionaryFormat:
                 "categories": {"test": "테스트"},
             }
             json.dump(terms_dict, f, ensure_ascii=False, indent=2)
-            f.flush()
+            temp_path = f.name
 
-            with open(f.name, encoding="utf-8") as rf:
+        # File is now closed, safe to read on Windows
+        try:
+            with open(temp_path, encoding="utf-8") as rf:
                 loaded = json.load(rf)
-
             assert loaded["terms"]["테스트용어"]["definition"] == "테스트를 위한 용어"
-
-            # Cleanup
-            Path(f.name).unlink()
+        finally:
+            Path(temp_path).unlink()
