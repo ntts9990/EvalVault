@@ -9,6 +9,7 @@ Based on "Memory in the Age of AI Agents: A Survey" framework:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import sqlite3
@@ -65,6 +66,88 @@ class SQLiteDomainMemoryAdapter:
         conn.commit()
         conn.close()
 
+        # Ensure FTS5 indexes are properly synchronized
+        self._rebuild_fts_indexes()
+
+    def _rebuild_fts_indexes(self) -> None:
+        """Rebuild FTS5 indexes from source tables.
+
+        This ensures FTS5 tables are synchronized with the source data,
+        fixing any corruption from INSERT OR REPLACE operations.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # Drop and recreate FTS5 tables to fix corruption
+            # This is more robust than trying to repair in-place
+
+            # Drop existing FTS5 tables and triggers
+            cursor.execute("DROP TRIGGER IF EXISTS facts_fts_insert")
+            cursor.execute("DROP TRIGGER IF EXISTS facts_fts_delete")
+            cursor.execute("DROP TRIGGER IF EXISTS facts_fts_update")
+            cursor.execute("DROP TABLE IF EXISTS facts_fts")
+
+            cursor.execute("DROP TRIGGER IF EXISTS behaviors_fts_insert")
+            cursor.execute("DROP TRIGGER IF EXISTS behaviors_fts_delete")
+            cursor.execute("DROP TRIGGER IF EXISTS behaviors_fts_update")
+            cursor.execute("DROP TABLE IF EXISTS behaviors_fts")
+
+            # Recreate FTS5 tables as standalone (no content= option)
+            # This avoids rowid synchronization issues with INSERT OR REPLACE
+            cursor.execute(
+                """
+                CREATE VIRTUAL TABLE facts_fts USING fts5(
+                    fact_id,
+                    subject,
+                    predicate,
+                    object
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE VIRTUAL TABLE behaviors_fts USING fts5(
+                    behavior_id,
+                    description,
+                    trigger_pattern
+                )
+                """
+            )
+
+            # Populate FTS5 tables from source data
+            cursor.execute(
+                """
+                INSERT INTO facts_fts(fact_id, subject, predicate, object)
+                SELECT fact_id, subject, predicate, object
+                FROM factual_facts
+                """
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO behaviors_fts(behavior_id, description, trigger_pattern)
+                SELECT behavior_id, description, trigger_pattern
+                FROM behavior_entries
+                """
+            )
+
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Tables may not exist yet on first init
+            pass
+        finally:
+            conn.close()
+
+    def rebuild_fts_indexes(self) -> None:
+        """Public method to rebuild FTS5 indexes.
+
+        Call this method if you suspect the FTS5 indexes are corrupted
+        or out of sync with the source tables.
+        """
+        self._rebuild_fts_indexes()
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection with foreign keys enabled."""
         conn = sqlite3.connect(self.db_path)
@@ -106,6 +189,9 @@ class SQLiteDomainMemoryAdapter:
                 ),
             )
 
+            # Update FTS5 index (standalone table, manual sync required)
+            self._sync_fact_to_fts(cursor, fact)
+
             # Phase 5: Save KG binding if present
             if fact.kg_entity_id:
                 cursor.execute(
@@ -131,6 +217,23 @@ class SQLiteDomainMemoryAdapter:
             return fact.fact_id
         finally:
             conn.close()
+
+    def _sync_fact_to_fts(self, cursor: sqlite3.Cursor, fact: FactualFact) -> None:
+        """Sync a single fact to the FTS5 index."""
+        try:
+            # Delete existing entry if present
+            cursor.execute("DELETE FROM facts_fts WHERE fact_id = ?", (fact.fact_id,))
+            # Insert new entry
+            cursor.execute(
+                """
+                INSERT INTO facts_fts(fact_id, subject, predicate, object)
+                VALUES (?, ?, ?, ?)
+                """,
+                (fact.fact_id, fact.subject, fact.predicate, fact.object),
+            )
+        except sqlite3.OperationalError:
+            # FTS table may not exist yet
+            pass
 
     def get_fact(self, fact_id: str) -> FactualFact:
         """사실을 조회합니다."""
@@ -271,6 +374,12 @@ class SQLiteDomainMemoryAdapter:
         try:
             cursor.execute("DELETE FROM factual_facts WHERE fact_id = ?", (fact_id,))
             deleted = cursor.rowcount > 0
+
+            # Also delete from FTS5 index
+            if deleted:
+                with contextlib.suppress(sqlite3.OperationalError):
+                    cursor.execute("DELETE FROM facts_fts WHERE fact_id = ?", (fact_id,))
+
             conn.commit()
             return deleted
         finally:
@@ -496,10 +605,33 @@ class SQLiteDomainMemoryAdapter:
                     behavior.created_at.isoformat(),
                 ),
             )
+
+            # Update FTS5 index (standalone table, manual sync required)
+            self._sync_behavior_to_fts(cursor, behavior)
+
             conn.commit()
             return behavior.behavior_id
         finally:
             conn.close()
+
+    def _sync_behavior_to_fts(self, cursor: sqlite3.Cursor, behavior: BehaviorEntry) -> None:
+        """Sync a single behavior to the FTS5 index."""
+        try:
+            # Delete existing entry if present
+            cursor.execute(
+                "DELETE FROM behaviors_fts WHERE behavior_id = ?", (behavior.behavior_id,)
+            )
+            # Insert new entry
+            cursor.execute(
+                """
+                INSERT INTO behaviors_fts(behavior_id, description, trigger_pattern)
+                VALUES (?, ?, ?)
+                """,
+                (behavior.behavior_id, behavior.description, behavior.trigger_pattern),
+            )
+        except sqlite3.OperationalError:
+            # FTS table may not exist yet
+            pass
 
     def get_behavior(self, behavior_id: str) -> BehaviorEntry:
         """행동 엔트리를 조회합니다."""
@@ -1077,6 +1209,17 @@ class SQLiteDomainMemoryAdapter:
         Returns:
             관련 FactualFact 리스트 (관련도 내림차순)
         """
+        return self._search_facts_with_retry(query, domain, language, limit, retry=True)
+
+    def _search_facts_with_retry(
+        self,
+        query: str,
+        domain: str | None,
+        language: str | None,
+        limit: int,
+        retry: bool,
+    ) -> list[FactualFact]:
+        """FTS5 검색 수행, 실패시 인덱스 재구성 후 재시도."""
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -1087,13 +1230,13 @@ class SQLiteDomainMemoryAdapter:
             if not fts_query:
                 return []
 
-            # FTS5 검색으로 fact_id 조회
+            # FTS5 검색으로 fact_id 조회 (standalone FTS5 table)
             cursor.execute(
                 """
-                SELECT fact_id, bm25(facts_fts) as rank
+                SELECT fact_id
                 FROM facts_fts
                 WHERE facts_fts MATCH ?
-                ORDER BY rank
+                ORDER BY bm25(facts_fts)
                 LIMIT ?
                 """,
                 (fts_query, limit * 3),  # 필터링 여유분 확보
@@ -1128,6 +1271,13 @@ class SQLiteDomainMemoryAdapter:
 
             cursor.execute(query_sql, params)
             return [self._row_to_fact(row) for row in cursor.fetchall()]
+        except sqlite3.DatabaseError as e:
+            # Handle corrupted FTS5 index by rebuilding and retrying
+            if retry and ("malformed" in str(e) or "fts5" in str(e).lower()):
+                conn.close()
+                self._rebuild_fts_indexes()
+                return self._search_facts_with_retry(query, domain, language, limit, retry=False)
+            raise
         finally:
             conn.close()
 
@@ -1166,6 +1316,17 @@ class SQLiteDomainMemoryAdapter:
         Returns:
             적용 가능한 BehaviorEntry 리스트 (성공률 내림차순)
         """
+        return self._search_behaviors_with_retry(context, domain, language, limit, retry=True)
+
+    def _search_behaviors_with_retry(
+        self,
+        context: str,
+        domain: str,
+        language: str,
+        limit: int,
+        retry: bool,
+    ) -> list[BehaviorEntry]:
+        """FTS5 행동 검색 수행, 실패시 인덱스 재구성 후 재시도."""
         import re
 
         conn = self._get_connection()
@@ -1238,6 +1399,15 @@ class SQLiteDomainMemoryAdapter:
             results = sorted(results, key=lambda b: b.success_rate, reverse=True)
 
             return results[:limit]
+        except sqlite3.DatabaseError as e:
+            # Handle corrupted FTS5 index by rebuilding and retrying
+            if retry and ("malformed" in str(e) or "fts5" in str(e).lower()):
+                conn.close()
+                self._rebuild_fts_indexes()
+                return self._search_behaviors_with_retry(
+                    context, domain, language, limit, retry=False
+                )
+            raise
         finally:
             conn.close()
 
