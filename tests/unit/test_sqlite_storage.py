@@ -365,3 +365,163 @@ class TestSQLiteStorageAdapter:
 
         retrieved_run = storage_adapter.get_run("test-run-003")
         assert len(retrieved_run.results) == 0
+
+
+class TestSQLiteStorageNLPAnalysis:
+    """NLP 분석 결과 저장 테스트."""
+
+    @pytest.fixture
+    def sample_run_for_analysis(self, storage_adapter):
+        """NLP 분석 테스트를 위한 샘플 run 생성."""
+        run = EvaluationRun(
+            run_id="test-run-001",
+            dataset_name="test-dataset",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 1, 10, 0, 0),
+        )
+        storage_adapter.save_run(run)
+        return run
+
+    @pytest.fixture
+    def sample_nlp_analysis(self, sample_run_for_analysis):
+        """테스트용 NLP 분석 결과."""
+        from evalvault.domain.entities.analysis import (
+            KeywordInfo,
+            NLPAnalysis,
+            QuestionType,
+            QuestionTypeStats,
+            TextStats,
+        )
+
+        return NLPAnalysis(
+            run_id=sample_run_for_analysis.run_id,
+            question_stats=TextStats(
+                char_count=100,
+                word_count=20,
+                sentence_count=2,
+                avg_word_length=4.5,
+                unique_word_ratio=0.9,
+            ),
+            answer_stats=TextStats(
+                char_count=200,
+                word_count=40,
+                sentence_count=4,
+                avg_word_length=4.0,
+                unique_word_ratio=0.85,
+            ),
+            question_types=[
+                QuestionTypeStats(
+                    question_type=QuestionType.FACTUAL,
+                    count=5,
+                    percentage=0.5,
+                    avg_scores={"faithfulness": 0.85},
+                ),
+                QuestionTypeStats(
+                    question_type=QuestionType.REASONING,
+                    count=3,
+                    percentage=0.3,
+                    avg_scores={"faithfulness": 0.75},
+                ),
+            ],
+            top_keywords=[
+                KeywordInfo(keyword="보험", frequency=5, tfidf_score=0.8),
+                KeywordInfo(keyword="보장금액", frequency=3, tfidf_score=0.6),
+            ],
+            insights=["High vocabulary diversity", "Questions are well-formed"],
+        )
+
+    def test_save_nlp_analysis_returns_id(self, storage_adapter, sample_nlp_analysis):
+        """NLP 분석 저장 시 ID 반환."""
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+
+        assert analysis_id is not None
+        assert analysis_id.startswith("nlp-test-run-001-")
+
+    def test_get_nlp_analysis_retrieves_stored_data(self, storage_adapter, sample_nlp_analysis):
+        """저장된 NLP 분석 결과 조회."""
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert retrieved.run_id == sample_nlp_analysis.run_id
+        assert retrieved.question_stats.char_count == 100
+        assert retrieved.question_stats.word_count == 20
+        assert retrieved.answer_stats.char_count == 200
+
+    def test_get_nlp_analysis_reconstructs_question_types(
+        self, storage_adapter, sample_nlp_analysis
+    ):
+        """QuestionTypeStats 복원 확인."""
+        from evalvault.domain.entities.analysis import QuestionType
+
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert len(retrieved.question_types) == 2
+        assert retrieved.question_types[0].question_type == QuestionType.FACTUAL
+        assert retrieved.question_types[0].count == 5
+        assert retrieved.question_types[0].avg_scores["faithfulness"] == 0.85
+
+    def test_get_nlp_analysis_reconstructs_keywords(self, storage_adapter, sample_nlp_analysis):
+        """KeywordInfo 복원 확인."""
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert len(retrieved.top_keywords) == 2
+        assert retrieved.top_keywords[0].keyword == "보험"
+        assert retrieved.top_keywords[0].frequency == 5
+        assert retrieved.top_keywords[0].tfidf_score == 0.8
+
+    def test_get_nlp_analysis_reconstructs_insights(self, storage_adapter, sample_nlp_analysis):
+        """인사이트 복원 확인."""
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert len(retrieved.insights) == 2
+        assert "High vocabulary diversity" in retrieved.insights
+
+    def test_get_nlp_analysis_raises_key_error(self, storage_adapter):
+        """존재하지 않는 분석 조회 시 KeyError."""
+        with pytest.raises(KeyError, match="NLP Analysis not found"):
+            storage_adapter.get_nlp_analysis("nonexistent-id")
+
+    def test_get_nlp_analysis_by_run_returns_latest(self, storage_adapter, sample_nlp_analysis):
+        """run_id로 최신 NLP 분석 조회."""
+        # 두 개의 분석 저장
+        storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+
+        retrieved = storage_adapter.get_nlp_analysis_by_run("test-run-001")
+
+        assert retrieved is not None
+        assert retrieved.run_id == "test-run-001"
+
+    def test_get_nlp_analysis_by_run_returns_none(self, storage_adapter):
+        """분석 없는 run_id 조회 시 None 반환."""
+        retrieved = storage_adapter.get_nlp_analysis_by_run("nonexistent-run")
+        assert retrieved is None
+
+    def test_save_nlp_analysis_with_minimal_data(self, storage_adapter):
+        """최소 데이터로 NLP 분석 저장."""
+        from evalvault.domain.entities.analysis import NLPAnalysis
+
+        # 먼저 run 생성
+        run = EvaluationRun(
+            run_id="test-run-002",
+            dataset_name="test-dataset",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 1, 10, 0, 0),
+        )
+        storage_adapter.save_run(run)
+
+        analysis = NLPAnalysis(run_id="test-run-002")
+
+        analysis_id = storage_adapter.save_nlp_analysis(analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert retrieved.run_id == "test-run-002"
+        assert retrieved.question_stats is None
+        assert retrieved.answer_stats is None
+        assert len(retrieved.question_types) == 0
+        assert len(retrieved.top_keywords) == 0

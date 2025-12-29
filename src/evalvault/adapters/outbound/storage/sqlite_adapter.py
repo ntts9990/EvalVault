@@ -11,9 +11,14 @@ from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 from evalvault.domain.entities.analysis import (
     AnalysisType,
     CorrelationInsight,
+    KeywordInfo,
     LowPerformerInfo,
     MetricStats,
+    NLPAnalysis,
+    QuestionType,
+    QuestionTypeStats,
     StatisticalAnalysis,
+    TextStats,
 )
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
 
@@ -716,4 +721,178 @@ class SQLiteStorageAdapter:
             insights=result_data.get("insights", []),
             overall_pass_rate=result_data.get("overall_pass_rate", 0.0),
             metric_pass_rates=result_data.get("metric_pass_rates", {}),
+        )
+
+    # NLP Analysis 관련 메서드
+
+    def save_nlp_analysis(self, analysis: NLPAnalysis) -> str:
+        """NLP 분석 결과를 저장합니다.
+
+        Args:
+            analysis: 저장할 NLP 분석 결과
+
+        Returns:
+            저장된 analysis의 ID
+        """
+        import uuid
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            analysis_id = f"nlp-{analysis.run_id}-{uuid.uuid4().hex[:8]}"
+            result_data = self._serialize_nlp_analysis(analysis)
+
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO analysis_results (
+                    analysis_id, run_id, analysis_type, result_data, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    analysis_id,
+                    analysis.run_id,
+                    AnalysisType.NLP.value,
+                    json.dumps(result_data, ensure_ascii=False),
+                    datetime.now().isoformat(),
+                ),
+            )
+
+            conn.commit()
+            return analysis_id
+
+        finally:
+            conn.close()
+
+    def get_nlp_analysis(self, analysis_id: str) -> NLPAnalysis:
+        """NLP 분석 결과를 조회합니다.
+
+        Args:
+            analysis_id: 조회할 분석 ID
+
+        Returns:
+            NLPAnalysis 객체
+
+        Raises:
+            KeyError: 분석을 찾을 수 없는 경우
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT analysis_id, run_id, analysis_type, result_data, created_at
+                FROM analysis_results
+                WHERE analysis_id = ? AND analysis_type = ?
+                """,
+                (analysis_id, AnalysisType.NLP.value),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                raise KeyError(f"NLP Analysis not found: {analysis_id}")
+
+            result_data = json.loads(row[3])
+            return self._deserialize_nlp_analysis(row[1], result_data)
+
+        finally:
+            conn.close()
+
+    def get_nlp_analysis_by_run(self, run_id: str) -> NLPAnalysis | None:
+        """특정 실행의 NLP 분석 결과를 조회합니다.
+
+        Args:
+            run_id: 실행 ID
+
+        Returns:
+            NLPAnalysis 또는 None (분석 결과가 없는 경우)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT analysis_id, run_id, analysis_type, result_data, created_at
+                FROM analysis_results
+                WHERE run_id = ? AND analysis_type = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (run_id, AnalysisType.NLP.value),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            result_data = json.loads(row[3])
+            return self._deserialize_nlp_analysis(row[1], result_data)
+
+        finally:
+            conn.close()
+
+    def _serialize_nlp_analysis(self, analysis: NLPAnalysis) -> dict[str, Any]:
+        """NLP 분석 결과를 JSON 직렬화 가능한 형태로 변환합니다."""
+        return {
+            "run_id": analysis.run_id,
+            "question_stats": asdict(analysis.question_stats) if analysis.question_stats else None,
+            "answer_stats": asdict(analysis.answer_stats) if analysis.answer_stats else None,
+            "context_stats": asdict(analysis.context_stats) if analysis.context_stats else None,
+            "question_types": [
+                {
+                    "question_type": qt.question_type.value,
+                    "count": qt.count,
+                    "percentage": qt.percentage,
+                    "avg_scores": qt.avg_scores,
+                }
+                for qt in analysis.question_types
+            ],
+            "top_keywords": [asdict(kw) for kw in analysis.top_keywords],
+            "topic_clusters": [asdict(tc) for tc in analysis.topic_clusters],
+            "insights": analysis.insights,
+        }
+
+    def _deserialize_nlp_analysis(
+        self,
+        run_id: str,
+        result_data: dict[str, Any],
+    ) -> NLPAnalysis:
+        """JSON 데이터를 NLPAnalysis로 역직렬화합니다."""
+        # Reconstruct TextStats
+        question_stats = None
+        if result_data.get("question_stats"):
+            question_stats = TextStats(**result_data["question_stats"])
+
+        answer_stats = None
+        if result_data.get("answer_stats"):
+            answer_stats = TextStats(**result_data["answer_stats"])
+
+        context_stats = None
+        if result_data.get("context_stats"):
+            context_stats = TextStats(**result_data["context_stats"])
+
+        # Reconstruct QuestionTypeStats
+        question_types = [
+            QuestionTypeStats(
+                question_type=QuestionType(qt["question_type"]),
+                count=qt["count"],
+                percentage=qt["percentage"],
+                avg_scores=qt.get("avg_scores", {}),
+            )
+            for qt in result_data.get("question_types", [])
+        ]
+
+        # Reconstruct KeywordInfo
+        top_keywords = [KeywordInfo(**kw) for kw in result_data.get("top_keywords", [])]
+
+        return NLPAnalysis(
+            run_id=run_id,
+            question_stats=question_stats,
+            answer_stats=answer_stats,
+            context_stats=context_stats,
+            question_types=question_types,
+            top_keywords=top_keywords,
+            insights=result_data.get("insights", []),
         )
