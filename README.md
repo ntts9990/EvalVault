@@ -27,6 +27,10 @@ minimal wiring.
 - Optional Langfuse integration for trace-level inspection
 - Dataset loaders for JSON, CSV, and Excel sources
 - Cross-platform support (Linux, macOS, Windows)
+- **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
+- **NLP Analysis**: Text statistics, question type classification, keyword extraction
+- **Causal Analysis**: Root cause analysis and causal relationship discovery
+- **Knowledge Graph**: Automatic test set generation from documents
 
 ## Quick Start
 
@@ -45,11 +49,16 @@ uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 
 ## Key Capabilities
 
-- Standardized scoring with six Ragas v1.0 metrics
+- Standardized scoring with six Ragas v1.0 metrics + domain-specific metrics
 - JSON/CSV/Excel dataset loaders with versioned metadata
-- Automatic result storage in SQLite (local) and Langfuse (cloud/self-hosted)
+- Automatic result storage in SQLite + PostgreSQL + Langfuse/MLflow
 - Air-gapped compatibility through Ollama profiles
 - Cross-platform CLI with thoughtful defaults
+- **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
+- **NLP Analysis**: Text statistics, question type classification, keyword extraction, topic clustering
+- **Causal Analysis**: Root cause analysis, causal relationship discovery, improvement suggestions
+- **Knowledge Graph**: Automatic test set generation from documents
+- **Experiment Management**: A/B testing and cross-group metric comparison
 
 ## Installation
 

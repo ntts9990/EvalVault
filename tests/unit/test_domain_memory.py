@@ -958,6 +958,72 @@ class TestSQLiteDomainMemoryAdapter:
         assert results["behaviors"] == []
         assert results["learnings"] == []
 
+    def test_rebuild_fts_indexes(self, memory_adapter):
+        """FTS5 인덱스 재구성 테스트."""
+        # 사실 저장
+        fact = FactualFact(
+            subject="재구성테스트",
+            predicate="대상",
+            object="FTS5",
+            domain="test",
+            language="ko",
+        )
+        memory_adapter.save_fact(fact)
+
+        # 수동 재구성
+        memory_adapter.rebuild_fts_indexes()
+
+        # 검색 가능한지 확인
+        results = memory_adapter.search_facts("재구성테스트", domain="test")
+        assert len(results) == 1
+        assert results[0].subject == "재구성테스트"
+
+    def test_search_facts_after_multiple_updates(self, memory_adapter):
+        """여러 번 업데이트 후 FTS5 검색 테스트."""
+        # 동일한 fact_id로 여러 번 업데이트 (INSERT OR REPLACE)
+        fact = FactualFact(
+            fact_id="fts-update-test",
+            subject="원래주제",
+            predicate="predicate",
+            object="object",
+            domain="test",
+        )
+        memory_adapter.save_fact(fact)
+
+        # 업데이트
+        fact.subject = "변경된주제"
+        memory_adapter.save_fact(fact)
+
+        # 변경된 내용으로 검색
+        results = memory_adapter.search_facts("변경된주제", domain="test")
+        assert len(results) == 1
+        assert results[0].subject == "변경된주제"
+
+        # 원래 내용으로는 검색 안됨
+        results = memory_adapter.search_facts("원래주제", domain="test")
+        assert len(results) == 0
+
+    def test_search_behaviors_after_rebuild(self, memory_adapter):
+        """FTS5 재구성 후 행동 검색 테스트."""
+        behavior = BehaviorEntry(
+            description="재구성 테스트용 행동",
+            trigger_pattern=r"재구성|FTS",
+            domain="test",
+            success_rate=0.85,
+        )
+        memory_adapter.save_behavior(behavior)
+
+        # 재구성
+        memory_adapter.rebuild_fts_indexes()
+
+        # 검색
+        results = memory_adapter.search_behaviors(
+            context="재구성 후 검색",
+            domain="test",
+            language="ko",
+        )
+        assert len(results) >= 1
+
     # =========================================================================
     # Dynamics: Formation Tests (Phase 3)
     # =========================================================================
