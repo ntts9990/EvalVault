@@ -1,5 +1,13 @@
 """CLI interface for EvalVault using Typer."""
 
+# Fix SSL certificate issues on macOS with uv-managed Python
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass  # truststore not installed, use default SSL
+
 import asyncio
 import base64
 import json

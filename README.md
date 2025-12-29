@@ -294,6 +294,149 @@ uv run evalvault config
 uv run evalvault metrics
 ```
 
+## A/B Testing Guide
+
+EvalVault supports A/B testing to compare different models, prompts, or configurations. This guide walks you through a complete experiment.
+
+### Step 1: Create an Experiment
+
+```bash
+uv run evalvault experiment-create \
+  --name "Model Comparison" \
+  --hypothesis "Larger model will score higher on answer relevancy" \
+  --db experiment.db
+```
+
+Output:
+```
+Created experiment: 20421536-e09a-4255-89a3-c402b2b80a2d
+  Name: Model Comparison
+  Status: draft
+```
+
+> Save the experiment ID for the following steps.
+
+### Step 2: Add Groups (A/B)
+
+Create two groups to compare:
+
+```bash
+# Group A: Baseline
+uv run evalvault experiment-add-group \
+  --id <experiment-id> \
+  -g "baseline" \
+  -d "gemma3:1b (1B params)" \
+  --db experiment.db
+
+# Group B: Challenger
+uv run evalvault experiment-add-group \
+  --id <experiment-id> \
+  -g "challenger" \
+  -d "gemma3n:e2b (4.5B params)" \
+  --db experiment.db
+```
+
+### Step 3: Run Evaluations
+
+Run evaluations with different configurations for each group:
+
+```bash
+# Group A: Run with baseline model
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --profile dev \
+  --model gemma3:1b \
+  --metrics faithfulness,answer_relevancy \
+  --db experiment.db
+
+# Save the Run ID from output (e.g., 34f364e9-cd28-4cf9-a93d-5c706aaf9f14)
+
+# Group B: Run with challenger model
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --profile dev \
+  --model gemma3n:e2b \
+  --metrics faithfulness,answer_relevancy \
+  --db experiment.db
+
+# Save the Run ID from output (e.g., 034da928-0f74-4205-8654-6492712472b3)
+```
+
+### Step 4: Add Runs to Groups
+
+Link evaluation runs to their respective groups:
+
+```bash
+# Add baseline run to Group A
+uv run evalvault experiment-add-run \
+  --id <experiment-id> \
+  -g "baseline" \
+  -r <baseline-run-id> \
+  --db experiment.db
+
+# Add challenger run to Group B
+uv run evalvault experiment-add-run \
+  --id <experiment-id> \
+  -g "challenger" \
+  -r <challenger-run-id> \
+  --db experiment.db
+```
+
+### Step 5: Compare Results
+
+View the comparison table:
+
+```bash
+uv run evalvault experiment-compare --id <experiment-id> --db experiment.db
+```
+
+Output:
+```
+Experiment Comparison
+
+Model Comparison
+Hypothesis: Larger model will score higher on answer relevancy
+
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Metric           ┃ baseline ┃ challenger ┃ Best Group ┃ Improvement ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ faithfulness     │    1.000 │      1.000 │  baseline  │       +0.0% │
+│ answer_relevancy │    0.908 │      0.957 │ challenger │       +5.4% │
+└──────────────────┴──────────┴────────────┴────────────┴─────────────┘
+```
+
+### Step 6: Conclude the Experiment
+
+Record your findings:
+
+```bash
+uv run evalvault experiment-conclude \
+  --id <experiment-id> \
+  --conclusion "Challenger model shows 5.4% improvement in answer relevancy with 2x latency trade-off" \
+  --db experiment.db
+```
+
+### Additional Commands
+
+```bash
+# View experiment summary
+uv run evalvault experiment-summary --id <experiment-id> --db experiment.db
+
+# List all experiments
+uv run evalvault experiment-list --db experiment.db
+```
+
+### Quick Reference
+
+| Step | Command |
+|------|---------|
+| Create experiment | `experiment-create --name "..." --hypothesis "..."` |
+| Add group | `experiment-add-group --id <exp> -g "name" -d "desc"` |
+| Run evaluation | `run dataset.json --model <model> --db experiment.db` |
+| Link run to group | `experiment-add-run --id <exp> -g "group" -r <run>` |
+| Compare results | `experiment-compare --id <exp>` |
+| Conclude | `experiment-conclude --id <exp> --conclusion "..."` |
+
+---
+
 ## Dataset Formats
 
 ### JSON (recommended)

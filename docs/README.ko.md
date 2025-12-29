@@ -293,6 +293,149 @@ uv run evalvault config
 uv run evalvault metrics
 ```
 
+## A/B 테스트 가이드
+
+EvalVault는 모델, 프롬프트, 설정 등을 비교하는 A/B 테스트를 지원합니다. 이 가이드는 실험의 전체 과정을 안내합니다.
+
+### 1단계: 실험 생성
+
+```bash
+uv run evalvault experiment-create \
+  --name "모델 비교" \
+  --hypothesis "큰 모델이 answer_relevancy에서 더 높은 점수를 받을 것" \
+  --db experiment.db
+```
+
+출력:
+```
+Created experiment: 20421536-e09a-4255-89a3-c402b2b80a2d
+  Name: 모델 비교
+  Status: draft
+```
+
+> 실험 ID를 저장해두세요. 이후 단계에서 사용합니다.
+
+### 2단계: 그룹 추가 (A/B)
+
+비교할 두 그룹을 생성합니다:
+
+```bash
+# 그룹 A: 기준 모델
+uv run evalvault experiment-add-group \
+  --id <experiment-id> \
+  -g "baseline" \
+  -d "gemma3:1b (1B 파라미터)" \
+  --db experiment.db
+
+# 그룹 B: 도전 모델
+uv run evalvault experiment-add-group \
+  --id <experiment-id> \
+  -g "challenger" \
+  -d "gemma3n:e2b (4.5B 파라미터)" \
+  --db experiment.db
+```
+
+### 3단계: 평가 실행
+
+각 그룹에 대해 다른 설정으로 평가를 실행합니다:
+
+```bash
+# 그룹 A: 기준 모델로 실행
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --profile dev \
+  --model gemma3:1b \
+  --metrics faithfulness,answer_relevancy \
+  --db experiment.db
+
+# 출력에서 Run ID를 저장 (예: 34f364e9-cd28-4cf9-a93d-5c706aaf9f14)
+
+# 그룹 B: 도전 모델로 실행
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --profile dev \
+  --model gemma3n:e2b \
+  --metrics faithfulness,answer_relevancy \
+  --db experiment.db
+
+# 출력에서 Run ID를 저장 (예: 034da928-0f74-4205-8654-6492712472b3)
+```
+
+### 4단계: 실행 결과를 그룹에 연결
+
+평가 실행을 해당 그룹에 연결합니다:
+
+```bash
+# 기준 모델 실행을 그룹 A에 추가
+uv run evalvault experiment-add-run \
+  --id <experiment-id> \
+  -g "baseline" \
+  -r <baseline-run-id> \
+  --db experiment.db
+
+# 도전 모델 실행을 그룹 B에 추가
+uv run evalvault experiment-add-run \
+  --id <experiment-id> \
+  -g "challenger" \
+  -r <challenger-run-id> \
+  --db experiment.db
+```
+
+### 5단계: 결과 비교
+
+비교 테이블을 확인합니다:
+
+```bash
+uv run evalvault experiment-compare --id <experiment-id> --db experiment.db
+```
+
+출력:
+```
+Experiment Comparison
+
+모델 비교
+Hypothesis: 큰 모델이 answer_relevancy에서 더 높은 점수를 받을 것
+
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Metric           ┃ baseline ┃ challenger ┃ Best Group ┃ Improvement ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ faithfulness     │    1.000 │      1.000 │  baseline  │       +0.0% │
+│ answer_relevancy │    0.908 │      0.957 │ challenger │       +5.4% │
+└──────────────────┴──────────┴────────────┴────────────┴─────────────┘
+```
+
+### 6단계: 실험 결론 기록
+
+결론을 기록합니다:
+
+```bash
+uv run evalvault experiment-conclude \
+  --id <experiment-id> \
+  --conclusion "도전 모델이 answer_relevancy에서 5.4% 개선, 단 2배의 지연 시간 트레이드오프" \
+  --db experiment.db
+```
+
+### 추가 명령어
+
+```bash
+# 실험 요약 보기
+uv run evalvault experiment-summary --id <experiment-id> --db experiment.db
+
+# 모든 실험 목록
+uv run evalvault experiment-list --db experiment.db
+```
+
+### 빠른 참조
+
+| 단계 | 명령어 |
+|------|--------|
+| 실험 생성 | `experiment-create --name "..." --hypothesis "..."` |
+| 그룹 추가 | `experiment-add-group --id <exp> -g "이름" -d "설명"` |
+| 평가 실행 | `run dataset.json --model <model> --db experiment.db` |
+| 실행 연결 | `experiment-add-run --id <exp> -g "그룹" -r <run>` |
+| 결과 비교 | `experiment-compare --id <exp>` |
+| 결론 기록 | `experiment-conclude --id <exp> --conclusion "..."` |
+
+---
+
 ## 데이터 형식
 
 ### JSON (권장)
