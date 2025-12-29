@@ -21,6 +21,7 @@ from evalvault.domain.entities.analysis import (
     QuestionType,
     QuestionTypeStats,
     TextStats,
+    TopicCluster,
 )
 
 if TYPE_CHECKING:
@@ -270,9 +271,21 @@ class NLPAnalysisAdapter:
         include_text_stats: bool = True,
         include_question_types: bool = True,
         include_keywords: bool = True,
+        include_topic_clusters: bool = False,
         top_k_keywords: int = 20,
+        min_cluster_size: int = 3,
     ) -> NLPAnalysis:
-        """통합 NLP 분석을 수행합니다."""
+        """통합 NLP 분석을 수행합니다.
+
+        Args:
+            run: 분석할 평가 실행
+            include_text_stats: 텍스트 통계 포함 여부
+            include_question_types: 질문 유형 분류 포함 여부
+            include_keywords: 키워드 추출 포함 여부
+            include_topic_clusters: 토픽 클러스터링 포함 여부 (임베딩 필요)
+            top_k_keywords: 추출할 키워드 수
+            min_cluster_size: 최소 클러스터 크기
+        """
         result = NLPAnalysis(run_id=run.run_id)
 
         if include_text_stats:
@@ -286,6 +299,9 @@ class NLPAnalysisAdapter:
 
         if include_keywords:
             result.top_keywords = self.extract_keywords(run, top_k=top_k_keywords)
+
+        if include_topic_clusters:
+            result.topic_clusters = self.cluster_topics(run, min_cluster_size=min_cluster_size)
 
         # 인사이트 생성
         result.insights = self._generate_insights(result)
@@ -475,4 +491,166 @@ class NLPAnalysisAdapter:
             if top_3:
                 insights.append(f"Top keywords: {', '.join(top_3)}")
 
+        # 토픽 클러스터 인사이트
+        if analysis.topic_clusters:
+            insights.append(f"Found {len(analysis.topic_clusters)} topic clusters")
+
         return insights
+
+    def cluster_topics(
+        self,
+        run: EvaluationRun,
+        *,
+        min_cluster_size: int = 3,
+        max_clusters: int = 10,
+    ) -> list[TopicCluster]:
+        """질문을 토픽으로 클러스터링합니다.
+
+        임베딩 기반 클러스터링을 수행합니다.
+        LLM 어댑터가 없거나 임베딩을 사용할 수 없으면 빈 리스트를 반환합니다.
+
+        Args:
+            run: 분석할 평가 실행
+            min_cluster_size: 최소 클러스터 크기
+            max_clusters: 최대 클러스터 수
+
+        Returns:
+            토픽 클러스터 리스트
+        """
+        if not run.results:
+            return []
+
+        if not self._use_embeddings or self._llm_adapter is None:
+            logger.debug("Topic clustering requires embeddings - skipping")
+            return []
+
+        questions = [r.question for r in run.results if r.question]
+        if len(questions) < min_cluster_size:
+            logger.debug(f"Not enough questions for clustering: {len(questions)}")
+            return []
+
+        try:
+            # 임베딩 가져오기
+            embeddings = self._llm_adapter.as_ragas_embeddings()
+            if embeddings is None:
+                logger.debug("No embeddings available for clustering")
+                return []
+
+            # 질문 임베딩 계산
+            question_embeddings = embeddings.embed_documents(questions)
+
+            # 간단한 k-means 클러스터링 (sklearn 사용)
+            return self._cluster_with_kmeans(
+                questions=questions,
+                embeddings=question_embeddings,
+                run=run,
+                min_cluster_size=min_cluster_size,
+                max_clusters=max_clusters,
+            )
+
+        except Exception as e:
+            logger.warning(f"Topic clustering failed: {e}")
+            return []
+
+    def _cluster_with_kmeans(
+        self,
+        questions: list[str],
+        embeddings: list[list[float]],
+        run: EvaluationRun,
+        min_cluster_size: int,
+        max_clusters: int,
+    ) -> list[TopicCluster]:
+        """K-Means 클러스터링을 수행합니다."""
+        try:
+            import numpy as np
+            from sklearn.cluster import KMeans
+            from sklearn.feature_extraction.text import TfidfVectorizer
+
+            n_samples = len(questions)
+            # 클러스터 수 결정 (최소 2, 최대 max_clusters, 샘플 수의 1/3)
+            n_clusters = min(max_clusters, max(2, n_samples // min_cluster_size))
+
+            if n_clusters < 2:
+                return []
+
+            # K-Means 클러스터링
+            embedding_array = np.array(embeddings)
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            labels = kmeans.fit_predict(embedding_array)
+
+            # 클러스터별 질문 그룹화
+            cluster_questions: dict[int, list[str]] = {}
+            cluster_indices: dict[int, list[int]] = {}
+
+            for idx, (question, label) in enumerate(zip(questions, labels, strict=True)):
+                label_int = int(label)
+                if label_int not in cluster_questions:
+                    cluster_questions[label_int] = []
+                    cluster_indices[label_int] = []
+                cluster_questions[label_int].append(question)
+                cluster_indices[label_int].append(idx)
+
+            # 각 클러스터에서 키워드 추출
+            vectorizer = TfidfVectorizer(max_features=10, token_pattern=r"[가-힣a-zA-Z]{2,}")
+
+            # 결과 맵핑 (question -> result)
+            question_to_result = {r.question: r for r in run.results if r.question}
+
+            clusters = []
+            for cluster_id in sorted(cluster_questions.keys()):
+                cluster_qs = cluster_questions[cluster_id]
+
+                # 최소 크기 미달 클러스터 제외
+                if len(cluster_qs) < min_cluster_size:
+                    continue
+
+                # 클러스터 키워드 추출
+                try:
+                    tfidf_matrix = vectorizer.fit_transform(cluster_qs)
+                    feature_names = vectorizer.get_feature_names_out()
+                    scores = tfidf_matrix.sum(axis=0).A1
+                    top_indices = scores.argsort()[-5:][::-1]
+                    keywords = [feature_names[i] for i in top_indices]
+                except Exception:
+                    keywords = []
+
+                # 클러스터 평균 점수 계산
+                avg_scores: dict[str, float] = {}
+                metric_values: dict[str, list[float]] = {}
+
+                for q in cluster_qs:
+                    result = question_to_result.get(q)
+                    if result:
+                        for m in result.metrics:
+                            if m.name not in metric_values:
+                                metric_values[m.name] = []
+                            metric_values[m.name].append(m.score)
+
+                for metric_name, values in metric_values.items():
+                    if values:
+                        avg_scores[metric_name] = sum(values) / len(values)
+
+                # 대표 질문 선택 (처음 3개)
+                representative_questions = cluster_qs[:3]
+
+                clusters.append(
+                    TopicCluster(
+                        cluster_id=cluster_id,
+                        keywords=keywords,
+                        document_count=len(cluster_qs),
+                        avg_scores=avg_scores,
+                        representative_questions=representative_questions,
+                    )
+                )
+
+            # 문서 수 기준 내림차순 정렬
+            clusters.sort(key=lambda c: c.document_count, reverse=True)
+
+            return clusters
+
+        except ImportError as e:
+            logger.debug(f"Clustering dependencies not available: {e}")
+            return []
+        except Exception as e:
+            logger.warning(f"K-Means clustering failed: {e}")
+            return []
