@@ -594,3 +594,181 @@ class TestNLPAnalysisAdapterHybrid:
         assert result.has_question_type_analysis is True
         # 임베딩이 None이므로 TF-IDF만으로 키워드 추출
         assert result.has_keyword_analysis is True
+
+
+class TestTopicClustering:
+    """토픽 클러스터링 테스트."""
+
+    @pytest.fixture
+    def clustering_run(self):
+        """클러스터링 테스트용 샘플 EvaluationRun (충분한 질문 포함)."""
+        return EvaluationRun(
+            run_id="cluster-run",
+            dataset_name="test-dataset",
+            model_name="gpt-5-nano",
+            started_at=datetime.now(),
+            results=[
+                # 보험료 관련 질문 클러스터
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="보험료는 얼마인가요?",
+                    answer="월 5만원입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-002",
+                    question="보험료 납입 방법은?",
+                    answer="카드 또는 계좌이체입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.85, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-003",
+                    question="보험료 할인 조건은?",
+                    answer="가족 할인 10% 적용됩니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.8, threshold=0.7)],
+                ),
+                # 보장 관련 질문 클러스터
+                TestCaseResult(
+                    test_case_id="tc-004",
+                    question="보장금액은 얼마인가요?",
+                    answer="1억원입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-005",
+                    question="보장 기간은 어떻게 되나요?",
+                    answer="10년 보장입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.88, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-006",
+                    question="보장 범위에 포함되는 것은?",
+                    answer="질병, 사고, 입원 등입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.82, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+    def test_cluster_topics_without_embeddings(self, clustering_run):
+        """임베딩 없이 클러스터링 시 빈 리스트 반환."""
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        adapter = NLPAnalysisAdapter(llm_adapter=None, use_embeddings=False)
+
+        result = adapter.cluster_topics(clustering_run)
+
+        assert result == []
+
+    def test_cluster_topics_with_mock_embeddings(self, clustering_run):
+        """Mock 임베딩으로 클러스터링 테스트."""
+        from unittest.mock import MagicMock
+
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        # Mock embeddings - 두 개의 클러스터로 분리되도록 설계
+        mock_embeddings = MagicMock()
+
+        # 보험료 관련 질문과 보장 관련 질문이 다른 클러스터에 속하도록
+        mock_embeddings.embed_documents.return_value = [
+            [0.1, 0.2, 0.3],  # 보험료 클러스터
+            [0.1, 0.2, 0.4],  # 보험료 클러스터
+            [0.1, 0.2, 0.35],  # 보험료 클러스터
+            [0.9, 0.8, 0.7],  # 보장 클러스터
+            [0.9, 0.8, 0.6],  # 보장 클러스터
+            [0.9, 0.8, 0.65],  # 보장 클러스터
+        ]
+
+        mock_llm = MagicMock()
+        mock_llm.as_ragas_embeddings.return_value = mock_embeddings
+
+        adapter = NLPAnalysisAdapter(llm_adapter=mock_llm, use_embeddings=True)
+
+        result = adapter.cluster_topics(clustering_run, min_cluster_size=2)
+
+        # 클러스터가 생성되어야 함
+        assert len(result) >= 1
+        # 각 클러스터는 필수 속성을 가져야 함
+        for cluster in result:
+            assert cluster.cluster_id >= 0
+            assert cluster.document_count >= 2
+            assert isinstance(cluster.keywords, list)
+            assert isinstance(cluster.avg_scores, dict)
+            assert isinstance(cluster.representative_questions, list)
+
+    def test_cluster_topics_insufficient_data(self):
+        """데이터가 부족하면 빈 리스트 반환."""
+        from unittest.mock import MagicMock
+
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        small_run = EvaluationRun(
+            run_id="small-run",
+            dataset_name="test",
+            model_name="test",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="질문1",
+                    answer="답변1",
+                    metrics=[MetricScore(name="f", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["f"],
+        )
+
+        mock_llm = MagicMock()
+        adapter = NLPAnalysisAdapter(llm_adapter=mock_llm, use_embeddings=True)
+
+        result = adapter.cluster_topics(small_run, min_cluster_size=3)
+
+        assert result == []
+
+    def test_analyze_with_topic_clusters(self, clustering_run):
+        """analyze 메서드에서 토픽 클러스터링 포함."""
+        from unittest.mock import MagicMock
+
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        mock_embeddings = MagicMock()
+        mock_embeddings.embed_documents.return_value = [
+            [0.1, 0.2, 0.3],
+            [0.1, 0.2, 0.4],
+            [0.1, 0.2, 0.35],
+            [0.9, 0.8, 0.7],
+            [0.9, 0.8, 0.6],
+            [0.9, 0.8, 0.65],
+        ]
+
+        mock_llm = MagicMock()
+        mock_llm.as_ragas_embeddings.return_value = mock_embeddings
+
+        adapter = NLPAnalysisAdapter(llm_adapter=mock_llm, use_embeddings=True)
+
+        result = adapter.analyze(clustering_run, include_topic_clusters=True, min_cluster_size=2)
+
+        # 토픽 클러스터가 포함되어야 함
+        assert len(result.topic_clusters) >= 1
+        # 인사이트에 클러스터 정보가 포함되어야 함
+        cluster_insight = [i for i in result.insights if "topic clusters" in i.lower()]
+        assert len(cluster_insight) > 0
+
+    def test_cluster_topics_graceful_fallback(self, clustering_run):
+        """임베딩 에러 시 graceful 폴백."""
+        from unittest.mock import MagicMock
+
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        mock_embeddings = MagicMock()
+        mock_embeddings.embed_documents.side_effect = Exception("Embedding failed")
+
+        mock_llm = MagicMock()
+        mock_llm.as_ragas_embeddings.return_value = mock_embeddings
+
+        adapter = NLPAnalysisAdapter(llm_adapter=mock_llm, use_embeddings=True)
+
+        result = adapter.cluster_topics(clustering_run)
+
+        # 에러 시 빈 리스트 반환
+        assert result == []
