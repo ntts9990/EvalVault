@@ -31,9 +31,17 @@ minimal wiring.
 ## Quick Start
 
 ```bash
+# Install via PyPI
 uv pip install evalvault
 evalvault run data.json --metrics faithfulness
+
+# Or from source (recommended for development)
+git clone https://github.com/ntts9990/EvalVault.git && cd EvalVault
+uv sync --extra dev
+uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 ```
+
+> **Why uv?** EvalVault uses [uv](https://docs.astral.sh/uv/) for fast, reliable dependency management. All commands should be prefixed with `uv run` when running from source.
 
 ## Key Capabilities
 
@@ -51,7 +59,7 @@ evalvault run data.json --metrics faithfulness
 uv pip install evalvault
 ```
 
-### Development Setup
+### Development Setup (From Source)
 
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
@@ -59,19 +67,185 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-## Run Your First Evaluation
+> **Note**: The `.python-version` file pins Python to 3.12. uv will automatically download and use Python 3.12 if not already installed.
+
+---
+
+## Complete Setup Guide (git clone → Evaluation with Storage)
+
+This section walks you through every step from cloning the repository to running evaluations with Langfuse tracing and SQLite storage.
+
+### Prerequisites
+
+| Requirement | Version | Installation |
+|-------------|---------|--------------|
+| **Python** | 3.12.x | Auto-installed by uv |
+| **uv** | Latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Docker** | Latest | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
+| **Ollama** | Latest | `curl -fsSL https://ollama.com/install.sh \| sh` |
+
+### Step 1: Clone and Install Dependencies
 
 ```bash
-# 1. Configure secrets
-cp .env.example .env
-echo "OPENAI_API_KEY=sk-your-key" >> .env
+# Clone the repository
+git clone https://github.com/ntts9990/EvalVault.git
+cd EvalVault
 
-# 2. Execute an evaluation
-evalvault run data.json --metrics faithfulness
+# Install dependencies (Python 3.12 is auto-selected via .python-version)
+uv sync --extra dev
 
-# 3. Inspect history
-evalvault history
+# Verify Python version
+uv run python --version
+# Expected: Python 3.12.x
 ```
+
+### Step 2: Set Up Ollama (Local LLM)
+
+EvalVault uses Ollama for air-gapped/local LLM evaluation. Start the Ollama server and pull the required models:
+
+```bash
+# Start Ollama server (runs in background)
+ollama serve &
+
+# Pull required models for dev profile
+ollama pull gemma3:1b              # LLM for evaluation
+ollama pull qwen3-embedding:0.6b   # Embedding model
+
+# Verify models are installed
+ollama list
+```
+
+**Expected output:**
+```
+NAME                    SIZE
+gemma3:1b               815 MB
+qwen3-embedding:0.6b    639 MB
+```
+
+### Step 3: Start Langfuse (Evaluation Tracking)
+
+Langfuse provides trace-level inspection and historical comparison of evaluation runs.
+
+```bash
+# Start Langfuse with Docker Compose
+docker compose -f docker-compose.langfuse.yml up -d
+
+# Verify all containers are healthy
+docker compose -f docker-compose.langfuse.yml ps
+```
+
+**Expected containers:**
+| Container | Port | Status |
+|-----------|------|--------|
+| langfuse-web | 3000 | healthy |
+| langfuse-worker | 3030 | healthy |
+| postgres | 5432 | healthy |
+| clickhouse | 8123 | healthy |
+| redis | 6379 | healthy |
+| minio | 9090 | healthy |
+
+### Step 4: Create Langfuse Project and API Keys
+
+1. Open http://localhost:3000 in your browser
+2. **Sign Up** - Create an account (email + password)
+3. **New Organization** - Create an organization (e.g., "EvalVault")
+4. **New Project** - Create a project (e.g., "RAG-Evaluation")
+5. **Settings → API Keys** - Generate new API keys
+6. Copy the **Public Key** (`pk-lf-...`) and **Secret Key** (`sk-lf-...`)
+
+### Step 5: Configure Environment Variables
+
+Create a `.env` file with your settings:
+
+```bash
+# Copy the example file
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
+
+```bash
+# EvalVault Configuration
+EVALVAULT_PROFILE=dev
+
+# Ollama Settings
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_TIMEOUT=120
+
+# Langfuse Settings (paste your keys here)
+LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key
+LANGFUSE_SECRET_KEY=sk-lf-your-secret-key
+LANGFUSE_HOST=http://localhost:3000
+```
+
+### Step 6: Run Your First Evaluation
+
+```bash
+# Run evaluation with sample dataset
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy
+
+# Expected output:
+# ╭───────────────────────────── Evaluation Results ─────────────────────────────╮
+# │ Evaluation Summary                                                           │
+# │   Run ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx                               │
+# │   Dataset: test_dataset v1.0.0                                               │
+# │   Model: ollama/gemma3:1b                                                    │
+# │   Duration: ~45s                                                             │
+# │ Results                                                                      │
+# │   Total Test Cases: 4                                                        │
+# │   Passed: 4                                                                  │
+# │   Pass Rate: 100.0%                                                          │
+# ╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### Step 7: Run Evaluation with Storage
+
+Save results to both Langfuse and SQLite for historical tracking:
+
+```bash
+# Run with Langfuse tracing + SQLite storage
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy \
+  --langfuse \
+  --db evalvault.db
+
+# Expected output includes:
+# Logged to Langfuse (trace_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+# Results saved to database: evalvault.db
+# Run ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+### Step 8: Verify Saved Results
+
+**SQLite History:**
+```bash
+uv run evalvault history --db evalvault.db
+
+# ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+# ┃ Run ID      ┃ Dataset    ┃ Model       ┃ Started At ┃ Pass Rate ┃ Test Cases ┃
+# ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+# │ 51f0286a... │ test_data… │ ollama/gem… │ 2025-12-29 │    100.0% │          4 │
+# └─────────────┴────────────┴─────────────┴────────────┴───────────┴────────────┘
+```
+
+**Langfuse Dashboard:**
+- Open http://localhost:3000
+- Navigate to **Traces** tab
+- View detailed trace information for each evaluation run
+
+### Quick Reference
+
+| Task | Command |
+|------|---------|
+| Run evaluation | `uv run evalvault run data.json --metrics faithfulness` |
+| Run with storage | `uv run evalvault run data.json --metrics faithfulness --langfuse --db evalvault.db` |
+| View history | `uv run evalvault history --db evalvault.db` |
+| List metrics | `uv run evalvault metrics` |
+| Show config | `uv run evalvault config` |
+| Stop Langfuse | `docker compose -f docker-compose.langfuse.yml down` |
+
+---
 
 ## Supported Metrics
 
@@ -86,33 +260,38 @@ evalvault history
 
 ## CLI Reference
 
+> **Note**: When running from source, prefix all commands with `uv run`. When installed via PyPI, use `evalvault` directly.
+
 ```bash
 # Run evaluations
-evalvault run data.json --metrics faithfulness,answer_relevancy
+uv run evalvault run data.json --metrics faithfulness,answer_relevancy
+
+# Run with Langfuse tracing + SQLite storage
+uv run evalvault run data.json --metrics faithfulness --langfuse --db evalvault.db
 
 # Parallel evaluation (faster for large datasets)
-evalvault run data.json --metrics faithfulness --parallel --batch-size 10
+uv run evalvault run data.json --metrics faithfulness --parallel --batch-size 10
 
 # Select Ollama profile
-evalvault run data.json --profile dev --metrics faithfulness
+uv run evalvault run data.json --profile dev --metrics faithfulness
 
 # Select OpenAI profile
-evalvault run data.json -p openai --metrics faithfulness
-
-# Enable Langfuse tracing
-evalvault run data.json --metrics faithfulness --langfuse
+uv run evalvault run data.json -p openai --metrics faithfulness
 
 # Show run history
-evalvault history --limit 10
+uv run evalvault history --db evalvault.db --limit 10
 
 # Compare runs
-evalvault compare <run_id1> <run_id2>
+uv run evalvault compare <run_id1> <run_id2> --db evalvault.db
 
 # Export results
-evalvault export <run_id> -o result.json
+uv run evalvault export <run_id> -o result.json --db evalvault.db
 
 # Inspect configuration
-evalvault config
+uv run evalvault config
+
+# List available metrics
+uv run evalvault metrics
 ```
 
 ## Dataset Formats
@@ -166,22 +345,6 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
-
-## Ollama Setup (Air-gapped)
-
-1. Install Ollama
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh  # Linux/macOS
-   ```
-2. Download models
-   ```bash
-   ollama pull gemma3:1b
-   ollama pull qwen3-embedding:0.6b
-   ```
-3. Run via a profile
-   ```bash
-   evalvault run data.json --profile dev --metrics faithfulness
-   ```
 
 ## Model Profiles (`config/models.yaml`)
 

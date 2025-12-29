@@ -30,9 +30,17 @@ SQLite 또는 Langfuse에 결과를 저장합니다. OpenAI, Ollama, 폐쇄망 �
 ## 빠른 시작
 
 ```bash
+# PyPI를 통한 설치
 uv pip install evalvault
 evalvault run data.json --metrics faithfulness
+
+# 또는 소스에서 설치 (개발 환경 권장)
+git clone https://github.com/ntts9990/EvalVault.git && cd EvalVault
+uv sync --extra dev
+uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 ```
+
+> **왜 uv인가?** EvalVault는 빠르고 안정적인 의존성 관리를 위해 [uv](https://docs.astral.sh/uv/)를 사용합니다. 소스에서 실행할 때는 모든 명령어 앞에 `uv run`을 붙여야 합니다.
 
 ## 핵심 기능
 
@@ -50,7 +58,7 @@ evalvault run data.json --metrics faithfulness
 uv pip install evalvault
 ```
 
-### 개발 환경
+### 개발 환경 (소스에서 설치)
 
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
@@ -58,19 +66,185 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-## 첫 평가 실행
+> **참고**: `.python-version` 파일이 Python 3.12를 지정합니다. uv가 Python 3.12를 자동으로 다운로드하여 사용합니다.
+
+---
+
+## 완전 설정 가이드 (git clone → 평가 저장 완료)
+
+이 섹션은 저장소 클론부터 Langfuse 추적 및 SQLite 저장을 포함한 평가 실행까지 모든 단계를 안내합니다.
+
+### 사전 요구사항
+
+| 요구사항 | 버전 | 설치 방법 |
+|----------|------|-----------|
+| **Python** | 3.12.x | uv가 자동 설치 |
+| **uv** | 최신 | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Docker** | 최신 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
+| **Ollama** | 최신 | `curl -fsSL https://ollama.com/install.sh \| sh` |
+
+### 1단계: 클론 및 의존성 설치
 
 ```bash
-# 1. 환경 변수 구성
-cp .env.example .env
-echo "OPENAI_API_KEY=sk-your-key" >> .env
+# 저장소 클론
+git clone https://github.com/ntts9990/EvalVault.git
+cd EvalVault
 
-# 2. 평가 실행
-evalvault run data.json --metrics faithfulness
+# 의존성 설치 (.python-version으로 Python 3.12 자동 선택)
+uv sync --extra dev
 
-# 3. 결과 확인
-evalvault history
+# Python 버전 확인
+uv run python --version
+# 예상 출력: Python 3.12.x
 ```
+
+### 2단계: Ollama 설정 (로컬 LLM)
+
+EvalVault는 폐쇄망/로컬 LLM 평가를 위해 Ollama를 사용합니다. Ollama 서버를 시작하고 필요한 모델을 다운로드하세요:
+
+```bash
+# Ollama 서버 시작 (백그라운드 실행)
+ollama serve &
+
+# dev 프로필에 필요한 모델 다운로드
+ollama pull gemma3:1b              # 평가용 LLM
+ollama pull qwen3-embedding:0.6b   # 임베딩 모델
+
+# 설치된 모델 확인
+ollama list
+```
+
+**예상 출력:**
+```
+NAME                    SIZE
+gemma3:1b               815 MB
+qwen3-embedding:0.6b    639 MB
+```
+
+### 3단계: Langfuse 시작 (평가 추적)
+
+Langfuse는 트레이스 레벨 검사 및 평가 실행의 이력 비교를 제공합니다.
+
+```bash
+# Docker Compose로 Langfuse 시작
+docker compose -f docker-compose.langfuse.yml up -d
+
+# 모든 컨테이너가 healthy 상태인지 확인
+docker compose -f docker-compose.langfuse.yml ps
+```
+
+**예상 컨테이너:**
+| 컨테이너 | 포트 | 상태 |
+|----------|------|------|
+| langfuse-web | 3000 | healthy |
+| langfuse-worker | 3030 | healthy |
+| postgres | 5432 | healthy |
+| clickhouse | 8123 | healthy |
+| redis | 6379 | healthy |
+| minio | 9090 | healthy |
+
+### 4단계: Langfuse 프로젝트 및 API 키 생성
+
+1. 브라우저에서 http://localhost:3000 열기
+2. **Sign Up** - 계정 생성 (이메일 + 비밀번호)
+3. **New Organization** - 조직 생성 (예: "EvalVault")
+4. **New Project** - 프로젝트 생성 (예: "RAG-Evaluation")
+5. **Settings → API Keys** - 새 API 키 생성
+6. **Public Key** (`pk-lf-...`)와 **Secret Key** (`sk-lf-...`) 복사
+
+### 5단계: 환경 변수 설정
+
+설정 파일 `.env`를 생성합니다:
+
+```bash
+# 예제 파일 복사
+cp .env.example .env
+```
+
+`.env` 파일을 편집합니다:
+
+```bash
+# EvalVault 설정
+EVALVAULT_PROFILE=dev
+
+# Ollama 설정
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_TIMEOUT=120
+
+# Langfuse 설정 (여기에 키를 붙여넣으세요)
+LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key
+LANGFUSE_SECRET_KEY=sk-lf-your-secret-key
+LANGFUSE_HOST=http://localhost:3000
+```
+
+### 6단계: 첫 번째 평가 실행
+
+```bash
+# 샘플 데이터셋으로 평가 실행
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy
+
+# 예상 출력:
+# ╭───────────────────────────── Evaluation Results ─────────────────────────────╮
+# │ Evaluation Summary                                                           │
+# │   Run ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx                               │
+# │   Dataset: test_dataset v1.0.0                                               │
+# │   Model: ollama/gemma3:1b                                                    │
+# │   Duration: ~45s                                                             │
+# │ Results                                                                      │
+# │   Total Test Cases: 4                                                        │
+# │   Passed: 4                                                                  │
+# │   Pass Rate: 100.0%                                                          │
+# ╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### 7단계: 저장 옵션을 포함한 평가 실행
+
+결과를 Langfuse와 SQLite 모두에 저장합니다:
+
+```bash
+# Langfuse 추적 + SQLite 저장으로 실행
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy \
+  --langfuse \
+  --db evalvault.db
+
+# 예상 출력에 포함되는 내용:
+# Logged to Langfuse (trace_id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+# Results saved to database: evalvault.db
+# Run ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+### 8단계: 저장된 결과 확인
+
+**SQLite 이력:**
+```bash
+uv run evalvault history --db evalvault.db
+
+# ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+# ┃ Run ID      ┃ Dataset    ┃ Model       ┃ Started At ┃ Pass Rate ┃ Test Cases ┃
+# ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+# │ 51f0286a... │ test_data… │ ollama/gem… │ 2025-12-29 │    100.0% │          4 │
+# └─────────────┴────────────┴─────────────┴────────────┴───────────┴────────────┘
+```
+
+**Langfuse 대시보드:**
+- http://localhost:3000 열기
+- **Traces** 탭으로 이동
+- 각 평가 실행의 상세 트레이스 정보 확인
+
+### 빠른 참조
+
+| 작업 | 명령어 |
+|------|--------|
+| 평가 실행 | `uv run evalvault run data.json --metrics faithfulness` |
+| 저장 옵션 포함 실행 | `uv run evalvault run data.json --metrics faithfulness --langfuse --db evalvault.db` |
+| 이력 조회 | `uv run evalvault history --db evalvault.db` |
+| 메트릭 목록 | `uv run evalvault metrics` |
+| 설정 확인 | `uv run evalvault config` |
+| Langfuse 중지 | `docker compose -f docker-compose.langfuse.yml down` |
+
+---
 
 ## 지원 메트릭
 
@@ -85,16 +259,38 @@ evalvault history
 
 ## CLI 명령어
 
+> **참고**: 소스에서 실행할 때는 모든 명령어 앞에 `uv run`을 붙이세요. PyPI로 설치한 경우 `evalvault`만 사용합니다.
+
 ```bash
-evalvault run data.json --metrics faithfulness,answer_relevancy
-evalvault run data.json --metrics faithfulness --parallel --batch-size 10  # 병렬 평가
-evalvault run data.json --profile dev --metrics faithfulness    # Ollama
-evalvault run data.json -p openai --metrics faithfulness        # OpenAI
-evalvault run data.json --metrics faithfulness --langfuse       # Langfuse
-evalvault history --limit 10
-evalvault compare <run_id1> <run_id2>
-evalvault export <run_id> -o result.json
-evalvault config
+# 평가 실행
+uv run evalvault run data.json --metrics faithfulness,answer_relevancy
+
+# Langfuse 추적 + SQLite 저장으로 실행
+uv run evalvault run data.json --metrics faithfulness --langfuse --db evalvault.db
+
+# 병렬 평가 (대용량 데이터셋에 효과적)
+uv run evalvault run data.json --metrics faithfulness --parallel --batch-size 10
+
+# Ollama 프로필 선택
+uv run evalvault run data.json --profile dev --metrics faithfulness
+
+# OpenAI 프로필 선택
+uv run evalvault run data.json -p openai --metrics faithfulness
+
+# 이력 조회
+uv run evalvault history --db evalvault.db --limit 10
+
+# 실행 비교
+uv run evalvault compare <run_id1> <run_id2> --db evalvault.db
+
+# 결과 내보내기
+uv run evalvault export <run_id> -o result.json --db evalvault.db
+
+# 설정 확인
+uv run evalvault config
+
+# 사용 가능한 메트릭 목록
+uv run evalvault metrics
 ```
 
 ## 데이터 형식
@@ -145,22 +341,6 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
-
-## Ollama 설정 (폐쇄망)
-
-1. 설치
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
-   ```
-2. 모델 다운로드
-   ```bash
-   ollama pull gemma3:1b
-   ollama pull qwen3-embedding:0.6b
-   ```
-3. 프로필로 실행
-   ```bash
-   evalvault run data.json --profile dev --metrics faithfulness
-   ```
 
 ## 모델 프로필 (`config/models.yaml`)
 
