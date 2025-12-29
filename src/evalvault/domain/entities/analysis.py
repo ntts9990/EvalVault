@@ -243,8 +243,8 @@ class AnalysisBundle:
 
     run_id: str
     statistical: StatisticalAnalysis | None = None
-    nlp: Any | None = None  # NLPAnalysis
-    causal: Any | None = None  # CausalAnalysisResult
+    nlp: Any | None = None  # NLPAnalysis (forward reference)
+    causal: Any | None = None  # CausalAnalysis (set after class definition)
     created_at: datetime = field(default_factory=datetime.now)
 
     @property
@@ -364,3 +364,156 @@ class NLPAnalysis:
         if not self.question_types:
             return None
         return max(self.question_types, key=lambda x: x.count).question_type
+
+
+# =============================================================================
+# Causal Analysis Entities (Phase 3)
+# =============================================================================
+
+
+class CausalFactorType(str, Enum):
+    """인과 요인 유형."""
+
+    QUESTION_LENGTH = "question_length"  # 질문 길이
+    ANSWER_LENGTH = "answer_length"  # 답변 길이
+    CONTEXT_COUNT = "context_count"  # 컨텍스트 수
+    CONTEXT_LENGTH = "context_length"  # 컨텍스트 총 길이
+    QUESTION_TYPE = "question_type"  # 질문 유형
+    QUESTION_COMPLEXITY = "question_complexity"  # 질문 복잡도
+    HAS_GROUND_TRUTH = "has_ground_truth"  # ground_truth 존재 여부
+    KEYWORD_OVERLAP = "keyword_overlap"  # 질문-컨텍스트 키워드 겹침
+
+
+class ImpactDirection(str, Enum):
+    """영향 방향."""
+
+    POSITIVE = "positive"  # 증가할수록 점수 증가
+    NEGATIVE = "negative"  # 증가할수록 점수 감소
+    NEUTRAL = "neutral"  # 유의미한 영향 없음
+    NONLINEAR = "nonlinear"  # 비선형 관계 (예: U자형)
+
+
+class ImpactStrength(str, Enum):
+    """영향 강도."""
+
+    NEGLIGIBLE = "negligible"  # < 0.1
+    WEAK = "weak"  # 0.1 - 0.3
+    MODERATE = "moderate"  # 0.3 - 0.5
+    STRONG = "strong"  # > 0.5
+
+
+@dataclass
+class FactorStats:
+    """요인별 통계."""
+
+    factor_type: CausalFactorType
+    mean: float
+    std: float
+    min: float
+    max: float
+    median: float
+
+
+@dataclass
+class StratifiedGroup:
+    """계층화된 그룹 (요인 값 범위별 그룹)."""
+
+    group_name: str  # "low", "medium", "high" 등
+    lower_bound: float
+    upper_bound: float
+    count: int
+    avg_scores: dict[str, float]  # 메트릭별 평균 점수
+
+
+@dataclass
+class FactorImpact:
+    """요인이 메트릭에 미치는 영향."""
+
+    factor_type: CausalFactorType
+    metric_name: str
+    direction: ImpactDirection
+    strength: ImpactStrength
+    correlation: float  # 상관계수
+    p_value: float
+    is_significant: bool  # p < 0.05
+    effect_size: float  # 표준화된 효과 크기
+    stratified_groups: list[StratifiedGroup] = field(default_factory=list)
+    interpretation: str = ""
+
+
+@dataclass
+class CausalRelationship:
+    """인과 관계."""
+
+    cause: CausalFactorType
+    effect_metric: str
+    direction: ImpactDirection
+    confidence: float  # 0.0 ~ 1.0
+    evidence: str = ""  # 근거 설명
+    sample_size: int = 0
+
+
+@dataclass
+class RootCause:
+    """근본 원인 분석 결과."""
+
+    metric_name: str
+    primary_causes: list[CausalFactorType]  # 주요 원인 (영향력 순)
+    contributing_factors: list[CausalFactorType]  # 기여 요인
+    explanation: str = ""
+
+
+@dataclass
+class InterventionSuggestion:
+    """개선 제안."""
+
+    target_metric: str
+    intervention: str  # 제안 내용
+    expected_impact: str  # 예상 효과
+    priority: int = 1  # 1=높음, 2=중간, 3=낮음
+    related_factors: list[CausalFactorType] = field(default_factory=list)
+
+
+@dataclass
+class CausalAnalysis:
+    """인과 분석 결과."""
+
+    run_id: str
+    analysis_id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: datetime = field(default_factory=datetime.now)
+
+    # 요인별 통계
+    factor_stats: dict[CausalFactorType, FactorStats] = field(default_factory=dict)
+
+    # 요인-메트릭 영향 분석
+    factor_impacts: list[FactorImpact] = field(default_factory=list)
+
+    # 식별된 인과 관계
+    causal_relationships: list[CausalRelationship] = field(default_factory=list)
+
+    # 근본 원인 분석
+    root_causes: list[RootCause] = field(default_factory=list)
+
+    # 개선 제안
+    interventions: list[InterventionSuggestion] = field(default_factory=list)
+
+    # 인사이트
+    insights: list[str] = field(default_factory=list)
+
+    @property
+    def significant_impacts(self) -> list[FactorImpact]:
+        """유의미한 영향만 필터링."""
+        return [fi for fi in self.factor_impacts if fi.is_significant]
+
+    @property
+    def strong_relationships(self) -> list[CausalRelationship]:
+        """신뢰도 높은 인과 관계만 필터링 (confidence > 0.7)."""
+        return [cr for cr in self.causal_relationships if cr.confidence > 0.7]
+
+    def get_impacts_for_metric(self, metric_name: str) -> list[FactorImpact]:
+        """특정 메트릭에 대한 모든 요인 영향 조회."""
+        return [fi for fi in self.factor_impacts if fi.metric_name == metric_name]
+
+    def get_impacts_for_factor(self, factor_type: CausalFactorType) -> list[FactorImpact]:
+        """특정 요인의 모든 메트릭 영향 조회."""
+        return [fi for fi in self.factor_impacts if fi.factor_type == factor_type]

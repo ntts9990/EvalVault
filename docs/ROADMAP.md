@@ -1,14 +1,14 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2025-12-28
-> Current Version: 1.0.0
-> Status: Phase 7 Complete (Production Ready)
+> Last Updated: 2025-12-29
+> Current Version: 1.1.0
+> Status: Analysis Features Complete (Phase 2 NLP + Phase 3 Causal)
 
 ---
 
 ## Overview
 
-EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습니다.
+EvalVault의 개발 로드맵입니다. Phase 1-7 Core System 및 Analysis 기능(Phase 2 NLP, Phase 3 Causal)이 완료되었습니다.
 
 ### Progress Summary
 
@@ -19,7 +19,109 @@ EvalVault의 개발 로드맵입니다. Phase 1-7까지 모두 완료되었습�
 | Phase 5 | Storage & Domain | ✅ Complete | +42 |
 | Phase 6 | Advanced Features | ✅ Complete | +160 |
 | Phase 7 | Production Ready | ✅ Complete | +10 |
-| **Total** | | | **390** |
+| **Phase 2 NLP** | NLP Analysis | ✅ Complete | +97 |
+| **Phase 3 Causal** | Causal Analysis | ✅ Complete | +27 |
+| **Total** | | | **778** |
+
+---
+
+## Phase 2: NLP Analysis ✅
+
+> **Status**: Complete (2025-12-29)
+> **Tests**: +97
+
+평가 결과에 대한 자연어 처리 분석 기능입니다.
+
+### 구현된 기능
+
+| Sub-Phase | Description | Status |
+|-----------|-------------|--------|
+| Phase 2.3 | NLP Adapter (Hybrid: Rule + ML + LLM) | ✅ Complete |
+| Phase 2.4 | AnalysisService Integration | ✅ Complete |
+| Phase 2.5 | CLI Integration (`--nlp`, `--profile`) | ✅ Complete |
+| Phase 2.6 | Database Storage for NLP Analysis | ✅ Complete |
+| Phase 2.7 | Topic Clustering (K-Means + Embeddings) | ✅ Complete |
+| Phase 2.8 | Report Generation (Markdown/HTML) | ✅ Complete |
+
+### 주요 파일
+
+```
+src/evalvault/
+├── adapters/outbound/analysis/
+│   └── nlp_adapter.py          # NLP 분석 어댑터
+├── adapters/outbound/report/
+│   └── markdown_adapter.py     # Markdown/HTML 보고서 생성
+├── ports/outbound/
+│   ├── nlp_analysis_port.py    # NLP 분석 포트
+│   └── report_port.py          # 보고서 생성 포트
+└── domain/entities/
+    └── analysis.py             # NLPAnalysis, TextStats, TopicCluster 등
+```
+
+### CLI 사용법
+
+```bash
+# NLP 분석 실행
+evalvault analyze <run_id> --nlp --profile dev
+
+# 보고서 생성
+evalvault analyze <run_id> --nlp --report report.md
+evalvault analyze <run_id> --nlp --report report.html
+```
+
+---
+
+## Phase 3: Causal Analysis ✅
+
+> **Status**: Complete (2025-12-29)
+> **Tests**: +27
+
+평가 결과에서 인과 관계를 분석하여 근본 원인을 파악하고 개선 제안을 생성합니다.
+
+### 구현된 기능
+
+| Feature | Description |
+|---------|-------------|
+| Factor Extraction | 질문 길이, 컨텍스트 수, 키워드 겹침 등 인과 요인 추출 |
+| Factor-Metric Impact | 각 요인이 메트릭에 미치는 영향 분석 (상관분석) |
+| Causal Relationships | 유의미한 인과 관계 식별 |
+| Root Cause Analysis | 메트릭별 근본 원인 분석 |
+| Intervention Suggestions | 개선 제안 생성 |
+| Stratified Analysis | 요인값별 계층화 분석 (low/medium/high) |
+
+### 주요 파일
+
+```
+src/evalvault/
+├── adapters/outbound/analysis/
+│   └── causal_adapter.py       # 인과 분석 어댑터
+├── ports/outbound/
+│   └── causal_analysis_port.py # 인과 분석 포트
+└── domain/entities/
+    └── analysis.py             # CausalAnalysis, FactorImpact, RootCause 등
+```
+
+### CLI 사용법
+
+```bash
+# 인과 분석 실행
+evalvault analyze <run_id> --causal
+
+# NLP + 인과 분석 함께 실행
+evalvault analyze <run_id> --nlp --causal --report report.html
+```
+
+### 인과 요인 (Causal Factors)
+
+| Factor | Description |
+|--------|-------------|
+| `question_length` | 질문 길이 (단어 수) |
+| `answer_length` | 답변 길이 (단어 수) |
+| `context_count` | 컨텍스트 수 |
+| `context_length` | 컨텍스트 총 길이 |
+| `question_complexity` | 질문 복잡도 |
+| `has_ground_truth` | ground_truth 존재 여부 |
+| `keyword_overlap` | 질문-컨텍스트 키워드 겹침 |
 
 ---
 
