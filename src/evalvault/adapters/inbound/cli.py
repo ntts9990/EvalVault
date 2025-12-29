@@ -26,6 +26,7 @@ from evalvault.adapters.outbound.analysis import NLPAnalysisAdapter, Statistical
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import LLMRelationAugmenter, get_llm_adapter
+from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.config.domain_config import (
@@ -1906,6 +1907,9 @@ def analyze(
     nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis"),
     causal: bool = typer.Option(False, "--causal", help="Include causal analysis"),
     output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
+    report: Path | None = typer.Option(
+        None, "--report", "-r", help="Output report file (*.md or *.html)"
+    ),
     save: bool = typer.Option(False, "--save", help="Save analysis to database"),
     db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
     profile: str | None = typer.Option(
@@ -1921,6 +1925,8 @@ def analyze(
         evalvault analyze abc123
         evalvault analyze abc123 --nlp --profile dev
         evalvault analyze abc123 --output analysis.json
+        evalvault analyze abc123 --report report.md
+        evalvault analyze abc123 --nlp --report report.html
         evalvault analyze abc123 --save --db evalvault.db
     """
     storage = SQLiteStorageAdapter(db_path=db_path)
@@ -1990,6 +1996,11 @@ def analyze(
     if output:
         _export_analysis_json(analysis, output, bundle.nlp if nlp else None)
         console.print(f"\n[green]Analysis exported to: {output}[/green]")
+
+    # Generate report if requested
+    if report:
+        _generate_report(bundle, report, include_nlp=nlp)
+        console.print(f"\n[green]Report generated: {report}[/green]")
 
 
 @app.command(name="analyze-compare")
@@ -2294,6 +2305,29 @@ def _export_analysis_json(analysis, output_path: Path, nlp_analysis=None) -> Non
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _generate_report(bundle, output_path: Path, include_nlp: bool = True) -> None:
+    """Generate analysis report (Markdown or HTML).
+
+    Args:
+        bundle: AnalysisBundle containing analysis results
+        output_path: Output file path (*.md or *.html)
+        include_nlp: Whether to include NLP analysis section
+    """
+    adapter = MarkdownReportAdapter()
+
+    # Determine format from file extension
+    suffix = output_path.suffix.lower()
+
+    if suffix == ".html":
+        content = adapter.generate_html(bundle, include_nlp=include_nlp)
+    else:
+        # Default to markdown
+        content = adapter.generate_markdown(bundle, include_nlp=include_nlp)
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 
 if __name__ == "__main__":
