@@ -1542,3 +1542,220 @@ class TestDisplayKGStats:
 
         _display_kg_stats(stats)
         # No exception means success
+
+
+class TestCLIAnalyzeNLP:
+    """CLI analyze --nlp 명령 테스트."""
+
+    def test_analyze_help_shows_nlp_option(self):
+        """analyze 명령 help에 --nlp 옵션 표시."""
+        result = runner.invoke(app, ["analyze", "--help"])
+        assert result.exit_code == 0
+        assert "--nlp" in result.stdout
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_analyze_run_not_found(self, mock_storage_cls, tmp_path):
+        """존재하지 않는 run ID 테스트."""
+        mock_storage = MagicMock()
+        mock_storage.get_run.side_effect = KeyError("Run not found")
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["analyze", "nonexistent-run", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    def test_analyze_without_nlp(
+        self, mock_service_cls, mock_cache_cls, mock_stat_cls, mock_storage_cls, tmp_path
+    ):
+        """--nlp 없이 analyze 실행."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import AnalysisBundle, StatisticalAnalysis
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock analysis service
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            ["analyze", "run-123", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        # NLP adapter should not be created
+        mock_service.analyze_run.assert_called_once()
+        call_kwargs = mock_service.analyze_run.call_args[1]
+        assert call_kwargs["include_nlp"] is False
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.NLPAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
+    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    def test_analyze_with_nlp(
+        self,
+        mock_service_cls,
+        mock_cache_cls,
+        mock_stat_cls,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_nlp_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--nlp 옵션으로 analyze 실행."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import (
+            AnalysisBundle,
+            NLPAnalysis,
+            QuestionType,
+            QuestionTypeStats,
+            StatisticalAnalysis,
+            TextStats,
+        )
+
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.evalvault_profile = None
+        mock_settings_cls.return_value = mock_settings
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock NLP adapter
+        mock_nlp = MagicMock()
+        mock_nlp_cls.return_value = mock_nlp
+
+        # Mock analysis service with NLP results
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+            nlp=NLPAnalysis(
+                run_id="run-123",
+                question_stats=TextStats(
+                    char_count=100,
+                    word_count=20,
+                    sentence_count=2,
+                    avg_word_length=4.5,
+                    unique_word_ratio=0.9,
+                ),
+                question_types=[
+                    QuestionTypeStats(
+                        question_type=QuestionType.FACTUAL,
+                        count=5,
+                        percentage=1.0,
+                    )
+                ],
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            ["analyze", "run-123", "--nlp", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        # NLP adapter should be created
+        mock_nlp_cls.assert_called_once()
+        mock_service.analyze_run.assert_called_once()
+        call_kwargs = mock_service.analyze_run.call_args[1]
+        assert call_kwargs["include_nlp"] is True
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.NLPAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
+    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch("evalvault.adapters.inbound.cli.apply_profile")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    def test_analyze_with_nlp_and_profile(
+        self,
+        mock_service_cls,
+        mock_cache_cls,
+        mock_stat_cls,
+        mock_apply_profile,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_nlp_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--nlp --profile 옵션으로 analyze 실행."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import AnalysisBundle, StatisticalAnalysis
+
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.evalvault_profile = None
+        mock_settings_cls.return_value = mock_settings
+        mock_apply_profile.return_value = mock_settings
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock analysis service
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            ["analyze", "run-123", "--nlp", "--profile", "dev", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        mock_apply_profile.assert_called_once_with(mock_settings, "dev")

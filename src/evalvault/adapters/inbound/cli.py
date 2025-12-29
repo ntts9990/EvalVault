@@ -22,7 +22,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from evalvault.adapters.outbound.analysis import StatisticalAnalysisAdapter
+from evalvault.adapters.outbound.analysis import NLPAnalysisAdapter, StatisticalAnalysisAdapter
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import LLMRelationAugmenter, get_llm_adapter
@@ -1903,16 +1903,23 @@ def domain_terms(
 @app.command()
 def analyze(
     run_id: str = typer.Argument(..., help="Run ID to analyze"),
-    nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis (requires extras)"),
+    nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis"),
     causal: bool = typer.Option(False, "--causal", help="Include causal analysis"),
     output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
     save: bool = typer.Option(False, "--save", help="Save analysis to database"),
     db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
+        help="Model profile for NLP embeddings (dev, prod, openai)",
+    ),
 ):
     """Analyze an evaluation run and show statistical insights.
 
     Examples:
         evalvault analyze abc123
+        evalvault analyze abc123 --nlp --profile dev
         evalvault analyze abc123 --output analysis.json
         evalvault analyze abc123 --save --db evalvault.db
     """
@@ -1931,7 +1938,27 @@ def analyze(
     # Create analysis service
     analysis_adapter = StatisticalAnalysisAdapter()
     cache_adapter = MemoryCacheAdapter()
-    service = AnalysisService(analysis_adapter, cache_adapter)
+
+    # Create NLP adapter if requested
+    nlp_adapter = None
+    if nlp:
+        settings = Settings()
+        profile_name = profile or settings.evalvault_profile
+        if profile_name:
+            settings = apply_profile(settings, profile_name)
+
+        # Get LLM adapter for embeddings
+        llm_adapter = get_llm_adapter(settings)
+        nlp_adapter = NLPAnalysisAdapter(
+            llm_adapter=llm_adapter,
+            use_embeddings=True,
+        )
+
+    service = AnalysisService(
+        analysis_adapter=analysis_adapter,
+        nlp_adapter=nlp_adapter,
+        cache_adapter=cache_adapter,
+    )
 
     # Perform analysis
     console.print(f"\n[bold]Analyzing run: {run_id}[/bold]\n")
@@ -1950,6 +1977,10 @@ def analyze(
     _display_low_performers(analysis)
     _display_insights(analysis)
 
+    # Display NLP analysis if available
+    if bundle.has_nlp and bundle.nlp:
+        _display_nlp_analysis(bundle.nlp)
+
     # Save to database if requested
     if save:
         storage.save_analysis(analysis)
@@ -1957,7 +1988,7 @@ def analyze(
 
     # Export to JSON if requested
     if output:
-        _export_analysis_json(analysis, output)
+        _export_analysis_json(analysis, output, bundle.nlp if nlp else None)
         console.print(f"\n[green]Analysis exported to: {output}[/green]")
 
 
@@ -2145,7 +2176,76 @@ def _display_insights(analysis) -> None:
     console.print()
 
 
-def _export_analysis_json(analysis, output_path: Path) -> None:
+def _display_nlp_analysis(nlp_analysis) -> None:
+    """Display NLP analysis results."""
+    console.print("\n[bold cyan]NLP Analysis[/bold cyan]\n")
+
+    # Text Statistics
+    if nlp_analysis.question_stats:
+        console.print("[bold]Text Statistics (Questions):[/bold]")
+        stats = nlp_analysis.question_stats
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Metric", style="bold")
+        table.add_column("Value", justify="right")
+
+        table.add_row("Total Characters", str(stats.char_count))
+        table.add_row("Total Words", str(stats.word_count))
+        table.add_row("Total Sentences", str(stats.sentence_count))
+        table.add_row("Avg Word Length", f"{stats.avg_word_length:.2f}")
+        table.add_row("Vocabulary Diversity", f"{stats.unique_word_ratio:.1%}")
+        table.add_row("Avg Sentence Length", f"{stats.avg_sentence_length:.1f} words")
+
+        console.print(table)
+        console.print()
+
+    # Question Types
+    if nlp_analysis.question_types:
+        console.print("[bold]Question Type Distribution:[/bold]")
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Type")
+        table.add_column("Count", justify="right")
+        table.add_column("Percentage", justify="right")
+        table.add_column("Avg Scores")
+
+        for qt in nlp_analysis.question_types:
+            avg_scores_str = ", ".join(f"{k}: {v:.2f}" for k, v in (qt.avg_scores or {}).items())
+            table.add_row(
+                qt.question_type.value.capitalize(),
+                str(qt.count),
+                f"{qt.percentage:.1%}",
+                avg_scores_str or "-",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Keywords
+    if nlp_analysis.top_keywords:
+        console.print("[bold]Top Keywords:[/bold]")
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Keyword")
+        table.add_column("Frequency", justify="right")
+        table.add_column("TF-IDF Score", justify="right")
+
+        for kw in nlp_analysis.top_keywords[:10]:  # Show top 10
+            table.add_row(
+                kw.keyword,
+                str(kw.frequency),
+                f"{kw.tfidf_score:.3f}",
+            )
+
+        console.print(table)
+        console.print()
+
+    # NLP Insights
+    if nlp_analysis.insights:
+        console.print("[bold]NLP Insights:[/bold]")
+        for insight in nlp_analysis.insights:
+            console.print(f"  • {insight}")
+        console.print()
+
+
+def _export_analysis_json(analysis, output_path: Path, nlp_analysis=None) -> None:
     """Export analysis to JSON file."""
     from dataclasses import asdict
 
@@ -2165,6 +2265,32 @@ def _export_analysis_json(analysis, output_path: Path) -> None:
         "low_performers": [asdict(lp) for lp in analysis.low_performers],
         "insights": analysis.insights,
     }
+
+    # Add NLP analysis if available
+    if nlp_analysis:
+        data["nlp_analysis"] = {
+            "run_id": nlp_analysis.run_id,
+            "question_stats": asdict(nlp_analysis.question_stats)
+            if nlp_analysis.question_stats
+            else None,
+            "answer_stats": asdict(nlp_analysis.answer_stats)
+            if nlp_analysis.answer_stats
+            else None,
+            "context_stats": asdict(nlp_analysis.context_stats)
+            if nlp_analysis.context_stats
+            else None,
+            "question_types": [
+                {
+                    "question_type": qt.question_type.value,
+                    "count": qt.count,
+                    "percentage": qt.percentage,
+                    "avg_scores": qt.avg_scores,
+                }
+                for qt in nlp_analysis.question_types
+            ],
+            "top_keywords": [asdict(kw) for kw in nlp_analysis.top_keywords],
+            "insights": nlp_analysis.insights,
+        }
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
