@@ -487,3 +487,157 @@ class TestCacheKeyGeneration:
         key2 = service._make_cache_key("run-001", True, False)
 
         assert key1 == key2
+
+
+class TestAnalysisServiceNLPIntegration:
+    """AnalysisService NLP 분석 통합 테스트."""
+
+    @pytest.fixture
+    def mock_analysis_adapter(self):
+        """Mock 통계 분석 어댑터."""
+        adapter = MagicMock(spec=StatisticalAnalysisAdapter)
+        adapter.analyze_statistics.return_value = StatisticalAnalysis(
+            run_id="run-001",
+            overall_pass_rate=0.8,
+        )
+        return adapter
+
+    @pytest.fixture
+    def mock_nlp_adapter(self):
+        """Mock NLP 분석 어댑터."""
+        from evalvault.domain.entities.analysis import (
+            KeywordInfo,
+            NLPAnalysis,
+            QuestionType,
+            QuestionTypeStats,
+            TextStats,
+        )
+
+        adapter = MagicMock()
+        adapter.analyze.return_value = NLPAnalysis(
+            run_id="run-001",
+            question_stats=TextStats(
+                char_count=100,
+                word_count=20,
+                sentence_count=2,
+                avg_word_length=4.5,
+                unique_word_ratio=0.9,
+            ),
+            question_types=[
+                QuestionTypeStats(
+                    question_type=QuestionType.FACTUAL,
+                    count=3,
+                    percentage=0.6,
+                    avg_scores={"faithfulness": 0.85},
+                ),
+            ],
+            top_keywords=[
+                KeywordInfo(keyword="보험", frequency=5, tfidf_score=0.8),
+            ],
+            insights=["High vocabulary diversity"],
+        )
+        return adapter
+
+    @pytest.fixture
+    def sample_run(self):
+        """테스트용 샘플 EvaluationRun."""
+        return EvaluationRun(
+            run_id="run-001",
+            dataset_name="test-dataset",
+            model_name="gpt-5-nano",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="이 보험의 보장금액은 얼마인가요?",
+                    answer="보장금액은 1억원입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+    def test_analyze_run_with_nlp_adapter(
+        self, mock_analysis_adapter, mock_nlp_adapter, sample_run
+    ):
+        """NLP 어댑터가 있을 때 NLP 분석 수행."""
+        service = AnalysisService(
+            analysis_adapter=mock_analysis_adapter,
+            nlp_adapter=mock_nlp_adapter,
+        )
+
+        result = service.analyze_run(sample_run, include_nlp=True)
+
+        assert result.has_nlp is True
+        assert result.nlp is not None
+        assert result.nlp.run_id == "run-001"
+        mock_nlp_adapter.analyze.assert_called_once()
+
+    def test_analyze_run_nlp_disabled_by_default(
+        self, mock_analysis_adapter, mock_nlp_adapter, sample_run
+    ):
+        """기본적으로 NLP 분석 비활성화 확인."""
+        service = AnalysisService(
+            analysis_adapter=mock_analysis_adapter,
+            nlp_adapter=mock_nlp_adapter,
+        )
+
+        result = service.analyze_run(sample_run)  # include_nlp=False (기본값)
+
+        assert result.has_nlp is False
+        mock_nlp_adapter.analyze.assert_not_called()
+
+    def test_analyze_run_without_nlp_adapter(self, mock_analysis_adapter, sample_run):
+        """NLP 어댑터 없이 include_nlp=True 시 graceful 처리."""
+        service = AnalysisService(
+            analysis_adapter=mock_analysis_adapter,
+            nlp_adapter=None,  # NLP 어댑터 없음
+        )
+
+        result = service.analyze_run(sample_run, include_nlp=True)
+
+        # NLP 어댑터가 없으면 NLP 분석은 None
+        assert result.has_nlp is False
+
+    def test_analyze_run_nlp_with_cache(self, mock_analysis_adapter, mock_nlp_adapter, sample_run):
+        """NLP 분석 결과 캐싱 테스트."""
+        cache_adapter = MagicMock(spec=MemoryCacheAdapter)
+        cache_adapter.get.return_value = None  # 첫 번째 호출은 캐시 미스
+
+        service = AnalysisService(
+            analysis_adapter=mock_analysis_adapter,
+            nlp_adapter=mock_nlp_adapter,
+            cache_adapter=cache_adapter,
+        )
+
+        result = service.analyze_run(sample_run, include_nlp=True, use_cache=True)
+
+        # 분석 수행됨
+        mock_nlp_adapter.analyze.assert_called_once()
+        # 캐시에 저장됨
+        cache_adapter.set.assert_called_once()
+        assert result.has_nlp is True
+
+    def test_analyze_run_nlp_content(self, mock_analysis_adapter, mock_nlp_adapter, sample_run):
+        """NLP 분석 결과 내용 검증."""
+        service = AnalysisService(
+            analysis_adapter=mock_analysis_adapter,
+            nlp_adapter=mock_nlp_adapter,
+        )
+
+        result = service.analyze_run(sample_run, include_nlp=True)
+
+        # 텍스트 통계
+        assert result.nlp.question_stats is not None
+        assert result.nlp.question_stats.char_count == 100
+
+        # 질문 유형
+        assert len(result.nlp.question_types) == 1
+        assert result.nlp.question_types[0].question_type.value == "factual"
+
+        # 키워드
+        assert len(result.nlp.top_keywords) == 1
+        assert result.nlp.top_keywords[0].keyword == "보험"
+
+        # 인사이트
+        assert "High vocabulary diversity" in result.nlp.insights
