@@ -7,6 +7,7 @@ from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.nlp_analysis_port import NLPAnalysisPort
 from evalvault.ports.outbound.relation_augmenter_port import RelationAugmenterPort
+from evalvault.ports.outbound.report_port import ReportPort
 from evalvault.ports.outbound.storage_port import StoragePort
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
@@ -18,6 +19,7 @@ __all__ = [
     "LLMPort",
     "NLPAnalysisPort",
     "RelationAugmenterPort",
+    "ReportPort",
     "StoragePort",
     "TrackerPort",
 ]
