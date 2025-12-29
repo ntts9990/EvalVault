@@ -1,9 +1,9 @@
 # 2026 Q1 Implementation Plan: Domain Memory Layering
 
-> **Document Version**: 2.5.0
+> **Document Version**: 3.0.0
 > **Created**: 2025-12-28
-> **Last Updated**: 2025-12-28
-> **Status**: Phase 5 Complete
+> **Last Updated**: 2025-12-29
+> **Status**: ✅ Complete (All Phases)
 
 ---
 
@@ -13,23 +13,30 @@
 
 | Initiative | Q1 Status | 이유 |
 |------------|-----------|------|
-| **Domain Memory Layering** | ✅ 구현 | 현재 파이프라인 아키텍처에 적용 가능 |
+| **Domain Memory Layering** | ✅ 완료 | 모든 Phase 완료 (Phase 1-5, 총 113개 테스트)
 | Coordination Profiler | ⏸️ 연기 | 프로파일링할 에이전트 시스템 부재 |
 | Latent Evidence Bus | ⏸️ 연기 | 에이전트 시스템 + 로컬 모델 필요 |
 
-**Q1 집중 목표**: Domain Memory Layering 완성
+**Q1 집중 목표**: Domain Memory Layering 완성 ✅
+
+**완료 상태**: 모든 Phase 완료 (2025-12-29)
+- Phase 1: Factual Memory Store (+40 tests)
+- Phase 2: Dynamics Evolution & Retrieval (+14 tests)
+- Phase 3: Dynamics Formation (+9 tests)
+- Phase 4: Config & Multi-language (+33 tests)
+- Phase 5: Forms Planar/Hierarchical (+17 tests)
+- **총 113개 테스트 완료**
 
 ### 리소스 요약
 
-| Phase | Duration | Effort | Priority | Status |
-|-------|----------|--------|----------|--------|
-| Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete |
-| Dynamics: Evolution | 1 week | 12h | Must Have | ✅ Complete |
-| Dynamics: Retrieval | 1 week | 12h | Must Have | ✅ Complete |
-| Dynamics: Formation | 1 week | 16h | Must Have | ✅ Complete |
-| Config & Multi-language | 1.5 weeks | 16h | Should Have | ✅ Complete |
-| Forms: Planar/Hierarchical | 1 week | 12h | Should Have | ✅ Complete |
-| **Total** | **8 weeks** | **92h** | | |
+| Phase | Duration | Effort | Priority | Status | Tests |
+|-------|----------|--------|----------|--------|-------|
+| Phase 1: Factual Memory Store | 2 weeks | 24h | Must Have | ✅ Complete | +40 |
+| Phase 2: Dynamics (Evolution + Retrieval) | 2 weeks | 24h | Must Have | ✅ Complete | +14 |
+| Phase 3: Dynamics (Formation) | 1 week | 16h | Must Have | ✅ Complete | +9 |
+| Phase 4: Config & Multi-language | 1.5 weeks | 16h | Should Have | ✅ Complete | +33 |
+| Phase 5: Forms (Planar/Hierarchical) | 1 week | 12h | Should Have | ✅ Complete | +17 |
+| **Total** | **8 weeks** | **92h** | | | **+113** |
 
 ---
 
@@ -66,6 +73,28 @@ Domain Memory 적용 후
 결과: 사용할수록 정확도 향상
      - 성공 패턴 강화, 실패 패턴 회피
      - 도메인 지식이 살아있는 데이터베이스
+```
+
+**중요한 설명:**
+- **Ragas 평가 자체는 매번 동일한 프롬프트를 사용합니다** (Ragas 메트릭의 고정된 프롬프트)
+- **학습 피드백 루프는 평가가 아닌 다른 컴포넌트에서 작동합니다:**
+  1. **KG 생성 및 테스트셋 생성**: EntityExtractor가 학습된 패턴을 사용하여 더 정확한 엔티티 추출
+  2. **도메인 지식 축적**: 평가 결과에서 검증된 사실(FactualFact)을 추출하여 도메인 지식베이스 구축
+  3. **패턴 학습**: 엔티티 타입별 신뢰도, 실패 패턴 등을 학습하여 다음 KG 생성에 반영
+
+**실제 작동 방식:**
+```
+평가 #1: Dataset → RagasEvaluator → EvaluationRun
+    └─> DomainLearningHook.on_evaluation_complete()
+            ├─> 엔티티 타입별 신뢰도 계산 (예: "organization" 타입 = 0.92)
+            └─> LearningMemory 저장
+
+평가 #2 (KG 기반 테스트셋 생성 시):
+    └─> KnowledgeGraphGenerator.build_graph(documents)
+            └─> EntityExtractor.extract_entities()
+                    └─> DomainMemoryAdapter.get_aggregated_reliability()
+                            └─> 학습된 신뢰도 점수를 가중치로 적용
+                                    └─> 더 정확한 엔티티 추출 → 더 나은 KG → 더 나은 테스트셋
 ```
 
 ### 1.3 정량적 성공 지표

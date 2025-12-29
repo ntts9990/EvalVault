@@ -1,14 +1,14 @@
 # EvalVault Development Roadmap
 
 > Last Updated: 2025-12-29
-> Current Version: 1.1.0
-> Status: Analysis Features Complete (Phase 2 NLP + Phase 3 Causal)
+> Current Version: 1.2.0
+> Status: Domain Memory Layering Complete (Phase 8)
 
 ---
 
 ## Overview
 
-EvalVault의 개발 로드맵입니다. Phase 1-7 Core System 및 Analysis 기능(Phase 2 NLP, Phase 3 Causal)이 완료되었습니다.
+EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), 그리고 Domain Memory Layering(Phase 8)이 완료되었습니다.
 
 ### Progress Summary
 
@@ -21,7 +21,8 @@ EvalVault의 개발 로드맵입니다. Phase 1-7 Core System 및 Analysis 기�
 | Phase 7 | Production Ready | ✅ Complete | +10 |
 | **Phase 2 NLP** | NLP Analysis | ✅ Complete | +97 |
 | **Phase 3 Causal** | Causal Analysis | ✅ Complete | +27 |
-| **Total** | | | **778** |
+| **Phase 8** | Domain Memory Layering | ✅ Complete | +113 |
+| **Total** | | | **891** |
 
 ---
 
@@ -125,17 +126,39 @@ evalvault analyze <run_id> --nlp --causal --report report.html
 
 ---
 
-## Phase 8: Domain Memory Layering (Target: 2026 Q1)
+## Phase 8: Domain Memory Layering ✅
 
-> **Status**: Planning
+> **Status**: Complete (2025-12-29)
+> **Tests**: +113
 > **Priority**: 🔥 High
-> **Effort**: ~50h / 4 weeks
 
 EvalVault의 현재 아키텍처(순차적 평가 파이프라인)에 맞는 실질적인 개선 사항입니다.
 
 ### 목표
 
 평가 결과에서 학습하여 엔티티 추출과 지식 그래프 생성의 정확도를 향상시킵니다.
+
+**중요한 설명:**
+- **Ragas 평가 자체는 매번 동일한 프롬프트를 사용합니다** (Ragas 메트릭의 고정된 프롬프트)
+- **학습 피드백 루프는 평가가 아닌 다른 컴포넌트에서 작동합니다:**
+  1. **KG 생성 및 테스트셋 생성**: EntityExtractor가 학습된 패턴을 사용하여 더 정확한 엔티티 추출
+  2. **도메인 지식 축적**: 평가 결과에서 검증된 사실(FactualFact)을 추출하여 도메인 지식베이스 구축
+  3. **패턴 학습**: 엔티티 타입별 신뢰도, 실패 패턴 등을 학습하여 다음 KG 생성에 반영
+
+**실제 작동 방식:**
+```
+평가 #1: Dataset → RagasEvaluator → EvaluationRun
+    └─> DomainLearningHook.on_evaluation_complete()
+            ├─> 엔티티 타입별 신뢰도 계산 (예: "organization" 타입 = 0.92)
+            └─> LearningMemory 저장
+
+평가 #2 (KG 기반 테스트셋 생성 시):
+    └─> KnowledgeGraphGenerator.build_graph(documents)
+            └─> EntityExtractor.extract_entities()
+                    └─> DomainMemoryAdapter.get_aggregated_reliability()
+                            └─> 학습된 신뢰도 점수를 가중치로 적용
+                                    └─> 더 정확한 엔티티 추출 → 더 나은 KG → 더 나은 테스트셋
+```
 
 ### 핵심 개념
 
@@ -147,9 +170,59 @@ Agent Memory Survey의 Forms×Functions 가이드라인을 도입해 도메인 �
 | **Experiential** | 평가에서 학습한 패턴 | 엔티티 타입별 신뢰도, 실패 패턴 |
 | **Working** | 현재 실행 컨텍스트 | 세션 캐시, 활성 KG 바인딩 |
 
-### 구현 계획
+### 구현된 기능
 
-#### Phase 8.1: Factual Memory Store (Week 1-2)
+| Sub-Phase | Description | Status | Tests |
+|-----------|-------------|--------|-------|
+| Phase 8.1 | Factual Memory Store | ✅ Complete | +40 |
+| Phase 8.2 | Dynamics: Evolution & Retrieval | ✅ Complete | +14 |
+| Phase 8.3 | Dynamics: Formation | ✅ Complete | +9 |
+| Phase 8.4 | Config & Multi-language | ✅ Complete | +33 |
+| Phase 8.5 | Forms: Planar/Hierarchical | ✅ Complete | +17 |
+| **Total** | | | **+113** |
+
+### 주요 파일
+
+```
+src/evalvault/
+├── domain/entities/
+│   └── memory.py                    # FactualFact, LearningMemory, BehaviorEntry
+├── domain/services/
+│   └── domain_learning_hook.py      # DomainLearningHook 서비스
+├── ports/outbound/
+│   ├── domain_memory_port.py        # DomainMemoryPort 인터페이스
+│   └── learning_hook_port.py         # DomainLearningHookPort 인터페이스
+├── adapters/outbound/domain_memory/
+│   ├── sqlite_adapter.py            # SQLiteDomainMemoryAdapter
+│   └── domain_memory_schema.sql     # 스키마 (FTS5 포함)
+└── config/
+    └── domain_config.py             # DomainMemoryConfig
+
+config/domains/insurance/
+├── memory.yaml                       # 도메인 메모리 설정
+├── terms_dictionary_ko.json          # 한국어 용어사전
+└── terms_dictionary_en.json          # 영어 용어사전
+```
+
+### CLI 사용법
+
+```bash
+# 도메인 초기화
+evalvault domain init insurance --languages ko,en
+
+# 도메인 목록 조회
+evalvault domain list
+
+# 도메인 설정 조회
+evalvault domain show insurance
+
+# 용어사전 조회
+evalvault domain terms insurance --language ko --limit 10
+```
+
+### 구현 계획 (참고용 - 완료됨)
+
+#### Phase 8.1: Factual Memory Store (Week 1-2) ✅
 
 ```
 src/evalvault/domain/entities/memory.py
@@ -164,7 +237,7 @@ src/evalvault/adapters/outbound/domain_memory/
 └── sqlite_adapter.py (SQLite 기반 메모리 저장소)
 ```
 
-#### Phase 8.2: Config Extension (Week 2-3)
+#### Phase 8.2: Config Extension (Week 2-3) ✅
 
 ```yaml
 # config/domains/insurance/memory.yaml
@@ -187,7 +260,7 @@ evalvault domain list               # 등록된 도메인 목록
 evalvault run ... --memory-layer working  # 특정 계층만 로드
 ```
 
-#### Phase 8.3: Learning Integration (Week 3-4)
+#### Phase 8.3: Learning Integration (Week 3-4) ✅
 
 **DomainLearningHook 프로토콜** (결합도 최소화):
 ```python
@@ -469,9 +542,9 @@ evalvault generate <documents> -n <num> -o <output>
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| Unit Tests | 431 | Domain, ports, adapters, services |
+| Unit Tests | 752 | Domain, ports, adapters, services, analysis |
 | Integration Tests | 26 | End-to-end flows |
-| **Total** | **457** | All passing |
+| **Total** | **778** | All passing |
 
 ### Test Files
 ```
@@ -493,7 +566,10 @@ tests/
 │   ├── test_postgres_storage.py  # 19 tests (Phase 6)
 │   ├── test_mlflow_tracker.py    # 17 tests (Phase 6)
 │   ├── test_azure_adapter.py     # 18 tests (Phase 6)
-│   └── test_anthropic_adapter.py # 19 tests (Phase 6)
+│   ├── test_anthropic_adapter.py # 19 tests (Phase 6)
+│   ├── test_nlp_adapter.py       # 97 tests (Phase 2 NLP)
+│   ├── test_causal_adapter.py    # 27 tests (Phase 3 Causal)
+│   └── test_domain_memory.py     # 80 tests (Phase 8)
 └── integration/
     ├── test_evaluation_flow.py   # 6 tests
     ├── test_data_flow.py         # 8 tests
@@ -511,6 +587,8 @@ tests/
 | 0.2.0 | 2024-12-24 | Phase 5 Complete - Storage & Domain |
 | 0.3.0 | 2025-12-24 | Phase 6 Complete - Advanced Features |
 | 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화 |
+| 1.1.0 | 2025-12-29 | Phase 2 NLP + Phase 3 Causal Analysis |
+| 1.2.0 | 2025-12-29 | Phase 8 Domain Memory Layering |
 
 ---
 
@@ -580,6 +658,10 @@ src/evalvault/
 | StoragePort | SQLiteAdapter | ✅ Complete |
 | StoragePort | PostgreSQLAdapter | ✅ Complete |
 | EvaluatorPort | RagasEvaluator | ✅ Complete |
+| NLPAnalysisPort | NLPAnalysisAdapter | ✅ Complete |
+| CausalAnalysisPort | CausalAnalysisAdapter | ✅ Complete |
+| ReportPort | MarkdownReportAdapter | ✅ Complete |
+| DomainMemoryPort | SQLiteDomainMemoryAdapter | ✅ Complete |
 
 ---
 
