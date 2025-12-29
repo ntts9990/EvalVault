@@ -22,6 +22,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from evalvault.adapters.outbound.analysis import StatisticalAnalysisAdapter
+from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import LLMRelationAugmenter, get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
@@ -33,6 +35,7 @@ from evalvault.config.domain_config import (
     save_domain_config,
 )
 from evalvault.config.settings import Settings, apply_profile
+from evalvault.domain.services.analysis_service import AnalysisService
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.experiment_manager import ExperimentManager
 from evalvault.domain.services.kg_generator import KnowledgeGraphGenerator
@@ -1890,6 +1893,281 @@ def domain_terms(
     if total > limit:
         console.print(f"\n[dim]Showing {limit} of {total} terms. Use --limit to show more.[/dim]")
     console.print()
+
+
+# ============================================================================
+# Analysis Commands
+# ============================================================================
+
+
+@app.command()
+def analyze(
+    run_id: str = typer.Argument(..., help="Run ID to analyze"),
+    nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis (requires extras)"),
+    causal: bool = typer.Option(False, "--causal", help="Include causal analysis"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
+    save: bool = typer.Option(False, "--save", help="Save analysis to database"),
+    db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+):
+    """Analyze an evaluation run and show statistical insights.
+
+    Examples:
+        evalvault analyze abc123
+        evalvault analyze abc123 --output analysis.json
+        evalvault analyze abc123 --save --db evalvault.db
+    """
+    storage = SQLiteStorageAdapter(db_path=db_path)
+
+    try:
+        run = storage.get_run(run_id)
+    except KeyError:
+        console.print(f"[red]Error: Run not found: {run_id}[/red]")
+        raise typer.Exit(1)
+
+    if not run.results:
+        console.print("[yellow]Warning: No test case results to analyze.[/yellow]")
+        raise typer.Exit(0)
+
+    # Create analysis service
+    analysis_adapter = StatisticalAnalysisAdapter()
+    cache_adapter = MemoryCacheAdapter()
+    service = AnalysisService(analysis_adapter, cache_adapter)
+
+    # Perform analysis
+    console.print(f"\n[bold]Analyzing run: {run_id}[/bold]\n")
+    bundle = service.analyze_run(run, include_nlp=nlp, include_causal=causal)
+
+    if not bundle.statistical:
+        console.print("[yellow]No statistical analysis available.[/yellow]")
+        raise typer.Exit(0)
+
+    analysis = bundle.statistical
+
+    # Display results
+    _display_analysis_summary(analysis)
+    _display_metric_stats(analysis)
+    _display_correlations(analysis)
+    _display_low_performers(analysis)
+    _display_insights(analysis)
+
+    # Save to database if requested
+    if save:
+        storage.save_analysis(analysis)
+        console.print(f"\n[green]Analysis saved to database: {db_path}[/green]")
+
+    # Export to JSON if requested
+    if output:
+        _export_analysis_json(analysis, output)
+        console.print(f"\n[green]Analysis exported to: {output}[/green]")
+
+
+@app.command(name="analyze-compare")
+def analyze_compare(
+    run_id1: str = typer.Argument(..., help="First run ID"),
+    run_id2: str = typer.Argument(..., help="Second run ID"),
+    metrics: str | None = typer.Option(
+        None, "--metrics", "-m", help="Comma-separated metrics to compare"
+    ),
+    test: str = typer.Option(
+        "t-test", "--test", "-t", help="Statistical test (t-test, mann-whitney)"
+    ),
+    db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+):
+    """Compare two evaluation runs statistically.
+
+    Examples:
+        evalvault analyze-compare run1 run2
+        evalvault analyze-compare run1 run2 --metrics faithfulness,answer_relevancy
+        evalvault analyze-compare run1 run2 --test mann-whitney
+    """
+    storage = SQLiteStorageAdapter(db_path=db_path)
+
+    try:
+        run_a = storage.get_run(run_id1)
+        run_b = storage.get_run(run_id2)
+    except KeyError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    # Parse metrics
+    metric_list = None
+    if metrics:
+        metric_list = [m.strip() for m in metrics.split(",")]
+
+    # Create analysis service
+    analysis_adapter = StatisticalAnalysisAdapter()
+    service = AnalysisService(analysis_adapter)
+
+    # Perform comparison
+    console.print("\n[bold]Comparing runs:[/bold]")
+    console.print(f"  Run A: {run_id1}")
+    console.print(f"  Run B: {run_id2}")
+    console.print(f"  Test: {test}\n")
+
+    comparisons = service.compare_runs(run_a, run_b, metrics=metric_list, test_type=test)
+
+    if not comparisons:
+        console.print("[yellow]No common metrics to compare.[/yellow]")
+        raise typer.Exit(0)
+
+    # Display comparison table
+    table = Table(title="Statistical Comparison", show_header=True, header_style="bold cyan")
+    table.add_column("Metric")
+    table.add_column("Run A (Mean)", justify="right")
+    table.add_column("Run B (Mean)", justify="right")
+    table.add_column("Diff (%)", justify="right")
+    table.add_column("p-value", justify="right")
+    table.add_column("Effect Size", justify="right")
+    table.add_column("Significant")
+    table.add_column("Winner")
+
+    for c in comparisons:
+        sig_style = "green" if c.is_significant else "dim"
+        winner = c.winner[:8] if c.winner else "-"
+
+        table.add_row(
+            c.metric,
+            f"{c.mean_a:.3f}",
+            f"{c.mean_b:.3f}",
+            f"{c.diff_percent:+.1f}%",
+            f"{c.p_value:.4f}",
+            f"{c.effect_size:.2f} ({c.effect_level.value})",
+            f"[{sig_style}]{'Yes' if c.is_significant else 'No'}[/{sig_style}]",
+            winner,
+        )
+
+    console.print(table)
+    console.print()
+
+
+def _display_analysis_summary(analysis) -> None:
+    """Display analysis summary panel."""
+    panel = Panel(
+        f"""[bold]Analysis Summary[/bold]
+Run ID: {analysis.run_id}
+Analysis Type: {analysis.analysis_type.value}
+Created: {analysis.created_at.strftime("%Y-%m-%d %H:%M:%S")}
+
+Overall Pass Rate: [{"green" if analysis.overall_pass_rate >= 0.7 else "yellow" if analysis.overall_pass_rate >= 0.5 else "red"}]{analysis.overall_pass_rate:.1%}[/]
+Metrics Analyzed: {len(analysis.metrics_summary)}
+Significant Correlations: {len(analysis.significant_correlations)}
+Low Performers Found: {len(analysis.low_performers)}""",
+        title="[bold cyan]Statistical Analysis[/bold cyan]",
+        border_style="cyan",
+    )
+    console.print(panel)
+
+
+def _display_metric_stats(analysis) -> None:
+    """Display metric statistics table."""
+    if not analysis.metrics_summary:
+        return
+
+    table = Table(title="Metric Statistics", show_header=True, header_style="bold cyan")
+    table.add_column("Metric")
+    table.add_column("Mean", justify="right")
+    table.add_column("Std", justify="right")
+    table.add_column("Min", justify="right")
+    table.add_column("Max", justify="right")
+    table.add_column("Median", justify="right")
+    table.add_column("Pass Rate", justify="right")
+
+    for metric_name, stats in analysis.metrics_summary.items():
+        pass_rate = analysis.metric_pass_rates.get(metric_name, 0)
+        pass_style = "green" if pass_rate >= 0.7 else "yellow" if pass_rate >= 0.5 else "red"
+
+        table.add_row(
+            metric_name,
+            f"{stats.mean:.3f}",
+            f"{stats.std:.3f}",
+            f"{stats.min:.3f}",
+            f"{stats.max:.3f}",
+            f"{stats.median:.3f}",
+            f"[{pass_style}]{pass_rate:.1%}[/{pass_style}]",
+        )
+
+    console.print(table)
+    console.print()
+
+
+def _display_correlations(analysis) -> None:
+    """Display significant correlations."""
+    if not analysis.significant_correlations:
+        return
+
+    console.print("[bold]Significant Correlations:[/bold]")
+    for corr in analysis.significant_correlations[:5]:  # Top 5
+        direction = "[green]+" if corr.correlation > 0 else "[red]-"
+        console.print(
+            f"  {direction}{abs(corr.correlation):.2f}[/] "
+            f"{corr.variable1} ↔ {corr.variable2} "
+            f"(p={corr.p_value:.4f}, {corr.interpretation})"
+        )
+    console.print()
+
+
+def _display_low_performers(analysis) -> None:
+    """Display low performing test cases."""
+    if not analysis.low_performers:
+        return
+
+    console.print(f"[bold]Low Performing Test Cases ({len(analysis.low_performers)}):[/bold]")
+
+    table = Table(show_header=True, header_style="bold yellow")
+    table.add_column("Test Case")
+    table.add_column("Metric")
+    table.add_column("Score", justify="right")
+    table.add_column("Threshold", justify="right")
+    table.add_column("Potential Causes")
+
+    for lp in analysis.low_performers[:10]:  # Top 10
+        causes = ", ".join(lp.potential_causes[:2]) if lp.potential_causes else "-"
+        table.add_row(
+            lp.test_case_id[:12] + "..." if len(lp.test_case_id) > 15 else lp.test_case_id,
+            lp.metric_name,
+            f"[red]{lp.score:.3f}[/red]",
+            f"{lp.threshold:.2f}",
+            causes[:40] + "..." if len(causes) > 40 else causes,
+        )
+
+    console.print(table)
+    console.print()
+
+
+def _display_insights(analysis) -> None:
+    """Display analysis insights."""
+    if not analysis.insights:
+        return
+
+    console.print("[bold]Insights:[/bold]")
+    for insight in analysis.insights:
+        console.print(f"  • {insight}")
+    console.print()
+
+
+def _export_analysis_json(analysis, output_path: Path) -> None:
+    """Export analysis to JSON file."""
+    from dataclasses import asdict
+
+    data = {
+        "analysis_id": analysis.analysis_id,
+        "run_id": analysis.run_id,
+        "analysis_type": analysis.analysis_type.value,
+        "created_at": analysis.created_at.isoformat(),
+        "overall_pass_rate": analysis.overall_pass_rate,
+        "metric_pass_rates": analysis.metric_pass_rates,
+        "metrics_summary": {
+            name: asdict(stats) for name, stats in analysis.metrics_summary.items()
+        },
+        "correlation_matrix": analysis.correlation_matrix,
+        "correlation_metrics": analysis.correlation_metrics,
+        "significant_correlations": [asdict(c) for c in analysis.significant_correlations],
+        "low_performers": [asdict(lp) for lp in analysis.low_performers],
+        "insights": analysis.insights,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":

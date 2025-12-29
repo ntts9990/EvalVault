@@ -2,10 +2,19 @@
 
 import json
 import sqlite3
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.entities.analysis import (
+    AnalysisType,
+    CorrelationInsight,
+    LowPerformerInfo,
+    MetricStats,
+    StatisticalAnalysis,
+)
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
 
 
@@ -503,3 +512,208 @@ class SQLiteStorageAdapter:
             experiment: 업데이트할 실험
         """
         self.save_experiment(experiment)
+
+    # Analysis 관련 메서드
+
+    def save_analysis(self, analysis: StatisticalAnalysis) -> str:
+        """분석 결과를 저장합니다.
+
+        Args:
+            analysis: 저장할 분석 결과
+
+        Returns:
+            저장된 analysis의 ID
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Serialize analysis to JSON
+            result_data = self._serialize_analysis(analysis)
+
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO analysis_results (
+                    analysis_id, run_id, analysis_type, result_data, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    analysis.analysis_id,
+                    analysis.run_id,
+                    analysis.analysis_type.value,
+                    json.dumps(result_data, ensure_ascii=False),
+                    analysis.created_at.isoformat(),
+                ),
+            )
+
+            conn.commit()
+            return analysis.analysis_id
+
+        finally:
+            conn.close()
+
+    def get_analysis(self, analysis_id: str) -> StatisticalAnalysis:
+        """분석 결과를 조회합니다.
+
+        Args:
+            analysis_id: 조회할 분석 ID
+
+        Returns:
+            StatisticalAnalysis 객체
+
+        Raises:
+            KeyError: 분석을 찾을 수 없는 경우
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                """
+                SELECT analysis_id, run_id, analysis_type, result_data, created_at
+                FROM analysis_results
+                WHERE analysis_id = ?
+                """,
+                (analysis_id,),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                raise KeyError(f"Analysis not found: {analysis_id}")
+
+            result_data = json.loads(row[3])
+            return self._deserialize_analysis(
+                analysis_id=row[0],
+                run_id=row[1],
+                analysis_type=row[2],
+                result_data=result_data,
+                created_at=row[4],
+            )
+
+        finally:
+            conn.close()
+
+    def get_analysis_by_run(
+        self,
+        run_id: str,
+        analysis_type: str | None = None,
+    ) -> list[StatisticalAnalysis]:
+        """특정 실행의 분석 결과를 조회합니다.
+
+        Args:
+            run_id: 실행 ID
+            analysis_type: 분석 유형 필터 (선택)
+
+        Returns:
+            StatisticalAnalysis 리스트
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            query = """
+                SELECT analysis_id, run_id, analysis_type, result_data, created_at
+                FROM analysis_results
+                WHERE run_id = ?
+            """
+            params: list[Any] = [run_id]
+
+            if analysis_type:
+                query += " AND analysis_type = ?"
+                params.append(analysis_type)
+
+            query += " ORDER BY created_at DESC"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            return [
+                self._deserialize_analysis(
+                    analysis_id=row[0],
+                    run_id=row[1],
+                    analysis_type=row[2],
+                    result_data=json.loads(row[3]),
+                    created_at=row[4],
+                )
+                for row in rows
+            ]
+
+        finally:
+            conn.close()
+
+    def delete_analysis(self, analysis_id: str) -> bool:
+        """분석 결과를 삭제합니다.
+
+        Args:
+            analysis_id: 삭제할 분석 ID
+
+        Returns:
+            삭제 성공 여부
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                "DELETE FROM analysis_results WHERE analysis_id = ?",
+                (analysis_id,),
+            )
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+
+        finally:
+            conn.close()
+
+    def _serialize_analysis(self, analysis: StatisticalAnalysis) -> dict[str, Any]:
+        """분석 결과를 JSON 직렬화 가능한 형태로 변환합니다."""
+        return {
+            "metrics_summary": {
+                name: asdict(stats) for name, stats in analysis.metrics_summary.items()
+            },
+            "correlation_matrix": analysis.correlation_matrix,
+            "correlation_metrics": analysis.correlation_metrics,
+            "significant_correlations": [asdict(c) for c in analysis.significant_correlations],
+            "low_performers": [asdict(lp) for lp in analysis.low_performers],
+            "insights": analysis.insights,
+            "overall_pass_rate": analysis.overall_pass_rate,
+            "metric_pass_rates": analysis.metric_pass_rates,
+        }
+
+    def _deserialize_analysis(
+        self,
+        analysis_id: str,
+        run_id: str,
+        analysis_type: str,
+        result_data: dict[str, Any],
+        created_at: str,
+    ) -> StatisticalAnalysis:
+        """JSON 데이터를 StatisticalAnalysis로 역직렬화합니다."""
+        # Reconstruct MetricStats
+        metrics_summary = {
+            name: MetricStats(**stats)
+            for name, stats in result_data.get("metrics_summary", {}).items()
+        }
+
+        # Reconstruct CorrelationInsight
+        significant_correlations = [
+            CorrelationInsight(**c) for c in result_data.get("significant_correlations", [])
+        ]
+
+        # Reconstruct LowPerformerInfo
+        low_performers = [LowPerformerInfo(**lp) for lp in result_data.get("low_performers", [])]
+
+        return StatisticalAnalysis(
+            analysis_id=analysis_id,
+            run_id=run_id,
+            analysis_type=AnalysisType(analysis_type),
+            created_at=datetime.fromisoformat(created_at),
+            metrics_summary=metrics_summary,
+            correlation_matrix=result_data.get("correlation_matrix", []),
+            correlation_metrics=result_data.get("correlation_metrics", []),
+            significant_correlations=significant_correlations,
+            low_performers=low_performers,
+            insights=result_data.get("insights", []),
+            overall_pass_rate=result_data.get("overall_pass_rate", 0.0),
+            metric_pass_rates=result_data.get("metric_pass_rates", {}),
+        )

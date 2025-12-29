@@ -98,3 +98,33 @@ CREATE TABLE IF NOT EXISTS experiment_group_runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_runs_group_id ON experiment_group_runs(group_id);
+
+-- Analysis results table
+CREATE TABLE IF NOT EXISTS analysis_results (
+    analysis_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    analysis_type TEXT NOT NULL,  -- 'statistical', 'nlp', 'causal', 'data_quality'
+    result_data TEXT NOT NULL,  -- JSON serialized analysis result
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_run_id ON analysis_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_type ON analysis_results(analysis_type);
+
+-- Analysis reports table
+CREATE TABLE IF NOT EXISTS analysis_reports (
+    report_id TEXT PRIMARY KEY,
+    run_id TEXT,
+    experiment_id TEXT,
+    report_type TEXT NOT NULL,  -- 'executive', 'technical', 'comprehensive'
+    format TEXT NOT NULL,  -- 'markdown', 'html', 'excel'
+    content TEXT,  -- Report content (markdown/html) or file path (excel)
+    metadata TEXT,  -- JSON metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE SET NULL,
+    FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
+CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
