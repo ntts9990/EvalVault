@@ -49,9 +49,10 @@ dependencies = [
     "rich",
     "pandas",
     "openpyxl",
-    "xlrd",      # For reading .xls files (Excel 97-2003)
-    "chardet",   # For automatic encoding detection in CSV files
+    "xlrd", # For reading .xls files (Excel 97-2003)
+    "chardet", # For automatic encoding detection in CSV files
     "truststore>=0.10.4",
+    "scikit-learn>=1.8.0",
 ]
 
 [project.urls]
