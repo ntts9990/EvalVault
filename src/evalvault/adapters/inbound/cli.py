@@ -22,7 +22,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from evalvault.adapters.outbound.analysis import NLPAnalysisAdapter, StatisticalAnalysisAdapter
+from evalvault.adapters.outbound.analysis import (
+    CausalAnalysisAdapter,
+    NLPAnalysisAdapter,
+    StatisticalAnalysisAdapter,
+)
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import LLMRelationAugmenter, get_llm_adapter
@@ -1924,9 +1928,11 @@ def analyze(
     Examples:
         evalvault analyze abc123
         evalvault analyze abc123 --nlp --profile dev
+        evalvault analyze abc123 --causal
+        evalvault analyze abc123 --nlp --causal
         evalvault analyze abc123 --output analysis.json
         evalvault analyze abc123 --report report.md
-        evalvault analyze abc123 --nlp --report report.html
+        evalvault analyze abc123 --nlp --causal --report report.html
         evalvault analyze abc123 --save --db evalvault.db
     """
     storage = SQLiteStorageAdapter(db_path=db_path)
@@ -1960,9 +1966,15 @@ def analyze(
             use_embeddings=True,
         )
 
+    # Create causal adapter if requested
+    causal_adapter = None
+    if causal:
+        causal_adapter = CausalAnalysisAdapter()
+
     service = AnalysisService(
         analysis_adapter=analysis_adapter,
         nlp_adapter=nlp_adapter,
+        causal_adapter=causal_adapter,
         cache_adapter=cache_adapter,
     )
 
@@ -1986,6 +1998,10 @@ def analyze(
     # Display NLP analysis if available
     if bundle.has_nlp and bundle.nlp:
         _display_nlp_analysis(bundle.nlp)
+
+    # Display causal analysis if available
+    if bundle.has_causal and bundle.causal:
+        _display_causal_analysis(bundle.causal)
 
     # Save to database if requested
     if save:
@@ -2252,6 +2268,82 @@ def _display_nlp_analysis(nlp_analysis) -> None:
     if nlp_analysis.insights:
         console.print("[bold]NLP Insights:[/bold]")
         for insight in nlp_analysis.insights:
+            console.print(f"  • {insight}")
+        console.print()
+
+
+def _display_causal_analysis(causal_analysis) -> None:
+    """Display causal analysis results."""
+    console.print("\n[bold magenta]Causal Analysis[/bold magenta]\n")
+
+    # Factor Impacts
+    significant_impacts = causal_analysis.significant_impacts
+    if significant_impacts:
+        console.print("[bold]Significant Factor-Metric Relationships:[/bold]")
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Factor")
+        table.add_column("Metric")
+        table.add_column("Direction")
+        table.add_column("Strength")
+        table.add_column("Correlation", justify="right")
+        table.add_column("p-value", justify="right")
+
+        for impact in significant_impacts[:10]:  # Show top 10
+            direction_style = "green" if impact.direction.value == "positive" else "red"
+            table.add_row(
+                impact.factor_type.value,
+                impact.metric_name,
+                f"[{direction_style}]{impact.direction.value}[/{direction_style}]",
+                impact.strength.value,
+                f"{impact.correlation:.3f}",
+                f"{impact.p_value:.4f}",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Causal Relationships
+    strong_relationships = causal_analysis.strong_relationships
+    if strong_relationships:
+        console.print("[bold]Strong Causal Relationships (confidence > 0.7):[/bold]")
+        for rel in strong_relationships[:5]:
+            direction_arrow = "↑" if rel.direction.value == "positive" else "↓"
+            console.print(
+                f"  • {rel.cause.value} → {rel.effect_metric} {direction_arrow} "
+                f"(confidence: {rel.confidence:.2f})"
+            )
+        console.print()
+
+    # Root Causes
+    if causal_analysis.root_causes:
+        console.print("[bold]Root Cause Analysis:[/bold]")
+        for rc in causal_analysis.root_causes:
+            primary_str = ", ".join(f.value for f in rc.primary_causes)
+            console.print(f"  [bold]{rc.metric_name}:[/bold]")
+            console.print(f"    Primary causes: {primary_str}")
+            if rc.contributing_factors:
+                contributing_str = ", ".join(f.value for f in rc.contributing_factors)
+                console.print(f"    Contributing factors: {contributing_str}")
+            if rc.explanation:
+                console.print(f"    Explanation: {rc.explanation}")
+        console.print()
+
+    # Intervention Suggestions
+    if causal_analysis.interventions:
+        console.print("[bold]Recommended Interventions:[/bold]")
+        for intervention in causal_analysis.interventions[:5]:  # Show top 5
+            priority_str = {1: "🔴 High", 2: "🟡 Medium", 3: "🟢 Low"}.get(
+                intervention.priority, f"Priority {intervention.priority}"
+            )
+            console.print(f"  [{priority_str}] {intervention.intervention}")
+            console.print(f"      Target: {intervention.target_metric}")
+            console.print(f"      Expected: {intervention.expected_impact}")
+        console.print()
+
+    # Causal Insights
+    if causal_analysis.insights:
+        console.print("[bold]Causal Insights:[/bold]")
+        for insight in causal_analysis.insights:
             console.print(f"  • {insight}")
         console.print()
 

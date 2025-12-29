@@ -19,6 +19,7 @@ from evalvault.domain.entities.analysis import (
 
 if TYPE_CHECKING:
     from evalvault.ports.outbound import AnalysisCachePort, AnalysisPort
+    from evalvault.ports.outbound.causal_analysis_port import CausalAnalysisPort
     from evalvault.ports.outbound.nlp_analysis_port import NLPAnalysisPort
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class AnalysisService:
         self,
         analysis_adapter: AnalysisPort,
         nlp_adapter: NLPAnalysisPort | None = None,
+        causal_adapter: CausalAnalysisPort | None = None,
         cache_adapter: AnalysisCachePort | None = None,
     ):
         """초기화.
@@ -41,10 +43,12 @@ class AnalysisService:
         Args:
             analysis_adapter: 통계 분석 어댑터 (AnalysisPort 구현체)
             nlp_adapter: NLP 분석 어댑터 (선택)
+            causal_adapter: 인과 분석 어댑터 (선택)
             cache_adapter: 캐시 어댑터 (선택)
         """
         self._analysis = analysis_adapter
         self._nlp = nlp_adapter
+        self._causal = causal_adapter
         self._cache = cache_adapter
 
     def analyze_run(
@@ -89,9 +93,9 @@ class AnalysisService:
 
         # 인과 분석 (선택적)
         causal = None
-        if include_causal:
-            # TODO: Phase 4에서 구현
-            logger.debug("Causal analysis requested but not yet implemented")
+        if include_causal and self._causal is not None:
+            logger.debug(f"Running causal analysis for: {run.run_id}")
+            causal = self._causal.analyze_causality(run)
 
         bundle = AnalysisBundle(
             run_id=run.run_id,

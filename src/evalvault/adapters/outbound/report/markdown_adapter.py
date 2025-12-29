@@ -6,7 +6,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from evalvault.domain.entities.analysis import AnalysisBundle, NLPAnalysis, StatisticalAnalysis
+    from evalvault.domain.entities.analysis import (
+        AnalysisBundle,
+        CausalAnalysis,
+        NLPAnalysis,
+        StatisticalAnalysis,
+    )
 
 
 class MarkdownReportAdapter:
@@ -20,6 +25,7 @@ class MarkdownReportAdapter:
         bundle: AnalysisBundle,
         *,
         include_nlp: bool = True,
+        include_causal: bool = True,
         include_recommendations: bool = True,
     ) -> str:
         """Markdown 형식 보고서 생성.
@@ -27,6 +33,7 @@ class MarkdownReportAdapter:
         Args:
             bundle: 분석 결과 번들
             include_nlp: NLP 분석 포함 여부
+            include_causal: 인과 분석 포함 여부
             include_recommendations: 권장사항 포함 여부
 
         Returns:
@@ -48,6 +55,10 @@ class MarkdownReportAdapter:
         if include_nlp and bundle.has_nlp and bundle.nlp:
             sections.append(self._generate_nlp_section(bundle.nlp))
 
+        # 인과 분석
+        if include_causal and bundle.has_causal and bundle.causal:
+            sections.append(self._generate_causal_section(bundle.causal))
+
         # 권장사항
         if include_recommendations:
             sections.append(self._generate_recommendations(bundle))
@@ -62,6 +73,7 @@ class MarkdownReportAdapter:
         bundle: AnalysisBundle,
         *,
         include_nlp: bool = True,
+        include_causal: bool = True,
         include_recommendations: bool = True,
     ) -> str:
         """HTML 형식 보고서 생성.
@@ -71,6 +83,7 @@ class MarkdownReportAdapter:
         Args:
             bundle: 분석 결과 번들
             include_nlp: NLP 분석 포함 여부
+            include_causal: 인과 분석 포함 여부
             include_recommendations: 권장사항 포함 여부
 
         Returns:
@@ -79,6 +92,7 @@ class MarkdownReportAdapter:
         markdown_content = self.generate_markdown(
             bundle,
             include_nlp=include_nlp,
+            include_causal=include_causal,
             include_recommendations=include_recommendations,
         )
 
@@ -238,6 +252,64 @@ class MarkdownReportAdapter:
         if nlp.insights:
             lines.append("\n### NLP Insights")
             for insight in nlp.insights:
+                lines.append(f"- {insight}")
+
+        return "\n".join(lines)
+
+    def _generate_causal_section(self, causal: CausalAnalysis) -> str:
+        """인과 분석 섹션 생성."""
+        lines = ["## Causal Analysis"]
+
+        # 유의미한 요인 영향
+        significant_impacts = causal.significant_impacts
+        if significant_impacts:
+            lines.append("\n### Significant Factor Impacts")
+            lines.append("| Factor | Metric | Direction | Strength | Correlation |")
+            lines.append("|--------|--------|-----------|----------|-------------|")
+
+            for impact in significant_impacts[:10]:
+                direction = "↑" if impact.direction.value == "positive" else "↓"
+                lines.append(
+                    f"| {impact.factor_type.value} | {impact.metric_name} | "
+                    f"{direction} {impact.direction.value} | {impact.strength.value} | "
+                    f"{impact.correlation:.3f} |"
+                )
+
+        # 강한 인과 관계
+        strong_rels = causal.strong_relationships
+        if strong_rels:
+            lines.append("\n### Strong Causal Relationships")
+            for rel in strong_rels[:5]:
+                direction = "increases" if rel.direction.value == "positive" else "decreases"
+                lines.append(
+                    f"- **{rel.cause.value}** → **{rel.effect_metric}**: "
+                    f"Higher values {direction} scores (confidence: {rel.confidence:.2f})"
+                )
+
+        # 근본 원인 분석
+        if causal.root_causes:
+            lines.append("\n### Root Cause Analysis")
+            for rc in causal.root_causes:
+                primary = ", ".join(f.value for f in rc.primary_causes)
+                lines.append(f"- **{rc.metric_name}**: Primary causes - {primary}")
+                if rc.explanation:
+                    lines.append(f"  - {rc.explanation}")
+
+        # 개선 제안
+        if causal.interventions:
+            lines.append("\n### Recommended Interventions")
+            for intervention in causal.interventions[:5]:
+                priority_emoji = {1: "🔴", 2: "🟡", 3: "🟢"}.get(intervention.priority, "⚪")
+                lines.append(
+                    f"- {priority_emoji} **{intervention.target_metric}**: "
+                    f"{intervention.intervention}"
+                )
+                lines.append(f"  - Expected: {intervention.expected_impact}")
+
+        # 인과 분석 인사이트
+        if causal.insights:
+            lines.append("\n### Causal Insights")
+            for insight in causal.insights:
                 lines.append(f"- {insight}")
 
         return "\n".join(lines)
