@@ -10,6 +10,7 @@ Modules:
     document_chunker: 문서 청킹
     hybrid_retriever: 하이브리드 검색 (BM25 + Dense)
     dense_retriever: Dense 임베딩 검색 (BGE-M3)
+    korean_evaluation: 한국어 RAG 평가 유틸리티
 """
 
 from evalvault.adapters.outbound.nlp.korean.bm25_retriever import (
@@ -32,6 +33,13 @@ from evalvault.adapters.outbound.nlp.korean.hybrid_retriever import (
     KoreanHybridRetriever,
 )
 from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
+from evalvault.adapters.outbound.nlp.korean.korean_evaluation import (
+    ClaimVerification,
+    FaithfulnessResult,
+    KoreanFaithfulnessChecker,
+    KoreanSemanticSimilarity,
+    SemanticSimilarityResult,
+)
 from evalvault.adapters.outbound.nlp.korean.korean_stopwords import (
     KOREAN_STOPWORDS,
     STOPWORD_POS_TAGS,
@@ -60,4 +68,10 @@ __all__ = [
     "KoreanDenseRetriever",
     "DenseRetrievalResult",
     "DeviceType",
+    # Korean Evaluation
+    "KoreanFaithfulnessChecker",
+    "KoreanSemanticSimilarity",
+    "FaithfulnessResult",
+    "ClaimVerification",
+    "SemanticSimilarityResult",
 ]
