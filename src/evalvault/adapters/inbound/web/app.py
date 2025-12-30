@@ -468,35 +468,163 @@ def render_reports_page(adapter, session):
     """보고서 페이지 렌더링."""
     import streamlit as st
 
+    from evalvault.adapters.inbound.web.components import (
+        ReportConfig,
+        ReportDownloader,
+        ReportGenerator,
+        ReportPreview,
+        ReportTemplate,
+        RunSelector,
+    )
+
     st.header("📄 Reports")
     st.markdown("평가 보고서를 생성하고 다운로드합니다.")
 
     # 평가 선택
-    runs = adapter.list_runs(limit=20)
+    runs = adapter.list_runs(limit=50)
     if not runs:
         st.info("보고서를 생성할 평가 결과가 없습니다.")
         return
 
-    run_options = {
-        f"{r.dataset_name} ({r.started_at.strftime('%Y-%m-%d')})": r.run_id for r in runs
-    }
-    selected = st.selectbox("평가 선택", options=list(run_options.keys()))
-    session.selected_report_run_id = run_options.get(selected)
+    # 실행 선택 섹션
+    st.subheader("1. 평가 선택")
+    selector = RunSelector(runs=runs)
+    options = selector.get_options()
 
-    # 보고서 옵션
-    st.subheader("보고서 옵션")
-    col1, col2 = st.columns(2)
-    with col1:
-        session.report_format = st.radio("출력 형식", options=["Markdown", "HTML"], horizontal=True)
-    with col2:
-        session.include_nlp = st.checkbox("NLP 분석 포함", value=True)
-        session.include_causal = st.checkbox("인과 분석 포함", value=True)
+    selected_option = st.selectbox(
+        "평가 실행 선택",
+        options=options,
+        format_func=lambda x: x,
+        help="보고서를 생성할 평가 실행을 선택하세요.",
+    )
 
-    # 생성 버튼
+    # 선택된 실행 ID 추출
+    selected_run_id = selected_option.split(" | ")[0] if selected_option else None
+    selected_run = selector.get_by_id(selected_run_id) if selected_run_id else None
+
+    if selected_run:
+        # 선택된 평가 정보 표시
+        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+        with info_col1:
+            st.metric("Dataset", selected_run.dataset_name)
+        with info_col2:
+            st.metric("Model", selected_run.model_name)
+        with info_col3:
+            st.metric("Pass Rate", f"{selected_run.pass_rate:.1%}")
+        with info_col4:
+            st.metric("Test Cases", selected_run.total_test_cases)
+
+    # 보고서 옵션 섹션
     st.divider()
-    if st.button("📝 보고서 생성", type="primary"):
-        st.info("보고서 생성 기능은 아직 구현 중입니다.")
-        # TODO: 실제 보고서 생성 로직
+    st.subheader("2. 보고서 설정")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # 템플릿 선택
+        templates = ReportTemplate.list_templates()
+        template_descriptions = {t: ReportTemplate.get_description(t) for t in templates}
+
+        selected_template = st.selectbox(
+            "템플릿",
+            options=templates,
+            format_func=lambda x: f"{x.title()} - {template_descriptions.get(x, '')}",
+        )
+
+        # 출력 형식
+        output_format = st.radio(
+            "출력 형식",
+            options=["markdown", "html"],
+            format_func=lambda x: {"markdown": "📝 Markdown", "html": "🌐 HTML"}.get(x, x),
+            horizontal=True,
+        )
+
+    with col2:
+        # 포함 옵션
+        st.caption("포함 항목")
+        include_summary = st.checkbox("요약", value=True)
+        include_metrics_detail = st.checkbox("메트릭 상세", value=True)
+        include_charts = st.checkbox("차트", value=True, disabled=True, help="HTML 형식에서만 지원")
+        include_nlp = st.checkbox("NLP 분석", value=False)
+        include_causal = st.checkbox("인과 분석", value=False)
+
+    # 보고서 생성 섹션
+    st.divider()
+    st.subheader("3. 보고서 생성")
+
+    # 설정 생성
+    config = ReportConfig(
+        output_format=output_format,
+        include_summary=include_summary,
+        include_metrics_detail=include_metrics_detail,
+        include_charts=include_charts and output_format == "html",
+        include_nlp_analysis=include_nlp,
+        include_causal_analysis=include_causal,
+        template_name=selected_template,
+    )
+
+    gen_col1, gen_col2 = st.columns([1, 3])
+
+    with gen_col1:
+        generate_clicked = st.button(
+            "📝 보고서 생성",
+            type="primary",
+            disabled=selected_run is None,
+        )
+
+    # 보고서 생성 및 미리보기
+    if generate_clicked and selected_run:
+        with st.spinner("보고서 생성 중..."):
+            # 메트릭 점수 (Mock - 실제로는 adapter에서 조회)
+            metrics = dict.fromkeys(selected_run.metrics_evaluated, 0.8)
+
+            # 보고서 생성
+            generator = ReportGenerator(config=config)
+            report_result = generator.generate(run=selected_run, metrics=metrics)
+
+            # 세션에 저장
+            session.generated_report = report_result
+
+        st.success("✅ 보고서 생성 완료!")
+
+    # 미리보기 및 다운로드
+    if hasattr(session, "generated_report") and session.generated_report:
+        report_result = session.generated_report
+
+        st.divider()
+        st.subheader("4. 보고서 미리보기")
+
+        # 통계 표시
+        preview = ReportPreview(result=report_result)
+        stats = preview.get_stats()
+
+        stat_col1, stat_col2, stat_col3 = st.columns(3)
+        with stat_col1:
+            st.caption(f"📄 {stats['char_count']:,} 문자")
+        with stat_col2:
+            st.caption(f"📝 {stats['line_count']} 줄")
+        with stat_col3:
+            st.caption(f"📊 형식: {report_result.format.upper()}")
+
+        # 미리보기 내용
+        with st.expander("📖 미리보기", expanded=True):
+            if report_result.format == "html":
+                st.components.v1.html(report_result.content, height=500, scrolling=True)
+            else:
+                st.markdown(preview.get_preview())
+
+        # 다운로드 버튼
+        st.divider()
+        downloader = ReportDownloader(result=report_result)
+        download_data = downloader.prepare_download()
+
+        st.download_button(
+            label=f"📥 {report_result.format.upper()} 다운로드",
+            data=download_data["data"],
+            file_name=download_data["filename"],
+            mime=download_data["mime_type"],
+            type="primary",
+        )
 
 
 def main():

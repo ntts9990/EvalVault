@@ -1,0 +1,85 @@
+{
+  "generated_at": "2025-12-30T10:58:34.643313",
+  "comparisons": [
+    {
+      "task": "faithfulness",
+      "metric": "faithfulness",
+      "baseline": 0.0,
+      "optimized": 0.7666666666666667,
+      "improvement": 0.7666666666666667,
+      "improvement_percent": 0.0,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "keyword",
+      "metric": "precision",
+      "baseline": 0.2369047619047619,
+      "optimized": 0.5357142857142857,
+      "improvement": 0.2988095238095238,
+      "improvement_percent": 126.13065326633166,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "keyword",
+      "metric": "recall",
+      "baseline": 0.2935714285714286,
+      "optimized": 0.6421428571428571,
+      "improvement": 0.34857142857142853,
+      "improvement_percent": 118.73479318734792,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "keyword",
+      "metric": "f1",
+      "baseline": 0.2609324009324009,
+      "optimized": 0.5795621045621046,
+      "improvement": 0.31862970362970366,
+      "improvement_percent": 122.11197325097632,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "keyword",
+      "metric": "baseline_precision",
+      "baseline": 0.25142857142857145,
+      "optimized": 0.25142857142857145,
+      "improvement": 0.0,
+      "improvement_percent": 0.0,
+      "is_significant": false,
+      "details": {}
+    },
+    {
+      "task": "keyword",
+      "metric": "improvement",
+      "baseline": -0.014523809523809533,
+      "optimized": 0.28428571428571425,
+      "improvement": 0.2988095238095238,
+      "improvement_percent": 0.0,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "retrieval",
+      "metric": "recall_at_5",
+      "baseline": 0.8,
+      "optimized": 1.0,
+      "improvement": 0.19999999999999996,
+      "improvement_percent": 24.999999999999993,
+      "is_significant": true,
+      "details": {}
+    },
+    {
+      "task": "retrieval",
+      "metric": "mrr",
+      "baseline": 0.6633333333333333,
+      "optimized": 0.9666666666666667,
+      "improvement": 0.30333333333333334,
+      "improvement_percent": 45.72864321608041,
+      "is_significant": true,
+      "details": {}
+    }
+  ]
+}

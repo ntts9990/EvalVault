@@ -1,0 +1,170 @@
+{
+  "name": "korean-faithfulness-benchmark",
+  "version": "1.0.0",
+  "description": "한국어 Faithfulness 검증 벤치마크 - 형태소 분석 기반 vs 단순 문자열 비교",
+  "purpose": "조사/어미 변형이 포함된 답변의 충실성을 정확히 판단할 수 있는지 측정",
+  "evaluation_metrics": ["accuracy", "precision", "recall", "f1"],
+  "test_categories": [
+    {
+      "category": "faithful_with_variation",
+      "description": "충실한 답변이지만 조사/어미가 다른 경우",
+      "expected_label": true,
+      "challenge": "단순 문자열 비교는 실패하지만 형태소 분석은 성공해야 함"
+    },
+    {
+      "category": "unfaithful",
+      "description": "컨텍스트에 없는 정보를 답변에 포함한 경우",
+      "expected_label": false,
+      "challenge": "형태소 분석과 무관하게 불충실해야 함"
+    },
+    {
+      "category": "faithful_exact",
+      "description": "컨텍스트와 정확히 일치하는 충실한 답변",
+      "expected_label": true,
+      "challenge": "기준선 - 두 방법 모두 성공해야 함"
+    },
+    {
+      "category": "partial_faithful",
+      "description": "일부만 컨텍스트에 있는 부분 충실 답변",
+      "expected_label": "partial",
+      "challenge": "부분 점수를 정확히 계산해야 함"
+    }
+  ],
+  "test_cases": [
+    {
+      "test_id": "faith-001",
+      "category": "faithful_with_variation",
+      "answer": "보험료는 월 15만원입니다.",
+      "contexts": ["보험료가 월 15만원이며, 납입 기간은 20년입니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.8, 1.0],
+      "note": "조사 '는/가' 차이만 있음 - 충실해야 함"
+    },
+    {
+      "test_id": "faith-002",
+      "category": "faithful_with_variation",
+      "answer": "사망보험금을 1억원 받을 수 있습니다.",
+      "contexts": ["사망보험금이 1억원 지급됩니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.8, 1.0],
+      "note": "조사 '을/이', 동사 '받을 수 있다/지급되다' 차이 - 의미상 충실"
+    },
+    {
+      "test_id": "faith-003",
+      "category": "faithful_with_variation",
+      "answer": "암 진단비가 3천만원 나옵니다.",
+      "contexts": ["암 진단 시 3,000만원의 진단비를 지급받습니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.7, 1.0],
+      "note": "숫자 표기법 및 동사 차이 - 의미상 충실"
+    },
+    {
+      "test_id": "faith-004",
+      "category": "unfaithful",
+      "answer": "보험료는 월 20만원이고, 면책기간은 30일입니다.",
+      "contexts": ["보험료가 월 15만원이며, 면책기간은 90일입니다."],
+      "expected_faithful": false,
+      "expected_score_range": [0.0, 0.3],
+      "note": "금액(15→20만원)과 기간(90→30일)이 틀림 - 불충실"
+    },
+    {
+      "test_id": "faith-005",
+      "category": "unfaithful",
+      "answer": "뇌졸중 진단비는 5천만원입니다.",
+      "contexts": ["뇌졸중 진단비는 2천만원입니다."],
+      "expected_faithful": false,
+      "expected_score_range": [0.0, 0.4],
+      "note": "금액이 틀림 - 불충실"
+    },
+    {
+      "test_id": "faith-006",
+      "category": "unfaithful",
+      "answer": "이 보험은 종신보험이므로 만기가 없습니다.",
+      "contexts": ["이 보험의 보장 기간은 80세 만기입니다."],
+      "expected_faithful": false,
+      "expected_score_range": [0.0, 0.3],
+      "note": "만기 정보가 반대 - 불충실"
+    },
+    {
+      "test_id": "faith-007",
+      "category": "faithful_exact",
+      "answer": "보험료 납입 기간은 20년입니다.",
+      "contexts": ["보험료 납입 기간은 20년입니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.95, 1.0],
+      "note": "정확히 일치 - 기준선"
+    },
+    {
+      "test_id": "faith-008",
+      "category": "faithful_exact",
+      "answer": "입원 시 1일당 5만원이 지급됩니다.",
+      "contexts": ["입원 시 1일당 5만원이 지급됩니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.95, 1.0],
+      "note": "정확히 일치 - 기준선"
+    },
+    {
+      "test_id": "faith-009",
+      "category": "partial_faithful",
+      "answer": "보험료는 월 15만원이고, 할인 시 12만원입니다.",
+      "contexts": ["보험료가 월 15만원입니다."],
+      "expected_faithful": "partial",
+      "expected_score_range": [0.4, 0.7],
+      "note": "15만원은 맞지만 할인 12만원은 컨텍스트에 없음 - 부분 충실"
+    },
+    {
+      "test_id": "faith-010",
+      "category": "partial_faithful",
+      "answer": "암 진단비 3천만원, 뇌졸중 진단비 5천만원이 지급됩니다.",
+      "contexts": ["암 진단 시 3,000만원의 진단비가 지급됩니다."],
+      "expected_faithful": "partial",
+      "expected_score_range": [0.3, 0.6],
+      "note": "암 3천만원은 맞지만 뇌졸중 5천만원은 컨텍스트에 없음 - 부분 충실"
+    },
+    {
+      "test_id": "faith-011",
+      "category": "faithful_with_variation",
+      "answer": "해약환급금이 납입 보험료 비율로 산정됩니다.",
+      "contexts": ["해약환급금은 납입한 보험료의 일정 비율로 계산됩니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.7, 1.0],
+      "note": "조사 및 동사 변형 - 의미상 충실"
+    },
+    {
+      "test_id": "faith-012",
+      "category": "faithful_with_variation",
+      "answer": "청약을 15일 안에 철회하면 보험료를 돌려받습니다.",
+      "contexts": ["청약 철회는 청약일로부터 15일 이내에 가능하며, 납입한 보험료 전액이 환급됩니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.7, 1.0],
+      "note": "표현 방식은 다르지만 의미상 동일"
+    },
+    {
+      "test_id": "faith-013",
+      "category": "unfaithful",
+      "answer": "고지의무를 위반해도 보험금 지급에 문제 없습니다.",
+      "contexts": ["고지의무 위반 시 보험금 지급이 거절되거나 계약이 해지될 수 있습니다."],
+      "expected_faithful": false,
+      "expected_score_range": [0.0, 0.2],
+      "note": "의미가 정반대 - 불충실"
+    },
+    {
+      "test_id": "faith-014",
+      "category": "faithful_with_variation",
+      "answer": "보험계약 대출을 해약환급금 80%까지 받을 수 있어요.",
+      "contexts": ["보험계약 대출은 해약환급금의 80% 범위 내에서 가능합니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.8, 1.0],
+      "note": "구어체 표현이지만 의미상 동일"
+    },
+    {
+      "test_id": "faith-015",
+      "category": "faithful_with_variation",
+      "answer": "수술 종류마다 보험금이 달라요. 적게는 50만원, 많게는 500만원까지.",
+      "contexts": ["수술비는 수술 종류에 따라 50만원에서 500만원까지 지급됩니다."],
+      "expected_faithful": true,
+      "expected_score_range": [0.7, 1.0],
+      "note": "구어체 + 문장 분리지만 의미상 동일"
+    }
+  ]
+}

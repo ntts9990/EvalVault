@@ -23,6 +23,15 @@ from evalvault.adapters.inbound.web.components.progress import (
     EvaluationProgress,
     ProgressStep,
 )
+from evalvault.adapters.inbound.web.components.reports import (
+    ReportConfig,
+    ReportDownloader,
+    ReportGenerator,
+    ReportPreview,
+    ReportResult,
+    ReportTemplate,
+    RunSelector,
+)
 from evalvault.adapters.inbound.web.components.stats import DashboardStats
 from evalvault.adapters.inbound.web.components.upload import (
     FileUploadHandler,
@@ -58,4 +67,12 @@ __all__ = [
     "RunDetailPanel",
     "HistoryExporter",
     "RunSearch",
+    # Reports
+    "ReportConfig",
+    "ReportResult",
+    "ReportTemplate",
+    "ReportGenerator",
+    "ReportDownloader",
+    "ReportPreview",
+    "RunSelector",
 ]
