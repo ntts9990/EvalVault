@@ -139,3 +139,37 @@
 **수정된 파일**:
 - `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
 - `src/evalvault/adapters/inbound/web/app.py` - Evaluate 페이지 리팩토링
+
+**PR**: [#57](https://github.com/ntts9990/EvalVault/pull/57) ✅ 머지 완료
+
+---
+
+### Phase 12.4: History 페이지 개선
+
+**시작 시간**: 2025-12-30
+
+**목표**:
+- [x] RunFilter 컴포넌트 생성
+- [x] RunTable 컴포넌트 생성 (정렬, 페이지네이션)
+- [x] RunSearch 컴포넌트 생성
+- [x] HistoryExporter 컴포넌트 생성 (CSV/JSON)
+- [x] History 페이지 리팩토링
+- [x] 테스트 작성
+
+**진행 상황**:
+
+| 시간 | 작업 | 결과 |
+|------|------|------|
+| 15:00 | History 페이지 테스트 27개 작성 | ✅ 완료 |
+| 15:15 | RunFilter, RunTable, RunSearch 구현 | ✅ 완료 |
+| 15:25 | HistoryExporter, RunDetailPanel 구현 | ✅ 완료 |
+| 15:30 | History 페이지 리팩토링 | ✅ 완료 |
+| 15:35 | 테스트 실행 (104/104 통과) | ✅ 완료 |
+
+**생성된 파일**:
+- `src/evalvault/adapters/inbound/web/components/history.py` - History 컴포넌트
+- `tests/unit/test_web_history.py` - History 컴포넌트 테스트 (27개)
+
+**수정된 파일**:
+- `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
+- `src/evalvault/adapters/inbound/web/app.py` - History 페이지 리팩토링

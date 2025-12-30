@@ -336,25 +336,94 @@ def render_history_page(adapter, session):
     """이력 조회 페이지 렌더링."""
     import streamlit as st
 
+    from evalvault.adapters.inbound.web.components import (
+        HistoryExporter,
+        RunFilter,
+        RunSearch,
+        RunTable,
+    )
+
     st.header("📋 History")
     st.markdown("이전 평가 결과를 확인합니다.")
 
-    # 필터
+    # 데이터 로드
+    all_runs = adapter.list_runs(limit=100)
+
+    # 검색 및 필터 섹션
+    search_col, filter_col = st.columns([2, 1])
+
+    with search_col:
+        search_query = st.text_input(
+            "🔍 검색",
+            placeholder="데이터셋 또는 모델 이름으로 검색...",
+            key="history_search",
+        )
+
+    with filter_col, st.popover("🔧 필터"):
+        # 모델 필터
+        model_options = ["All"] + sorted({r.model_name for r in all_runs})
+        selected_model = st.selectbox("모델", options=model_options, index=0)
+
+        # 통과율 필터
+        min_pass_rate = st.slider("최소 통과율", 0.0, 1.0, 0.0, 0.1)
+
+        # 날짜 필터 (UI만, 추후 구현)
+        st.checkbox("날짜 범위 필터", disabled=True, help="추후 구현 예정")
+
+    # 검색 적용
+    search = RunSearch(query=search_query)
+    runs = search.search(all_runs)
+
+    # 필터 적용
+    run_filter = RunFilter(
+        model_name=selected_model if selected_model != "All" else None,
+        min_pass_rate=min_pass_rate if min_pass_rate > 0 else None,
+    )
+    runs = run_filter.apply(runs)
+
+    # 결과 요약
+    st.divider()
     col1, col2, col3 = st.columns(3)
     with col1:
-        session.filter_dataset = st.text_input("데이터셋 이름", placeholder="필터...")
+        st.metric("Total Runs", len(runs))
     with col2:
-        session.filter_model = st.selectbox(
-            "모델", options=["All", "gpt-5-nano", "gpt-4", "gpt-4o"], index=0
-        )
+        avg_rate = sum(r.pass_rate for r in runs) / len(runs) if runs else 0
+        st.metric("Avg Pass Rate", f"{avg_rate * 100:.1f}%")
     with col3:
-        session.filter_pass_rate = st.slider("최소 통과율", 0.0, 1.0, 0.0, 0.1)
+        total_cases = sum(r.total_test_cases for r in runs)
+        st.metric("Total Test Cases", f"{total_cases:,}")
 
-    # 평가 목록
+    # 테이블 및 정렬
     st.divider()
-    runs = adapter.list_runs(limit=50)
 
     if runs:
+        # 정렬 옵션
+        sort_col, export_col = st.columns([3, 1])
+        with sort_col:
+            sort_by = st.selectbox(
+                "정렬 기준",
+                options=["date", "pass_rate", "dataset", "model"],
+                format_func=lambda x: {
+                    "date": "📅 날짜",
+                    "pass_rate": "📊 통과율",
+                    "dataset": "📁 데이터셋",
+                    "model": "🤖 모델",
+                }.get(x, x),
+                index=0,
+            )
+        with export_col:
+            exporter = HistoryExporter(runs=runs)
+            st.download_button(
+                "📥 CSV 다운로드",
+                data=exporter.to_csv(),
+                file_name="evaluation_history.csv",
+                mime="text/csv",
+            )
+
+        # 테이블 생성
+        table = RunTable(runs=runs, page_size=10)
+        table.sort_by(sort_by, ascending=sort_by == "dataset")
+
         # 테이블 헤더
         cols = st.columns([3, 2, 2, 1, 1, 1])
         cols[0].markdown("**Dataset**")
@@ -364,7 +433,7 @@ def render_history_page(adapter, session):
         cols[4].markdown("**Date**")
         cols[5].markdown("**Actions**")
 
-        for run in runs:
+        for run in table.get_current_page_runs():
             cols = st.columns([3, 2, 2, 1, 1, 1])
             cols[0].text(run.dataset_name)
             cols[1].text(run.model_name)
@@ -384,6 +453,13 @@ def render_history_page(adapter, session):
             cols[4].text(run.started_at.strftime("%m/%d"))
             if cols[5].button("👁", key=f"view_{run.run_id}", help="상세 보기"):
                 session.current_run_id = run.run_id
+
+        # 페이지네이션
+        if table.total_pages > 1:
+            st.divider()
+            page_cols = st.columns([1, 3, 1])
+            with page_cols[1]:
+                st.caption(f"Page {table.page} of {table.total_pages}")
     else:
         st.info("평가 이력이 없습니다.")
 
