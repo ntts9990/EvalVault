@@ -101,3 +101,41 @@
 **수정된 파일**:
 - `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
 - `src/evalvault/adapters/inbound/web/app.py` - Home 페이지 리팩토링
+
+**PR**: [#56](https://github.com/ntts9990/EvalVault/pull/56) ✅ 머지 완료
+
+---
+
+### Phase 12.3: Evaluate 페이지 개선
+
+**시작 시간**: 2025-12-30
+
+**목표**:
+- [x] 파일 업로드 컴포넌트 개선
+- [x] 메트릭 선택 컴포넌트 개선
+- [x] 진행률 표시 컴포넌트 생성
+- [x] 평가 실행 로직 연결 (mock)
+- [x] 테스트 작성
+
+**진행 상황**:
+
+| 시간 | 작업 | 결과 |
+|------|------|------|
+| 14:00 | Evaluate 페이지 테스트 26개 작성 | ✅ 완료 |
+| 14:10 | FileUploadHandler 컴포넌트 구현 | ✅ 완료 |
+| 14:15 | MetricSelector 컴포넌트 구현 | ✅ 완료 |
+| 14:20 | EvaluationProgress 컴포넌트 구현 | ✅ 완료 |
+| 14:25 | EvaluationConfig 컴포넌트 구현 | ✅ 완료 |
+| 14:30 | Evaluate 페이지 리팩토링 | ✅ 완료 |
+| 14:35 | 테스트 실행 (77/77 통과) | ✅ 완료 |
+
+**생성된 파일**:
+- `src/evalvault/adapters/inbound/web/components/upload.py` - FileUploadHandler
+- `src/evalvault/adapters/inbound/web/components/metrics.py` - MetricSelector
+- `src/evalvault/adapters/inbound/web/components/progress.py` - EvaluationProgress
+- `src/evalvault/adapters/inbound/web/components/evaluate.py` - EvaluationConfig
+- `tests/unit/test_web_evaluate.py` - Evaluate 컴포넌트 테스트 (26개)
+
+**수정된 파일**:
+- `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
+- `src/evalvault/adapters/inbound/web/app.py` - Evaluate 페이지 리팩토링
