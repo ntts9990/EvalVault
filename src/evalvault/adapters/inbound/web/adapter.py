@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from evalvault.ports.inbound.web_port import (
@@ -15,6 +18,8 @@ from evalvault.ports.inbound.web_port import (
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun
+    from evalvault.domain.entities.improvement import ImprovementReport
+    from evalvault.ports.outbound.llm_port import LLMPort
     from evalvault.ports.outbound.storage_port import StoragePort
 
 logger = logging.getLogger(__name__)
@@ -31,6 +36,28 @@ AVAILABLE_METRICS = [
 ]
 
 
+@dataclass
+class GateResult:
+    """품질 게이트 개별 메트릭 결과."""
+
+    metric: str
+    score: float
+    threshold: float
+    passed: bool
+    gap: float
+
+
+@dataclass
+class GateReport:
+    """품질 게이트 전체 리포트."""
+
+    run_id: str
+    results: list[GateResult]
+    overall_passed: bool
+    regression_detected: bool = False
+    regression_amount: float | None = None
+
+
 class WebUIAdapter:
     """웹 UI 어댑터.
 
@@ -43,6 +70,8 @@ class WebUIAdapter:
         storage: StoragePort | None = None,
         evaluator: object | None = None,
         report_generator: object | None = None,
+        llm_adapter: LLMPort | None = None,
+        data_loader: object | None = None,
     ):
         """어댑터 초기화.
 
@@ -50,10 +79,14 @@ class WebUIAdapter:
             storage: 저장소 어댑터 (선택적)
             evaluator: 평가 서비스 (선택적)
             report_generator: 보고서 생성기 (선택적)
+            llm_adapter: LLM 어댑터 (선택적)
+            data_loader: 데이터 로더 (선택적)
         """
         self._storage = storage
         self._evaluator = evaluator
         self._report_generator = report_generator
+        self._llm_adapter = llm_adapter
+        self._data_loader = data_loader
 
     def run_evaluation(
         self,
@@ -69,10 +102,66 @@ class WebUIAdapter:
 
         Returns:
             평가 결과
+
+        Raises:
+            RuntimeError: 필수 컴포넌트가 설정되지 않은 경우
         """
-        # TODO: 실제 평가 로직 구현
-        # 현재는 CLI의 run 명령어 로직을 재사용할 예정
-        raise NotImplementedError("Evaluation execution not yet implemented")
+        if self._evaluator is None:
+            raise RuntimeError("Evaluator not configured")
+        if self._llm_adapter is None:
+            raise RuntimeError("LLM adapter not configured")
+        if self._data_loader is None:
+            raise RuntimeError("Data loader not configured")
+
+        # 1. 데이터셋 로드
+        logger.info(f"Loading dataset from: {request.dataset_path}")
+        dataset = self._data_loader.load(request.dataset_path)
+
+        # 2. 진행률 초기화
+        if on_progress:
+            on_progress(
+                EvalProgress(
+                    current=0,
+                    total=len(dataset.test_cases),
+                    current_metric="",
+                    percent=0.0,
+                    status="running",
+                )
+            )
+
+        # 3. 평가 실행 (비동기 -> 동기 변환)
+        logger.info(f"Starting evaluation with metrics: {request.metrics}")
+
+        async def run_async_evaluation():
+            return await self._evaluator.evaluate(
+                dataset=dataset,
+                metrics=request.metrics,
+                llm=self._llm_adapter,
+                thresholds=request.thresholds or {},
+                parallel=True,
+                batch_size=5,
+            )
+
+        result = asyncio.run(run_async_evaluation())
+
+        # 4. 완료 진행률 콜백
+        if on_progress:
+            on_progress(
+                EvalProgress(
+                    current=result.total_test_cases,
+                    total=result.total_test_cases,
+                    current_metric="",
+                    percent=100.0,
+                    status="completed",
+                )
+            )
+
+        # 5. 결과 저장
+        if self._storage:
+            logger.info(f"Saving evaluation run: {result.run_id}")
+            self._storage.save_run(result)
+
+        return result
 
     def list_runs(
         self,
@@ -207,6 +296,142 @@ class WebUIAdapter:
             "semantic_similarity": "답변과 ground_truth 간 의미적 유사도 평가",
             "insurance_term_accuracy": "보험 용어 정확성 평가",
         }
+
+    def get_improvement_guide(
+        self,
+        run_id: str,
+        *,
+        include_llm: bool = False,
+        metrics: list[str] | None = None,
+    ) -> ImprovementReport:
+        """개선 가이드 생성.
+
+        평가 결과를 분석하여 RAG 시스템 개선 가이드를 생성합니다.
+
+        Args:
+            run_id: 분석할 평가 실행 ID
+            include_llm: LLM 기반 분석 포함 여부
+            metrics: 분석할 메트릭 (None이면 모두)
+
+        Returns:
+            ImprovementReport 개선 가이드 리포트
+
+        Raises:
+            KeyError: 평가 결과를 찾을 수 없는 경우
+            RuntimeError: 저장소가 설정되지 않은 경우
+        """
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+
+        # 평가 결과 조회
+        run = self._storage.get_run(run_id)
+        if run is None:
+            raise KeyError(f"Run not found: {run_id}")
+
+        # 개선 가이드 서비스 초기화
+        from evalvault.adapters.outbound.improvement.insight_generator import (
+            InsightGenerator,
+        )
+        from evalvault.adapters.outbound.improvement.pattern_detector import (
+            PatternDetector,
+        )
+        from evalvault.adapters.outbound.improvement.playbook_loader import (
+            PlaybookLoader,
+        )
+        from evalvault.domain.services.improvement_guide_service import (
+            ImprovementGuideService,
+        )
+
+        # 기본 플레이북 로드
+        playbook_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "config"
+            / "playbooks"
+            / "improvement_playbook.yaml"
+        )
+        playbook = None
+        if playbook_path.exists():
+            loader = PlaybookLoader(playbook_path)
+            playbook = loader.load()
+
+        # 패턴 탐지기 초기화
+        detector = PatternDetector(playbook=playbook)
+
+        # 인사이트 생성기 초기화 (LLM 사용 시)
+        generator = None
+        if include_llm and self._llm_adapter:
+            generator = InsightGenerator(llm_adapter=self._llm_adapter)
+
+        # 서비스 초기화 및 리포트 생성
+        service = ImprovementGuideService(
+            pattern_detector=detector,
+            insight_generator=generator,
+            playbook=playbook,
+            enable_llm_enrichment=include_llm,
+        )
+
+        return service.generate_report(run, metrics=metrics, include_llm_analysis=include_llm)
+
+    def check_quality_gate(
+        self,
+        run_id: str,
+        thresholds: dict[str, float] | None = None,
+    ) -> GateReport:
+        """품질 게이트 체크.
+
+        평가 결과가 설정된 임계값을 통과하는지 확인합니다.
+
+        Args:
+            run_id: 체크할 평가 실행 ID
+            thresholds: 커스텀 임계값 (None이면 평가 시 설정된 임계값 사용)
+
+        Returns:
+            GateReport 품질 게이트 결과
+
+        Raises:
+            KeyError: 평가 결과를 찾을 수 없는 경우
+            RuntimeError: 저장소가 설정되지 않은 경우
+        """
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+
+        # 평가 결과 조회
+        run = self._storage.get_run(run_id)
+        if run is None:
+            raise KeyError(f"Run not found: {run_id}")
+
+        # 임계값 결정 (커스텀 > 평가 시 설정값)
+        effective_thresholds = thresholds or run.thresholds or {}
+
+        # 각 메트릭에 대해 게이트 체크
+        results: list[GateResult] = []
+        for metric in run.metrics_evaluated:
+            score = run.get_avg_score(metric)
+            if score is None:
+                score = 0.0
+
+            threshold = effective_thresholds.get(metric, 0.7)
+            passed = score >= threshold
+            gap = threshold - score
+
+            results.append(
+                GateResult(
+                    metric=metric,
+                    score=score,
+                    threshold=threshold,
+                    passed=passed,
+                    gap=gap,
+                )
+            )
+
+        # 전체 통과 여부 계산
+        overall_passed = all(r.passed for r in results)
+
+        return GateReport(
+            run_id=run_id,
+            results=results,
+            overall_passed=overall_passed,
+        )
 
 
 def create_adapter() -> WebUIAdapter:

@@ -45,7 +45,7 @@ def create_app():
         # 네비게이션
         page = st.radio(
             "Navigation",
-            options=["🏠 Home", "📊 Evaluate", "📋 History", "📄 Reports"],
+            options=["🏠 Home", "📊 Evaluate", "📋 History", "🔧 Improve", "📄 Reports"],
             label_visibility="collapsed",
         )
 
@@ -71,6 +71,8 @@ def create_app():
         render_evaluate_page(adapter, session)
     elif page == "📋 History":
         render_history_page(adapter, session)
+    elif page == "🔧 Improve":
+        render_improvement_page(adapter, session)
     elif page == "📄 Reports":
         render_reports_page(adapter, session)
 
@@ -173,6 +175,66 @@ def render_home_page(adapter, session):
                     unsafe_allow_html=True,
                 )
 
+    # 품질 게이트 및 개선 제안 섹션
+    st.divider()
+    st.subheader("품질 현황 및 개선 제안")
+
+    if runs:
+        # 가장 최근 실행의 품질 게이트 표시
+        latest_run = runs[0]
+        try:
+            gate_report = adapter.check_quality_gate(latest_run.run_id)
+
+            gate_col1, gate_col2 = st.columns([1, 2])
+
+            with gate_col1:
+                # 품질 게이트 상태
+                if gate_report.overall_passed:
+                    st.success("✅ 품질 게이트 PASS")
+                else:
+                    st.error("❌ 품질 게이트 FAIL")
+
+                st.caption(f"최근 평가: {latest_run.run_id[:12]}...")
+
+            with gate_col2:
+                # 메트릭별 상태 (실패 메트릭 강조)
+                failed_metrics = [r for r in gate_report.results if not r.passed]
+                passed_metrics = [r for r in gate_report.results if r.passed]
+
+                if failed_metrics:
+                    st.markdown("**개선 필요 메트릭:**")
+                    for result in failed_metrics[:3]:  # 상위 3개만
+                        gap_pct = abs(result.gap) * 100
+                        st.markdown(
+                            f"- 🔴 **{result.metric}**: {result.score:.2f} / {result.threshold:.2f} "
+                            f"(갭: -{gap_pct:.1f}%)"
+                        )
+
+                if passed_metrics:
+                    with st.expander(f"✅ 통과 메트릭 ({len(passed_metrics)}개)"):
+                        for result in passed_metrics:
+                            st.markdown(
+                                f"- {result.metric}: {result.score:.2f} / {result.threshold:.2f}"
+                            )
+
+            # 빠른 개선 제안 링크
+            if failed_metrics:
+                st.markdown("---")
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.info(
+                        f"💡 {len(failed_metrics)}개 메트릭이 임계값 미달입니다. "
+                        "개선 가이드를 확인하세요."
+                    )
+                with col2:
+                    if st.button("🔧 개선 가이드", key="home_improve_btn"):
+                        session.current_run_id = latest_run.run_id
+
+        except Exception as e:
+            st.warning(f"품질 게이트 정보를 가져오는 데 실패했습니다: {e}")
+    else:
+        st.info("아직 평가 결과가 없습니다.")
+
     # 최근 평가 목록
     st.divider()
     st.subheader("최근 평가")
@@ -181,7 +243,7 @@ def render_home_page(adapter, session):
 
     if not recent_list.is_empty:
         for run in recent_list.displayed_runs:
-            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
             with col1:
                 emoji = recent_list.get_pass_rate_emoji(run.pass_rate)
                 st.text(f"{emoji} {run.dataset_name}")
@@ -197,6 +259,9 @@ def render_home_page(adapter, session):
                     st.error(f"{pass_rate_pct:.1f}%")
             with col4:
                 st.text(run.started_at.strftime("%m/%d"))
+            with col5:
+                if st.button("🔧", key=f"improve_{run.run_id}", help="개선 가이드"):
+                    session.current_run_id = run.run_id
 
         if recent_list.has_more:
             st.caption(f"+{recent_list.remaining_count} more runs...")
@@ -625,6 +690,198 @@ def render_reports_page(adapter, session):
             mime=download_data["mime_type"],
             type="primary",
         )
+
+
+def render_improvement_page(adapter, session):
+    """개선 가이드 페이지 렌더링."""
+    import streamlit as st
+
+    from evalvault.adapters.inbound.web.components import RunSelector
+
+    st.header("🔧 개선 가이드")
+    st.markdown("평가 결과를 분석하여 RAG 시스템 개선 방안을 제안합니다.")
+
+    # 평가 결과 조회
+    runs = adapter.list_runs(limit=50)
+
+    if not runs:
+        st.info("분석할 평가 결과가 없습니다. 먼저 평가를 실행해주세요.")
+        return
+
+    # 실행 선택 섹션
+    st.subheader("1. 평가 선택")
+    selector = RunSelector(runs=runs)
+    options = selector.get_options()
+
+    selected_option = st.selectbox(
+        "분석할 평가 실행 선택",
+        options=options,
+        format_func=lambda x: x,
+        help="개선 가이드를 생성할 평가 실행을 선택하세요.",
+    )
+
+    # 선택된 실행 ID 추출
+    selected_run_id = selected_option.split(" | ")[0] if selected_option else None
+    selected_run = selector.get_by_id(selected_run_id) if selected_run_id else None
+
+    if not selected_run:
+        return
+
+    # 선택된 평가 정보 및 품질 게이트
+    st.divider()
+    st.subheader("2. 품질 현황")
+
+    # 품질 게이트 체크
+    try:
+        gate_report = adapter.check_quality_gate(selected_run_id)
+
+        # 전체 상태 표시
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("전체 통과율", f"{selected_run.pass_rate:.1%}")
+        with col2:
+            if gate_report.overall_passed:
+                st.success("✅ 품질 게이트 PASS")
+            else:
+                st.error("❌ 품질 게이트 FAIL")
+        with col3:
+            st.metric("테스트 케이스", selected_run.total_test_cases)
+
+        # 메트릭별 현황
+        st.markdown("**메트릭별 현황**")
+        for result in gate_report.results:
+            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            with col1:
+                # 프로그레스 바
+                st.progress(result.score, text=result.metric)
+            with col2:
+                st.text(f"{result.score:.2f}")
+            with col3:
+                st.text(f"/ {result.threshold:.2f}")
+            with col4:
+                if result.passed:
+                    st.success("✅")
+                else:
+                    st.error("❌")
+
+    except Exception as e:
+        st.warning(f"품질 게이트 정보를 가져오는 데 실패했습니다: {e}")
+
+    # 개선 가이드 생성 옵션
+    st.divider()
+    st.subheader("3. 개선 가이드 생성")
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        include_llm = st.checkbox(
+            "LLM 분석 포함",
+            value=False,
+            help="LLM을 사용하여 더 상세한 분석을 수행합니다. (추가 비용 발생)",
+        )
+    with col2:
+        generate_clicked = st.button("🔍 분석 시작", type="primary")
+
+    # 개선 가이드 생성
+    if generate_clicked:
+        with st.spinner("개선 가이드 생성 중..."):
+            try:
+                report = adapter.get_improvement_guide(
+                    selected_run_id,
+                    include_llm=include_llm,
+                )
+
+                # 세션에 저장
+                session.improvement_report = report
+
+            except Exception as e:
+                st.error(f"개선 가이드 생성 실패: {e}")
+                return
+
+    # 개선 가이드 표시
+    if hasattr(session, "improvement_report") and session.improvement_report:
+        report = session.improvement_report
+
+        st.divider()
+        st.subheader("4. 개선 가이드")
+
+        # 요약
+        st.markdown(f"""
+        **분석 요약**
+        - 분석 대상: {report.run_id}
+        - 테스트 케이스: {report.total_test_cases}개
+        - 실패 케이스: {report.failed_test_cases}개
+        - 통과율: {report.pass_rate:.1%}
+        """)
+
+        # 가이드 목록
+        if report.guides:
+            for i, guide in enumerate(report.guides, 1):
+                priority_colors = {
+                    "P0_CRITICAL": "🔴",
+                    "P1_HIGH": "🟠",
+                    "P2_MEDIUM": "🟡",
+                    "P3_LOW": "🟢",
+                }
+                priority_icon = priority_colors.get(guide.priority.name, "⚪")
+
+                with st.expander(
+                    f"{priority_icon} {i}. {guide.component.value.title()} 개선 "
+                    f"(예상 +{guide.total_expected_improvement:.0%})",
+                    expanded=i == 1,
+                ):
+                    # 대상 메트릭
+                    st.markdown(f"**대상 메트릭**: {', '.join(guide.target_metrics)}")
+
+                    # 증거 데이터
+                    if guide.evidence:
+                        st.markdown("**증거 데이터**")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("실패 케이스", guide.evidence.total_failures)
+                        with col2:
+                            if guide.evidence.avg_score_failures:
+                                st.metric(
+                                    "실패 평균 점수",
+                                    f"{guide.evidence.avg_score_failures:.2f}",
+                                )
+                        with col3:
+                            if guide.evidence.avg_score_passes:
+                                st.metric(
+                                    "통과 평균 점수",
+                                    f"{guide.evidence.avg_score_passes:.2f}",
+                                )
+
+                    # 개선 액션
+                    st.markdown("**권장 액션**")
+                    for j, action in enumerate(guide.actions, 1):
+                        effort_icons = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+                        effort_icon = effort_icons.get(action.effort.value, "⚪")
+
+                        st.markdown(
+                            f"{j}. **{action.title}** {effort_icon} "
+                            f"(예상 +{action.expected_improvement:.0%})"
+                        )
+                        st.caption(action.description)
+
+                        if action.implementation_hint:
+                            st.code(action.implementation_hint, language="python")
+
+                    # 검증 방법
+                    if guide.verification_command:
+                        st.markdown("**검증 방법**")
+                        st.code(guide.verification_command, language="bash")
+        else:
+            st.info("탐지된 개선 패턴이 없습니다. 현재 시스템이 양호한 상태입니다.")
+
+        # 마크다운 다운로드
+        st.divider()
+        if hasattr(report, "to_markdown"):
+            st.download_button(
+                "📥 마크다운 다운로드",
+                data=report.to_markdown(),
+                file_name=f"improvement_guide_{report.run_id}.md",
+                mime="text/markdown",
+            )
 
 
 def main():
