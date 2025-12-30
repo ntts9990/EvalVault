@@ -151,6 +151,9 @@ class ReportTemplate:
 
     def _render_basic(self, run: RunSummary, metrics: dict[str, float]) -> str:
         """기본 템플릿 렌더링."""
+        # 기본 임계값
+        default_threshold = 0.7
+
         lines = [
             f"# 평가 보고서: {run.dataset_name}",
             "",
@@ -163,12 +166,43 @@ class ReportTemplate:
             "",
             "## 메트릭 결과",
             "",
+            "| 메트릭 | 점수 | 임계값 | 결과 |",
+            "|--------|------|--------|------|",
         ]
 
+        passed_count = 0
+        failed_metrics = []
         for metric_name, score in metrics.items():
-            lines.append(f"- **{metric_name}**: {score:.3f}")
+            threshold = default_threshold
+            passed = score >= threshold
+            status = "✅ Pass" if passed else "❌ Fail"
+            if passed:
+                passed_count += 1
+            else:
+                failed_metrics.append((metric_name, score, threshold))
+            lines.append(f"| {metric_name} | {score:.3f} | {threshold:.2f} | {status} |")
 
         lines.append("")
+
+        # 권장사항
+        lines.append("## 권장사항")
+        lines.append("")
+
+        if failed_metrics:
+            lines.append("다음 메트릭의 개선이 필요합니다:")
+            lines.append("")
+            for metric_name, score, threshold in failed_metrics:
+                gap = threshold - score
+                lines.append(
+                    f"- **{metric_name}**: {score:.3f} → {threshold:.2f} 필요 (갭: {gap:.3f})"
+                )
+            lines.append("")
+            lines.append("> 💡 **Improve 페이지**에서 상세 개선 가이드를 확인하세요.")
+        else:
+            lines.append("✅ 모든 메트릭이 임계값을 충족합니다!")
+
+        lines.append("")
+        lines.append("---")
         lines.append(f"*생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
         return "\n".join(lines)

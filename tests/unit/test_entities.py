@@ -170,11 +170,12 @@ class TestEvaluationRun:
         assert run.total_test_cases == 0
 
     def test_pass_rate(self):
-        """pass_rate 계산 테스트."""
+        """pass_rate 계산 테스트 (메트릭 기준 통과율)."""
         run = EvaluationRun(
             dataset_name="test",
             dataset_version="1.0.0",
             model_name="gpt-4o",
+            metrics_evaluated=["f"],
             results=[
                 TestCaseResult(
                     test_case_id="tc-001",
@@ -187,8 +188,10 @@ class TestEvaluationRun:
             ],
         )
         assert run.total_test_cases == 2
-        assert run.passed_test_cases == 1
-        assert run.pass_rate == 0.5
+        assert run.passed_test_cases == 1  # strict: 1개 테스트 케이스만 모든 메트릭 통과
+        assert run.strict_pass_rate == 0.5  # 테스트 케이스 기준 통과율
+        # 메트릭 "f"의 평균: (0.9 + 0.5) / 2 = 0.7 >= 0.7 → 통과
+        assert run.pass_rate == 1.0  # 메트릭 기준 통과율 (1/1 메트릭 통과)
 
     def test_pass_rate_empty(self):
         """결과 없을 때 pass_rate=0."""

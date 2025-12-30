@@ -382,7 +382,8 @@ class TestLogEvaluationRun:
         # Verify metadata via update_trace call
         update_call = mock_span.update_trace.call_args_list[0]
         assert update_call[1]["metadata"]["passed_test_cases"] == 1
-        assert update_call[1]["metadata"]["pass_rate"] == 0.5
+        # 메트릭 "faithfulness"의 평균: (0.85 + 0.5) / 2 = 0.675 < 0.7 → 실패
+        assert update_call[1]["metadata"]["pass_rate"] == 0.0  # 메트릭 기준 통과율
         # Verify output shows failure
         assert update_call[1]["output"]["summary"]["passed"] == 1
         assert update_call[1]["output"]["summary"]["failed"] == 1

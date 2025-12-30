@@ -100,13 +100,45 @@ class EvaluationRun:
 
     @property
     def passed_test_cases(self) -> int:
+        """모든 메트릭을 통과한 테스트 케이스 수 (strict)."""
         return sum(1 for r in self.results if r.all_passed)
 
     @property
-    def pass_rate(self) -> float:
+    def strict_pass_rate(self) -> float:
+        """모든 메트릭 통과 기준 통과율 (strict quality gate)."""
         if not self.results:
             return 0.0
         return self.passed_test_cases / self.total_test_cases
+
+    @property
+    def pass_rate(self) -> float:
+        """메트릭 기준 통과율 (개별 메트릭 통과 비율).
+
+        각 메트릭의 평균 점수가 임계값을 넘는 비율을 계산합니다.
+        예: 7개 메트릭 중 4개가 평균적으로 임계값을 넘으면 4/7 = 57%
+        """
+        if not self.results or not self.metrics_evaluated:
+            return 0.0
+
+        passed_metrics = 0
+        for metric_name in self.metrics_evaluated:
+            avg_score = self.get_avg_score(metric_name)
+            threshold = self._get_threshold(metric_name)
+            if avg_score is not None and avg_score >= threshold:
+                passed_metrics += 1
+
+        return passed_metrics / len(self.metrics_evaluated)
+
+    def _get_threshold(self, metric_name: str) -> float:
+        """메트릭의 임계값 조회."""
+        if self.thresholds and metric_name in self.thresholds:
+            return self.thresholds[metric_name]
+        # 결과에서 임계값 찾기
+        for r in self.results:
+            m = r.get_metric(metric_name)
+            if m:
+                return m.threshold
+        return 0.7  # 기본값
 
     @property
     def duration_seconds(self) -> float | None:

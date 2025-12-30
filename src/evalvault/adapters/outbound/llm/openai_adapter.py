@@ -220,3 +220,58 @@ class OpenAIAdapter(LLMPort):
     def reset_token_usage(self) -> None:
         """Reset token usage counters."""
         self._token_usage.reset()
+
+    async def agenerate_text(self, prompt: str) -> str:
+        """Generate text from a prompt (async).
+
+        Uses the OpenAI chat completions API directly for simple text generation.
+
+        Args:
+            prompt: The prompt to generate text from
+
+        Returns:
+            Generated text string
+        """
+        response = await self._client.chat.completions.create(
+            model=self._model_name,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=8192,  # 긴 보고서를 위해 증가
+        )
+        return response.choices[0].message.content or ""
+
+    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+        """Generate text from a prompt (sync).
+
+        Uses sync OpenAI client directly.
+
+        Args:
+            prompt: The prompt to generate text from
+            json_mode: If True, force JSON response format
+
+        Returns:
+            Generated text string
+        """
+        from openai import OpenAI
+
+        # 동기 클라이언트 생성
+        client_kwargs = {}
+        if self._settings.openai_api_key:
+            client_kwargs["api_key"] = self._settings.openai_api_key
+        if self._settings.openai_base_url:
+            client_kwargs["base_url"] = self._settings.openai_base_url
+
+        sync_client = OpenAI(**client_kwargs)
+
+        # API 호출 파라미터
+        api_kwargs: dict = {
+            "model": self._model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_completion_tokens": 8192,  # 긴 보고서를 위해 증가
+        }
+
+        # JSON 모드 설정
+        if json_mode:
+            api_kwargs["response_format"] = {"type": "json_object"}
+
+        response = sync_client.chat.completions.create(**api_kwargs)
+        return response.choices[0].message.content or ""

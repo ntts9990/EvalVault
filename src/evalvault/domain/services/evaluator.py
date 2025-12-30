@@ -156,7 +156,11 @@ class RagasEvaluator:
         eval_results_by_test_case = {}
         if ragas_metrics:
             eval_results_by_test_case = await self._evaluate_with_ragas(
-                dataset=dataset, metrics=ragas_metrics, llm=llm
+                dataset=dataset,
+                metrics=ragas_metrics,
+                llm=llm,
+                parallel=parallel,
+                batch_size=batch_size,
             )
 
         # Evaluate with custom metrics (if any custom metrics)
@@ -218,7 +222,12 @@ class RagasEvaluator:
         return run
 
     async def _evaluate_with_ragas(
-        self, dataset: Dataset, metrics: list[str], llm: LLMPort
+        self,
+        dataset: Dataset,
+        metrics: list[str],
+        llm: LLMPort,
+        parallel: bool = False,
+        batch_size: int = 5,
     ) -> dict[str, TestCaseEvalResult]:
         """Ragas로 실제 평가 수행.
 
@@ -226,11 +235,14 @@ class RagasEvaluator:
             dataset: 평가할 데이터셋
             metrics: 평가할 메트릭 리스트
             llm: LLM 어댑터
+            parallel: 병렬 처리 여부
+            batch_size: 병렬 처리 시 배치 크기
 
         Returns:
             테스트 케이스 ID별 평가 결과 (토큰 사용량 포함)
             예: {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}, tokens_used=150)}
         """
+
         # Convert dataset to Ragas format
         ragas_samples = []
         for test_case in dataset.test_cases:
@@ -259,55 +271,45 @@ class RagasEvaluator:
                 else:
                     ragas_metrics.append(metric_class(llm=ragas_llm))
 
-        # Evaluate using Ragas with token and timing tracking
+        # 병렬 처리 vs 순차 처리
+        if parallel and len(ragas_samples) > 1:
+            return await self._evaluate_parallel(
+                dataset=dataset,
+                ragas_samples=ragas_samples,
+                ragas_metrics=ragas_metrics,
+                llm=llm,
+                batch_size=batch_size,
+            )
+        else:
+            return await self._evaluate_sequential(
+                dataset=dataset,
+                ragas_samples=ragas_samples,
+                ragas_metrics=ragas_metrics,
+                llm=llm,
+            )
+
+    async def _evaluate_sequential(
+        self,
+        dataset: Dataset,
+        ragas_samples: list,
+        ragas_metrics: list,
+        llm: LLMPort,
+    ) -> dict[str, TestCaseEvalResult]:
+        """순차 평가 (기존 로직)."""
         results: dict[str, TestCaseEvalResult] = {}
+
         for idx, sample in enumerate(ragas_samples):
             test_case_id = dataset.test_cases[idx].id
-            scores: dict[str, float] = {}
 
             # Reset token tracking before each test case
             if hasattr(llm, "reset_token_usage"):
                 llm.reset_token_usage()
 
-            # Track start time for this test case
+            # 단일 테스트 케이스 평가
             test_case_started_at = datetime.now()
-
-            for metric in ragas_metrics:
-                # Ragas >=0.4 uses ascore() with kwargs, older uses single_turn_ascore(sample)
-                if hasattr(metric, "ascore"):
-                    # New Ragas 0.4+ API: build kwargs based on metric requirements
-                    all_args = {
-                        "user_input": sample.user_input,
-                        "response": sample.response,
-                        "retrieved_contexts": sample.retrieved_contexts,
-                        "reference": sample.reference,
-                    }
-                    # Get required args for this metric
-                    required_args = self.METRIC_ARGS.get(
-                        metric.name,
-                        ["user_input", "response", "retrieved_contexts"],
-                    )
-                    kwargs = {
-                        k: v for k, v in all_args.items() if k in required_args and v is not None
-                    }
-                    result = await metric.ascore(**kwargs)
-                elif hasattr(metric, "single_turn_ascore"):
-                    # Legacy Ragas <0.4 API
-                    result = await metric.single_turn_ascore(sample)
-                else:  # pragma: no cover
-                    raise AttributeError(
-                        f"{metric.__class__.__name__} does not support scoring API."
-                    )
-                # Handle MetricResult (v0.4+), score attr, or raw float
-                if hasattr(result, "value"):
-                    scores[metric.name] = result.value
-                elif hasattr(result, "score"):
-                    scores[metric.name] = result.score
-                else:
-                    scores[metric.name] = float(result)
-
-            # Track end time and calculate latency
+            scores = await self._score_single_sample(sample, ragas_metrics)
             test_case_finished_at = datetime.now()
+
             latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
 
             # Get token usage for this test case
@@ -326,13 +328,153 @@ class RagasEvaluator:
                 tokens_used=test_case_tokens,
                 prompt_tokens=test_case_prompt_tokens,
                 completion_tokens=test_case_completion_tokens,
-                cost_usd=0.0,  # Cost tracking not available via direct API
+                cost_usd=0.0,
                 started_at=test_case_started_at,
                 finished_at=test_case_finished_at,
                 latency_ms=latency_ms,
             )
 
         return results
+
+    async def _evaluate_parallel(
+        self,
+        dataset: Dataset,
+        ragas_samples: list,
+        ragas_metrics: list,
+        llm: LLMPort,
+        batch_size: int = 5,
+    ) -> dict[str, TestCaseEvalResult]:
+        """병렬 평가 (배치 단위로 동시 실행).
+
+        Args:
+            dataset: 데이터셋
+            ragas_samples: Ragas 샘플 목록
+            ragas_metrics: 평가할 메트릭 목록
+            llm: LLM 어댑터
+            batch_size: 동시 실행할 테스트 케이스 수
+
+        Returns:
+            테스트 케이스별 평가 결과
+        """
+        import asyncio
+
+        results: dict[str, TestCaseEvalResult] = {}
+        total_samples = len(ragas_samples)
+
+        # 토큰 추적 리셋 (전체 배치 시작 전)
+        if hasattr(llm, "reset_token_usage"):
+            llm.reset_token_usage()
+
+        batch_start_time = datetime.now()
+
+        # 배치 단위로 병렬 처리
+        for batch_start in range(0, total_samples, batch_size):
+            batch_end = min(batch_start + batch_size, total_samples)
+            batch_samples = ragas_samples[batch_start:batch_end]
+            batch_test_cases = dataset.test_cases[batch_start:batch_end]
+
+            # 배치 내 태스크 생성
+            tasks = []
+            for sample in batch_samples:
+                task = self._score_single_sample(sample, ragas_metrics)
+                tasks.append(task)
+
+            # 배치 병렬 실행
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 결과 수집
+            for test_case, scores_or_error in zip(batch_test_cases, batch_results, strict=True):
+                if isinstance(scores_or_error, Exception):
+                    # 에러 발생 시 빈 점수로 처리
+                    scores = {m.name: 0.0 for m in ragas_metrics}
+                else:
+                    scores = scores_or_error
+
+                results[test_case.id] = TestCaseEvalResult(
+                    scores=scores,
+                    tokens_used=0,  # 병렬 처리 시 개별 추적 불가 - 나중에 평균으로 분배
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    cost_usd=0.0,
+                    started_at=batch_start_time,
+                    finished_at=datetime.now(),
+                    latency_ms=0,
+                )
+
+        # 전체 토큰 사용량 가져와서 테스트 케이스별로 평균 분배
+        if hasattr(llm, "get_and_reset_token_usage"):
+            total_prompt, total_completion, total_tokens = llm.get_and_reset_token_usage()
+            if total_samples > 0:
+                avg_tokens = total_tokens // total_samples
+                avg_prompt = total_prompt // total_samples
+                avg_completion = total_completion // total_samples
+
+                for test_case_id in results:
+                    results[test_case_id].tokens_used = avg_tokens
+                    results[test_case_id].prompt_tokens = avg_prompt
+                    results[test_case_id].completion_tokens = avg_completion
+
+        # 레이턴시 계산 (전체 시간 / 테스트 케이스 수)
+        total_elapsed = (datetime.now() - batch_start_time).total_seconds() * 1000
+        if total_samples > 0:
+            avg_latency = int(total_elapsed / total_samples)
+            for test_case_id in results:
+                results[test_case_id].latency_ms = avg_latency
+
+        return results
+
+    async def _score_single_sample(
+        self, sample: SingleTurnSample, ragas_metrics: list
+    ) -> dict[str, float]:
+        """단일 샘플에 대해 모든 메트릭 점수 계산.
+
+        Args:
+            sample: 평가할 Ragas 샘플
+            ragas_metrics: 메트릭 인스턴스 목록
+
+        Returns:
+            메트릭명: 점수 딕셔너리
+        """
+        scores: dict[str, float] = {}
+
+        for metric in ragas_metrics:
+            try:
+                # Ragas >=0.4 uses ascore() with kwargs
+                if hasattr(metric, "ascore"):
+                    all_args = {
+                        "user_input": sample.user_input,
+                        "response": sample.response,
+                        "retrieved_contexts": sample.retrieved_contexts,
+                        "reference": sample.reference,
+                    }
+                    required_args = self.METRIC_ARGS.get(
+                        metric.name,
+                        ["user_input", "response", "retrieved_contexts"],
+                    )
+                    kwargs = {
+                        k: v for k, v in all_args.items() if k in required_args and v is not None
+                    }
+                    result = await metric.ascore(**kwargs)
+                elif hasattr(metric, "single_turn_ascore"):
+                    # Legacy Ragas <0.4 API
+                    result = await metric.single_turn_ascore(sample)
+                else:
+                    raise AttributeError(
+                        f"{metric.__class__.__name__} does not support scoring API."
+                    )
+
+                # Handle MetricResult (v0.4+), score attr, or raw float
+                if hasattr(result, "value"):
+                    scores[metric.name] = result.value
+                elif hasattr(result, "score"):
+                    scores[metric.name] = result.score
+                else:
+                    scores[metric.name] = float(result)
+            except Exception:
+                # 개별 메트릭 실패 시 0.0으로 처리
+                scores[metric.name] = 0.0
+
+        return scores
 
     async def _evaluate_with_custom_metrics(
         self, dataset: Dataset, metrics: list[str]

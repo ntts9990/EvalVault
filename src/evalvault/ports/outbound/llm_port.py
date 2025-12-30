@@ -80,3 +80,38 @@ class LLMPort(ABC):
             True if thinking mode is available and enabled
         """
         return self.get_thinking_config().enabled
+
+    async def agenerate_text(self, prompt: str) -> str:
+        """Generate text from a prompt (async).
+
+        Simple text generation for use cases like report generation,
+        not for Ragas evaluation.
+
+        Args:
+            prompt: The prompt to generate text from
+
+        Returns:
+            Generated text string
+
+        Raises:
+            NotImplementedError: If not implemented by adapter
+        """
+        raise NotImplementedError("agenerate_text not implemented")
+
+    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+        """Generate text from a prompt (sync).
+
+        Simple text generation for use cases like report generation,
+        not for Ragas evaluation.
+
+        Args:
+            prompt: The prompt to generate text from
+            json_mode: If True, force JSON response format
+
+        Returns:
+            Generated text string
+
+        Raises:
+            NotImplementedError: If not implemented by adapter
+        """
+        raise NotImplementedError("generate_text not implemented")
