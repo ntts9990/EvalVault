@@ -193,7 +193,7 @@ class InsightGenerator:
             max_samples_per_analysis: 배치 분석 시 최대 샘플 수
             enable_llm_analysis: LLM 분석 활성화 여부
         """
-        self._llm = llm_adapter
+        self._llm_adapter = llm_adapter
         self._max_samples = max_samples_per_analysis
         self._enable_llm = enable_llm_analysis and llm_adapter is not None
 
@@ -236,7 +236,8 @@ class InsightGenerator:
         )
 
         try:
-            response = self._llm.generate(prompt)
+            # LLM adapter의 generate_text 사용 (JSON 모드)
+            response = self._llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_single_response(response)
         except Exception as e:
             logger.warning(f"LLM analysis failed: {e}")
@@ -286,7 +287,8 @@ class InsightGenerator:
         )
 
         try:
-            response = self._llm.generate(prompt)
+            # LLM adapter의 generate_text 사용 (JSON 모드)
+            response = self._llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_batch_response(response)
         except Exception as e:
             logger.warning(f"LLM batch analysis failed: {e}")

@@ -60,7 +60,7 @@ class PatternDetector:
         self,
         playbook: Playbook | None = None,
         *,
-        min_sample_size: int = 5,
+        min_sample_size: int = 1,
         significance_level: float = 0.05,
         max_representative_samples: int = 3,
     ):
@@ -255,9 +255,9 @@ class PatternDetector:
         threshold: float,
     ) -> PatternEvidence | None:
         """단일 패턴 탐지."""
-        # 각 규칙 확인
-        matched_vectors: list[FeatureVector] = []
+        # 각 규칙 확인 (AND 로직: 모든 규칙을 만족해야 매칭)
         rule_results: list[dict[str, Any]] = []
+        all_rule_matched_ids: list[set[str]] = []
 
         for rule in pattern_def.detection_rules:
             handler = self._rule_handlers.get(rule.rule_type)
@@ -273,19 +273,32 @@ class PatternDetector:
             )
             rule_results.append(result)
 
+            # 각 규칙별 매칭된 ID 수집
             if result.get("matched"):
-                matched_vectors.extend(result.get("matched_vectors", []))
+                matched_ids = {v.test_case_id for v in result.get("matched_vectors", [])}
+                all_rule_matched_ids.append(matched_ids)
+            else:
+                # 규칙이 매칭되지 않으면 빈 집합
+                all_rule_matched_ids.append(set())
 
-        # 매칭된 벡터가 없으면 패턴 없음
-        if not matched_vectors:
+        # 규칙이 없으면 패턴 없음
+        if not all_rule_matched_ids:
             return None
 
-        # 중복 제거
-        unique_matched = {v.test_case_id: v for v in matched_vectors}
-        matched_vectors = list(unique_matched.values())
+        # AND 로직: 모든 규칙에서 매칭된 ID의 교집합
+        common_ids = all_rule_matched_ids[0]
+        for ids in all_rule_matched_ids[1:]:
+            common_ids = common_ids & ids
 
-        # 최소 샘플 수 확인
-        if len(matched_vectors) < self._min_sample_size:
+        # 교집합이 비어있으면 패턴 없음
+        if not common_ids:
+            return None
+
+        # 매칭된 벡터 추출
+        matched_vectors = [v for v in feature_vectors if v.test_case_id in common_ids]
+
+        # 최소 샘플 수 확인 (최소 1개 이상이면 패턴 탐지)
+        if len(matched_vectors) < 1:
             return None
 
         # 통계 계산
@@ -294,7 +307,7 @@ class PatternDetector:
 
         # 영향받은/받지 않은 그룹의 메트릭 점수
         affected_scores = [v.metric_scores.get(target_metric, 0) for v in matched_vectors]
-        unaffected_ids = {v.test_case_id for v in feature_vectors} - unique_matched.keys()
+        unaffected_ids = {v.test_case_id for v in feature_vectors} - common_ids
         unaffected_scores = [
             v.metric_scores.get(target_metric, 0)
             for v in feature_vectors

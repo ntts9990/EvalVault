@@ -251,8 +251,8 @@ class TestInsightGeneratorWithMockLLM:
     def test_analyze_with_mock_llm(self):
         """Mock LLM으로 분석."""
 
-        class MockLLM:
-            def generate(self, prompt: str) -> str:
+        class MockLLMAdapter:
+            def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
                 return """
 ```json
 {
@@ -268,7 +268,7 @@ class TestInsightGeneratorWithMockLLM:
 ```
 """
 
-        generator = InsightGenerator(llm_adapter=MockLLM())
+        generator = InsightGenerator(llm_adapter=MockLLMAdapter())
 
         failure = FailureSample(
             test_case_id="tc-001",
@@ -287,8 +287,8 @@ class TestInsightGeneratorWithMockLLM:
     def test_batch_analyze_with_mock_llm(self):
         """Mock LLM으로 배치 분석."""
 
-        class MockLLM:
-            def generate(self, prompt: str) -> str:
+        class MockLLMAdapter:
+            def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
                 return """
 ```json
 {
@@ -305,7 +305,7 @@ class TestInsightGeneratorWithMockLLM:
 ```
 """
 
-        generator = InsightGenerator(llm_adapter=MockLLM())
+        generator = InsightGenerator(llm_adapter=MockLLMAdapter())
 
         failures = [
             FailureSample(

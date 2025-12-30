@@ -56,7 +56,11 @@ def create_app():
             st.caption("Model Configuration")
             model = st.selectbox(
                 "Default Model",
-                options=["gpt-5-nano", "gpt-4", "gpt-4o", "claude-3-5-sonnet"],
+                options=[
+                    "gpt-5-nano (OpenAI)",
+                    "gemma3:1b (Ollama, dev)",
+                    "gpt-oss-safeguard:20b (Ollama, prod)",
+                ],
                 index=0,
             )
             session.selected_model = model
@@ -145,11 +149,11 @@ def render_home_page(adapter, session):
 
     with chart_col1:
         pass_rate_fig = create_pass_rate_chart(runs[:10])
-        st.plotly_chart(pass_rate_fig, use_container_width=True, key="home_pass_rate_chart")
+        st.plotly_chart(pass_rate_fig, width="stretch", key="home_pass_rate_chart")
 
     with chart_col2:
         trend_fig = create_trend_chart(runs)
-        st.plotly_chart(trend_fig, use_container_width=True, key="home_trend_chart")
+        st.plotly_chart(trend_fig, width="stretch", key="home_trend_chart")
 
     # 지원 메트릭 섹션
     st.divider()
@@ -309,6 +313,14 @@ def render_evaluate_page(adapter, session):
             )
             if validation_result.dataset_name:
                 st.caption(f"Dataset: {validation_result.dataset_name}")
+            # 임계값 정보 표시
+            if validation_result.thresholds:
+                threshold_str = ", ".join(
+                    f"{k}: {v:.2f}" for k, v in validation_result.thresholds.items()
+                )
+                st.caption(f"📏 임계값: {threshold_str}")
+            else:
+                st.caption("📏 임계값: 기본값 0.7 적용 (JSON에 thresholds 미지정)")
         else:
             st.error(f"❌ {validation_result.error_message}")
 
@@ -348,7 +360,11 @@ def render_evaluate_page(adapter, session):
         with col1:
             session.selected_model = st.selectbox(
                 "모델",
-                options=["gpt-5-nano", "gpt-4", "gpt-4o", "claude-3-5-sonnet"],
+                options=[
+                    "gpt-5-nano (OpenAI)",
+                    "gemma3:1b (Ollama, dev)",
+                    "gpt-oss-safeguard:20b (Ollama, prod)",
+                ],
                 index=0,
             )
         with col2:
@@ -356,19 +372,11 @@ def render_evaluate_page(adapter, session):
         with col3:
             session.parallel_processing = st.checkbox("병렬 처리", value=True)
 
-        # 임계값 설정
-        st.caption("메트릭 임계값 (Pass/Fail 기준)")
-        threshold_cols = st.columns(len(selected_metrics) if selected_metrics else 1)
-        for i, metric in enumerate(selected_metrics[:4]):  # 최대 4개만 표시
-            with threshold_cols[i]:
-                st.number_input(
-                    metric,
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.7,
-                    step=0.1,
-                    key=f"threshold_{metric}",
-                )
+        # 임계값 안내 (데이터셋에서 로드됨)
+        st.caption(
+            "💡 메트릭 임계값은 데이터셋 JSON의 `thresholds`에서 로드됩니다. "
+            "미지정 시 기본값 0.7 적용."
+        )
 
     # 실행 버튼
     st.divider()
@@ -382,8 +390,107 @@ def render_evaluate_page(adapter, session):
     col1, col2 = st.columns([3, 1])
     with col1:
         if st.button("🚀 평가 실행", type="primary", disabled=not can_run):
-            st.info("평가 실행 기능은 아직 구현 중입니다.")
-            # TODO: 실제 평가 실행 로직
+            # LLM 설정 확인
+            if adapter._llm_adapter is None:
+                st.error("LLM이 설정되지 않았습니다. .env 파일에 OPENAI_API_KEY를 설정해주세요.")
+            else:
+                try:
+                    # 평가 시작 상태 설정
+                    session.is_evaluating = True
+
+                    # 파일 내용 읽기
+                    file_content = uploaded_file.getvalue()
+
+                    # st.status를 사용하여 진행 상태 표시
+                    with st.status("🔄 평가 진행 중...", expanded=True) as status:
+                        # Dataset 생성
+                        status.write("📂 데이터셋 파싱 중...")
+                        dataset = adapter.create_dataset_from_upload(
+                            uploaded_file.name,
+                            file_content,
+                        )
+                        status.write(f"✅ 데이터셋 로드 완료: {len(dataset.test_cases)}개 케이스")
+
+                        # 데이터셋에서 Threshold 로드 (미지정 시 기본값 0.7)
+                        thresholds = dataset.thresholds or {}
+                        if thresholds:
+                            status.write(f"📏 임계값 로드: {thresholds}")
+                        else:
+                            status.write("📏 임계값: 기본값 0.7 적용")
+
+                        # 메트릭 정보 표시
+                        status.write(f"📊 평가 메트릭: {', '.join(selected_metrics)}")
+                        status.write("⏳ LLM API 호출 중... (1-2분 소요될 수 있습니다)")
+
+                        # 평가 실행
+                        import time
+
+                        start_time = time.time()
+                        parallel_mode = session.parallel_processing
+                        mode_str = "병렬" if parallel_mode else "순차"
+                        status.write(f"⚡ 실행 모드: {mode_str} 처리")
+
+                        result = adapter.run_evaluation_with_dataset(
+                            dataset=dataset,
+                            metrics=selected_metrics,
+                            thresholds=thresholds,
+                            parallel=parallel_mode,
+                            batch_size=5,
+                        )
+                        elapsed = time.time() - start_time
+
+                        # 완료 상태로 업데이트
+                        status.update(label="✅ 평가 완료!", state="complete", expanded=False)
+                        status.write(f"⏱️ 소요 시간: {elapsed:.1f}초")
+
+                    # 결과 표시
+                    st.success(f"✅ 평가 완료! (Run ID: `{result.run_id}`)")
+
+                    # 요약 메트릭
+                    result_cols = st.columns(4)
+                    with result_cols[0]:
+                        st.metric("통과율", f"{result.pass_rate:.1%}")
+                    with result_cols[1]:
+                        st.metric("테스트 케이스", result.total_test_cases)
+                    with result_cols[2]:
+                        passed = result.passed_test_cases
+                        st.metric("통과", f"{passed}/{result.total_test_cases}")
+                    with result_cols[3]:
+                        duration = result.duration_seconds or 0
+                        st.metric("소요 시간", f"{duration:.1f}s")
+
+                    # 메트릭별 점수
+                    st.subheader("📊 메트릭별 결과")
+                    metric_results = []
+                    for metric in result.metrics_evaluated:
+                        score = result.get_avg_score(metric)
+                        threshold = thresholds.get(metric, 0.7)
+                        passed = score >= threshold if score else False
+                        metric_results.append(
+                            {
+                                "메트릭": metric,
+                                "점수": f"{score:.3f}" if score else "N/A",
+                                "임계값": f"{threshold:.2f}",
+                                "결과": "✅ Pass" if passed else "❌ Fail",
+                            }
+                        )
+
+                    st.dataframe(metric_results, width="stretch")
+
+                    # 세션 상태 업데이트
+                    session.current_run_id = result.run_id
+
+                    # History 페이지 이동 안내
+                    st.info("📋 History 페이지에서 상세 결과를 확인할 수 있습니다.")
+
+                except Exception as e:
+                    st.error(f"❌ 평가 실패: {e}")
+                    import traceback
+
+                    st.code(traceback.format_exc())
+                finally:
+                    session.is_evaluating = False
+
     with col2:
         if session.is_evaluating:
             st.warning("실행 중...")
@@ -395,6 +502,8 @@ def render_evaluate_page(adapter, session):
         st.warning("⚠️ 유효한 데이터셋 파일을 업로드하세요.")
     elif not selected_metrics:
         st.warning("⚠️ 최소 하나의 메트릭을 선택하세요.")
+    elif adapter._llm_adapter is None:
+        st.warning("⚠️ LLM이 설정되지 않았습니다. .env에 OPENAI_API_KEY를 설정하세요.")
 
 
 def render_history_page(adapter, session):
@@ -579,117 +688,210 @@ def render_reports_page(adapter, session):
         with info_col4:
             st.metric("Test Cases", selected_run.total_test_cases)
 
-    # 보고서 옵션 섹션
+    # 보고서 유형 선택
     st.divider()
-    st.subheader("2. 보고서 설정")
+    st.subheader("2. 보고서 유형 선택")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # 템플릿 선택
-        templates = ReportTemplate.list_templates()
-        template_descriptions = {t: ReportTemplate.get_description(t) for t in templates}
-
-        selected_template = st.selectbox(
-            "템플릿",
-            options=templates,
-            format_func=lambda x: f"{x.title()} - {template_descriptions.get(x, '')}",
-        )
-
-        # 출력 형식
-        output_format = st.radio(
-            "출력 형식",
-            options=["markdown", "html"],
-            format_func=lambda x: {"markdown": "📝 Markdown", "html": "🌐 HTML"}.get(x, x),
-            horizontal=True,
-        )
-
-    with col2:
-        # 포함 옵션
-        st.caption("포함 항목")
-        include_summary = st.checkbox("요약", value=True)
-        include_metrics_detail = st.checkbox("메트릭 상세", value=True)
-        include_charts = st.checkbox("차트", value=True, disabled=True, help="HTML 형식에서만 지원")
-        include_nlp = st.checkbox("NLP 분석", value=False)
-        include_causal = st.checkbox("인과 분석", value=False)
-
-    # 보고서 생성 섹션
-    st.divider()
-    st.subheader("3. 보고서 생성")
-
-    # 설정 생성
-    config = ReportConfig(
-        output_format=output_format,
-        include_summary=include_summary,
-        include_metrics_detail=include_metrics_detail,
-        include_charts=include_charts and output_format == "html",
-        include_nlp_analysis=include_nlp,
-        include_causal_analysis=include_causal,
-        template_name=selected_template,
+    report_type = st.radio(
+        "보고서 유형",
+        options=["ai_analysis", "basic"],
+        format_func=lambda x: {
+            "ai_analysis": "🤖 AI 분석 보고서 (권장) - LLM 기반 전문가 수준 분석",
+            "basic": "📝 기본 보고서 - 템플릿 기반 요약",
+        }.get(x, x),
+        horizontal=False,
+        help="AI 분석 보고서는 LLM을 사용하여 전문가 수준의 심층 분석을 제공합니다.",
     )
 
-    gen_col1, gen_col2 = st.columns([1, 3])
+    # AI 분석 보고서
+    if report_type == "ai_analysis":
+        st.info(
+            "💡 **AI 분석 보고서**는 각 메트릭에 대해 전문가 관점의 분석, "
+            "최신 RAG 연구 기반 권장사항, 구체적인 액션 아이템을 제공합니다. "
+            "(LLM API 호출로 인해 2-3분 소요될 수 있습니다)"
+        )
 
-    with gen_col1:
+        # 보고서 생성 버튼
+        st.divider()
+        st.subheader("3. AI 분석 보고서 생성")
+
+        if adapter._llm_adapter is None:
+            st.error("LLM이 설정되지 않았습니다. .env 파일에 OPENAI_API_KEY를 설정해주세요.")
+        else:
+            generate_ai_clicked = st.button(
+                "🤖 AI 분석 보고서 생성",
+                type="primary",
+                disabled=selected_run is None,
+            )
+
+            if generate_ai_clicked and selected_run:
+                with st.status("🤖 AI 분석 보고서 생성 중...", expanded=True) as status:
+                    try:
+                        status.write("📊 평가 결과 로드 중...")
+                        status.write("🧠 LLM 분석 시작 (각 메트릭별 전문가 분석)...")
+                        status.write("⏳ 약 2-3분 소요될 수 있습니다...")
+
+                        # LLM 보고서 생성
+                        llm_report = adapter.generate_llm_report(selected_run.run_id)
+
+                        status.update(
+                            label="✅ AI 분석 보고서 생성 완료!",
+                            state="complete",
+                            expanded=False,
+                        )
+
+                        # 세션에 저장
+                        session.llm_report = llm_report
+
+                    except Exception as e:
+                        st.error(f"❌ 보고서 생성 실패: {e}")
+                        import traceback
+
+                        st.code(traceback.format_exc())
+
+            # LLM 보고서 미리보기
+            if hasattr(session, "llm_report") and session.llm_report:
+                llm_report = session.llm_report
+
+                st.divider()
+                st.subheader("4. AI 분석 보고서 미리보기")
+
+                # 보고서 내용 마크다운으로 표시
+                report_content = llm_report.to_markdown()
+
+                stat_col1, stat_col2 = st.columns(2)
+                with stat_col1:
+                    st.caption(f"📄 {len(report_content):,} 문자")
+                with stat_col2:
+                    st.caption(f"📊 {len(llm_report.metric_analyses)}개 메트릭 분석 포함")
+
+                with st.expander("📖 보고서 전체 보기", expanded=True):
+                    st.markdown(report_content)
+
+                # 다운로드 버튼
+                st.divider()
+                st.download_button(
+                    label="📥 마크다운 다운로드",
+                    data=report_content,
+                    file_name=f"ai_report_{llm_report.run_id}.md",
+                    mime="text/markdown",
+                    type="primary",
+                )
+
+    # 기본 보고서
+    else:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # 템플릿 선택
+            templates = ReportTemplate.list_templates()
+            template_descriptions = {t: ReportTemplate.get_description(t) for t in templates}
+
+            selected_template = st.selectbox(
+                "템플릿",
+                options=templates,
+                format_func=lambda x: f"{x.title()} - {template_descriptions.get(x, '')}",
+            )
+
+            # 출력 형식
+            output_format = st.radio(
+                "출력 형식",
+                options=["markdown", "html"],
+                format_func=lambda x: {
+                    "markdown": "📝 Markdown",
+                    "html": "🌐 HTML",
+                }.get(x, x),
+                horizontal=True,
+            )
+
+        with col2:
+            # 포함 옵션
+            st.caption("포함 항목")
+            include_summary = st.checkbox("요약", value=True)
+            include_metrics_detail = st.checkbox("메트릭 상세", value=True)
+
+        # 보고서 생성 섹션
+        st.divider()
+        st.subheader("3. 기본 보고서 생성")
+
+        # 설정 생성
+        config = ReportConfig(
+            output_format=output_format,
+            include_summary=include_summary,
+            include_metrics_detail=include_metrics_detail,
+            include_charts=False,
+            include_nlp_analysis=False,
+            include_causal_analysis=False,
+            template_name=selected_template,
+        )
+
         generate_clicked = st.button(
-            "📝 보고서 생성",
+            "📝 기본 보고서 생성",
             type="primary",
             disabled=selected_run is None,
         )
 
-    # 보고서 생성 및 미리보기
-    if generate_clicked and selected_run:
-        with st.spinner("보고서 생성 중..."):
-            # 메트릭 점수 (Mock - 실제로는 adapter에서 조회)
-            metrics = dict.fromkeys(selected_run.metrics_evaluated, 0.8)
+        # 보고서 생성 및 미리보기
+        if generate_clicked and selected_run:
+            with st.spinner("보고서 생성 중..."):
+                # 실제 메트릭 점수 조회
+                try:
+                    run_details = adapter.get_run_details(selected_run.run_id)
+                    metrics = {
+                        m: run_details.get_avg_score(m) or 0.0
+                        for m in run_details.metrics_evaluated
+                    }
+                except Exception as e:
+                    st.warning(f"메트릭 점수 조회 실패: {e}. 기본값 사용.")
+                    metrics = dict.fromkeys(selected_run.metrics_evaluated, 0.0)
 
-            # 보고서 생성
-            generator = ReportGenerator(config=config)
-            report_result = generator.generate(run=selected_run, metrics=metrics)
+                # 보고서 생성
+                generator = ReportGenerator(config=config)
+                report_result = generator.generate(run=selected_run, metrics=metrics)
 
-            # 세션에 저장
-            session.generated_report = report_result
+                # 세션에 저장
+                session.generated_report = report_result
 
-        st.success("✅ 보고서 생성 완료!")
+            st.success("✅ 보고서 생성 완료!")
 
-    # 미리보기 및 다운로드
-    if hasattr(session, "generated_report") and session.generated_report:
-        report_result = session.generated_report
+        # 미리보기 및 다운로드
+        if hasattr(session, "generated_report") and session.generated_report:
+            report_result = session.generated_report
 
-        st.divider()
-        st.subheader("4. 보고서 미리보기")
+            st.divider()
+            st.subheader("4. 보고서 미리보기")
 
-        # 통계 표시
-        preview = ReportPreview(result=report_result)
-        stats = preview.get_stats()
+            # 통계 표시
+            preview = ReportPreview(result=report_result)
+            stats = preview.get_stats()
 
-        stat_col1, stat_col2, stat_col3 = st.columns(3)
-        with stat_col1:
-            st.caption(f"📄 {stats['char_count']:,} 문자")
-        with stat_col2:
-            st.caption(f"📝 {stats['line_count']} 줄")
-        with stat_col3:
-            st.caption(f"📊 형식: {report_result.format.upper()}")
+            stat_col1, stat_col2, stat_col3 = st.columns(3)
+            with stat_col1:
+                st.caption(f"📄 {stats['char_count']:,} 문자")
+            with stat_col2:
+                st.caption(f"📝 {stats['line_count']} 줄")
+            with stat_col3:
+                st.caption(f"📊 형식: {report_result.format.upper()}")
 
-        # 미리보기 내용
-        with st.expander("📖 미리보기", expanded=True):
-            if report_result.format == "html":
-                st.components.v1.html(report_result.content, height=500, scrolling=True)
-            else:
-                st.markdown(preview.get_preview())
+            # 미리보기 내용
+            with st.expander("📖 미리보기", expanded=True):
+                if report_result.format == "html":
+                    st.components.v1.html(report_result.content, height=500, scrolling=True)
+                else:
+                    st.markdown(preview.get_preview())
 
-        # 다운로드 버튼
-        st.divider()
-        downloader = ReportDownloader(result=report_result)
-        download_data = downloader.prepare_download()
+            # 다운로드 버튼
+            st.divider()
+            downloader = ReportDownloader(result=report_result)
+            download_data = downloader.prepare_download()
 
-        st.download_button(
-            label=f"📥 {report_result.format.upper()} 다운로드",
-            data=download_data["data"],
-            file_name=download_data["filename"],
-            mime=download_data["mime_type"],
-            type="primary",
-        )
+            st.download_button(
+                label=f"📥 {report_result.format.upper()} 다운로드",
+                data=download_data["data"],
+                file_name=download_data["filename"],
+                mime=download_data["mime_type"],
+                type="primary",
+            )
 
 
 def render_improvement_page(adapter, session):
@@ -777,9 +979,23 @@ def render_improvement_page(adapter, session):
             "LLM 분석 포함",
             value=False,
             help="LLM을 사용하여 더 상세한 분석을 수행합니다. (추가 비용 발생)",
+            key="improve_include_llm",
         )
     with col2:
         generate_clicked = st.button("🔍 분석 시작", type="primary")
+
+    # 옵션 변경 시 이전 결과 무효화
+    if "last_improve_options" not in st.session_state:
+        st.session_state.last_improve_options = {"run_id": None, "include_llm": False}
+
+    options_changed = (
+        st.session_state.last_improve_options["run_id"] != selected_run_id
+        or st.session_state.last_improve_options["include_llm"] != include_llm
+    )
+
+    if options_changed and hasattr(session, "improvement_report") and session.improvement_report:
+        # 옵션이 변경되면 이전 결과 무효화
+        session.improvement_report = None
 
     # 개선 가이드 생성
     if generate_clicked:
@@ -792,6 +1008,12 @@ def render_improvement_page(adapter, session):
 
                 # 세션에 저장
                 session.improvement_report = report
+
+                # 현재 옵션 저장
+                st.session_state.last_improve_options = {
+                    "run_id": selected_run_id,
+                    "include_llm": include_llm,
+                }
 
             except Exception as e:
                 st.error(f"개선 가이드 생성 실패: {e}")

@@ -228,8 +228,8 @@ class TestImprovementGuideServiceWithMockLLM:
     def test_generate_report_with_llm(self):
         """LLM으로 리포트 생성."""
 
-        class MockLLM:
-            def generate(self, prompt: str) -> str:
+        class MockLLMAdapter:
+            def generate_text(self, prompt: str) -> str:
                 return """
 ```json
 {
@@ -246,7 +246,7 @@ class TestImprovementGuideServiceWithMockLLM:
 """
 
         detector = PatternDetector(min_sample_size=3)
-        generator = InsightGenerator(llm_adapter=MockLLM())
+        generator = InsightGenerator(llm_adapter=MockLLMAdapter())
         service = ImprovementGuideService(
             pattern_detector=detector,
             insight_generator=generator,

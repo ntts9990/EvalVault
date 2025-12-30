@@ -297,6 +297,181 @@ class WebUIAdapter:
             "insurance_term_accuracy": "보험 용어 정확성 평가",
         }
 
+    def create_dataset_from_upload(
+        self,
+        filename: str,
+        content: bytes,
+    ):
+        """업로드된 파일에서 Dataset 생성.
+
+        Args:
+            filename: 원본 파일명 (확장자로 형식 판단)
+            content: 파일 내용 (bytes)
+
+        Returns:
+            Dataset 인스턴스
+
+        Raises:
+            ValueError: 지원하지 않는 파일 형식인 경우
+        """
+        import csv
+        import io
+        import json
+        import tempfile
+
+        from evalvault.domain.entities import Dataset, TestCase
+
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+        if ext == "json":
+            # JSON 파일 파싱
+            text = content.decode("utf-8")
+            data = json.loads(text)
+
+            test_cases = []
+            for idx, tc_data in enumerate(data.get("test_cases", [])):
+                test_cases.append(
+                    TestCase(
+                        id=str(tc_data.get("id", f"tc-{idx + 1:03d}")),
+                        question=tc_data["question"],
+                        answer=tc_data["answer"],
+                        contexts=tc_data.get("contexts", []),
+                        ground_truth=tc_data.get("ground_truth"),
+                    )
+                )
+
+            return Dataset(
+                name=data.get("name", Path(filename).stem),
+                version=data.get("version", "1.0.0"),
+                test_cases=test_cases,
+                thresholds=data.get("thresholds", {}),
+            )
+
+        elif ext == "csv":
+            # CSV 파일 파싱
+            text = content.decode("utf-8")
+            reader = csv.DictReader(io.StringIO(text))
+
+            test_cases = []
+            for idx, row in enumerate(reader):
+                # contexts 파싱 (JSON 배열 또는 | 구분)
+                contexts_raw = row.get("contexts", "[]")
+                if contexts_raw.startswith("["):
+                    contexts = json.loads(contexts_raw)
+                else:
+                    contexts = [c.strip() for c in contexts_raw.split("|") if c.strip()]
+
+                test_cases.append(
+                    TestCase(
+                        id=row.get("id", f"tc-{idx + 1:03d}"),
+                        question=row["question"],
+                        answer=row["answer"],
+                        contexts=contexts,
+                        ground_truth=row.get("ground_truth"),
+                    )
+                )
+
+            return Dataset(
+                name=Path(filename).stem,
+                version="1.0.0",
+                test_cases=test_cases,
+            )
+
+        elif ext in ("xlsx", "xls"):
+            # Excel 파일은 임시 파일로 저장 후 기존 loader 사용
+            from evalvault.adapters.outbound.dataset import get_loader
+
+            with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = Path(tmp.name)
+
+            try:
+                loader = get_loader(tmp_path)
+                return loader.load(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+        else:
+            raise ValueError(f"지원하지 않는 파일 형식: {ext}")
+
+    def run_evaluation_with_dataset(
+        self,
+        dataset,
+        metrics: list[str],
+        thresholds: dict[str, float] | None = None,
+        *,
+        parallel: bool = True,
+        batch_size: int = 5,
+        on_progress: Callable[[EvalProgress], None] | None = None,
+    ) -> EvaluationRun:
+        """데이터셋 객체로 직접 평가 실행.
+
+        Args:
+            dataset: 평가할 Dataset 객체
+            metrics: 평가 메트릭 목록
+            thresholds: 메트릭별 임계값 (선택)
+            parallel: 병렬 처리 여부 (기본값: True)
+            batch_size: 병렬 처리 배치 크기 (기본값: 5)
+            on_progress: 진행 상황 콜백 (선택)
+
+        Returns:
+            EvaluationRun 결과
+
+        Raises:
+            RuntimeError: evaluator 또는 llm_adapter가 설정되지 않은 경우
+        """
+        if self._evaluator is None:
+            raise RuntimeError("Evaluator not configured")
+        if self._llm_adapter is None:
+            raise RuntimeError("LLM adapter not configured. .env에 OPENAI_API_KEY를 설정하세요.")
+
+        # 진행률 초기화
+        if on_progress:
+            on_progress(
+                EvalProgress(
+                    current=0,
+                    total=len(dataset.test_cases),
+                    current_metric="",
+                    percent=0.0,
+                    status="running",
+                )
+            )
+
+        # 평가 실행 (비동기 -> 동기 변환)
+        mode = "병렬" if parallel else "순차"
+        logger.info(f"Starting evaluation ({mode}) with metrics: {metrics}")
+
+        async def run_async_evaluation():
+            return await self._evaluator.evaluate(
+                dataset=dataset,
+                metrics=metrics,
+                llm=self._llm_adapter,
+                thresholds=thresholds or {},
+                parallel=parallel,
+                batch_size=batch_size,
+            )
+
+        result = asyncio.run(run_async_evaluation())
+
+        # 완료 진행률 콜백
+        if on_progress:
+            on_progress(
+                EvalProgress(
+                    current=result.total_test_cases,
+                    total=result.total_test_cases,
+                    current_metric="",
+                    percent=100.0,
+                    status="completed",
+                )
+            )
+
+        # 결과 저장
+        if self._storage:
+            logger.info(f"Saving evaluation run: {result.run_id}")
+            self._storage.save_run(result)
+
+        return result
+
     def get_improvement_guide(
         self,
         run_id: str,
@@ -363,11 +538,13 @@ class WebUIAdapter:
             generator = InsightGenerator(llm_adapter=self._llm_adapter)
 
         # 서비스 초기화 및 리포트 생성
+        # max_llm_samples=2로 설정하여 LLM 호출 수 감소 (속도 개선)
         service = ImprovementGuideService(
             pattern_detector=detector,
             insight_generator=generator,
             playbook=playbook,
             enable_llm_enrichment=include_llm,
+            max_llm_samples=2,
         )
 
         return service.generate_report(run, metrics=metrics, include_llm_analysis=include_llm)
@@ -433,11 +610,87 @@ class WebUIAdapter:
             overall_passed=overall_passed,
         )
 
+    def generate_llm_report(
+        self,
+        run_id: str,
+        *,
+        metrics_to_analyze: list[str] | None = None,
+        thresholds: dict[str, float] | None = None,
+    ):
+        """LLM 기반 지능형 보고서 생성.
+
+        전문가 수준의 분석, 최신 연구 기반 권장사항,
+        구체적인 액션 아이템을 포함한 보고서를 생성합니다.
+
+        Args:
+            run_id: 분석할 평가 실행 ID
+            metrics_to_analyze: 분석할 메트릭 (None이면 모두)
+            thresholds: 메트릭별 임계값
+
+        Returns:
+            LLMReport 인스턴스
+
+        Raises:
+            KeyError: 평가 결과를 찾을 수 없는 경우
+            RuntimeError: LLM 또는 저장소가 설정되지 않은 경우
+        """
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        if self._llm_adapter is None:
+            raise RuntimeError("LLM adapter not configured. .env에 OPENAI_API_KEY를 설정하세요.")
+
+        # 평가 결과 조회
+        run = self._storage.get_run(run_id)
+        if run is None:
+            raise KeyError(f"Run not found: {run_id}")
+
+        # LLM 보고서 생성기 초기화
+        from evalvault.adapters.outbound.report import LLMReportGenerator
+
+        generator = LLMReportGenerator(
+            llm_adapter=self._llm_adapter,
+            include_research_insights=True,
+            include_action_items=True,
+        )
+
+        # 동기 방식으로 보고서 생성
+        return generator.generate_report_sync(
+            run,
+            metrics_to_analyze=metrics_to_analyze,
+            thresholds=thresholds or run.thresholds,
+        )
+
 
 def create_adapter() -> WebUIAdapter:
     """WebUIAdapter 인스턴스 생성 팩토리.
 
     설정에 따라 적절한 저장소와 서비스를 주입합니다.
     """
-    # TODO: 실제 설정에서 저장소와 서비스 로드
-    return WebUIAdapter()
+    from evalvault.adapters.outbound.llm import get_llm_adapter
+    from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+    from evalvault.config.settings import Settings
+    from evalvault.domain.services.evaluator import RagasEvaluator
+
+    # 설정 로드
+    settings = Settings()
+
+    # Storage 생성 (기본 SQLite)
+    db_path = Path("evalvault.db")
+    storage = SQLiteStorageAdapter(db_path=db_path)
+
+    # LLM adapter 생성 (API 키 없으면 None)
+    llm_adapter = None
+    try:
+        llm_adapter = get_llm_adapter(settings)
+        logger.info(f"LLM adapter initialized: {settings.llm_provider}")
+    except Exception as e:
+        logger.warning(f"LLM adapter initialization failed: {e}")
+
+    # Evaluator 생성
+    evaluator = RagasEvaluator()
+
+    return WebUIAdapter(
+        storage=storage,
+        evaluator=evaluator,
+        llm_adapter=llm_adapter,
+    )
