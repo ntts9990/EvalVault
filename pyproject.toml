@@ -87,9 +87,15 @@ korean = [
     "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
     "rank-bm25>=0.2.2",               # BM25 검색
 ]
+web = [
+    "streamlit>=1.40.0",
+    "plotly>=5.18.0",
+    "watchdog>=3.0.0",                # Hot reload for Streamlit
+]
 
 [project.scripts]
 evalvault = "evalvault.adapters.inbound.cli:app"
+evalvault-web = "evalvault.adapters.inbound.web.app:main"
 
 [build-system]
 requires = ["hatchling"]

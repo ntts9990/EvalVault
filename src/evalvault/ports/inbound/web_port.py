@@ -1,0 +1,157 @@
+"""Web UI inbound port interface."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Protocol
+
+if TYPE_CHECKING:
+    from evalvault.domain.entities import EvaluationRun
+
+
+@dataclass
+class EvalRequest:
+    """평가 실행 요청."""
+
+    dataset_path: str
+    metrics: list[str]
+    model_name: str = "gpt-5-nano"
+    langfuse_enabled: bool = False
+    thresholds: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class EvalProgress:
+    """평가 진행 상태."""
+
+    current: int
+    total: int
+    current_metric: str
+    percent: float
+    status: str = "running"  # running, completed, failed
+    error_message: str | None = None
+
+
+@dataclass
+class RunSummary:
+    """평가 실행 요약."""
+
+    run_id: str
+    dataset_name: str
+    model_name: str
+    pass_rate: float
+    total_test_cases: int
+    started_at: datetime
+    finished_at: datetime | None
+    metrics_evaluated: list[str]
+    total_tokens: int = 0
+    total_cost_usd: float | None = None
+
+
+@dataclass
+class RunFilters:
+    """평가 목록 필터."""
+
+    dataset_name: str | None = None
+    model_name: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    min_pass_rate: float | None = None
+    max_pass_rate: float | None = None
+
+
+class WebUIPort(Protocol):
+    """웹 UI 인바운드 포트.
+
+    웹 UI가 도메인 서비스에 접근하기 위한 인터페이스입니다.
+    CLI와 마찬가지로 도메인 서비스를 호출하여 평가, 분석, 보고서 생성 등을 수행합니다.
+    """
+
+    def run_evaluation(
+        self,
+        request: EvalRequest,
+        *,
+        on_progress: Callable[[EvalProgress], None] | None = None,
+    ) -> EvaluationRun:
+        """평가 실행.
+
+        Args:
+            request: 평가 실행 요청
+            on_progress: 진행률 콜백 함수
+
+        Returns:
+            평가 실행 결과
+        """
+        ...
+
+    def list_runs(
+        self,
+        limit: int = 50,
+        filters: RunFilters | None = None,
+    ) -> list[RunSummary]:
+        """평가 목록 조회.
+
+        Args:
+            limit: 최대 조회 개수
+            filters: 필터 조건
+
+        Returns:
+            평가 실행 요약 목록
+        """
+        ...
+
+    def get_run_details(self, run_id: str) -> EvaluationRun:
+        """평가 상세 조회.
+
+        Args:
+            run_id: 평가 실행 ID
+
+        Returns:
+            평가 실행 상세 정보
+
+        Raises:
+            KeyError: 평가를 찾을 수 없는 경우
+        """
+        ...
+
+    def delete_run(self, run_id: str) -> bool:
+        """평가 삭제.
+
+        Args:
+            run_id: 삭제할 평가 ID
+
+        Returns:
+            삭제 성공 여부
+        """
+        ...
+
+    def generate_report(
+        self,
+        run_id: str,
+        output_format: Literal["markdown", "html"] = "markdown",
+        *,
+        include_nlp: bool = True,
+        include_causal: bool = True,
+    ) -> str:
+        """보고서 생성.
+
+        Args:
+            run_id: 평가 실행 ID
+            output_format: 출력 포맷 (markdown, html)
+            include_nlp: NLP 분석 포함 여부
+            include_causal: 인과 분석 포함 여부
+
+        Returns:
+            생성된 보고서 문자열
+        """
+        ...
+
+    def get_available_metrics(self) -> list[str]:
+        """사용 가능한 메트릭 목록 조회.
+
+        Returns:
+            메트릭 이름 목록
+        """
+        ...

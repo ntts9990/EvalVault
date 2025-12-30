@@ -297,7 +297,7 @@ class DomainLearningHook(Protocol):
 
 > **Status**: Complete (9.1-9.5)
 > **Priority**: ✅ Complete
-> **Goal**: 한국어 RAG 시스템 성능을 실질적으로 향상시키는 도구와 가이드 제공
+> **Goal**: 한국어 RAG 시스템의 성능을 정확하게 측정하고 분석하기 위한 평가 도구 제공
 > **Tests**: +24
 
 ### 구현된 기능
