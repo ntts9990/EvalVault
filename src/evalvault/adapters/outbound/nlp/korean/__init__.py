@@ -9,11 +9,17 @@ Modules:
     bm25_retriever: BM25 기반 검색기
     document_chunker: 문서 청킹
     hybrid_retriever: 하이브리드 검색 (BM25 + Dense)
+    dense_retriever: Dense 임베딩 검색 (BGE-M3)
 """
 
 from evalvault.adapters.outbound.nlp.korean.bm25_retriever import (
     KoreanBM25Retriever,
     RetrievalResult,
+)
+from evalvault.adapters.outbound.nlp.korean.dense_retriever import (
+    DenseRetrievalResult,
+    DeviceType,
+    KoreanDenseRetriever,
 )
 from evalvault.adapters.outbound.nlp.korean.document_chunker import (
     Chunk,
@@ -50,4 +56,8 @@ __all__ = [
     "KoreanHybridRetriever",
     "HybridResult",
     "FusionMethod",
+    # Dense Retriever
+    "KoreanDenseRetriever",
+    "DenseRetrievalResult",
+    "DeviceType",
 ]

@@ -38,21 +38,22 @@
 
 ### 한국어 임베딩 모델 비교 (2024-2025)
 
-> 참고: [BGE-M3 Korean](https://huggingface.co/upskyy/bge-m3-korean), [dragonkue/BGE-m3-ko](https://huggingface.co/dragonkue/BGE-m3-ko)
+> 참고: [dragonkue/BGE-m3-ko](https://huggingface.co/dragonkue/BGE-m3-ko), [upskyy/bge-m3-korean](https://huggingface.co/upskyy/bge-m3-korean)
 
-| 모델 | 차원 | Max Tokens | 특징 | 선택 |
-|------|------|------------|------|------|
-| **upskyy/bge-m3-korean** | 1024 | 8192 | BGE-M3 한국어 파인튜닝, Dense+Sparse+ColBERT | ✅ **1순위** |
-| **dragonkue/BGE-m3-ko** | 1024 | 8192 | 568M params, 한국어 벤치마크 우수 | ✅ **2순위** |
-| BAAI/bge-m3 | 1024 | 8192 | 100+ 언어, Dense+Sparse+Multi-vec | 🔄 Fallback |
-| intfloat/multilingual-e5-large | 1024 | 512 | 다국어, 안정적 | 🔄 대안 |
-| jhgan/ko-sroberta-multitask | 768 | 512 | 한국어 특화, 작은 크기 | 🔄 경량 |
+| 모델 | 차원 | Max Tokens | AutoRAG Top-k 1 | 특징 | 선택 |
+|------|------|------------|-----------------|------|------|
+| **dragonkue/BGE-m3-ko** | 1024 | 8192 | **0.7456** | 한국어 SOTA, Apache 2.0 | ✅ **1순위** |
+| upskyy/bge-m3-korean | 1024 | 8192 | 0.5351 | BGE-M3 파인튜닝 | 🔄 2순위 |
+| BAAI/bge-m3 | 1024 | 8192 | 0.6578 | 100+ 언어, Dense+Sparse+Multi-vec | 🔄 Fallback |
+| intfloat/multilingual-e5-large | 1024 | 512 | - | 다국어, 안정적 | 🔄 대안 |
+| jhgan/ko-sroberta-multitask | 768 | 512 | - | 한국어 특화, 작은 크기 | 🔄 경량 |
 
-**결정**: **upskyy/bge-m3-korean** (1순위)
-- 한국어에 특화된 파인튜닝
+**결정**: **dragonkue/BGE-m3-ko** (1순위)
+- AutoRAG 벤치마크에서 **+39.4% 성능 향상** (0.7456 vs 0.5351)
+- MIRACL 벤치마크 cosine_ndcg@10: 0.6833
 - 8192 토큰 지원 (긴 문서 처리 가능)
-- Dense + Sparse + ColBERT 3가지 검색 모드 지원
-- 영어-한국어 유사도 0.78-0.94 달성
+- Apache 2.0 라이선스 (상업적 사용 가능)
+- SentenceTransformer 호환
 
 ---
 
