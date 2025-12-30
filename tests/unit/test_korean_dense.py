@@ -440,3 +440,137 @@ class TestHybridRetrieverDenseIntegration:
         assert hybrid.has_embeddings
         assert hybrid._embeddings is not None
         assert len(hybrid._embeddings) == 2
+
+
+class TestQwen3EmbeddingSupport:
+    """Qwen3-Embedding 및 Matryoshka 지원 테스트."""
+
+    def test_qwen3_models_in_supported_models(self):
+        """Qwen3-Embedding 모델이 SUPPORTED_MODELS에 등록되어 있는지 확인."""
+        assert "qwen3-embedding:0.6b" in KoreanDenseRetriever.SUPPORTED_MODELS
+        assert "qwen3-embedding:8b" in KoreanDenseRetriever.SUPPORTED_MODELS
+
+    def test_qwen3_model_config(self):
+        """Qwen3-Embedding 모델 설정 확인."""
+        config_06b = KoreanDenseRetriever.SUPPORTED_MODELS["qwen3-embedding:0.6b"]
+        assert config_06b["type"] == "ollama"
+        assert config_06b["matryoshka"] is True
+        assert config_06b["matryoshka_range"] == (32, 768)
+        assert config_06b["recommended_dim"] == 256
+
+        config_8b = KoreanDenseRetriever.SUPPORTED_MODELS["qwen3-embedding:8b"]
+        assert config_8b["type"] == "ollama"
+        assert config_8b["matryoshka"] is True
+        assert config_8b["matryoshka_range"] == (32, 4096)
+        assert config_8b["recommended_dim"] == 1024
+
+    def test_profile_config_dev(self):
+        """dev 프로파일 설정 확인."""
+        retriever = KoreanDenseRetriever()
+        model, dim = retriever._get_profile_config("dev")
+
+        assert model == "qwen3-embedding:0.6b"
+        assert dim == 256
+
+    def test_profile_config_prod(self):
+        """prod 프로파일 설정 확인."""
+        retriever = KoreanDenseRetriever()
+        model, dim = retriever._get_profile_config("prod")
+
+        assert model == "qwen3-embedding:8b"
+        assert dim == 1024
+
+    def test_profile_config_invalid(self):
+        """잘못된 프로파일 오류 확인."""
+        retriever = KoreanDenseRetriever()
+
+        with pytest.raises(ValueError, match="Unknown profile"):
+            retriever._get_profile_config("invalid")
+
+    def test_qwen3_requires_ollama_adapter(self):
+        """Ollama 어댑터 없이 Qwen3 모델 초기화 시 오류 확인."""
+        with pytest.raises(ValueError, match="ollama_adapter is required"):
+            KoreanDenseRetriever(model_name="qwen3-embedding:0.6b")
+
+    def test_qwen3_with_mock_adapter(self):
+        """모킹된 Ollama 어댑터로 Qwen3 모델 초기화."""
+        mock_adapter = MagicMock()
+        mock_adapter.embed_sync.return_value = [[0.1, 0.2, 0.3] * 85 + [0.1]]  # 256 dim
+
+        retriever = KoreanDenseRetriever(
+            model_name="qwen3-embedding:0.6b",
+            ollama_adapter=mock_adapter,
+            matryoshka_dim=256,
+        )
+
+        assert retriever.model_name == "qwen3-embedding:0.6b"
+        assert retriever.matryoshka_dim == 256
+        assert retriever.dimension == 256
+
+    def test_qwen3_auto_dimension_selection(self):
+        """Matryoshka 차원 자동 선택 확인."""
+        mock_adapter = MagicMock()
+
+        retriever = KoreanDenseRetriever(
+            model_name="qwen3-embedding:0.6b",
+            ollama_adapter=mock_adapter,
+            # matryoshka_dim not specified - should auto-select
+        )
+
+        # Should auto-select recommended_dim
+        assert retriever._matryoshka_dim == 256
+
+    def test_profile_based_init(self):
+        """프로파일 기반 초기화 확인."""
+        mock_adapter = MagicMock()
+
+        retriever = KoreanDenseRetriever(
+            profile="dev",
+            ollama_adapter=mock_adapter,
+        )
+
+        assert retriever.model_name == "qwen3-embedding:0.6b"
+        assert retriever.matryoshka_dim == 256
+        assert retriever.dimension == 256
+
+    def test_encode_with_ollama_mock(self):
+        """Ollama 어댑터로 인코딩 테스트."""
+        mock_adapter = MagicMock()
+        mock_embeddings = [[0.1] * 256, [0.2] * 256]
+        mock_adapter.embed_sync.return_value = mock_embeddings
+
+        retriever = KoreanDenseRetriever(
+            model_name="qwen3-embedding:0.6b",
+            ollama_adapter=mock_adapter,
+            matryoshka_dim=256,
+        )
+
+        texts = ["보험료 납입", "보장금액"]
+        embeddings = retriever.encode(texts)
+
+        mock_adapter.embed_sync.assert_called_once_with(
+            texts=texts,
+            model="qwen3-embedding:0.6b",
+            dimension=256,
+        )
+
+        assert embeddings.shape == (2, 256)
+
+    def test_matryoshka_dim_property(self):
+        """matryoshka_dim 프로퍼티 확인."""
+        mock_adapter = MagicMock()
+
+        retriever = KoreanDenseRetriever(
+            model_name="qwen3-embedding:8b",
+            ollama_adapter=mock_adapter,
+            matryoshka_dim=1024,
+        )
+
+        assert retriever.matryoshka_dim == 1024
+
+    def test_default_model_no_matryoshka(self):
+        """기본 HuggingFace 모델은 Matryoshka 없음 확인."""
+        retriever = KoreanDenseRetriever()
+
+        assert retriever.matryoshka_dim is None
+        assert retriever._ollama_adapter is None
