@@ -1,14 +1,14 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2025-12-29
-> Current Version: 1.2.0
-> Status: Domain Memory Layering Complete (Phase 8)
+> Last Updated: 2025-12-30
+> Current Version: 1.3.0
+> Status: Phase 9 Korean RAG Optimization Complete ✅
 
 ---
 
 ## Overview
 
-EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), 그리고 Domain Memory Layering(Phase 8)이 완료되었습니다.
+EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), Domain Memory Layering(Phase 8), 그리고 Korean RAG Optimization(Phase 9)이 완료되었습니다.
 
 ### Progress Summary
 
@@ -22,7 +22,15 @@ EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(P
 | **Phase 2 NLP** | NLP Analysis | ✅ Complete | +97 |
 | **Phase 3 Causal** | Causal Analysis | ✅ Complete | +27 |
 | **Phase 8** | Domain Memory Layering | ✅ Complete | +113 |
-| **Total** | | | **891** |
+| **Phase 9** | Korean RAG Optimization | ✅ Complete (9.1-9.5) | +24 |
+| **Total** | | | **915** |
+
+### Test Coverage Summary
+
+> **Status Update (2025-12-28)**: 테스트 커버리지 개선 계획 완료
+> - 전체 커버리지: 53% → **89%** 달성
+> - CLI 커버리지: 46% → **89%** (목표 80% 초과 달성)
+> - 총 테스트 수: **457개** (Unit 431 + Integration 26)
 
 ---
 
@@ -285,6 +293,94 @@ class DomainLearningHook(Protocol):
 
 ---
 
+## Phase 9: Korean RAG Optimization ✅
+
+> **Status**: Complete (9.1-9.5)
+> **Priority**: ✅ Complete
+> **Goal**: 한국어 RAG 시스템 성능을 실질적으로 향상시키는 도구와 가이드 제공
+> **Tests**: +24
+
+### 구현된 기능
+
+| Sub-Phase | Description | Status |
+|-----------|-------------|--------|
+| Phase 9.1 | Korean NLP Foundation (KiwiTokenizer) | ✅ Complete |
+| Phase 9.2 | Korean Keyword Extraction + Hybrid Search | ✅ Complete |
+| Phase 9.3 | Dense Embedding (BGE-m3-ko) | ✅ Complete |
+| Phase 9.4 | Korean RAG Evaluation (Faithfulness) | ✅ Complete |
+| Phase 9.5 | Benchmarks & Guidelines | ✅ Complete |
+
+### 주요 파일
+
+```
+src/evalvault/
+├── adapters/outbound/nlp/
+│   └── korean/
+│       ├── kiwi_tokenizer.py           # Kiwi 기반 토크나이저
+│       ├── korean_stopwords.py         # 한국어 불용어 사전
+│       ├── korean_bm25_retriever.py    # 형태소 분석 BM25 검색
+│       ├── korean_hybrid_retriever.py  # BM25 + Dense 하이브리드
+│       ├── korean_dense_retriever.py   # Dense 임베딩 검색
+│       └── korean_faithfulness.py      # Faithfulness 검증 도구
+├── domain/entities/
+│   └── benchmark.py                    # RAGTestCase, BenchmarkResult
+├── domain/services/
+│   └── benchmark_runner.py             # KoreanRAGBenchmarkRunner
+├── ports/outbound/
+│   └── korean_nlp_port.py              # 한국어 NLP 포트
+
+examples/benchmarks/
+├── run_korean_benchmark.py             # 벤치마크 실행 스크립트
+├── README.md                           # 벤치마크 가이드
+└── korean_rag/                         # 벤치마크 데이터셋
+
+tests/unit/
+└── test_benchmark_runner.py            # 24개 벤치마크 테스트
+```
+
+### 기술 스택
+
+- **형태소 분석**: Kiwi (kiwipiepy) - Pure Python, 빠른 속도, 높은 정확도
+- **임베딩 모델**: dragonkue/BGE-m3-ko - AutoRAG 벤치마크 1위 (+39.4% 성능 향상)
+- **검색**: BM25 + Dense 하이브리드 (Reciprocal Rank Fusion)
+
+### 통합 포인트
+
+1. **테스트셋 생성**: KoreanDocumentChunker로 의미 단위 청킹
+2. **NLP Analysis**: 형태소 분석 기반 키워드 추출 (정확도 60% → 85%+)
+3. **KG 생성**: 형태소 분석 기반 엔티티 추출 (정확도 70% → 90%+)
+4. **Domain Memory**: 사실 정규화로 중복 제거
+5. **평가 품질**: Faithfulness 검증 보조 (+5-10% 향상)
+
+### 예상 효과
+
+| 기능 | 개선율 |
+|------|--------|
+| 테스트셋 품질 | +15-20% |
+| 키워드 추출 정확도 | +25% (60% → 85%+) |
+| 엔티티 추출 정확도 | +20% (70% → 90%+) |
+| KG 품질 | +20-30% |
+| Domain Memory 정확도 | +10-15% |
+
+### CLI 사용법
+
+```bash
+# 한국어 최적화 옵션 사용
+evalvault generate documents.md --method knowledge_graph --korean
+
+# 한국어 토크나이저로 NLP 분석
+evalvault analyze <run_id> --nlp --korean
+
+# 한국어 청킹으로 테스트셋 생성
+evalvault generate documents.md --korean-chunker
+```
+
+### 상세 문서
+
+- `docs/PHASE9_KOREAN_RAG.md`: 전체 구현 계획 및 통합 전략
+
+---
+
 ## Future: Agent System Integration
 
 > **Status**: Research / Deferred
@@ -542,9 +638,9 @@ evalvault generate <documents> -n <num> -o <output>
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| Unit Tests | 752 | Domain, ports, adapters, services, analysis |
+| Unit Tests | 776 | Domain, ports, adapters, services, analysis |
 | Integration Tests | 26 | End-to-end flows |
-| **Total** | **778** | All passing |
+| **Total** | **802** | All passing |
 
 ### Test Files
 ```
@@ -569,7 +665,8 @@ tests/
 │   ├── test_anthropic_adapter.py # 19 tests (Phase 6)
 │   ├── test_nlp_adapter.py       # 97 tests (Phase 2 NLP)
 │   ├── test_causal_adapter.py    # 27 tests (Phase 3 Causal)
-│   └── test_domain_memory.py     # 80 tests (Phase 8)
+│   ├── test_domain_memory.py     # 80 tests (Phase 8)
+│   └── test_benchmark_runner.py  # 24 tests (Phase 9.5)
 └── integration/
     ├── test_evaluation_flow.py   # 6 tests
     ├── test_data_flow.py         # 8 tests
@@ -589,6 +686,7 @@ tests/
 | 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화 |
 | 1.1.0 | 2025-12-29 | Phase 2 NLP + Phase 3 Causal Analysis |
 | 1.2.0 | 2025-12-29 | Phase 8 Domain Memory Layering |
+| 1.3.0 | 2025-12-30 | Phase 9 Korean RAG Optimization Complete |
 
 ---
 

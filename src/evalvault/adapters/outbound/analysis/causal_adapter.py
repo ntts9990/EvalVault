@@ -24,6 +24,7 @@ from evalvault.domain.entities.analysis import (
 )
 
 if TYPE_CHECKING:
+    from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
     from evalvault.domain.entities import EvaluationRun
 
 logger = logging.getLogger(__name__)
@@ -41,15 +42,31 @@ class CausalAnalysisAdapter:
         *,
         num_strata: int = 3,
         min_group_size: int = 3,
+        korean_tokenizer: KiwiTokenizer | None = None,
     ):
         """초기화.
 
         Args:
             num_strata: 계층화 그룹 수 (기본: 3 - low/medium/high)
             min_group_size: 그룹별 최소 샘플 수
+            korean_tokenizer: 한국어 형태소 분석기 (KiwiTokenizer)
         """
         self._num_strata = num_strata
         self._min_group_size = min_group_size
+        self._korean_tokenizer = korean_tokenizer
+        self._korean_checker = None
+
+        # 한국어 토크나이저가 있으면 KoreanFaithfulnessChecker 초기화
+        if korean_tokenizer is not None:
+            try:
+                from evalvault.adapters.outbound.nlp.korean import (
+                    KoreanFaithfulnessChecker,
+                )
+
+                self._korean_checker = KoreanFaithfulnessChecker(korean_tokenizer)
+                logger.info("Korean keyword overlap enabled with morphological analysis")
+            except ImportError:
+                logger.warning("Korean NLP module not available, using basic keyword overlap")
 
     def analyze_causality(
         self,
@@ -181,11 +198,18 @@ class CausalAnalysisAdapter:
         return min(complexity, 1.0)
 
     def _calculate_keyword_overlap(self, question: str, contexts: list[str] | None) -> float:
-        """질문과 컨텍스트 간 키워드 겹침 비율 계산."""
+        """질문과 컨텍스트 간 키워드 겹침 비율 계산.
+
+        한국어 토크나이저가 설정된 경우 형태소 분석 기반으로 계산합니다.
+        """
         if not contexts:
             return 0.0
 
-        # 간단한 키워드 추출 (불용어 제외)
+        # 한국어 형태소 분석 기반 키워드 겹침 (개선된 버전)
+        if self._korean_checker is not None:
+            return self._korean_checker.calculate_keyword_overlap(question, contexts)
+
+        # 기본 구현: 간단한 키워드 추출 (불용어 제외)
         stopwords = {
             "the",
             "a",
