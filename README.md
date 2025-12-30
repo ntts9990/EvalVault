@@ -27,10 +27,13 @@ minimal wiring.
 - Optional Langfuse integration for trace-level inspection
 - Dataset loaders for JSON, CSV, and Excel sources
 - Cross-platform support (Linux, macOS, Windows)
+- **Web UI**: Streamlit dashboard for evaluation, history, and reports
+- **Korean NLP**: Morphological analysis with Kiwi, BM25/Dense/Hybrid retrieval
 - **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
 - **NLP Analysis**: Text statistics, question type classification, keyword extraction
 - **Causal Analysis**: Root cause analysis and causal relationship discovery
 - **Knowledge Graph**: Automatic test set generation from documents
+- **Analysis Pipeline**: DAG-based query analysis with intent classification
 
 ## Quick Start
 
@@ -54,11 +57,14 @@ uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 - Automatic result storage in SQLite + PostgreSQL + Langfuse/MLflow
 - Air-gapped compatibility through Ollama profiles
 - Cross-platform CLI with thoughtful defaults
+- **Web UI**: Streamlit dashboard with evaluation, history, and report generation
+- **Korean NLP**: Morphological analysis (Kiwi), BM25/Dense/Hybrid retrieval
 - **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
 - **NLP Analysis**: Text statistics, question type classification, keyword extraction, topic clustering
 - **Causal Analysis**: Root cause analysis, causal relationship discovery, improvement suggestions
 - **Knowledge Graph**: Automatic test set generation from documents
 - **Experiment Management**: A/B testing and cross-group metric comparison
+- **Analysis Pipeline**: DAG-based query analysis with 12 intent types
 
 ## Installation
 
@@ -73,8 +79,22 @@ uv pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
+
+# Basic development environment
 uv sync --extra dev
+
+# Full development environment (recommended)
+uv sync --extra dev --extra korean --extra web
 ```
+
+**Optional Extras:**
+| Extra | Packages | Purpose |
+|-------|----------|---------|
+| `korean` | kiwipiepy, rank-bm25 | Korean NLP (morphological analysis, BM25) |
+| `web` | streamlit, plotly | Streamlit Web UI Dashboard |
+| `postgres` | psycopg | PostgreSQL storage support |
+| `mlflow` | mlflow | MLflow tracker integration |
+| `anthropic` | anthropic | Anthropic LLM adapter |
 
 > **Note**: The `.python-version` file pins Python to 3.12. uv will automatically download and use Python 3.12 if not already installed.
 
@@ -301,6 +321,18 @@ uv run evalvault config
 
 # List available metrics
 uv run evalvault metrics
+
+# Launch Web UI (requires --extra web)
+uv run evalvault web --port 8501
+
+# Query-based analysis pipeline (requires --extra korean)
+uv run evalvault pipeline analyze "요약해줘" --run-id <run_id>
+uv run evalvault pipeline intents     # List analysis intents
+uv run evalvault pipeline templates   # List pipeline templates
+
+# Run benchmarks
+uv run evalvault benchmark run --name korean-rag
+uv run evalvault benchmark list
 ```
 
 ## A/B Testing Guide
