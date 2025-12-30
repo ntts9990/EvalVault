@@ -79,53 +79,115 @@ def render_home_page(adapter, session):
     """홈 페이지 렌더링."""
     import streamlit as st
 
+    from evalvault.adapters.inbound.web.components import (
+        DashboardStats,
+        MetricSummaryCard,
+        RecentRunsList,
+        create_pass_rate_chart,
+        create_trend_chart,
+    )
+
     st.header("Welcome to EvalVault")
     st.markdown(
         """
         EvalVault는 RAG (Retrieval-Augmented Generation) 시스템을 평가하고
         분석하기 위한 도구입니다.
-
-        ### 시작하기
-
-        1. **📊 Evaluate**: 데이터셋을 업로드하고 평가를 실행하세요
-        2. **📋 History**: 이전 평가 결과를 확인하세요
-        3. **📄 Reports**: 평가 보고서를 생성하고 다운로드하세요
-
-        ### 지원 메트릭
         """
     )
 
-    # 메트릭 카드
-    metrics = adapter.get_available_metrics()
-    descriptions = adapter.get_metric_descriptions()
+    # 평가 데이터 조회
+    runs = adapter.list_runs(limit=20)
 
-    cols = st.columns(3)
-    for i, metric in enumerate(metrics):
-        with cols[i % 3]:
-            st.markdown(
-                f"""
-                <div style="
-                    padding: 1rem;
-                    border-radius: 0.5rem;
-                    border: 1px solid #334155;
-                    margin-bottom: 0.5rem;
-                ">
-                    <strong>{metric}</strong><br>
-                    <small style="color: #94A3B8;">{descriptions.get(metric, "")}</small>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    # 대시보드 통계 계산
+    stats = DashboardStats.from_runs(runs)
 
-    # 최근 평가 요약
+    # 통계 카드 섹션
+    st.subheader("Overview")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        card = MetricSummaryCard(
+            title="Total Runs",
+            value=stats.total_runs,
+            format_type="number",
+        )
+        st.metric(label=card.title, value=card.formatted_value)
+
+    with col2:
+        card = MetricSummaryCard(
+            title="Test Cases",
+            value=stats.total_test_cases,
+            format_type="number",
+        )
+        st.metric(label=card.title, value=card.formatted_value)
+
+    with col3:
+        card = MetricSummaryCard(
+            title="Avg Pass Rate",
+            value=stats.avg_pass_rate,
+            format_type="percent",
+        )
+        st.metric(label=card.title, value=card.formatted_value)
+
+    with col4:
+        card = MetricSummaryCard(
+            title="Total Cost",
+            value=stats.total_cost,
+            format_type="currency",
+        )
+        st.metric(label=card.title, value=card.formatted_value)
+
+    # 차트 섹션
+    st.divider()
+    chart_col1, chart_col2 = st.columns(2)
+
+    with chart_col1:
+        pass_rate_fig = create_pass_rate_chart(runs[:10])
+        st.plotly_chart(pass_rate_fig, use_container_width=True)
+
+    with chart_col2:
+        trend_fig = create_trend_chart(runs)
+        st.plotly_chart(trend_fig, use_container_width=True)
+
+    # 지원 메트릭 섹션
+    st.divider()
+    with st.expander("📊 지원 메트릭", expanded=False):
+        metrics = adapter.get_available_metrics()
+        descriptions = adapter.get_metric_descriptions()
+
+        cols = st.columns(3)
+        for i, metric in enumerate(metrics):
+            with cols[i % 3]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding: 0.75rem;
+                        border-radius: 0.5rem;
+                        border: 1px solid #334155;
+                        margin-bottom: 0.5rem;
+                    ">
+                        <strong>{metric}</strong><br>
+                        <small style="color: #94A3B8;">{descriptions.get(metric, "")}</small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    # 최근 평가 목록
+    st.divider()
     st.subheader("최근 평가")
-    runs = adapter.list_runs(limit=5)
-    if runs:
-        for run in runs:
-            col1, col2, col3 = st.columns([3, 1, 1])
+
+    recent_list = RecentRunsList(runs=runs, max_items=5)
+
+    if not recent_list.is_empty:
+        for run in recent_list.displayed_runs:
+            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
             with col1:
-                st.text(f"📋 {run.dataset_name}")
+                emoji = recent_list.get_pass_rate_emoji(run.pass_rate)
+                st.text(f"{emoji} {run.dataset_name}")
             with col2:
+                st.text(run.model_name)
+            with col3:
                 pass_rate_pct = run.pass_rate * 100
                 if pass_rate_pct >= 70:
                     st.success(f"{pass_rate_pct:.1f}%")
@@ -133,8 +195,11 @@ def render_home_page(adapter, session):
                     st.warning(f"{pass_rate_pct:.1f}%")
                 else:
                     st.error(f"{pass_rate_pct:.1f}%")
-            with col3:
-                st.text(run.started_at.strftime("%Y-%m-%d"))
+            with col4:
+                st.text(run.started_at.strftime("%m/%d"))
+
+        if recent_list.has_more:
+            st.caption(f"+{recent_list.remaining_count} more runs...")
     else:
         st.info("아직 평가 이력이 없습니다. 첫 평가를 실행해보세요!")
 
