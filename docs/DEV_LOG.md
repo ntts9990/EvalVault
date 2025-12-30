@@ -31,11 +31,11 @@
 **시작 시간**: 2025-12-30
 
 **목표**:
-- [ ] 의존성 추가 (streamlit, plotly)
-- [ ] CLI 진입점 추가 (evalvault-web)
-- [ ] 기본 앱 구조 생성
-- [ ] WebUIPort 인터페이스 정의
-- [ ] 테스트 작성
+- [x] 의존성 추가 (streamlit, plotly)
+- [x] CLI 진입점 추가 (evalvault-web)
+- [x] 기본 앱 구조 생성
+- [x] WebUIPort 인터페이스 정의
+- [x] 테스트 작성
 
 **진행 상황**:
 
@@ -63,3 +63,41 @@
 **수정된 파일**:
 - `pyproject.toml` - web extra 의존성, evalvault-web 진입점 추가
 - `src/evalvault/ports/inbound/__init__.py` - WebUIPort 내보내기 추가
+
+**PR**: [#55](https://github.com/ntts9990/EvalVault/pull/55) ✅ 머지 완료
+
+---
+
+### Phase 12.2: Home 페이지 대시보드 위젯
+
+**시작 시간**: 2025-12-30
+
+**목표**:
+- [x] Plotly 차트 컴포넌트 생성
+- [x] MetricSummaryCard 컴포넌트 생성
+- [x] RecentRunsList 컴포넌트 생성
+- [x] Home 페이지 리팩토링
+- [x] 테스트 작성
+
+**진행 상황**:
+
+| 시간 | 작업 | 결과 |
+|------|------|------|
+| 13:00 | 대시보드 테스트 24개 작성 | ✅ 완료 |
+| 13:10 | Plotly 차트 컴포넌트 (charts.py) 구현 | ✅ 완료 |
+| 13:15 | MetricSummaryCard 컴포넌트 (cards.py) 구현 | ✅ 완료 |
+| 13:20 | RecentRunsList 컴포넌트 (lists.py) 구현 | ✅ 완료 |
+| 13:25 | DashboardStats 컴포넌트 (stats.py) 구현 | ✅ 완료 |
+| 13:30 | Home 페이지 리팩토링 | ✅ 완료 |
+| 13:35 | 테스트 실행 (51/51 통과) | ✅ 완료 |
+
+**생성된 파일**:
+- `src/evalvault/adapters/inbound/web/components/charts.py` - Plotly 차트 (3종)
+- `src/evalvault/adapters/inbound/web/components/cards.py` - MetricSummaryCard
+- `src/evalvault/adapters/inbound/web/components/lists.py` - RecentRunsList
+- `src/evalvault/adapters/inbound/web/components/stats.py` - DashboardStats
+- `tests/unit/test_web_dashboard.py` - 대시보드 컴포넌트 테스트 (24개)
+
+**수정된 파일**:
+- `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
+- `src/evalvault/adapters/inbound/web/app.py` - Home 페이지 리팩토링
