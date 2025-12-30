@@ -7,14 +7,28 @@ from __future__ import annotations
 
 import pytest
 
-from evalvault.adapters.outbound.nlp.korean import (
-    KOREAN_STOPWORDS,
-    STOPWORD_POS_TAGS,
-    KiwiTokenizer,
-    is_stopword,
-)
+# Check if kiwipiepy is available
+try:
+    from evalvault.adapters.outbound.nlp.korean import (
+        KOREAN_STOPWORDS,
+        STOPWORD_POS_TAGS,
+        KiwiTokenizer,
+        is_stopword,
+    )
+
+    HAS_KIWI = True
+except ImportError:
+    HAS_KIWI = False
+    # Define placeholders for type hints
+    KiwiTokenizer = None  # type: ignore[misc,assignment]
+    KOREAN_STOPWORDS = set()  # type: ignore[misc]
+    STOPWORD_POS_TAGS = set()  # type: ignore[misc]
+
+    def is_stopword(word: str, pos_tag: str | None = None) -> bool:  # type: ignore[misc]
+        return False
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerBasic:
     """KiwiTokenizer 기본 기능 테스트."""
 
@@ -68,6 +82,7 @@ class TestKiwiTokenizerBasic:
         assert "가입" in tokens or "가입하다" in tokens
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerExtraction:
     """키워드/명사 추출 테스트."""
 
@@ -106,6 +121,7 @@ class TestKiwiTokenizerExtraction:
         assert len(keywords) > 0
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerSentences:
     """문장 분리 테스트."""
 
@@ -143,6 +159,7 @@ class TestKiwiTokenizerSentences:
         assert len(sentences) == 3
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerPOS:
     """품사 태깅 테스트."""
 
@@ -168,6 +185,7 @@ class TestKiwiTokenizerPOS:
         assert any(t.startswith("N") for t in tags)
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerAnalyze:
     """형태소 분석 테스트."""
 
@@ -200,6 +218,7 @@ class TestKiwiTokenizerAnalyze:
         assert has_noun or has_verb
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerOptions:
     """토크나이저 옵션 테스트."""
 
@@ -245,6 +264,7 @@ class TestKiwiTokenizerOptions:
             assert len(token) >= 2
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerUserDict:
     """사용자 사전 테스트."""
 
@@ -273,6 +293,7 @@ class TestKiwiTokenizerUserDict:
             assert term in tokens
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerNormalize:
     """텍스트 정규화 테스트."""
 
@@ -297,6 +318,7 @@ class TestKiwiTokenizerNormalize:
         assert "?" not in normalized
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKoreanStopwords:
     """한국어 불용어 테스트."""
 
@@ -328,6 +350,7 @@ class TestKoreanStopwords:
         assert is_stopword("보험", "NNG") is False  # 일반명사
 
 
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
 class TestKiwiTokenizerInsurance:
     """보험 도메인 특화 테스트."""
 

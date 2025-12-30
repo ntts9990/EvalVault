@@ -17,6 +17,14 @@ from evalvault.adapters.outbound.nlp.korean import (
 )
 from evalvault.ports.outbound import EmbeddingResult
 
+# Check if kiwipiepy is available (needed for hybrid retriever tests)
+try:
+    from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer  # noqa: F401
+
+    HAS_KIWI = True
+except ImportError:
+    HAS_KIWI = False
+
 
 class TestDeviceType:
     """DeviceType 열거형 테스트."""
