@@ -10,6 +10,13 @@ from evalvault.adapters.inbound.web.components.evaluate import (
     EvaluationConfig,
     EvaluationResult,
 )
+from evalvault.adapters.inbound.web.components.history import (
+    HistoryExporter,
+    RunDetailPanel,
+    RunFilter,
+    RunSearch,
+    RunTable,
+)
 from evalvault.adapters.inbound.web.components.lists import RecentRunsList
 from evalvault.adapters.inbound.web.components.metrics import MetricSelector
 from evalvault.adapters.inbound.web.components.progress import (
@@ -45,4 +52,10 @@ __all__ = [
     # Evaluate
     "EvaluationConfig",
     "EvaluationResult",
+    # History
+    "RunFilter",
+    "RunTable",
+    "RunDetailPanel",
+    "HistoryExporter",
+    "RunSearch",
 ]
