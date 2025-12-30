@@ -4,6 +4,7 @@
 - 규칙 기반: 빠른 초기 분류
 - ML 기반: TF-IDF, 임베딩 기반 키워드/유사도
 - LLM 기반: 복잡한 케이스 처리 (선택적)
+- 형태소 분석: Kiwi 기반 한국어 토큰화 (선택적)
 
 한국어/영어 모두 지원합니다.
 """
@@ -25,6 +26,7 @@ from evalvault.domain.entities.analysis import (
 )
 
 if TYPE_CHECKING:
+    from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
     from evalvault.domain.entities import EvaluationRun
     from evalvault.ports.outbound.llm_port import LLMPort
 
@@ -121,6 +123,7 @@ class NLPAnalysisAdapter:
         llm_adapter: LLMPort | None = None,
         use_embeddings: bool = True,
         use_llm_classification: bool = False,
+        korean_tokenizer: KiwiTokenizer | None = None,
     ) -> None:
         """NLPAnalysisAdapter 초기화.
 
@@ -128,10 +131,12 @@ class NLPAnalysisAdapter:
             llm_adapter: LLM/임베딩 제공 어댑터 (OpenAIAdapter, OllamaAdapter 등)
             use_embeddings: 임베딩 기반 분석 사용 여부
             use_llm_classification: LLM 기반 질문 분류 사용 여부
+            korean_tokenizer: 한국어 형태소 분석기 (KiwiTokenizer)
         """
         self._llm_adapter = llm_adapter
         self._use_embeddings = use_embeddings and llm_adapter is not None
         self._use_llm_classification = use_llm_classification and llm_adapter is not None
+        self._korean_tokenizer = korean_tokenizer
         self._tfidf_vectorizer = None
 
     def analyze_text_statistics(self, run: EvaluationRun) -> NLPAnalysis:
@@ -309,18 +314,31 @@ class NLPAnalysisAdapter:
         return result
 
     def _calculate_text_stats(self, texts: list[str]) -> TextStats:
-        """텍스트 리스트에 대한 통계를 계산합니다."""
+        """텍스트 리스트에 대한 통계를 계산합니다.
+
+        한국어 형태소 분석기가 설정된 경우 더 정확한 토큰화를 사용합니다.
+        """
         combined_text = " ".join(texts)
 
         # 문자 수
         char_count = len(combined_text)
 
-        # 단어 추출 (한글/영어)
-        words = self.WORD_PATTERN.findall(combined_text)
+        # 단어 추출 (한국어 토크나이저 사용 여부에 따라)
+        if self._korean_tokenizer and self._has_korean_text([combined_text]):
+            words = self._korean_tokenizer.tokenize(combined_text)
+        else:
+            words = self.WORD_PATTERN.findall(combined_text)
         word_count = len(words)
 
-        # 문장 수
-        sentences = [s.strip() for s in self.SENTENCE_PATTERN.split(combined_text) if s.strip()]
+        # 문장 수 (한국어 토크나이저로 더 정확한 분리)
+        if self._korean_tokenizer and self._has_korean_text([combined_text]):
+            sentences = self._korean_tokenizer.split_sentences(combined_text)
+            if not sentences:
+                sentences = [
+                    s.strip() for s in self.SENTENCE_PATTERN.split(combined_text) if s.strip()
+                ]
+        else:
+            sentences = [s.strip() for s in self.SENTENCE_PATTERN.split(combined_text) if s.strip()]
         sentence_count = max(len(sentences), 1)  # 최소 1
 
         # 평균 단어 길이
@@ -361,7 +379,86 @@ class NLPAnalysisAdapter:
         return QuestionType.FACTUAL
 
     def _extract_keywords_tfidf(self, documents: list[str], top_k: int) -> list[KeywordInfo]:
-        """TF-IDF 기반 키워드 추출."""
+        """TF-IDF 기반 키워드 추출.
+
+        한국어 형태소 분석기가 설정된 경우 Kiwi를 사용하여
+        더 정확한 키워드를 추출합니다.
+        """
+        # 한국어 텍스트가 포함된 경우 형태소 분석 사용
+        if self._korean_tokenizer and self._has_korean_text(documents):
+            return self._extract_keywords_korean(documents, top_k)
+
+        return self._extract_keywords_tfidf_basic(documents, top_k)
+
+    def _has_korean_text(self, documents: list[str]) -> bool:
+        """문서에 한국어가 포함되어 있는지 확인합니다."""
+        korean_pattern = re.compile(r"[가-힣]")
+        return any(korean_pattern.search(doc) for doc in documents)
+
+    def _extract_keywords_korean(self, documents: list[str], top_k: int) -> list[KeywordInfo]:
+        """Kiwi 형태소 분석기를 사용한 한국어 키워드 추출.
+
+        형태소 분석을 통해 명사/동사/형용사를 추출하고
+        TF-IDF로 중요도를 계산합니다.
+        """
+        if not self._korean_tokenizer:
+            return self._extract_keywords_tfidf_basic(documents, top_k)
+
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+
+            # 각 문서에서 키워드 추출 (형태소 분석)
+            tokenized_docs = []
+            all_keywords: list[str] = []
+
+            for doc in documents:
+                # Kiwi로 키워드 추출 (명사, 동사, 형용사)
+                keywords = self._korean_tokenizer.extract_keywords(doc)
+                tokenized_docs.append(" ".join(keywords))
+                all_keywords.extend(keywords)
+
+            # 빈 문서 처리
+            if not any(tokenized_docs):
+                return self._extract_keywords_tfidf_basic(documents, top_k)
+
+            # TF-IDF 계산
+            vectorizer = TfidfVectorizer(
+                max_features=top_k * 2,
+                token_pattern=r"[가-힣a-zA-Z0-9]+",
+            )
+            tfidf_matrix = vectorizer.fit_transform(tokenized_docs)
+            feature_names = vectorizer.get_feature_names_out()
+
+            # 각 단어의 평균 TF-IDF 점수
+            mean_tfidf = tfidf_matrix.mean(axis=0).A1
+
+            # 단어 빈도 계산
+            word_counter: Counter[str] = Counter(all_keywords)
+
+            # KeywordInfo 생성
+            keywords_info = []
+            for idx, word in enumerate(feature_names):
+                keywords_info.append(
+                    KeywordInfo(
+                        keyword=word,
+                        frequency=word_counter.get(word, 0),
+                        tfidf_score=float(mean_tfidf[idx]),
+                    )
+                )
+
+            # TF-IDF 내림차순 정렬 및 top_k 선택
+            keywords_info.sort(key=lambda x: x.tfidf_score, reverse=True)
+            return keywords_info[:top_k]
+
+        except ImportError:
+            logger.warning("sklearn not available, falling back to basic extraction")
+            return self._extract_keywords_tfidf_basic(documents, top_k)
+        except Exception as e:
+            logger.warning(f"Korean keyword extraction failed: {e}, falling back")
+            return self._extract_keywords_tfidf_basic(documents, top_k)
+
+    def _extract_keywords_tfidf_basic(self, documents: list[str], top_k: int) -> list[KeywordInfo]:
+        """기본 TF-IDF 키워드 추출 (정규식 기반)."""
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
 

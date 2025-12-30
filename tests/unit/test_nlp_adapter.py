@@ -13,6 +13,14 @@ from evalvault.domain.entities.analysis import (
     TextStats,
 )
 
+# Check if kiwipiepy is available
+try:
+    from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
+
+    HAS_KIWI = True
+except ImportError:
+    HAS_KIWI = False
+
 
 class TestNLPAnalysisAdapterTextStats:
     """텍스트 통계 분석 테스트."""
@@ -772,3 +780,210 @@ class TestTopicClustering:
 
         # 에러 시 빈 리스트 반환
         assert result == []
+
+
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+class TestNLPAnalysisAdapterKorean:
+    """한국어 형태소 분석 통합 테스트."""
+
+    @pytest.fixture
+    def korean_tokenizer(self):
+        """한국어 토크나이저 인스턴스."""
+        return KiwiTokenizer()
+
+    @pytest.fixture
+    def adapter_with_korean(self, korean_tokenizer):
+        """한국어 토크나이저가 설정된 어댑터."""
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        return NLPAnalysisAdapter(korean_tokenizer=korean_tokenizer)
+
+    @pytest.fixture
+    def korean_run(self) -> EvaluationRun:
+        """한국어 데이터가 포함된 EvaluationRun."""
+        return EvaluationRun(
+            run_id="korean-run",
+            dataset_name="korean-dataset",
+            model_name="gpt-5-nano",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="이 보험의 보장금액은 얼마인가요?",
+                    answer="이 보험의 사망 보장금액은 1억원입니다.",
+                    contexts=["해당 보험의 사망 보장금액은 1억원입니다."],
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-002",
+                    question="보험료 납입 기간은 어떻게 되나요?",
+                    answer="납입 기간은 10년, 15년, 20년 중 선택 가능합니다.",
+                    contexts=["보험료 납입 기간은 다양하게 선택할 수 있습니다."],
+                    metrics=[MetricScore(name="faithfulness", score=0.85, threshold=0.7)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-003",
+                    question="보험 해지시 환급금은 어떻게 되나요?",
+                    answer="해지 환급금은 납입 보험료의 약 80%입니다.",
+                    contexts=["중도 해지시 환급금이 지급됩니다."],
+                    metrics=[MetricScore(name="faithfulness", score=0.8, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+    def test_adapter_init_with_korean_tokenizer(self, adapter_with_korean):
+        """한국어 토크나이저로 어댑터 초기화."""
+        assert adapter_with_korean._korean_tokenizer is not None
+
+    def test_extract_keywords_with_korean_tokenizer(self, adapter_with_korean, korean_run):
+        """한국어 형태소 분석을 사용한 키워드 추출."""
+        keywords = adapter_with_korean.extract_keywords(korean_run)
+
+        assert len(keywords) > 0
+        # 보험 관련 키워드가 추출되어야 함
+        keyword_texts = [k.keyword for k in keywords]
+        keyword_str = " ".join(keyword_texts)
+        assert any(term in keyword_str for term in ["보험", "보장", "납입", "환급"])
+
+    def test_extract_keywords_removes_particles(self, adapter_with_korean, korean_run):
+        """형태소 분석으로 조사가 제거됨."""
+        keywords = adapter_with_korean.extract_keywords(korean_run)
+
+        keyword_texts = [k.keyword for k in keywords]
+        # 조사가 키워드로 추출되지 않아야 함
+        particles = ["은", "는", "이", "가", "을", "를", "의"]
+        for particle in particles:
+            assert particle not in keyword_texts
+
+    def test_text_stats_with_korean_tokenizer(self, adapter_with_korean, korean_run):
+        """한국어 토크나이저를 사용한 텍스트 통계."""
+        result = adapter_with_korean.analyze_text_statistics(korean_run)
+
+        assert result.question_stats is not None
+        assert result.question_stats.word_count > 0
+        # 형태소 분석 사용 시 단어 수가 정규식보다 더 정확함
+        assert result.question_stats.sentence_count >= 1
+
+    def test_analyze_with_korean_tokenizer(self, adapter_with_korean, korean_run):
+        """한국어 토크나이저를 사용한 전체 분석."""
+        result = adapter_with_korean.analyze(korean_run)
+
+        assert result.run_id == "korean-run"
+        assert result.has_text_stats
+        assert result.has_question_type_analysis
+        assert result.has_keyword_analysis
+        # 한국어 질문 유형 분류
+        assert len(result.question_types) > 0
+
+    def test_fallback_to_basic_when_no_korean_text(self, adapter_with_korean):
+        """영어만 있을 경우 기본 추출 사용."""
+        english_run = EvaluationRun(
+            run_id="english-run",
+            dataset_name="english-dataset",
+            model_name="gpt-5-nano",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="What is the coverage amount?",
+                    answer="The coverage amount is 100 million won.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+        keywords = adapter_with_korean.extract_keywords(english_run)
+
+        # 영어 키워드가 추출되어야 함
+        assert len(keywords) > 0
+        keyword_texts = [k.keyword for k in keywords]
+        assert any(
+            term.lower() in [k.lower() for k in keyword_texts]
+            for term in ["coverage", "amount", "million"]
+        )
+
+    def test_korean_keyword_quality(self, adapter_with_korean):
+        """한국어 키워드 추출 품질 테스트."""
+        run = EvaluationRun(
+            run_id="quality-run",
+            dataset_name="test",
+            model_name="test",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="종신보험의 사망보험금 지급 조건은 무엇인가요?",
+                    answer="피보험자가 보험기간 중 사망하면 사망보험금을 지급합니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+        keywords = adapter_with_korean.extract_keywords(run, top_k=10)
+
+        keyword_texts = [k.keyword for k in keywords]
+        # 핵심 보험 용어가 추출되어야 함
+        assert any(
+            term in keyword_texts
+            for term in ["종신보험", "사망보험금", "피보험자", "보험기간", "사망", "보험금", "지급"]
+        )
+
+
+@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+class TestNLPAnalysisAdapterKoreanFallback:
+    """한국어 분석 폴백 테스트."""
+
+    def test_adapter_without_korean_tokenizer_still_works(self):
+        """한국어 토크나이저 없이도 동작."""
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+
+        adapter = NLPAnalysisAdapter()  # 토크나이저 없음
+
+        run = EvaluationRun(
+            run_id="no-tokenizer-run",
+            dataset_name="test",
+            model_name="test",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="보험료가 얼마인가요?",
+                    answer="월 5만원입니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+        # 기본 정규식 기반으로 동작
+        keywords = adapter.extract_keywords(run)
+        assert len(keywords) > 0
+
+    def test_mixed_korean_english_text(self):
+        """한국어-영어 혼합 텍스트 처리."""
+        from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+        from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
+
+        adapter = NLPAnalysisAdapter(korean_tokenizer=KiwiTokenizer())
+
+        run = EvaluationRun(
+            run_id="mixed-run",
+            dataset_name="test",
+            model_name="test",
+            started_at=datetime.now(),
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    question="CI보험의 coverage는 어떻게 되나요?",
+                    answer="Critical Illness 발생시 보험금을 지급합니다.",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                ),
+            ],
+            metrics_evaluated=["faithfulness"],
+        )
+
+        keywords = adapter.extract_keywords(run)
+        assert len(keywords) > 0
