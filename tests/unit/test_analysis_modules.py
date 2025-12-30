@@ -1,0 +1,437 @@
+"""Phase 14.4: Analysis Module Adapters 단위 테스트.
+
+TDD Red Phase - 테스트 먼저 작성.
+"""
+
+from __future__ import annotations
+
+# =============================================================================
+# BaseAnalysisModule Tests
+# =============================================================================
+
+
+class TestBaseAnalysisModule:
+    """BaseAnalysisModule 테스트 - 분석 모듈 기본 클래스."""
+
+    def test_base_module_has_module_id(self):
+        """module_id 속성 존재."""
+        from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+
+        class TestModule(BaseAnalysisModule):
+            module_id = "test_module"
+            name = "Test Module"
+            description = "테스트 모듈"
+            input_types = ["input"]
+            output_types = ["output"]
+
+            def execute(self, inputs, params=None):
+                return {}
+
+        module = TestModule()
+        assert module.module_id == "test_module"
+
+    def test_base_module_has_metadata(self):
+        """metadata 속성 존재."""
+        from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+        from evalvault.domain.entities.analysis_pipeline import ModuleMetadata
+
+        class TestModule(BaseAnalysisModule):
+            module_id = "test_module"
+            name = "Test Module"
+            description = "테스트 모듈"
+            input_types = ["input"]
+            output_types = ["output"]
+
+            def execute(self, inputs, params=None):
+                return {}
+
+        module = TestModule()
+        assert isinstance(module.metadata, ModuleMetadata)
+        assert module.metadata.module_id == "test_module"
+        assert module.metadata.name == "Test Module"
+
+    def test_base_module_validate_inputs_default(self):
+        """validate_inputs 기본 구현."""
+        from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+
+        class TestModule(BaseAnalysisModule):
+            module_id = "test"
+            name = "Test"
+            description = "Test"
+            input_types = []
+            output_types = []
+
+            def execute(self, inputs, params=None):
+                return {}
+
+        module = TestModule()
+        assert module.validate_inputs({}) is True
+        assert module.validate_inputs({"any": "data"}) is True
+
+
+# =============================================================================
+# DataLoaderModule Tests
+# =============================================================================
+
+
+class TestDataLoaderModule:
+    """DataLoaderModule 테스트 - 데이터 로드 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.data_loader_module import (
+            DataLoaderModule,
+        )
+
+        module = DataLoaderModule()
+        assert module.module_id == "data_loader"
+
+    def test_execute_with_context(self):
+        """컨텍스트에서 데이터 로드."""
+        from evalvault.adapters.outbound.analysis.data_loader_module import (
+            DataLoaderModule,
+        )
+
+        module = DataLoaderModule()
+        inputs = {
+            "__context__": {
+                "query": "테스트 쿼리",
+                "run_id": "run-123",
+            }
+        }
+
+        result = module.execute(inputs)
+
+        assert "loaded" in result
+        assert result["loaded"] is True
+        assert "query" in result
+        assert result["query"] == "테스트 쿼리"
+
+    def test_execute_with_run_id(self):
+        """run_id가 있을 때 결과에 포함."""
+        from evalvault.adapters.outbound.analysis.data_loader_module import (
+            DataLoaderModule,
+        )
+
+        module = DataLoaderModule()
+        inputs = {
+            "__context__": {
+                "query": "분석해줘",
+                "run_id": "run-456",
+            }
+        }
+
+        result = module.execute(inputs)
+
+        assert result["run_id"] == "run-456"
+
+
+# =============================================================================
+# StatisticalAnalyzerModule Tests
+# =============================================================================
+
+
+class TestStatisticalAnalyzerModule:
+    """StatisticalAnalyzerModule 테스트 - 통계 분석 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.statistical_analyzer_module import (
+            StatisticalAnalyzerModule,
+        )
+
+        module = StatisticalAnalyzerModule()
+        assert module.module_id == "statistical_analyzer"
+
+    def test_execute_with_data(self):
+        """데이터로 통계 분석."""
+        from evalvault.adapters.outbound.analysis.statistical_analyzer_module import (
+            StatisticalAnalyzerModule,
+        )
+
+        module = StatisticalAnalyzerModule()
+        inputs = {
+            "__context__": {"query": "분석"},
+            "data_loader": {
+                "loaded": True,
+                "metrics": {
+                    "faithfulness": [0.8, 0.9, 0.7, 0.85],
+                    "answer_relevancy": [0.75, 0.8, 0.85, 0.9],
+                },
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "statistics" in result
+        assert "summary" in result
+
+    def test_execute_calculates_mean(self):
+        """평균 계산."""
+        from evalvault.adapters.outbound.analysis.statistical_analyzer_module import (
+            StatisticalAnalyzerModule,
+        )
+
+        module = StatisticalAnalyzerModule()
+        inputs = {
+            "__context__": {"query": "분석"},
+            "data_loader": {
+                "loaded": True,
+                "metrics": {
+                    "faithfulness": [0.8, 0.8, 0.8, 0.8],
+                },
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert result["statistics"]["faithfulness"]["mean"] == 0.8
+
+
+# =============================================================================
+# SummaryReportModule Tests
+# =============================================================================
+
+
+class TestSummaryReportModule:
+    """SummaryReportModule 테스트 - 요약 보고서 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.summary_report_module import (
+            SummaryReportModule,
+        )
+
+        module = SummaryReportModule()
+        assert module.module_id == "summary_report"
+
+    def test_execute_generates_report(self):
+        """보고서 생성."""
+        from evalvault.adapters.outbound.analysis.summary_report_module import (
+            SummaryReportModule,
+        )
+
+        module = SummaryReportModule()
+        inputs = {
+            "__context__": {"query": "요약해줘"},
+            "statistical_analyzer": {
+                "statistics": {
+                    "faithfulness": {"mean": 0.85, "std": 0.05},
+                    "answer_relevancy": {"mean": 0.82, "std": 0.08},
+                },
+                "summary": {
+                    "total_metrics": 2,
+                    "average_score": 0.835,
+                },
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "report" in result
+        assert "format" in result
+        assert result["format"] == "markdown"
+
+    def test_execute_report_contains_statistics(self):
+        """보고서에 통계 포함."""
+        from evalvault.adapters.outbound.analysis.summary_report_module import (
+            SummaryReportModule,
+        )
+
+        module = SummaryReportModule()
+        inputs = {
+            "__context__": {"query": "요약해줘"},
+            "statistical_analyzer": {
+                "statistics": {
+                    "faithfulness": {"mean": 0.9, "std": 0.02},
+                },
+                "summary": {
+                    "total_metrics": 1,
+                    "average_score": 0.9,
+                },
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "faithfulness" in result["report"] or "0.9" in result["report"]
+
+
+# =============================================================================
+# VerificationReportModule Tests
+# =============================================================================
+
+
+class TestVerificationReportModule:
+    """VerificationReportModule 테스트 - 검증 보고서 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.verification_report_module import (
+            VerificationReportModule,
+        )
+
+        module = VerificationReportModule()
+        assert module.module_id == "verification_report"
+
+    def test_execute_generates_verification_report(self):
+        """검증 보고서 생성."""
+        from evalvault.adapters.outbound.analysis.verification_report_module import (
+            VerificationReportModule,
+        )
+
+        module = VerificationReportModule()
+        inputs = {
+            "__context__": {"query": "형태소 분석 확인"},
+            "quality_check": {
+                "passed": True,
+                "checks": [
+                    {"name": "토큰화", "status": "pass"},
+                    {"name": "품사 태깅", "status": "pass"},
+                ],
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "report" in result
+        assert "verification_status" in result
+        assert result["verification_status"] == "passed"
+
+
+# =============================================================================
+# ComparisonReportModule Tests
+# =============================================================================
+
+
+class TestComparisonReportModule:
+    """ComparisonReportModule 테스트 - 비교 보고서 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.comparison_report_module import (
+            ComparisonReportModule,
+        )
+
+        module = ComparisonReportModule()
+        assert module.module_id == "comparison_report"
+
+    def test_execute_generates_comparison_report(self):
+        """비교 보고서 생성."""
+        from evalvault.adapters.outbound.analysis.comparison_report_module import (
+            ComparisonReportModule,
+        )
+
+        module = ComparisonReportModule()
+        inputs = {
+            "__context__": {"query": "비교해줘"},
+            "comparison": {
+                "method_a": {"score": 0.85},
+                "method_b": {"score": 0.78},
+                "winner": "method_a",
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "report" in result
+        assert "comparison_summary" in result
+
+
+# =============================================================================
+# AnalysisReportModule Tests
+# =============================================================================
+
+
+class TestAnalysisReportModule:
+    """AnalysisReportModule 테스트 - 분석 보고서 모듈."""
+
+    def test_module_id(self):
+        """모듈 ID 확인."""
+        from evalvault.adapters.outbound.analysis.analysis_report_module import (
+            AnalysisReportModule,
+        )
+
+        module = AnalysisReportModule()
+        assert module.module_id == "analysis_report"
+
+    def test_execute_generates_analysis_report(self):
+        """분석 보고서 생성."""
+        from evalvault.adapters.outbound.analysis.analysis_report_module import (
+            AnalysisReportModule,
+        )
+
+        module = AnalysisReportModule()
+        inputs = {
+            "__context__": {"query": "낮은 메트릭 원인 분석"},
+            "root_cause": {
+                "causes": [
+                    {"metric": "faithfulness", "reason": "컨텍스트 부족"},
+                ],
+                "recommendations": ["컨텍스트 보강 필요"],
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "report" in result
+        assert "analysis_summary" in result
+
+
+# =============================================================================
+# ModuleRegistry Integration Tests
+# =============================================================================
+
+
+class TestModuleRegistryIntegration:
+    """모듈 레지스트리 통합 테스트."""
+
+    def test_register_all_basic_modules(self):
+        """기본 모듈들 등록."""
+        from evalvault.adapters.outbound.analysis import (
+            DataLoaderModule,
+            StatisticalAnalyzerModule,
+            SummaryReportModule,
+        )
+        from evalvault.domain.services.pipeline_orchestrator import (
+            PipelineOrchestrator,
+        )
+
+        orchestrator = PipelineOrchestrator()
+
+        # 기본 모듈들 등록
+        orchestrator.register_module(DataLoaderModule())
+        orchestrator.register_module(StatisticalAnalyzerModule())
+        orchestrator.register_module(SummaryReportModule())
+
+        assert orchestrator.get_module("data_loader") is not None
+        assert orchestrator.get_module("statistical_analyzer") is not None
+        assert orchestrator.get_module("summary_report") is not None
+
+    def test_execute_summary_pipeline_with_real_modules(self):
+        """실제 모듈로 요약 파이프라인 실행."""
+        from evalvault.adapters.outbound.analysis import (
+            DataLoaderModule,
+            StatisticalAnalyzerModule,
+            SummaryReportModule,
+        )
+        from evalvault.domain.entities.analysis_pipeline import (
+            AnalysisIntent,
+        )
+        from evalvault.domain.services.pipeline_orchestrator import (
+            AnalysisPipelineService,
+        )
+
+        service = AnalysisPipelineService()
+
+        # 모듈 등록
+        service.register_module(DataLoaderModule())
+        service.register_module(StatisticalAnalyzerModule())
+        service.register_module(SummaryReportModule())
+
+        # 파이프라인 실행
+        result = service.analyze("결과를 요약해줘")
+
+        assert result is not None
+        assert result.is_complete
+        assert result.intent == AnalysisIntent.GENERATE_SUMMARY
