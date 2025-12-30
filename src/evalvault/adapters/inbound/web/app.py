@@ -208,55 +208,128 @@ def render_evaluate_page(adapter, session):
     """평가 실행 페이지 렌더링."""
     import streamlit as st
 
+    from evalvault.adapters.inbound.web.components import (
+        FileUploadHandler,
+        MetricSelector,
+    )
+
     st.header("📊 Evaluate")
     st.markdown("데이터셋을 업로드하고 RAG 평가를 실행합니다.")
 
-    # 파일 업로드
+    # 초기화
+    upload_handler = FileUploadHandler()
+    metric_selector = MetricSelector()
+
+    # 파일 업로드 섹션
+    st.subheader("1. 데이터셋 업로드")
+
     uploaded_file = st.file_uploader(
         "데이터셋 업로드",
         type=["csv", "json", "xlsx"],
         help="CSV, JSON, 또는 Excel 형식의 데이터셋을 업로드하세요.",
     )
 
+    validation_result = None
     if uploaded_file:
-        st.success(f"✅ {uploaded_file.name} 업로드됨")
+        # 파일 검증
+        content = uploaded_file.read()
+        uploaded_file.seek(0)  # 다시 읽을 수 있도록 리셋
 
-    # 메트릭 선택
-    st.subheader("메트릭 선택")
-    available_metrics = adapter.get_available_metrics()
-    descriptions = adapter.get_metric_descriptions()
+        validation_result = upload_handler.validate_file(uploaded_file.name, content)
+
+        if validation_result.is_valid:
+            st.success(
+                f"✅ {uploaded_file.name} ({validation_result.row_count} rows, "
+                f"{validation_result.file_type.upper()})"
+            )
+            if validation_result.dataset_name:
+                st.caption(f"Dataset: {validation_result.dataset_name}")
+        else:
+            st.error(f"❌ {validation_result.error_message}")
+
+    # 메트릭 선택 섹션
+    st.divider()
+    st.subheader("2. 메트릭 선택")
+
+    # 카테고리별 그룹화
+    categories = metric_selector.get_metrics_by_category()
 
     selected_metrics = []
-    cols = st.columns(2)
-    for i, metric in enumerate(available_metrics):
-        with cols[i % 2]:
-            if st.checkbox(
-                f"{metric}",
-                value=metric in ["faithfulness", "answer_relevancy"],
-                help=descriptions.get(metric, ""),
-            ):
-                selected_metrics.append(metric)
+    for category, metrics in categories.items():
+        with st.expander(f"📁 {category.title()}", expanded=category == "generation"):
+            cols = st.columns(2)
+            for i, metric in enumerate(metrics):
+                with cols[i % 2]:
+                    icon = metric_selector.get_icon(metric)
+                    desc = metric_selector.get_description(metric)
+                    if st.checkbox(
+                        f"{icon} {metric}",
+                        value=metric in metric_selector.get_default_metrics(),
+                        help=desc,
+                        key=f"metric_{metric}",
+                    ):
+                        selected_metrics.append(metric)
 
     session.selected_metrics = selected_metrics
 
+    # 선택된 메트릭 표시
+    if selected_metrics:
+        st.caption(f"Selected: {', '.join(selected_metrics)}")
+
     # 고급 옵션
-    with st.expander("고급 옵션"):
-        col1, col2 = st.columns(2)
+    st.divider()
+    with st.expander("⚙️ 고급 옵션"):
+        col1, col2, col3 = st.columns(3)
         with col1:
-            session.langfuse_enabled = st.checkbox("Langfuse 트래킹 활성화", value=False)
+            session.selected_model = st.selectbox(
+                "모델",
+                options=["gpt-5-nano", "gpt-4", "gpt-4o", "claude-3-5-sonnet"],
+                index=0,
+            )
         with col2:
+            session.langfuse_enabled = st.checkbox("Langfuse 트래킹", value=False)
+        with col3:
             session.parallel_processing = st.checkbox("병렬 처리", value=True)
+
+        # 임계값 설정
+        st.caption("메트릭 임계값 (Pass/Fail 기준)")
+        threshold_cols = st.columns(len(selected_metrics) if selected_metrics else 1)
+        for i, metric in enumerate(selected_metrics[:4]):  # 최대 4개만 표시
+            with threshold_cols[i]:
+                st.number_input(
+                    metric,
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.7,
+                    step=0.1,
+                    key=f"threshold_{metric}",
+                )
 
     # 실행 버튼
     st.divider()
-    if st.button(
-        "🚀 평가 실행", type="primary", disabled=not uploaded_file or not selected_metrics
-    ):
-        if session.is_evaluating:
-            st.warning("평가가 이미 실행 중입니다.")
-        else:
+    can_run = (
+        validation_result is not None
+        and validation_result.is_valid
+        and len(selected_metrics) > 0
+        and not session.is_evaluating
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if st.button("🚀 평가 실행", type="primary", disabled=not can_run):
             st.info("평가 실행 기능은 아직 구현 중입니다.")
             # TODO: 실제 평가 실행 로직
+    with col2:
+        if session.is_evaluating:
+            st.warning("실행 중...")
+
+    # 상태 메시지
+    if not uploaded_file:
+        st.info("💡 먼저 데이터셋 파일을 업로드하세요.")
+    elif not validation_result or not validation_result.is_valid:
+        st.warning("⚠️ 유효한 데이터셋 파일을 업로드하세요.")
+    elif not selected_metrics:
+        st.warning("⚠️ 최소 하나의 메트릭을 선택하세요.")
 
 
 def render_history_page(adapter, session):
