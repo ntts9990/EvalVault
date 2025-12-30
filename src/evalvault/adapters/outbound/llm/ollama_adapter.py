@@ -242,3 +242,107 @@ class OllamaAdapter(LLMPort):
             budget_tokens=None,  # Not used for Ollama
             think_level=self._think_level,
         )
+
+    async def embed(
+        self,
+        texts: str | list[str],
+        model: str | None = None,
+        dimension: int | None = None,
+    ) -> list[float] | list[list[float]]:
+        """Generate embeddings using Ollama embed API with Matryoshka support.
+
+        Qwen3-Embedding 모델은 Matryoshka Representation Learning을 지원하여
+        가변 차원 임베딩을 생성할 수 있습니다.
+
+        Args:
+            texts: Single text or list of texts to embed
+            model: Embedding model name (default: configured model)
+            dimension: Matryoshka dimension for Qwen3-Embedding
+                      - 0.6B model: 32~768 (recommended: 256 for dev)
+                      - 8B model: 32~4096 (recommended: 1024 for prod)
+
+        Returns:
+            Single embedding if single text input, list of embeddings otherwise
+
+        Example:
+            >>> adapter = OllamaAdapter(settings)
+            >>> # Single text
+            >>> embedding = await adapter.embed("보험료 납입", dimension=256)
+            >>> # Multiple texts
+            >>> embeddings = await adapter.embed(["보험료", "보장금액"], dimension=256)
+        """
+        model = model or self._embedding_model_name
+        is_single = isinstance(texts, str)
+        text_list = [texts] if is_single else texts
+
+        embeddings = []
+        async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout, connect=30.0)) as client:
+            for text in text_list:
+                payload: dict[str, Any] = {
+                    "model": model,
+                    "prompt": text,
+                }
+
+                # Matryoshka dimension support for Qwen3-Embedding
+                if dimension is not None:
+                    payload["options"] = {"num_ctx": 8192}
+                    # Truncate embedding to specified dimension after generation
+                    # Ollama doesn't support dimension parameter directly,
+                    # so we truncate the output embedding
+                    payload["_truncate_dim"] = dimension
+
+                response = await client.post(
+                    f"{self._base_url}/api/embeddings",
+                    json={k: v for k, v in payload.items() if not k.startswith("_")},
+                )
+                response.raise_for_status()
+                result = response.json()
+                embedding = result["embedding"]
+
+                # Apply Matryoshka truncation if specified
+                if dimension is not None and len(embedding) > dimension:
+                    embedding = embedding[:dimension]
+
+                embeddings.append(embedding)
+
+        return embeddings[0] if is_single else embeddings
+
+    def embed_sync(
+        self,
+        texts: str | list[str],
+        model: str | None = None,
+        dimension: int | None = None,
+    ) -> list[float] | list[list[float]]:
+        """Synchronous version of embed() for non-async contexts.
+
+        Args:
+            texts: Single text or list of texts to embed
+            model: Embedding model name (default: configured model)
+            dimension: Matryoshka dimension for Qwen3-Embedding
+
+        Returns:
+            Single embedding if single text input, list of embeddings otherwise
+        """
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # Already in async context - use nest_asyncio if available
+            try:
+                import nest_asyncio
+
+                nest_asyncio.apply()
+                return loop.run_until_complete(self.embed(texts, model, dimension))
+            except ImportError:
+                # Create new event loop in thread
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.embed(texts, model, dimension))
+                    return future.result()
+        else:
+            return asyncio.run(self.embed(texts, model, dimension))

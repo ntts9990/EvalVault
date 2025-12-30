@@ -1,13 +1,27 @@
-"""Korean Dense Retriever with BGE-M3 support.
+"""Korean Dense Retriever with BGE-M3 and Qwen3-Embedding support.
 
 한국어 Dense 임베딩 기반 검색을 제공합니다.
-BGE-M3-Korean 모델을 기본으로 사용하며, sentence-transformers로 fallback합니다.
+BGE-M3-Korean 모델을 기본으로 사용하며, Qwen3-Embedding (Ollama) 및 sentence-transformers를 지원합니다.
+
+Qwen3-Embedding Features:
+    - Matryoshka Representation Learning (MRL): 가변 차원 임베딩 지원
+    - 0.6B 모델: 32~768 차원 (개발용, 권장: 256)
+    - 8B 모델: 32~4096 차원 (운영용, 권장: 1024)
 
 Example:
     >>> from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
     >>> retriever = KoreanDenseRetriever()
     >>> retriever.index(["보험료 납입 기간은 20년입니다.", "보장금액은 1억원입니다."])
     >>> results = retriever.search("보험료 기간", top_k=1)
+
+    # Qwen3-Embedding with Matryoshka (Ollama)
+    >>> from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+    >>> adapter = OllamaAdapter(settings)
+    >>> retriever = KoreanDenseRetriever(
+    ...     model_name="qwen3-embedding:0.6b",
+    ...     ollama_adapter=adapter,
+    ...     matryoshka_dim=256,
+    ... )
 """
 
 from __future__ import annotations
@@ -74,6 +88,7 @@ class KoreanDenseRetriever:
     # dragonkue/BGE-m3-ko가 AutoRAG 벤치마크에서 upskyy/bge-m3-korean보다
     # +39.4% 높은 성능 (0.7456 vs 0.5351)
     SUPPORTED_MODELS = {
+        # ===== HuggingFace Models =====
         "dragonkue/BGE-m3-ko": {  # 1순위: 한국어 최고 성능
             "dimension": 1024,
             "max_length": 8192,
@@ -101,6 +116,25 @@ class KoreanDenseRetriever:
             "max_length": 512,
             "type": "sentence-transformers",
         },
+        # ===== Ollama Qwen3-Embedding Models (Matryoshka 지원) =====
+        # 폐쇄망 환경용 Qwen3-Embedding
+        # Matryoshka Representation Learning으로 가변 차원 임베딩 지원
+        "qwen3-embedding:0.6b": {  # 개발용 (경량)
+            "dimension": 768,  # 기본 차원 (Matryoshka로 축소 가능)
+            "max_length": 8192,
+            "type": "ollama",
+            "matryoshka": True,
+            "matryoshka_range": (32, 768),
+            "recommended_dim": 256,  # 개발용 권장 차원
+        },
+        "qwen3-embedding:8b": {  # 운영용 (고성능)
+            "dimension": 4096,  # 기본 차원
+            "max_length": 8192,
+            "type": "ollama",
+            "matryoshka": True,
+            "matryoshka_range": (32, 4096),
+            "recommended_dim": 1024,  # 운영용 권장 차원
+        },
     }
 
     # 기본 모델: dragonkue/BGE-m3-ko (AutoRAG 벤치마크 1위)
@@ -112,19 +146,65 @@ class KoreanDenseRetriever:
         use_fp16: bool = True,
         device: str | DeviceType = DeviceType.AUTO,
         batch_size: int = 32,
+        ollama_adapter: Any = None,
+        matryoshka_dim: int | None = None,
+        profile: str | None = None,
     ) -> None:
         """KoreanDenseRetriever 초기화.
 
         Args:
-            model_name: 사용할 모델 이름 (기본: upskyy/bge-m3-korean)
+            model_name: 사용할 모델 이름 (기본: dragonkue/BGE-m3-ko)
             use_fp16: FP16 양자화 사용 (메모리 절약)
             device: 디바이스 (auto, cpu, cuda, mps)
             batch_size: 인코딩 배치 크기
+            ollama_adapter: Ollama LLM 어댑터 (Qwen3-Embedding 사용 시 필수)
+            matryoshka_dim: Matryoshka 차원 (Qwen3-Embedding 전용)
+                - None: 모델 권장 차원 사용
+                - 256: 개발용 (속도 우선)
+                - 1024: 운영용 (품질 우선)
+            profile: 프로파일 이름 ('dev' 또는 'prod')
+                - 'dev': qwen3-embedding:0.6b, dim=256
+                - 'prod': qwen3-embedding:8b, dim=1024
+
+        Example:
+            >>> # HuggingFace 모델 사용 (기존 방식)
+            >>> retriever = KoreanDenseRetriever()
+
+            >>> # Ollama Qwen3-Embedding 사용 (profile 기반)
+            >>> retriever = KoreanDenseRetriever(profile="dev", ollama_adapter=adapter)
+
+            >>> # 직접 모델/차원 지정
+            >>> retriever = KoreanDenseRetriever(
+            ...     model_name="qwen3-embedding:8b",
+            ...     matryoshka_dim=1024,
+            ...     ollama_adapter=adapter,
+            ... )
         """
+        # Profile-based model selection
+        if profile:
+            model_name, matryoshka_dim = self._get_profile_config(profile)
+
         self._model_name = model_name or self.DEFAULT_MODEL
         self._use_fp16 = use_fp16
         self._device = self._resolve_device(device)
         self._batch_size = batch_size
+        self._ollama_adapter = ollama_adapter
+        self._matryoshka_dim = matryoshka_dim
+
+        # Validate Ollama adapter for Ollama models
+        model_info = self.SUPPORTED_MODELS.get(self._model_name)
+        if model_info and model_info.get("type") == "ollama" and not self._ollama_adapter:
+            raise ValueError(
+                f"ollama_adapter is required for Ollama model '{self._model_name}'. "
+                "Create one with: OllamaAdapter(settings)"
+            )
+
+        # Auto-select matryoshka dimension if not specified
+        if model_info and model_info.get("matryoshka") and self._matryoshka_dim is None:
+            self._matryoshka_dim = model_info.get("recommended_dim")
+            logger.info(
+                f"Auto-selected Matryoshka dimension: {self._matryoshka_dim} for {self._model_name}"
+            )
 
         self._model: Any = None
         self._model_type: str | None = None
@@ -144,11 +224,23 @@ class KoreanDenseRetriever:
 
     @property
     def dimension(self) -> int:
-        """임베딩 차원."""
+        """임베딩 차원.
+
+        Matryoshka 모델의 경우 설정된 matryoshka_dim을 반환합니다.
+        """
+        # Matryoshka dimension takes precedence
+        if self._matryoshka_dim is not None:
+            return self._matryoshka_dim
+
         model_info = self.SUPPORTED_MODELS.get(self._model_name)
         if model_info:
             return model_info["dimension"]
         return 1024  # 기본값
+
+    @property
+    def matryoshka_dim(self) -> int | None:
+        """Matryoshka 차원 (설정된 경우)."""
+        return self._matryoshka_dim
 
     @property
     def model_name(self) -> str:
@@ -183,13 +275,45 @@ class KoreanDenseRetriever:
 
         return device
 
+    def _get_profile_config(self, profile: str) -> tuple[str, int]:
+        """프로파일에 따른 모델/차원 설정을 반환합니다.
+
+        Args:
+            profile: 'dev' 또는 'prod'
+
+        Returns:
+            (model_name, matryoshka_dim) 튜플
+        """
+        profiles = {
+            "dev": ("qwen3-embedding:0.6b", 256),
+            "prod": ("qwen3-embedding:8b", 1024),
+        }
+
+        if profile not in profiles:
+            raise ValueError(f"Unknown profile: {profile}. Use 'dev' or 'prod'.")
+
+        return profiles[profile]
+
     def _load_model(self) -> None:
-        """모델 로딩 (lazy loading)."""
+        """모델 로딩 (lazy loading).
+
+        Ollama 모델의 경우 별도 로딩이 필요 없습니다 (어댑터 사용).
+        """
         if self._model is not None:
             return
 
         model_info = self.SUPPORTED_MODELS.get(self._model_name)
         model_type = model_info["type"] if model_info else "sentence-transformers"
+
+        # Ollama models use adapter directly - no model loading needed
+        if model_type == "ollama":
+            self._model_type = "ollama"
+            self._model = True  # Mark as loaded
+            logger.info(
+                f"Using Ollama adapter for: {self._model_name} "
+                f"(matryoshka_dim: {self._matryoshka_dim})"
+            )
+            return
 
         logger.info(
             f"Loading model: {self._model_name} (type: {model_type}, device: {self._device})"
@@ -260,7 +384,10 @@ class KoreanDenseRetriever:
 
         batch_size = batch_size or self._batch_size
 
-        if self._model_type == "bge-m3":
+        if self._model_type == "ollama":
+            # Ollama Qwen3-Embedding with Matryoshka
+            embeddings = self._encode_with_ollama(texts, show_progress=show_progress)
+        elif self._model_type == "bge-m3":
             # BGE-M3 모델
             result = self._model.encode(
                 texts,
@@ -279,6 +406,37 @@ class KoreanDenseRetriever:
                 show_progress_bar=show_progress,
                 convert_to_numpy=True,
             )
+
+        return np.array(embeddings)
+
+    def _encode_with_ollama(
+        self,
+        texts: list[str],
+        show_progress: bool = False,
+    ) -> np.ndarray:
+        """Ollama adapter를 사용하여 임베딩 생성.
+
+        Matryoshka 차원을 자동으로 적용합니다.
+
+        Args:
+            texts: 임베딩할 텍스트 리스트
+            show_progress: 진행 상황 표시 (현재 미사용)
+
+        Returns:
+            임베딩 벡터 배열
+        """
+        if not self._ollama_adapter:
+            raise ValueError("Ollama adapter is not configured")
+
+        # Use sync version of embed
+        embeddings = self._ollama_adapter.embed_sync(
+            texts=texts,
+            model=self._model_name,
+            dimension=self._matryoshka_dim,
+        )
+
+        if show_progress:
+            logger.info(f"Encoded {len(texts)} texts with Ollama (dim={self._matryoshka_dim})")
 
         return np.array(embeddings)
 
