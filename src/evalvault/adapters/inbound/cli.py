@@ -1910,10 +1910,263 @@ def domain_terms(
 
 
 @app.command()
+def gate(
+    run_id: str = typer.Argument(..., help="Run ID to check"),
+    threshold: list[str] = typer.Option(
+        None,
+        "--threshold",
+        "-t",
+        help="Custom threshold in format 'metric:value' (e.g., 'faithfulness:0.8')",
+    ),
+    baseline: str | None = typer.Option(
+        None,
+        "--baseline",
+        "-b",
+        help="Baseline run ID for regression detection",
+    ),
+    fail_on_regression: float = typer.Option(
+        0.05,
+        "--fail-on-regression",
+        "-r",
+        help="Fail if metric drops by more than this amount (default: 0.05)",
+    ),
+    output_format: str = typer.Option(
+        "table",
+        "--format",
+        "-f",
+        help="Output format: table, json, or github-actions",
+    ),
+    db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+):
+    """Quality gate check for CI/CD pipelines.
+
+    Checks if evaluation results meet thresholds and detects regressions.
+
+    Exit codes:
+      0 - All checks passed
+      1 - Threshold check failed
+      2 - Regression detected (when --baseline is specified)
+      3 - Run not found
+
+    Examples:
+        evalvault gate abc123
+        evalvault gate abc123 -t faithfulness:0.8 -t context_precision:0.7
+        evalvault gate abc123 --baseline baseline123 --fail-on-regression 0.03
+        evalvault gate abc123 --format github-actions
+        evalvault gate abc123 --format json
+    """
+    storage = SQLiteStorageAdapter(db_path=db_path)
+
+    # Load run
+    try:
+        run = storage.get_run(run_id)
+    except KeyError:
+        if output_format == "json":
+            import json
+
+            console.print(json.dumps({"status": "error", "message": f"Run not found: {run_id}"}))
+        elif output_format == "github-actions":
+            console.print(f"::error::Run not found: {run_id}")
+        else:
+            console.print(f"[red]Error: Run not found: {run_id}[/red]")
+        raise typer.Exit(3)
+
+    # Parse custom thresholds
+    custom_thresholds = {}
+    if threshold:
+        for t in threshold:
+            if ":" not in t:
+                console.print(f"[red]Error: Invalid threshold format: {t}[/red]")
+                console.print("[dim]Use format: metric:value (e.g., faithfulness:0.8)[/dim]")
+                raise typer.Exit(1)
+            metric, value = t.split(":", 1)
+            try:
+                custom_thresholds[metric.strip()] = float(value.strip())
+            except ValueError:
+                console.print(f"[red]Error: Invalid threshold value: {value}[/red]")
+                raise typer.Exit(1)
+
+    # Merge thresholds (custom > run > default)
+    thresholds = dict.fromkeys(run.metrics_evaluated, 0.7)
+    thresholds.update(run.thresholds or {})
+    thresholds.update(custom_thresholds)
+
+    # Load baseline if specified
+    baseline_run = None
+    if baseline:
+        try:
+            baseline_run = storage.get_run(baseline)
+        except KeyError:
+            if output_format == "json":
+                import json
+
+                console.print(
+                    json.dumps(
+                        {"status": "error", "message": f"Baseline run not found: {baseline}"}
+                    )
+                )
+            elif output_format == "github-actions":
+                console.print(f"::error::Baseline run not found: {baseline}")
+            else:
+                console.print(f"[red]Error: Baseline run not found: {baseline}[/red]")
+            raise typer.Exit(3)
+
+    # Check thresholds
+    results = []
+    all_passed = True
+    regression_detected = False
+
+    for metric in run.metrics_evaluated:
+        avg_score = run.get_avg_score(metric)
+        thresh = thresholds.get(metric, 0.7)
+        passed = avg_score >= thresh
+
+        result = {
+            "metric": metric,
+            "score": avg_score,
+            "threshold": thresh,
+            "passed": passed,
+        }
+
+        if not passed:
+            all_passed = False
+
+        # Check regression if baseline exists
+        if baseline_run and metric in baseline_run.metrics_evaluated:
+            baseline_score = baseline_run.get_avg_score(metric)
+            diff = avg_score - baseline_score
+            result["baseline_score"] = baseline_score
+            result["diff"] = diff
+            result["regression"] = diff < -fail_on_regression
+
+            if result["regression"]:
+                regression_detected = True
+
+        results.append(result)
+
+    # Output results
+    if output_format == "json":
+        import json
+
+        output_data = {
+            "run_id": run_id,
+            "status": "passed" if all_passed and not regression_detected else "failed",
+            "all_thresholds_passed": all_passed,
+            "regression_detected": regression_detected,
+            "results": results,
+        }
+        if baseline:
+            output_data["baseline_id"] = baseline
+            output_data["fail_on_regression"] = fail_on_regression
+        console.print(json.dumps(output_data, indent=2))
+
+    elif output_format == "github-actions":
+        # GitHub Actions output format
+        for r in results:
+            status = "✅" if r["passed"] else "❌"
+            reg_status = ""
+            if "regression" in r:
+                reg_status = " (📉 REGRESSION)" if r["regression"] else ""
+            console.print(
+                f"{status} {r['metric']}: {r['score']:.3f} (threshold: {r['threshold']:.2f}){reg_status}"
+            )
+
+        # Set output variables
+        console.print(
+            f"::set-output name=passed::{str(all_passed and not regression_detected).lower()}"
+        )
+        console.print(f"::set-output name=pass_rate::{run.pass_rate:.3f}")
+
+        if not all_passed:
+            failed_metrics = [r["metric"] for r in results if not r["passed"]]
+            console.print(
+                f"::error::Quality gate failed. Metrics below threshold: {', '.join(failed_metrics)}"
+            )
+
+        if regression_detected:
+            regressed_metrics = [r["metric"] for r in results if r.get("regression")]
+            console.print(f"::warning::Regression detected in: {', '.join(regressed_metrics)}")
+
+    else:  # table format
+        console.print(f"\n[bold]Quality Gate Check: {run_id}[/bold]\n")
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Metric")
+        table.add_column("Score", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Status", justify="center")
+        if baseline_run:
+            table.add_column("Baseline", justify="right")
+            table.add_column("Diff", justify="right")
+            table.add_column("Regression", justify="center")
+
+        for r in results:
+            status = "[green]PASS[/green]" if r["passed"] else "[red]FAIL[/red]"
+            score_color = "green" if r["passed"] else "red"
+
+            if baseline_run:
+                baseline_score = r.get("baseline_score", "-")
+                diff = r.get("diff", 0)
+                diff_str = (
+                    f"[{'green' if diff >= 0 else 'red'}]{diff:+.3f}[/]"
+                    if isinstance(diff, float)
+                    else "-"
+                )
+                reg_status = "[red]YES[/red]" if r.get("regression") else "[green]NO[/green]"
+                table.add_row(
+                    r["metric"],
+                    f"[{score_color}]{r['score']:.3f}[/{score_color}]",
+                    f"{r['threshold']:.2f}",
+                    status,
+                    f"{baseline_score:.3f}"
+                    if isinstance(baseline_score, float)
+                    else baseline_score,
+                    diff_str,
+                    reg_status,
+                )
+            else:
+                table.add_row(
+                    r["metric"],
+                    f"[{score_color}]{r['score']:.3f}[/{score_color}]",
+                    f"{r['threshold']:.2f}",
+                    status,
+                )
+
+        console.print(table)
+
+        # Summary
+        if all_passed and not regression_detected:
+            console.print("\n[bold green]✅ Quality gate PASSED[/bold green]")
+        else:
+            if not all_passed:
+                failed = [r["metric"] for r in results if not r["passed"]]
+                console.print("\n[bold red]❌ Quality gate FAILED[/bold red]")
+                console.print(f"[red]Failed metrics: {', '.join(failed)}[/red]")
+            if regression_detected:
+                regressed = [r["metric"] for r in results if r.get("regression")]
+                console.print("\n[bold yellow]📉 Regression detected[/bold yellow]")
+                console.print(f"[yellow]Regressed metrics: {', '.join(regressed)}[/yellow]")
+
+        console.print()
+
+    # Exit with appropriate code
+    if not all_passed:
+        raise typer.Exit(1)
+    if regression_detected:
+        raise typer.Exit(2)
+
+
+@app.command()
 def analyze(
     run_id: str = typer.Argument(..., help="Run ID to analyze"),
     nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis"),
     causal: bool = typer.Option(False, "--causal", help="Include causal analysis"),
+    playbook: bool = typer.Option(
+        False, "--playbook", help="Include playbook-based improvement analysis"
+    ),
+    enable_llm: bool = typer.Option(
+        False, "--enable-llm", help="Enable LLM-based insight generation for playbook analysis"
+    ),
     output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
     report: Path | None = typer.Option(
         None, "--report", "-r", help="Output report file (*.md or *.html)"
@@ -1934,9 +2187,12 @@ def analyze(
         evalvault analyze abc123 --nlp --profile dev
         evalvault analyze abc123 --causal
         evalvault analyze abc123 --nlp --causal
+        evalvault analyze abc123 --playbook
+        evalvault analyze abc123 --playbook --enable-llm
         evalvault analyze abc123 --output analysis.json
         evalvault analyze abc123 --report report.md
         evalvault analyze abc123 --nlp --causal --report report.html
+        evalvault analyze abc123 --playbook --report improvement.md
         evalvault analyze abc123 --save --db evalvault.db
     """
     storage = SQLiteStorageAdapter(db_path=db_path)
@@ -2007,6 +2263,11 @@ def analyze(
     if bundle.has_causal and bundle.causal:
         _display_causal_analysis(bundle.causal)
 
+    # Perform playbook-based improvement analysis if requested
+    improvement_report = None
+    if playbook:
+        improvement_report = _perform_playbook_analysis(run, enable_llm, profile)
+
     # Save to database if requested
     if save:
         storage.save_analysis(analysis)
@@ -2014,12 +2275,12 @@ def analyze(
 
     # Export to JSON if requested
     if output:
-        _export_analysis_json(analysis, output, bundle.nlp if nlp else None)
+        _export_analysis_json(analysis, output, bundle.nlp if nlp else None, improvement_report)
         console.print(f"\n[green]Analysis exported to: {output}[/green]")
 
     # Generate report if requested
     if report:
-        _generate_report(bundle, report, include_nlp=nlp)
+        _generate_report(bundle, report, include_nlp=nlp, improvement_report=improvement_report)
         console.print(f"\n[green]Report generated: {report}[/green]")
 
 
@@ -2352,7 +2613,9 @@ def _display_causal_analysis(causal_analysis) -> None:
         console.print()
 
 
-def _export_analysis_json(analysis, output_path: Path, nlp_analysis=None) -> None:
+def _export_analysis_json(
+    analysis, output_path: Path, nlp_analysis=None, improvement_report=None
+) -> None:
     """Export analysis to JSON file."""
     from dataclasses import asdict
 
@@ -2399,17 +2662,173 @@ def _export_analysis_json(analysis, output_path: Path, nlp_analysis=None) -> Non
             "insights": nlp_analysis.insights,
         }
 
+    # Add improvement report if available
+    if improvement_report:
+        data["improvement_report"] = improvement_report.to_dict()
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _generate_report(bundle, output_path: Path, include_nlp: bool = True) -> None:
+def _perform_playbook_analysis(run, enable_llm: bool, profile: str | None):
+    """Perform playbook-based improvement analysis.
+
+    Args:
+        run: EvaluationRun to analyze
+        enable_llm: Whether to enable LLM-based insight generation
+        profile: Model profile for LLM
+
+    Returns:
+        ImprovementReport with guides and recommendations
+    """
+    from evalvault.adapters.outbound.improvement.insight_generator import InsightGenerator
+    from evalvault.adapters.outbound.improvement.pattern_detector import PatternDetector
+    from evalvault.adapters.outbound.improvement.playbook_loader import get_default_playbook
+    from evalvault.domain.services.improvement_guide_service import ImprovementGuideService
+
+    console.print("\n[bold cyan]Playbook-based Improvement Analysis[/bold cyan]\n")
+
+    playbook = get_default_playbook()
+    detector = PatternDetector(playbook=playbook)
+
+    # Create insight generator if LLM is enabled
+    insight_generator = None
+    if enable_llm:
+        settings = Settings()
+        profile_name = profile or settings.evalvault_profile
+        if profile_name:
+            settings = apply_profile(settings, profile_name)
+
+        llm_adapter = get_llm_adapter(settings)
+        insight_generator = InsightGenerator(llm_adapter=llm_adapter)
+        console.print("[dim]LLM-based insight generation enabled[/dim]")
+
+    # Create improvement guide service
+    service = ImprovementGuideService(
+        pattern_detector=detector,
+        insight_generator=insight_generator,
+        playbook=playbook,
+        enable_llm_enrichment=enable_llm,
+    )
+
+    # Generate improvement report
+    with console.status("[bold green]Analyzing patterns and generating recommendations..."):
+        report = service.generate_report(run, include_llm_analysis=enable_llm)
+
+    # Display improvement report
+    _display_improvement_report(report)
+
+    return report
+
+
+def _display_improvement_report(report) -> None:
+    """Display improvement report in console."""
+    from evalvault.domain.entities.improvement import ImprovementPriority
+
+    # Summary panel
+    summary = f"""[bold]Improvement Analysis Summary[/bold]
+Run ID: {report.run_id}
+Total Test Cases: {report.total_test_cases}
+Guides Generated: {len(report.guides)}
+Analysis Methods: {", ".join(m.value for m in report.analysis_methods_used)}
+
+[bold]Metric Performance vs Thresholds[/bold]"""
+
+    for metric, score in report.metric_scores.items():
+        gap = report.metric_gaps.get(metric, 0)
+        status = "[red]Below threshold[/red]" if gap > 0 else "[green]Meeting threshold[/green]"
+        summary += f"\n  {metric}: {score:.3f} ({status})"
+        if gap > 0:
+            summary += f" [dim](gap: -{gap:.3f})[/dim]"
+
+    console.print(
+        Panel(summary, title="[bold cyan]Improvement Analysis[/bold cyan]", border_style="cyan")
+    )
+
+    # Display guides by priority
+    if not report.guides:
+        console.print("[yellow]No improvement guides generated.[/yellow]")
+        return
+
+    critical_guides = report.get_critical_guides()
+    if critical_guides:
+        console.print("\n[bold red]Critical Issues (P0)[/bold red]")
+        for guide in critical_guides:
+            _display_guide(guide)
+
+    high_priority = [g for g in report.guides if g.priority == ImprovementPriority.P1_HIGH]
+    if high_priority:
+        console.print("\n[bold yellow]High Priority (P1)[/bold yellow]")
+        for guide in high_priority[:3]:  # Top 3
+            _display_guide(guide)
+
+    medium_priority = [g for g in report.guides if g.priority == ImprovementPriority.P2_MEDIUM]
+    if medium_priority:
+        console.print("\n[bold blue]Medium Priority (P2)[/bold blue]")
+        for guide in medium_priority[:2]:  # Top 2
+            _display_guide(guide)
+
+
+def _display_guide(guide) -> None:
+    """Display a single improvement guide."""
+    component_icons = {
+        "retriever": "🔍",
+        "reranker": "📊",
+        "generator": "🤖",
+        "chunker": "📄",
+        "embedder": "📐",
+        "query_processor": "🔧",
+        "prompt": "💬",
+    }
+
+    icon = component_icons.get(guide.component.value, "📌")
+    console.print(
+        f"\n  {icon} [bold]{guide.component.value.upper()}[/bold] - {', '.join(guide.target_metrics)}"
+    )
+
+    if guide.evidence:
+        # Display primary pattern if available
+        primary = guide.evidence.primary_pattern
+        if primary:
+            console.print(f"     Pattern: {primary.pattern_type.value}")
+            console.print(
+                f"     Affected: {primary.affected_count}/{primary.total_count} test cases ({primary.affected_ratio:.1%})"
+            )
+        elif guide.evidence.total_failures > 0:
+            console.print(f"     Failures: {guide.evidence.total_failures} test cases")
+            console.print(f"     Avg Score (failures): {guide.evidence.avg_score_failures:.3f}")
+
+    if guide.actions:
+        console.print("     [bold]Recommended Actions:[/bold]")
+        for action in guide.actions[:3]:  # Top 3 actions
+            effort_color = {"low": "green", "medium": "yellow", "high": "red"}.get(
+                action.effort, "white"
+            )
+            console.print(f"       • {action.title}")
+            if action.description:
+                console.print(
+                    f"         [dim]{action.description[:60]}...[/dim]"
+                    if len(action.description) > 60
+                    else f"         [dim]{action.description}[/dim]"
+                )
+            console.print(
+                f"         Expected: +{action.expected_improvement:.1%} | Effort: [{effort_color}]{action.effort}[/{effort_color}]"
+            )
+
+    if guide.verification_command:
+        console.print(f"     [dim]Verify: {guide.verification_command}[/dim]")
+
+
+def _generate_report(
+    bundle, output_path: Path, include_nlp: bool = True, improvement_report=None
+) -> None:
     """Generate analysis report (Markdown or HTML).
 
     Args:
         bundle: AnalysisBundle containing analysis results
         output_path: Output file path (*.md or *.html)
         include_nlp: Whether to include NLP analysis section
+        improvement_report: Optional ImprovementReport to include
     """
     adapter = MarkdownReportAdapter()
 
@@ -2421,6 +2840,10 @@ def _generate_report(bundle, output_path: Path, include_nlp: bool = True) -> Non
     else:
         # Default to markdown
         content = adapter.generate_markdown(bundle, include_nlp=include_nlp)
+
+    # Append improvement report if available
+    if improvement_report:
+        content += "\n\n" + improvement_report.to_markdown()
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
