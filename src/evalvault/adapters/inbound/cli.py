@@ -58,6 +58,10 @@ kg_app = typer.Typer(name="kg", help="Knowledge graph utilities.")
 app.add_typer(kg_app, name="kg")
 domain_app = typer.Typer(name="domain", help="Domain memory management.")
 app.add_typer(domain_app, name="domain")
+pipeline_app = typer.Typer(name="pipeline", help="Query-based analysis pipeline.")
+app.add_typer(pipeline_app, name="pipeline")
+benchmark_app = typer.Typer(name="benchmark", help="Korean RAG benchmark utilities.")
+app.add_typer(benchmark_app, name="benchmark")
 console = Console()
 
 # Available metrics
@@ -2420,6 +2424,361 @@ def _generate_report(bundle, output_path: Path, include_nlp: bool = True) -> Non
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
+
+
+# ============================================================================
+# Web UI Command
+# ============================================================================
+
+
+@app.command()
+def web(
+    port: int = typer.Option(
+        8501,
+        "--port",
+        "-p",
+        help="Port to run the web server on.",
+    ),
+    host: str = typer.Option(
+        "localhost",
+        "--host",
+        "-h",
+        help="Host to bind the web server to.",
+    ),
+    db_path: Path = typer.Option(
+        "evalvault.db",
+        "--db",
+        help="Path to SQLite database file.",
+    ),
+):
+    """Launch the EvalVault Web UI (Streamlit dashboard).
+
+    Examples:
+        evalvault web
+        evalvault web --port 8502
+        evalvault web --host 0.0.0.0 --port 8080
+    """
+    import subprocess
+    import sys
+
+    console.print("\n[bold]EvalVault Web UI[/bold]\n")
+    console.print(f"Starting server at [cyan]http://{host}:{port}[/cyan]")
+    console.print(f"Database: [dim]{db_path}[/dim]")
+    console.print("\n[dim]Press Ctrl+C to stop the server.[/dim]\n")
+
+    try:
+        # Get the path to the Streamlit app
+        from evalvault.adapters.inbound.web import app as web_app_module
+
+        app_path = Path(web_app_module.__file__).parent / "app.py"
+
+        # Run Streamlit
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "streamlit",
+                "run",
+                str(app_path),
+                "--server.port",
+                str(port),
+                "--server.address",
+                host,
+                "--",
+                "--db",
+                str(db_path),
+            ],
+            check=True,
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped.[/yellow]")
+    except ImportError:
+        console.print("[red]Error:[/red] Streamlit not installed.")
+        console.print("Install with: [cyan]uv add streamlit[/cyan]")
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]Error starting web server:[/red] {e}")
+        raise typer.Exit(1)
+
+
+# ============================================================================
+# Pipeline Commands (Phase 14)
+# ============================================================================
+
+
+@pipeline_app.command("analyze")
+def pipeline_analyze(
+    query: str = typer.Argument(..., help="Analysis query in natural language."),
+    run_id: str | None = typer.Option(
+        None,
+        "--run",
+        "-r",
+        help="Run ID to analyze (optional).",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file for results (JSON format).",
+    ),
+    db_path: Path = typer.Option(
+        "evalvault.db",
+        "--db",
+        help="Path to database file.",
+    ),
+):
+    """Analyze evaluation results using natural language query.
+
+    The system automatically classifies your intent and builds
+    an appropriate analysis pipeline.
+
+    Examples:
+        evalvault pipeline analyze "형태소 분석이 제대로 되고 있는지 확인해줘"
+        evalvault pipeline analyze "결과를 요약해줘" --run run-123
+        evalvault pipeline analyze "BM25와 Dense 검색을 비교해줘"
+    """
+    from evalvault.adapters.outbound.analysis import (
+        DataLoaderModule,
+        StatisticalAnalyzerModule,
+        SummaryReportModule,
+    )
+    from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
+
+    console.print("\n[bold]Pipeline Analysis[/bold]\n")
+    console.print(f"Query: [cyan]{query}[/cyan]")
+
+    # Initialize service
+    service = AnalysisPipelineService()
+
+    # Register modules
+    service.register_module(DataLoaderModule())
+    service.register_module(StatisticalAnalyzerModule())
+    service.register_module(SummaryReportModule())
+
+    # Classify intent
+    intent = service.get_intent(query)
+    console.print(f"Detected Intent: [green]{intent.value}[/green]\n")
+
+    # Execute pipeline
+    with console.status("[bold green]Running analysis pipeline..."):
+        result = service.analyze(query, run_id=run_id)
+
+    # Display results
+    if result.is_complete:
+        console.print("[green]Pipeline completed successfully![/green]")
+        console.print(f"Duration: {result.total_duration_ms}ms")
+        console.print(f"Nodes executed: {len(result.node_results)}")
+
+        # Show final output
+        if result.final_output:
+            console.print("\n[bold]Results:[/bold]")
+            for node_id, output in result.final_output.items():
+                if isinstance(output, dict) and "report" in output:
+                    console.print(Panel(output["report"], title=node_id))
+                else:
+                    console.print(f"  {node_id}: {output}")
+    else:
+        console.print("[red]Pipeline failed.[/red]")
+        for node_id, node_result in result.node_results.items():
+            if node_result.error:
+                console.print(f"  [red]{node_id}:[/red] {node_result.error}")
+
+    # Save to file if requested
+    if output:
+        import json
+
+        data = {
+            "query": query,
+            "intent": result.intent.value if result.intent else None,
+            "is_complete": result.is_complete,
+            "duration_ms": result.total_duration_ms,
+            "final_output": result.final_output,
+        }
+        with open(output, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        console.print(f"\n[green]Results saved to {output}[/green]")
+
+    console.print()
+
+
+@pipeline_app.command("intents")
+def pipeline_intents():
+    """List all available analysis intents.
+
+    Shows all intent types that can be automatically detected
+    from user queries.
+    """
+    from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+
+    console.print("\n[bold]Available Analysis Intents[/bold]\n")
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Intent", style="bold")
+    table.add_column("Category")
+    table.add_column("Description")
+
+    intent_descriptions = {
+        AnalysisIntent.VERIFY_MORPHEME: ("Verification", "형태소 분석 검증"),
+        AnalysisIntent.VERIFY_EMBEDDING: ("Verification", "임베딩 품질 검증"),
+        AnalysisIntent.VERIFY_RETRIEVAL: ("Verification", "검색 품질 검증"),
+        AnalysisIntent.COMPARE_SEARCH_METHODS: ("Comparison", "검색 방식 비교 (BM25/Dense/Hybrid)"),
+        AnalysisIntent.COMPARE_MODELS: ("Comparison", "LLM 모델 비교"),
+        AnalysisIntent.COMPARE_RUNS: ("Comparison", "평가 결과 비교"),
+        AnalysisIntent.ANALYZE_LOW_METRICS: ("Analysis", "낮은 메트릭 원인 분석"),
+        AnalysisIntent.ANALYZE_PATTERNS: ("Analysis", "패턴 분석"),
+        AnalysisIntent.ANALYZE_TRENDS: ("Analysis", "추세 분석"),
+        AnalysisIntent.GENERATE_SUMMARY: ("Report", "요약 보고서 생성"),
+        AnalysisIntent.GENERATE_DETAILED: ("Report", "상세 보고서 생성"),
+        AnalysisIntent.GENERATE_COMPARISON: ("Report", "비교 보고서 생성"),
+    }
+
+    for intent in AnalysisIntent:
+        category, desc = intent_descriptions.get(intent, ("Other", intent.value))
+        table.add_row(intent.value, category, desc)
+
+    console.print(table)
+    console.print("\n[dim]Use 'evalvault pipeline analyze \"<query>\"' to run analysis.[/dim]\n")
+
+
+@pipeline_app.command("templates")
+def pipeline_templates():
+    """List available pipeline templates for each intent.
+
+    Shows the pre-defined node configurations for each analysis intent.
+    """
+    from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+    from evalvault.domain.services.pipeline_template_registry import PipelineTemplateRegistry
+
+    console.print("\n[bold]Pipeline Templates[/bold]\n")
+
+    registry = PipelineTemplateRegistry()
+
+    for intent in AnalysisIntent:
+        template = registry.get_template(intent)
+        if template and template.nodes:
+            console.print(f"[bold cyan]{intent.value}[/bold cyan]")
+            for node in template.nodes:
+                deps = f" (depends: {', '.join(node.depends_on)})" if node.depends_on else ""
+                console.print(f"  • {node.name} [{node.module}]{deps}")
+            console.print()
+
+    console.print("[dim]Templates define the DAG structure for each analysis intent.[/dim]\n")
+
+
+# ============================================================================
+# Benchmark Commands (Phase 9.5)
+# ============================================================================
+
+
+@benchmark_app.command("run")
+def benchmark_run(
+    name: str = typer.Option(
+        "korean-rag",
+        "--name",
+        "-n",
+        help="Benchmark name to run.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file for results (JSON format).",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed output.",
+    ),
+):
+    """Run a benchmark suite.
+
+    Examples:
+        evalvault benchmark run
+        evalvault benchmark run --name korean-rag --output results.json
+    """
+    console.print(f"\n[bold]Running Benchmark: {name}[/bold]\n")
+
+    try:
+        from evalvault.domain.services.benchmark_runner import KoreanRAGBenchmarkRunner
+
+        runner = KoreanRAGBenchmarkRunner()
+
+        with console.status("[bold green]Running benchmark..."):
+            results = runner.run_all()
+
+        # Display results
+        table = Table(title="Benchmark Results", show_header=True, header_style="bold cyan")
+        table.add_column("Test Case")
+        table.add_column("Status")
+        table.add_column("Score", justify="right")
+        table.add_column("Details")
+
+        passed = 0
+        for result in results:
+            status = "[green]PASS[/green]" if result.passed else "[red]FAIL[/red]"
+            if result.passed:
+                passed += 1
+            score = f"{result.score:.2f}" if result.score is not None else "-"
+            details = result.details[:40] + "..." if len(result.details) > 40 else result.details
+            table.add_row(result.name, status, score, details)
+
+        console.print(table)
+        console.print(f"\n[bold]Summary:[/bold] {passed}/{len(results)} tests passed")
+
+        # Save to file if requested
+        if output:
+            import json
+
+            data = {
+                "benchmark": name,
+                "total": len(results),
+                "passed": passed,
+                "results": [
+                    {
+                        "name": r.name,
+                        "passed": r.passed,
+                        "score": r.score,
+                        "details": r.details,
+                    }
+                    for r in results
+                ],
+            }
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            console.print(f"[green]Results saved to {output}[/green]")
+
+    except ImportError as e:
+        console.print(f"[red]Error:[/red] Benchmark dependencies not available: {e}")
+        console.print("[dim]Some benchmarks require additional packages (kiwipiepy, etc.)[/dim]")
+        raise typer.Exit(1)
+
+    console.print()
+
+
+@benchmark_app.command("list")
+def benchmark_list():
+    """List available benchmarks.
+
+    Shows all benchmark suites that can be run.
+    """
+    console.print("\n[bold]Available Benchmarks[/bold]\n")
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Name", style="bold")
+    table.add_column("Description")
+    table.add_column("Test Cases")
+    table.add_column("Requirements")
+
+    table.add_row(
+        "korean-rag",
+        "Korean RAG system benchmark",
+        "~10",
+        "kiwipiepy, sentence-transformers",
+    )
+
+    console.print(table)
+    console.print("\n[dim]Use 'evalvault benchmark run --name <name>' to run a benchmark.[/dim]\n")
 
 
 if __name__ == "__main__":
