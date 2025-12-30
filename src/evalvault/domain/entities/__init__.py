@@ -14,6 +14,19 @@ from evalvault.domain.entities.analysis import (
 )
 from evalvault.domain.entities.dataset import Dataset, TestCase
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.entities.improvement import (
+    EffortLevel,
+    EvidenceSource,
+    FailureSample,
+    ImprovementAction,
+    ImprovementEvidence,
+    ImprovementPriority,
+    ImprovementReport,
+    PatternEvidence,
+    PatternType,
+    RAGComponent,
+    RAGImprovementGuide,
+)
 from evalvault.domain.entities.kg import EntityModel, RelationModel
 from evalvault.domain.entities.result import (
     EvaluationRun,
@@ -40,6 +53,18 @@ __all__ = [
     # Experiment
     "Experiment",
     "ExperimentGroup",
+    # Improvement
+    "EffortLevel",
+    "EvidenceSource",
+    "FailureSample",
+    "ImprovementAction",
+    "ImprovementEvidence",
+    "ImprovementPriority",
+    "ImprovementReport",
+    "PatternEvidence",
+    "PatternType",
+    "RAGComponent",
+    "RAGImprovementGuide",
     # KG
     "EntityModel",
     "RelationModel",

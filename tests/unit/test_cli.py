@@ -1759,3 +1759,502 @@ class TestCLIAnalyzeNLP:
         )
         assert result.exit_code == 0
         mock_apply_profile.assert_called_once_with(mock_settings, "dev")
+
+
+class TestCLIGate:
+    """CLI gate 명령 테스트."""
+
+    def test_gate_help(self):
+        """gate 명령 help 테스트."""
+        result = runner.invoke(app, ["gate", "--help"])
+        assert result.exit_code == 0
+        assert "threshold" in result.stdout.lower()
+        assert "baseline" in result.stdout.lower()
+        assert "format" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_run_not_found(self, mock_storage_cls, tmp_path):
+        """존재하지 않는 run ID 테스트."""
+        mock_storage = MagicMock()
+        mock_storage.get_run.side_effect = KeyError("Run not found")
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "nonexistent-run", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 3
+        assert "not found" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_pass(self, mock_storage_cls, tmp_path):
+        """모든 메트릭 통과 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness", "context_precision"]
+        mock_run.thresholds = {"faithfulness": 0.7, "context_precision": 0.7}
+        mock_run.get_avg_score.side_effect = lambda m: 0.85 if m == "faithfulness" else 0.80
+        mock_run.pass_rate = 0.9
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        assert "PASSED" in result.stdout or "passed" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_fail(self, mock_storage_cls, tmp_path):
+        """메트릭 미달 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.8}
+        mock_run.get_avg_score.return_value = 0.65
+        mock_run.pass_rate = 0.5
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 1
+        assert "FAILED" in result.stdout or "failed" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_custom_threshold(self, mock_storage_cls, tmp_path):
+        """커스텀 임계값 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.75
+        mock_run.pass_rate = 0.7
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # 0.8 임계값 사용 시 실패해야 함
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "-t", "faithfulness:0.8", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 1
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_json_output(self, mock_storage_cls, tmp_path):
+        """JSON 출력 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.85
+        mock_run.pass_rate = 0.9
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--format", "json", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "passed"
+        assert data["all_thresholds_passed"] is True
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_github_actions_output(self, mock_storage_cls, tmp_path):
+        """GitHub Actions 출력 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.85
+        mock_run.pass_rate = 0.9
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--format", "github-actions", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        assert "::set-output" in result.stdout
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_with_baseline(self, mock_storage_cls, tmp_path):
+        """베이스라인 비교 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.85
+        mock_run.pass_rate = 0.9
+
+        mock_baseline = MagicMock()
+        mock_baseline.run_id = "baseline-123"
+        mock_baseline.metrics_evaluated = ["faithfulness"]
+        mock_baseline.get_avg_score.return_value = 0.80
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.side_effect = [mock_run, mock_baseline]
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--baseline", "baseline-123", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        assert "Baseline" in result.stdout or "baseline" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_regression_detected(self, mock_storage_cls, tmp_path):
+        """회귀 감지 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.72  # 임계값은 통과
+        mock_run.pass_rate = 0.7
+
+        mock_baseline = MagicMock()
+        mock_baseline.run_id = "baseline-123"
+        mock_baseline.metrics_evaluated = ["faithfulness"]
+        mock_baseline.get_avg_score.return_value = 0.85  # 베이스라인보다 0.13 하락
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.side_effect = [mock_run, mock_baseline]
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            [
+                "gate",
+                "run-123",
+                "--baseline",
+                "baseline-123",
+                "--fail-on-regression",
+                "0.05",
+                "--db",
+                str(tmp_path / "test.db"),
+            ],
+        )
+        assert result.exit_code == 2  # Regression detected
+        assert "regression" in result.stdout.lower()
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_baseline_not_found(self, mock_storage_cls, tmp_path):
+        """베이스라인 미발견 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.side_effect = [mock_run, KeyError("Baseline not found")]
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "--baseline", "nonexistent", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 3
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    def test_gate_invalid_threshold_format(self, mock_storage_cls, tmp_path):
+        """잘못된 임계값 형식 테스트."""
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        result = runner.invoke(
+            app,
+            ["gate", "run-123", "-t", "invalid-format", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 1
+        assert "Invalid threshold format" in result.stdout
+
+
+class TestCLIAnalyzePlaybook:
+    """CLI analyze --playbook 명령 테스트."""
+
+    def test_analyze_help_shows_playbook_option(self):
+        """analyze 명령 help에 --playbook 옵션 표시."""
+        result = runner.invoke(app, ["analyze", "--help"])
+        assert result.exit_code == 0
+        assert "--playbook" in result.stdout
+        assert "--enable-llm" in result.stdout
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch("evalvault.adapters.inbound.cli._perform_playbook_analysis")
+    def test_analyze_with_playbook(
+        self,
+        mock_playbook_analysis,
+        mock_service_cls,
+        mock_cache_cls,
+        mock_stat_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--playbook 옵션으로 analyze 실행."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import AnalysisBundle, StatisticalAnalysis
+        from evalvault.domain.entities.improvement import ImprovementReport
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock analysis service
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        # Mock playbook analysis
+        mock_report = ImprovementReport(run_id="run-123")
+        mock_playbook_analysis.return_value = mock_report
+
+        result = runner.invoke(
+            app,
+            ["analyze", "run-123", "--playbook", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        mock_playbook_analysis.assert_called_once()
+        call_args = mock_playbook_analysis.call_args[0]
+        assert call_args[0] == mock_run  # run
+        assert call_args[1] is False  # enable_llm
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch("evalvault.adapters.inbound.cli._perform_playbook_analysis")
+    def test_analyze_with_playbook_and_llm(
+        self,
+        mock_playbook_analysis,
+        mock_service_cls,
+        mock_cache_cls,
+        mock_stat_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--playbook --enable-llm 옵션으로 analyze 실행."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import AnalysisBundle, StatisticalAnalysis
+        from evalvault.domain.entities.improvement import ImprovementReport
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock analysis service
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        # Mock playbook analysis
+        mock_report = ImprovementReport(run_id="run-123")
+        mock_playbook_analysis.return_value = mock_report
+
+        result = runner.invoke(
+            app,
+            ["analyze", "run-123", "--playbook", "--enable-llm", "--db", str(tmp_path / "test.db")],
+        )
+        assert result.exit_code == 0
+        mock_playbook_analysis.assert_called_once()
+        call_args = mock_playbook_analysis.call_args[0]
+        assert call_args[1] is True  # enable_llm
+
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
+    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
+    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    def test_analyze_without_playbook(
+        self,
+        mock_service_cls,
+        mock_cache_cls,
+        mock_stat_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--playbook 없이 analyze 실행 시 플레이북 분석 안함."""
+        from datetime import datetime
+
+        from evalvault.domain.entities.analysis import AnalysisBundle, StatisticalAnalysis
+
+        # Mock run
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = [MagicMock()]
+
+        mock_storage = MagicMock()
+        mock_storage.get_run.return_value = mock_run
+        mock_storage_cls.return_value = mock_storage
+
+        # Mock analysis service
+        mock_bundle = AnalysisBundle(
+            run_id="run-123",
+            statistical=StatisticalAnalysis(
+                run_id="run-123",
+                overall_pass_rate=0.8,
+                created_at=datetime.now(),
+            ),
+        )
+        mock_service = MagicMock()
+        mock_service.analyze_run.return_value = mock_bundle
+        mock_service_cls.return_value = mock_service
+
+        with patch("evalvault.adapters.inbound.cli._perform_playbook_analysis") as mock_playbook:
+            result = runner.invoke(
+                app,
+                ["analyze", "run-123", "--db", str(tmp_path / "test.db")],
+            )
+            assert result.exit_code == 0
+            mock_playbook.assert_not_called()
+
+
+class TestPerformPlaybookAnalysis:
+    """_perform_playbook_analysis 함수 테스트."""
+
+    def test_perform_playbook_analysis_creates_report(self):
+        """플레이북 분석이 리포트를 생성하는지 테스트."""
+        from evalvault.adapters.inbound.cli import _perform_playbook_analysis
+        from evalvault.domain.entities.improvement import ImprovementReport
+
+        mock_run = MagicMock()
+        mock_run.run_id = "run-123"
+        mock_run.results = []
+        mock_run.metrics_evaluated = ["faithfulness"]
+        mock_run.thresholds = {"faithfulness": 0.7}
+        mock_run.get_avg_score.return_value = 0.6
+
+        # Call the function - it should complete without error
+        result = _perform_playbook_analysis(mock_run, enable_llm=False, profile=None)
+
+        assert isinstance(result, ImprovementReport)
+        assert result.run_id == "run-123"
+
+
+class TestDisplayImprovementReport:
+    """_display_improvement_report 함수 테스트."""
+
+    def test_display_improvement_report_empty(self, capsys):
+        """빈 리포트 표시."""
+        from evalvault.adapters.inbound.cli import _display_improvement_report
+        from evalvault.domain.entities.improvement import ImprovementReport
+
+        report = ImprovementReport(
+            run_id="run-123",
+            total_test_cases=10,
+            metric_scores={"faithfulness": 0.85},
+            metric_gaps={},
+            guides=[],
+        )
+
+        _display_improvement_report(report)
+        # No exception means success
+
+    def test_display_improvement_report_with_guides(self, capsys):
+        """가이드가 있는 리포트 표시."""
+        from evalvault.adapters.inbound.cli import _display_improvement_report
+        from evalvault.domain.entities.improvement import (
+            EvidenceSource,
+            ImprovementAction,
+            ImprovementEvidence,
+            ImprovementPriority,
+            ImprovementReport,
+            PatternEvidence,
+            PatternType,
+            RAGComponent,
+            RAGImprovementGuide,
+        )
+
+        # Create proper evidence structure
+        pattern_evidence = PatternEvidence(
+            pattern_type=PatternType.HALLUCINATION,
+            affected_count=5,
+            total_count=20,
+        )
+
+        evidence = ImprovementEvidence(
+            target_metric="faithfulness",
+            detected_patterns=[pattern_evidence],
+            total_failures=5,
+            avg_score_failures=0.45,
+            avg_score_passes=0.85,
+            analysis_methods=[EvidenceSource.RULE_BASED],
+        )
+
+        guide = RAGImprovementGuide(
+            component=RAGComponent.GENERATOR,
+            target_metrics=["faithfulness"],
+            priority=ImprovementPriority.P1_HIGH,
+            evidence=evidence,
+            actions=[
+                ImprovementAction(
+                    title="Temperature 감소",
+                    description="LLM의 창의성을 낮춤",
+                    expected_improvement=0.08,
+                    effort="low",
+                )
+            ],
+            verification_command="evalvault run data.csv --metrics faithfulness",
+        )
+
+        report = ImprovementReport(
+            run_id="run-123",
+            total_test_cases=20,
+            metric_scores={"faithfulness": 0.65},
+            metric_gaps={"faithfulness": 0.05},
+            guides=[guide],
+            analysis_methods_used=[EvidenceSource.RULE_BASED],
+        )
+
+        _display_improvement_report(report)
+        # No exception means success

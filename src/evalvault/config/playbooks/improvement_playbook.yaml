@@ -1,0 +1,632 @@
+# RAG Improvement Playbook
+# 메트릭별 개선 규칙과 액션을 정의합니다.
+# Rule-based 패턴 탐지에 사용되며, LLM 분석과 결합됩니다.
+
+version: "1.0.0"
+
+# 전역 설정
+global:
+  default_threshold: 0.7
+  min_sample_size: 5  # 패턴 탐지를 위한 최소 샘플 수
+  significance_level: 0.05  # 통계적 유의수준
+  max_representative_samples: 3  # 대표 실패 사례 최대 수
+
+# 메트릭별 개선 플레이북
+metrics:
+  # =========================================================================
+  # Faithfulness (충실도)
+  # =========================================================================
+  faithfulness:
+    description: "답변이 컨텍스트에 충실한지 평가"
+    default_threshold: 0.8
+
+    patterns:
+      # 패턴 1: Hallucination (컨텍스트에 없는 정보 생성)
+      - pattern_id: hallucination
+        pattern_type: hallucination
+        description: "LLM이 컨텍스트에 없는 정보를 생성"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "faithfulness < 0.6"
+
+          - type: text_analysis
+            condition: "answer_has_numbers_not_in_context"
+
+          - type: text_analysis
+            condition: "answer_has_dates_not_in_context"
+
+        component: generator
+        priority: p1_high
+
+        actions:
+          - title: "Temperature 감소"
+            description: "LLM의 창의성을 낮춰 컨텍스트 기반 응답 유도"
+            implementation_hint: |
+              # 현재
+              llm = ChatOpenAI(temperature=0.7)
+
+              # 권장
+              llm = ChatOpenAI(temperature=0.0)
+            expected_improvement: 0.08
+            expected_improvement_range: [0.05, 0.12]
+            effort: low
+
+          - title: "프롬프트 강화"
+            description: "컨텍스트 기반 응답을 명시적으로 요구"
+            implementation_hint: |
+              # 프롬프트에 추가
+              "다음 규칙을 반드시 지키세요:
+              1. 제공된 컨텍스트에 있는 정보만 사용하세요.
+              2. 컨텍스트에 없는 수치, 날짜, 이름은 절대 사용하지 마세요.
+              3. 확실하지 않으면 '해당 정보를 찾을 수 없습니다'라고 답하세요."
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.20]
+            effort: low
+
+          - title: "Citation 요구"
+            description: "답변에 출처 표시를 요구하여 검증 가능하게 함"
+            implementation_hint: |
+              # 프롬프트에 추가
+              "각 주장에 대해 [출처: 문서명 또는 문장] 형식으로 출처를 표시하세요."
+            expected_improvement: 0.18
+            expected_improvement_range: [0.12, 0.25]
+            effort: medium
+
+      # 패턴 2: 컨텍스트 누락 (필요한 정보가 검색되지 않음)
+      - pattern_id: missing_evidence
+        pattern_type: missing_context
+        description: "답변의 근거가 되는 컨텍스트가 검색되지 않음"
+
+        detection_rules:
+          - type: metric_combination
+            condition: "faithfulness < 0.7 AND context_recall < 0.6"
+
+          - type: correlation
+            variables: ["faithfulness", "context_count"]
+            min_correlation: 0.3
+
+        component: retriever
+        priority: p1_high
+
+        actions:
+          - title: "top_k 증가"
+            description: "검색 결과 수를 늘려 필요한 정보 포함 확률 증가"
+            implementation_hint: |
+              # 현재
+              retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+              # 권장
+              retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+            expected_improvement: 0.08
+            expected_improvement_range: [0.05, 0.12]
+            effort: low
+
+          - title: "Reranker 도입"
+            description: "Cross-encoder로 검색 결과 재정렬"
+            implementation_hint: |
+              from sentence_transformers import CrossEncoder
+
+              reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+              def rerank(query, docs, top_k=3):
+                  pairs = [(query, doc.page_content) for doc in docs]
+                  scores = reranker.predict(pairs)
+                  ranked = sorted(zip(scores, docs), reverse=True)
+                  return [doc for _, doc in ranked[:top_k]]
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: medium
+
+  # =========================================================================
+  # Context Precision (컨텍스트 정밀도)
+  # =========================================================================
+  context_precision:
+    description: "검색된 컨텍스트 중 관련 있는 비율"
+    default_threshold: 0.7
+
+    patterns:
+      # 패턴 1: 긴 질문 + 낮은 정밀도
+      - pattern_id: long_query_low_precision
+        pattern_type: long_query_low_precision
+        description: "복합 질문에서 검색 정밀도 저하"
+
+        detection_rules:
+          - type: feature_threshold
+            feature: question_length
+            threshold: 50  # 문자 수
+            direction: greater_than
+
+          - type: correlation
+            variables: ["question_length", "context_precision"]
+            expected_direction: negative
+            min_correlation: -0.3
+
+        component: query_processor
+        priority: p0_critical
+
+        actions:
+          - title: "Query Decomposition"
+            description: "복합 질문을 단순 질문으로 분해"
+            implementation_hint: |
+              # LLM을 사용한 질문 분해
+              decompose_prompt = """
+              다음 복합 질문을 2-3개의 단순 질문으로 분해하세요.
+
+              복합 질문: {question}
+
+              단순 질문들:
+              """
+
+              # 각 단순 질문으로 검색 후 결과 병합
+              all_docs = []
+              for sub_q in decomposed_questions:
+                  docs = retriever.get_relevant_documents(sub_q)
+                  all_docs.extend(docs)
+
+              # 중복 제거 및 reranking
+              unique_docs = deduplicate(all_docs)
+            expected_improvement: 0.18
+            expected_improvement_range: [0.12, 0.25]
+            effort: medium
+
+          - title: "HyDE (Hypothetical Document Embedding)"
+            description: "가상 답변을 생성하여 검색에 활용"
+            implementation_hint: |
+              # 1. 질문에 대한 가상 답변 생성
+              hyde_prompt = "다음 질문에 대한 이상적인 답변을 작성하세요: {question}"
+              hypothetical_answer = llm.invoke(hyde_prompt)
+
+              # 2. 가상 답변으로 검색
+              docs = retriever.get_relevant_documents(hypothetical_answer)
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: medium
+
+      # 패턴 2: 청크 크기 문제
+      - pattern_id: chunking_issue
+        pattern_type: context_boundary_issue
+        description: "청크가 너무 커서 불필요한 정보 포함"
+
+        detection_rules:
+          - type: feature_threshold
+            feature: avg_context_length
+            threshold: 800  # 토큰 수
+            direction: greater_than
+
+          - type: metric_threshold
+            condition: "context_precision < 0.5"
+
+        component: chunker
+        priority: p1_high
+
+        actions:
+          - title: "Chunk 크기 감소"
+            description: "청크 크기를 줄여 관련 정보 집중"
+            implementation_hint: |
+              # 현재
+              text_splitter = RecursiveCharacterTextSplitter(
+                  chunk_size=1000,
+                  chunk_overlap=200
+              )
+
+              # 권장
+              text_splitter = RecursiveCharacterTextSplitter(
+                  chunk_size=500,
+                  chunk_overlap=100
+              )
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: low
+
+          - title: "Semantic Chunking"
+            description: "의미 단위로 청킹하여 문맥 보존"
+            implementation_hint: |
+              from langchain_experimental.text_splitter import SemanticChunker
+              from langchain_openai import OpenAIEmbeddings
+
+              embeddings = OpenAIEmbeddings()
+              text_splitter = SemanticChunker(
+                  embeddings=embeddings,
+                  breakpoint_threshold_type="percentile",
+                  breakpoint_threshold_amount=95
+              )
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.22]
+            effort: medium
+
+      # 패턴 3: 임베딩 불일치
+      - pattern_id: embedding_mismatch
+        pattern_type: low_keyword_overlap
+        description: "키워드는 겹치지만 의미적 유사도가 낮음"
+
+        detection_rules:
+          - type: feature_comparison
+            condition: "keyword_overlap > 0.4 AND semantic_similarity < 0.5"
+
+        component: embedder
+        priority: p2_medium
+
+        actions:
+          - title: "Hybrid Search"
+            description: "Dense + BM25 결합으로 키워드/의미 모두 포착"
+            implementation_hint: |
+              from langchain.retrievers import EnsembleRetriever
+              from langchain_community.retrievers import BM25Retriever
+
+              bm25_retriever = BM25Retriever.from_documents(documents)
+              bm25_retriever.k = 5
+
+              dense_retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+              ensemble_retriever = EnsembleRetriever(
+                  retrievers=[bm25_retriever, dense_retriever],
+                  weights=[0.4, 0.6]
+              )
+            expected_improvement: 0.18
+            expected_improvement_range: [0.12, 0.25]
+            effort: medium
+
+          - title: "도메인 특화 임베딩"
+            description: "도메인에 맞는 임베딩 모델로 교체"
+            implementation_hint: |
+              # 한국어 도메인의 경우
+              from sentence_transformers import SentenceTransformer
+
+              # 범용 → 도메인 특화
+              # model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+              model = SentenceTransformer('intfloat/multilingual-e5-large')
+
+              # 또는 파인튜닝된 모델 사용
+              # model = SentenceTransformer('your-finetuned-model')
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.22]
+            effort: high
+
+  # =========================================================================
+  # Context Recall (컨텍스트 재현율)
+  # =========================================================================
+  context_recall:
+    description: "필요한 정보가 검색되었는지 평가"
+    default_threshold: 0.7
+
+    patterns:
+      # 패턴 1: top_k 부족
+      - pattern_id: insufficient_k
+        pattern_type: missing_context
+        description: "검색 결과 수가 부족하여 필요한 정보 누락"
+
+        detection_rules:
+          - type: feature_threshold
+            feature: context_count
+            threshold: 3
+            direction: less_than_or_equal
+
+          - type: metric_threshold
+            condition: "context_recall < 0.6"
+
+        component: retriever
+        priority: p1_high
+
+        actions:
+          - title: "top_k 증가"
+            description: "검색 결과 수를 늘림"
+            implementation_hint: |
+              # k를 단계적으로 증가
+              # 3 → 5 → 10 (reranker와 함께 사용 권장)
+              retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
+
+              # reranker로 필터링
+              final_docs = rerank(query, docs, top_k=5)
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.22]
+            effort: low
+
+          - title: "Multi-query Retrieval"
+            description: "질문 변형을 생성하여 다중 검색"
+            implementation_hint: |
+              from langchain.retrievers.multi_query import MultiQueryRetriever
+
+              retriever = MultiQueryRetriever.from_llm(
+                  retriever=vectorstore.as_retriever(),
+                  llm=llm
+              )
+
+              # 또는 수동으로
+              variations = [
+                  original_query,
+                  rephrase(original_query),
+                  expand_with_synonyms(original_query)
+              ]
+              all_docs = []
+              for q in variations:
+                  all_docs.extend(retriever.get_relevant_documents(q))
+            expected_improvement: 0.18
+            expected_improvement_range: [0.12, 0.25]
+            effort: medium
+
+      # 패턴 2: 인덱스 커버리지 부족
+      - pattern_id: index_coverage_gap
+        pattern_type: missing_context
+        description: "관련 문서가 인덱스에 없음"
+
+        detection_rules:
+          - type: text_analysis
+            condition: "ground_truth_entities_not_in_any_context"
+
+        component: chunker  # 실제로는 인덱싱 전체 과정
+        priority: p0_critical
+
+        actions:
+          - title: "커버리지 분석"
+            description: "누락된 주제 영역 식별"
+            implementation_hint: |
+              # 실패 케이스의 ground_truth에서 키워드 추출
+              failed_keywords = extract_keywords(failed_ground_truths)
+
+              # 인덱스에서 해당 키워드 검색
+              for kw in failed_keywords:
+                  results = search_index(kw)
+                  if not results:
+                      print(f"커버리지 갭: {kw}")
+            expected_improvement: 0.25
+            expected_improvement_range: [0.15, 0.40]
+            effort: high
+
+          - title: "문서 추가 인덱싱"
+            description: "식별된 갭 영역의 문서 추가"
+            implementation_hint: |
+              # 갭 영역 관련 문서 수집 및 인덱싱
+              new_docs = collect_documents_for_gap_topics()
+              vectorstore.add_documents(new_docs)
+            expected_improvement: 0.30
+            expected_improvement_range: [0.20, 0.45]
+            effort: high
+
+  # =========================================================================
+  # Answer Relevancy (답변 관련성)
+  # =========================================================================
+  answer_relevancy:
+    description: "답변이 질문에 관련 있는지 평가"
+    default_threshold: 0.75
+
+    patterns:
+      # 패턴 1: 주제 이탈
+      - pattern_id: off_topic
+        pattern_type: off_topic_response
+        description: "질문과 무관한 답변 생성"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "answer_relevancy < 0.5"
+
+          - type: feature_threshold
+            feature: question_answer_similarity
+            threshold: 0.4
+            direction: less_than
+
+        component: generator
+        priority: p1_high
+
+        actions:
+          - title: "질문 재강조 프롬프트"
+            description: "프롬프트에서 질문을 다시 언급"
+            implementation_hint: |
+              # 프롬프트 템플릿
+              """
+              질문: {question}
+
+              컨텍스트: {context}
+
+              위 질문에 대해서만 답변하세요.
+              다른 주제로 벗어나지 마세요.
+
+              질문 다시 확인: {question}
+
+              답변:
+              """
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: low
+
+          - title: "Few-shot 예제"
+            description: "좋은 답변 예시 제공"
+            implementation_hint: |
+              few_shot_examples = [
+                  {"question": "보험료 납입 방법은?",
+                   "answer": "보험료는 월납, 연납, 일시납 중 선택 가능합니다."},
+                  {"question": "해지환급금은 언제 받을 수 있나요?",
+                   "answer": "해지 신청 후 3영업일 이내 지급됩니다."}
+              ]
+
+              # 프롬프트에 예제 포함
+              prompt = f"""
+              다음 예시처럼 답변하세요:
+              {format_examples(few_shot_examples)}
+
+              질문: {question}
+              답변:
+              """
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.22]
+            effort: low
+
+      # 패턴 2: 불완전한 답변
+      - pattern_id: incomplete_answer
+        pattern_type: incomplete_answer
+        description: "질문의 일부만 답변"
+
+        detection_rules:
+          - type: text_analysis
+            condition: "question_has_multiple_parts AND answer_coverage < 0.7"
+
+        component: generator
+        priority: p2_medium
+
+        actions:
+          - title: "질문 분해 요구"
+            description: "각 하위 질문에 순서대로 답변"
+            implementation_hint: |
+              prompt = """
+              질문을 분석하고 각 부분에 순서대로 답변하세요.
+
+              질문: {question}
+
+              형식:
+              1. [첫 번째 부분에 대한 답변]
+              2. [두 번째 부분에 대한 답변]
+              ...
+              """
+            expected_improvement: 0.15
+            expected_improvement_range: [0.10, 0.22]
+            effort: low
+
+          - title: "Chain-of-Thought"
+            description: "단계별 추론 유도"
+            implementation_hint: |
+              prompt = """
+              다음 질문에 단계별로 추론하여 답변하세요.
+
+              질문: {question}
+
+              1단계: 질문 분석
+              2단계: 관련 정보 확인
+              3단계: 종합 답변
+              """
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: low
+
+      # 패턴 3: 장황한 답변
+      - pattern_id: verbose_response
+        pattern_type: verbose_response
+        description: "불필요하게 긴 답변"
+
+        detection_rules:
+          - type: feature_threshold
+            feature: answer_length
+            threshold: 500  # 문자 수
+            direction: greater_than
+
+          - type: correlation
+            variables: ["answer_length", "answer_relevancy"]
+            expected_direction: negative
+            min_correlation: -0.25
+
+        component: generator
+        priority: p3_low
+
+        actions:
+          - title: "간결성 요구"
+            description: "프롬프트에서 간결한 답변 요구"
+            implementation_hint: |
+              prompt = """
+              다음 질문에 2-3문장으로 간결하게 답변하세요.
+              핵심 정보만 포함하고 불필요한 설명은 생략하세요.
+
+              질문: {question}
+              답변 (2-3문장):
+              """
+            expected_improvement: 0.08
+            expected_improvement_range: [0.05, 0.12]
+            effort: low
+
+  # =========================================================================
+  # Factual Correctness (사실적 정확성)
+  # =========================================================================
+  factual_correctness:
+    description: "ground_truth 대비 사실적 정확성"
+    default_threshold: 0.8
+
+    patterns:
+      - pattern_id: factual_error
+        pattern_type: hallucination
+        description: "ground_truth와 다른 사실 진술"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "factual_correctness < 0.6"
+
+        component: generator
+        priority: p0_critical
+
+        actions:
+          - title: "Self-consistency 검증"
+            description: "여러 번 생성 후 일관된 답변 선택"
+            implementation_hint: |
+              # 동일 질문에 대해 n번 생성
+              responses = [llm.invoke(prompt) for _ in range(5)]
+
+              # 가장 일관된 답변 선택
+              from collections import Counter
+              answer_counts = Counter(responses)
+              best_answer = answer_counts.most_common(1)[0][0]
+            expected_improvement: 0.10
+            expected_improvement_range: [0.05, 0.15]
+            effort: medium
+
+          - title: "Fact verification chain"
+            description: "생성 후 사실 검증 단계 추가"
+            implementation_hint: |
+              # 1. 답변 생성
+              answer = llm.invoke(generation_prompt)
+
+              # 2. 사실 검증
+              verify_prompt = f"""
+              다음 답변의 각 주장이 컨텍스트에서 확인되는지 검증하세요.
+
+              답변: {answer}
+              컨텍스트: {context}
+
+              검증 결과 (확인됨/확인안됨):
+              """
+              verification = llm.invoke(verify_prompt)
+
+              # 3. 검증되지 않은 주장 제거하고 재생성
+            expected_improvement: 0.18
+            expected_improvement_range: [0.12, 0.25]
+            effort: high
+
+  # =========================================================================
+  # Semantic Similarity (의미적 유사도)
+  # =========================================================================
+  semantic_similarity:
+    description: "답변과 ground_truth 간 의미적 유사도"
+    default_threshold: 0.7
+
+    patterns:
+      - pattern_id: semantic_mismatch
+        pattern_type: off_topic_response
+        description: "의미적으로 다른 답변"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "semantic_similarity < 0.5"
+
+        component: generator
+        priority: p2_medium
+
+        actions:
+          - title: "답변 스타일 가이드"
+            description: "기대 답변 형식에 맞추기"
+            implementation_hint: |
+              # ground_truth 스타일 분석 후 가이드 제공
+              prompt = """
+              다음 형식으로 답변하세요:
+              - 핵심 정보를 먼저 제시
+              - 구체적인 수치나 조건 포함
+              - 불필요한 수식어 제외
+
+              질문: {question}
+              답변:
+              """
+            expected_improvement: 0.10
+            expected_improvement_range: [0.05, 0.15]
+            effort: low
+
+# 공통 검증 명령어
+verification_commands:
+  baseline: "evalvault run {dataset} --metrics {metrics} --tag baseline"
+  after_fix: "evalvault run {dataset} --metrics {metrics} --tag after_fix"
+  compare: "evalvault compare baseline after_fix --metrics {metrics}"
+  gate: "evalvault gate results.json --threshold {metric}:{threshold}"
