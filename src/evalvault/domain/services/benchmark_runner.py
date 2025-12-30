@@ -187,10 +187,15 @@ class KoreanRAGBenchmarkRunner:
                         contexts=tc.get("contexts", []),
                     )
                     metrics["faithfulness"] = faith_result.score
-                    metrics["coverage"] = faith_result.coverage
-                    reason = (
-                        f"Verified {faith_result.verified_count}/{faith_result.total_claims} claims"
-                    )
+                    # Calculate average coverage from claim results
+                    if faith_result.claim_results:
+                        avg_coverage = sum(cr.coverage for cr in faith_result.claim_results) / len(
+                            faith_result.claim_results
+                        )
+                        metrics["coverage"] = avg_coverage
+                    else:
+                        metrics["coverage"] = 1.0
+                    reason = f"Verified {faith_result.faithful_claims}/{faith_result.total_claims} claims"
                 else:
                     # Fallback: 단순 문자열 비교
                     metrics["faithfulness"] = self._simple_faithfulness(
