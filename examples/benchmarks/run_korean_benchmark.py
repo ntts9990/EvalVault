@@ -83,6 +83,17 @@ def main() -> int:
         default=0.7,
         help="통과 기준 점수 (default: 0.7)",
     )
+    parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="하이브리드 검색 사용 (BM25 + Dense Embedding)",
+    )
+    parser.add_argument(
+        "--embedding-profile",
+        choices=["dev", "prod"],
+        default=None,
+        help="Qwen3-Embedding 프로파일 (dev: 0.6b/256d, prod: 8b/1024d)",
+    )
 
     args = parser.parse_args()
 
@@ -103,11 +114,28 @@ def main() -> int:
         print("  uv run python examples/benchmarks/run_korean_benchmark.py")
         return 1
 
+    # Ollama 어댑터 초기화 (Qwen3-Embedding 사용 시)
+    ollama_adapter = None
+    if args.hybrid and args.embedding_profile:
+        try:
+            from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+            from evalvault.config.settings import Settings
+
+            settings = Settings()
+            ollama_adapter = OllamaAdapter(settings)
+            print(f"  Ollama adapter initialized: {settings.ollama_base_url}")
+        except Exception as e:
+            print(f"  Warning: Failed to initialize Ollama adapter: {e}")
+            print("  Falling back to HuggingFace embedding model")
+
     # 벤치마크 러너 초기화
     runner = KoreanRAGBenchmarkRunner(
         use_korean_tokenizer=True,
         threshold=args.threshold,
         verbose=args.verbose,
+        use_hybrid_search=args.hybrid,
+        ollama_adapter=ollama_adapter,
+        embedding_profile=args.embedding_profile,
     )
 
     # 출력 디렉토리 생성
@@ -121,6 +149,9 @@ def main() -> int:
     print(f"  Output Dir: {args.output_dir}")
     print(f"  Threshold: {args.threshold}")
     print(f"  Task: {args.task}")
+    if args.hybrid:
+        profile_info = f" ({args.embedding_profile})" if args.embedding_profile else ""
+        print(f"  Hybrid Search: Enabled{profile_info}")
     print("=" * 70)
 
     # 벤치마크 실행

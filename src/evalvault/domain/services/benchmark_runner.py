@@ -76,6 +76,9 @@ class KoreanRAGBenchmarkRunner:
         use_korean_tokenizer: bool = True,
         threshold: float = 0.7,
         verbose: bool = False,
+        use_hybrid_search: bool = False,
+        ollama_adapter: Any = None,
+        embedding_profile: str | None = None,
     ) -> None:
         """벤치마크 러너 초기화.
 
@@ -83,13 +86,20 @@ class KoreanRAGBenchmarkRunner:
             use_korean_tokenizer: Kiwi 형태소 분석기 사용 여부
             threshold: 통과 기준 점수
             verbose: 상세 출력 여부
+            use_hybrid_search: 하이브리드 검색 (BM25 + Dense) 사용 여부
+            ollama_adapter: Ollama LLM 어댑터 (Qwen3-Embedding 사용 시)
+            embedding_profile: 임베딩 프로파일 ('dev' 또는 'prod')
         """
         self.use_korean_tokenizer = use_korean_tokenizer
         self.threshold = threshold
         self.verbose = verbose
+        self.use_hybrid_search = use_hybrid_search
+        self.ollama_adapter = ollama_adapter
+        self.embedding_profile = embedding_profile
         self._tokenizer = None
         self._faithfulness_checker = None
         self._semantic_similarity = None
+        self._dense_retriever = None
 
     @property
     def tokenizer(self) -> Any:
@@ -130,6 +140,26 @@ class KoreanRAGBenchmarkRunner:
             except ImportError:
                 self._semantic_similarity = None
         return self._semantic_similarity
+
+    @property
+    def dense_retriever(self) -> Any:
+        """KoreanDenseRetriever 인스턴스 (lazy loading, Qwen3-Embedding 지원)."""
+        if self._dense_retriever is None and self.use_hybrid_search:
+            try:
+                from evalvault.adapters.outbound.nlp.korean import KoreanDenseRetriever
+
+                if self.ollama_adapter and self.embedding_profile:
+                    # Qwen3-Embedding with Matryoshka
+                    self._dense_retriever = KoreanDenseRetriever(
+                        profile=self.embedding_profile,
+                        ollama_adapter=self.ollama_adapter,
+                    )
+                else:
+                    # Default HuggingFace model
+                    self._dense_retriever = KoreanDenseRetriever()
+            except ImportError:
+                self._dense_retriever = None
+        return self._dense_retriever
 
     def load_test_data(self, file_path: str | Path) -> dict[str, Any]:
         """테스트 데이터 로드."""
@@ -376,18 +406,41 @@ class KoreanRAGBenchmarkRunner:
 
         # 검색기 초기화
         retriever = None
+        doc_contents = [d.get("content", "") for d in documents]
 
         try:
-            from evalvault.adapters.outbound.nlp.korean import KoreanBM25Retriever
+            if self.use_hybrid_search:
+                # 하이브리드 검색 (BM25 + Dense Embedding)
+                from evalvault.adapters.outbound.nlp.korean import KoreanHybridRetriever
 
-            if self.tokenizer:
-                retriever = KoreanBM25Retriever(tokenizer=self.tokenizer)
-                doc_contents = [d.get("content", "") for d in documents]
-                retriever.index(doc_contents)
+                if self.tokenizer:
+                    embedding_func = None
+                    if self.dense_retriever:
+                        embedding_func = self.dense_retriever.get_embedding_func()
+                        if self.verbose:
+                            print(
+                                f"  Using hybrid search with {self.dense_retriever.model_name} "
+                                f"(dim={self.dense_retriever.dimension})"
+                            )
+
+                    retriever = KoreanHybridRetriever(
+                        tokenizer=self.tokenizer,
+                        embedding_func=embedding_func,
+                        bm25_weight=0.4,
+                        dense_weight=0.6,
+                    )
+                    retriever.index(doc_contents, compute_embeddings=embedding_func is not None)
             else:
-                # tokenizer 없으면 기본 BM25로 fallback
-                # KoreanBM25Retriever는 tokenizer 필수이므로 None인 경우 스킵
-                pass
+                # BM25 전용 검색
+                from evalvault.adapters.outbound.nlp.korean import KoreanBM25Retriever
+
+                if self.tokenizer:
+                    retriever = KoreanBM25Retriever(tokenizer=self.tokenizer)
+                    retriever.index(doc_contents)
+                else:
+                    # tokenizer 없으면 기본 BM25로 fallback
+                    # KoreanBM25Retriever는 tokenizer 필수이므로 None인 경우 스킵
+                    pass
 
         except ImportError:
             pass
@@ -417,7 +470,12 @@ class KoreanRAGBenchmarkRunner:
             try:
                 # 형태소 분석 기반 검색
                 if retriever:
-                    results = retriever.search(query, top_k=5)
+                    if self.use_hybrid_search and hasattr(retriever, "has_embeddings"):
+                        results = retriever.search(
+                            query, top_k=5, use_dense=retriever.has_embeddings
+                        )
+                    else:
+                        results = retriever.search(query, top_k=5)
                     # 검색 결과에서 doc_id 추출
                     retrieved_doc_ids = set()
                     for i, res in enumerate(results):
