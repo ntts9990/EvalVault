@@ -1,0 +1,605 @@
+{
+  "task_name": "korean-retrieval-benchmark",
+  "task_type": "Retrieval",
+  "mteb_version": "1.14.20",
+  "evalvault_version": "1.0.0",
+  "dataset_revision": "1.0.0",
+  "languages": [
+    "kor-Hang"
+  ],
+  "scores": {
+    "test": [
+      {
+        "main_score": 1.0,
+        "hf_subset": "default",
+        "languages": [
+          "kor-Hang"
+        ],
+        "recall_at_5": 1.0,
+        "mrr": 0.9666666666666667
+      }
+    ]
+  },
+  "evaluation_time": 4.618499,
+  "metadata": {
+    "domain": "insurance",
+    "model_name": null,
+    "model_revision": null,
+    "total_tests": 15,
+    "passed_tests": 15,
+    "failed_tests": 0,
+    "pass_rate": 1.0
+  },
+  "deepeval_format": {
+    "test_results": [
+      {
+        "test_id": "ret-001",
+        "category": "particle_variation",
+        "input": "보험료가 얼마인가요",
+        "actual_output": "",
+        "expected_output": "doc-001",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 114.03489112854004,
+        "error": null
+      },
+      {
+        "test_id": "ret-002",
+        "category": "particle_variation",
+        "input": "사망보험금이 지급되나요",
+        "actual_output": "",
+        "expected_output": "doc-002",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 87.44978904724121,
+        "error": null
+      },
+      {
+        "test_id": "ret-003",
+        "category": "ending_variation",
+        "input": "암 진단비 지급됩니다",
+        "actual_output": "",
+        "expected_output": "doc-003",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 86.14778518676758,
+        "error": null
+      },
+      {
+        "test_id": "ret-004",
+        "category": "ending_variation",
+        "input": "해약환급금 계산됩니다",
+        "actual_output": "",
+        "expected_output": "doc-004",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 79.38098907470703,
+        "error": null
+      },
+      {
+        "test_id": "ret-005",
+        "category": "compound_noun",
+        "input": "뇌졸중진단비",
+        "actual_output": "",
+        "expected_output": "doc-005",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 74.84602928161621,
+        "error": null
+      },
+      {
+        "test_id": "ret-006",
+        "category": "compound_noun",
+        "input": "입원일당",
+        "actual_output": "",
+        "expected_output": "doc-006",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 113.97671699523926,
+        "error": null
+      },
+      {
+        "test_id": "ret-007",
+        "category": "particle_variation",
+        "input": "수술비가 얼마예요",
+        "actual_output": "",
+        "expected_output": "doc-007",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 76.53403282165527,
+        "error": null
+      },
+      {
+        "test_id": "ret-008",
+        "category": "ending_variation",
+        "input": "대출 가능합니다",
+        "actual_output": "",
+        "expected_output": "doc-008",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 0.5
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 83.34517478942871,
+        "error": null
+      },
+      {
+        "test_id": "ret-009",
+        "category": "particle_variation",
+        "input": "청약철회가 가능한가요",
+        "actual_output": "",
+        "expected_output": "doc-009",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 86.22884750366211,
+        "error": null
+      },
+      {
+        "test_id": "ret-010",
+        "category": "ending_variation",
+        "input": "고지의무 위반했습니다",
+        "actual_output": "",
+        "expected_output": "doc-010",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 78.42206954956055,
+        "error": null
+      },
+      {
+        "test_id": "ret-011",
+        "category": "baseline",
+        "input": "보험료",
+        "actual_output": "",
+        "expected_output": "doc-001",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 106.13608360290527,
+        "error": null
+      },
+      {
+        "test_id": "ret-012",
+        "category": "baseline",
+        "input": "사망",
+        "actual_output": "",
+        "expected_output": "doc-002",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 72.97420501708984,
+        "error": null
+      },
+      {
+        "test_id": "ret-013",
+        "category": "baseline",
+        "input": "암 진단",
+        "actual_output": "",
+        "expected_output": "doc-003",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 70.13487815856934,
+        "error": null
+      },
+      {
+        "test_id": "ret-014",
+        "category": "baseline",
+        "input": "해약 환급",
+        "actual_output": "",
+        "expected_output": "doc-004",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 77.88991928100586,
+        "error": null
+      },
+      {
+        "test_id": "ret-015",
+        "category": "baseline",
+        "input": "입원 보장",
+        "actual_output": "",
+        "expected_output": "doc-006",
+        "retrieval_context": [],
+        "metrics": {
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "threshold": 0.5,
+        "success": true,
+        "reason": null,
+        "duration_ms": 76.7209529876709,
+        "error": null
+      }
+    ],
+    "metrics_summary": {
+      "recall_at_5": {
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "threshold": 0.5,
+        "average": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "mrr": {
+        "scores": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.5,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "threshold": 0.5,
+        "average": 0.9666666666666667,
+        "min": 0.5,
+        "max": 1.0
+      }
+    },
+    "overall_success": true,
+    "pass_rate": 1.0,
+    "total_tests": 15,
+    "passed_tests": 15,
+    "failed_tests": 0,
+    "evaluation_time": 4.618499
+  },
+  "test_results": [
+    {
+      "test_id": "ret-001",
+      "category": "particle_variation",
+      "input": "보험료가 얼마인가요",
+      "actual_output": "",
+      "expected_output": "doc-001",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 114.03489112854004,
+      "error": null
+    },
+    {
+      "test_id": "ret-002",
+      "category": "particle_variation",
+      "input": "사망보험금이 지급되나요",
+      "actual_output": "",
+      "expected_output": "doc-002",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 87.44978904724121,
+      "error": null
+    },
+    {
+      "test_id": "ret-003",
+      "category": "ending_variation",
+      "input": "암 진단비 지급됩니다",
+      "actual_output": "",
+      "expected_output": "doc-003",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 86.14778518676758,
+      "error": null
+    },
+    {
+      "test_id": "ret-004",
+      "category": "ending_variation",
+      "input": "해약환급금 계산됩니다",
+      "actual_output": "",
+      "expected_output": "doc-004",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 79.38098907470703,
+      "error": null
+    },
+    {
+      "test_id": "ret-005",
+      "category": "compound_noun",
+      "input": "뇌졸중진단비",
+      "actual_output": "",
+      "expected_output": "doc-005",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 74.84602928161621,
+      "error": null
+    },
+    {
+      "test_id": "ret-006",
+      "category": "compound_noun",
+      "input": "입원일당",
+      "actual_output": "",
+      "expected_output": "doc-006",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 113.97671699523926,
+      "error": null
+    },
+    {
+      "test_id": "ret-007",
+      "category": "particle_variation",
+      "input": "수술비가 얼마예요",
+      "actual_output": "",
+      "expected_output": "doc-007",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 76.53403282165527,
+      "error": null
+    },
+    {
+      "test_id": "ret-008",
+      "category": "ending_variation",
+      "input": "대출 가능합니다",
+      "actual_output": "",
+      "expected_output": "doc-008",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 0.5
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 83.34517478942871,
+      "error": null
+    },
+    {
+      "test_id": "ret-009",
+      "category": "particle_variation",
+      "input": "청약철회가 가능한가요",
+      "actual_output": "",
+      "expected_output": "doc-009",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 86.22884750366211,
+      "error": null
+    },
+    {
+      "test_id": "ret-010",
+      "category": "ending_variation",
+      "input": "고지의무 위반했습니다",
+      "actual_output": "",
+      "expected_output": "doc-010",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 78.42206954956055,
+      "error": null
+    },
+    {
+      "test_id": "ret-011",
+      "category": "baseline",
+      "input": "보험료",
+      "actual_output": "",
+      "expected_output": "doc-001",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 106.13608360290527,
+      "error": null
+    },
+    {
+      "test_id": "ret-012",
+      "category": "baseline",
+      "input": "사망",
+      "actual_output": "",
+      "expected_output": "doc-002",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 72.97420501708984,
+      "error": null
+    },
+    {
+      "test_id": "ret-013",
+      "category": "baseline",
+      "input": "암 진단",
+      "actual_output": "",
+      "expected_output": "doc-003",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 70.13487815856934,
+      "error": null
+    },
+    {
+      "test_id": "ret-014",
+      "category": "baseline",
+      "input": "해약 환급",
+      "actual_output": "",
+      "expected_output": "doc-004",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 77.88991928100586,
+      "error": null
+    },
+    {
+      "test_id": "ret-015",
+      "category": "baseline",
+      "input": "입원 보장",
+      "actual_output": "",
+      "expected_output": "doc-006",
+      "retrieval_context": [],
+      "metrics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "threshold": 0.5,
+      "success": true,
+      "reason": null,
+      "duration_ms": 76.7209529876709,
+      "error": null
+    }
+  ],
+  "started_at": "2025-12-30T01:57:47.414649+00:00",
+  "completed_at": "2025-12-30T01:57:52.033148+00:00"
+}

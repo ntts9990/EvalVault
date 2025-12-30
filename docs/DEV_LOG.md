@@ -173,3 +173,63 @@
 **수정된 파일**:
 - `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
 - `src/evalvault/adapters/inbound/web/app.py` - History 페이지 리팩토링
+
+**PR**: [#58](https://github.com/ntts9990/EvalVault/pull/58) ✅ 머지 완료
+
+---
+
+### Phase 12.5: Reports 페이지 (보고서 생성/다운로드)
+
+**시작 시간**: 2025-12-30
+
+**목표**:
+- [x] ReportConfig 컴포넌트 생성 (설정)
+- [x] ReportTemplate 컴포넌트 생성 (템플릿)
+- [x] ReportGenerator 컴포넌트 생성 (생성기)
+- [x] ReportPreview 컴포넌트 생성 (미리보기)
+- [x] ReportDownloader 컴포넌트 생성 (다운로드)
+- [x] RunSelector 컴포넌트 생성 (실행 선택)
+- [x] Reports 페이지 리팩토링
+- [x] 테스트 작성
+
+**진행 상황**:
+
+| 시간 | 작업 | 결과 |
+|------|------|------|
+| 16:00 | Reports 페이지 테스트 34개 작성 (TDD) | ✅ 완료 |
+| 16:15 | ReportConfig, ReportResult 구현 | ✅ 완료 |
+| 16:20 | ReportTemplate (basic, detailed) 구현 | ✅ 완료 |
+| 16:25 | ReportGenerator (Markdown/HTML) 구현 | ✅ 완료 |
+| 16:30 | ReportDownloader, ReportPreview 구현 | ✅ 완료 |
+| 16:35 | RunSelector 구현 | ✅ 완료 |
+| 16:40 | Reports 페이지 리팩토링 | ✅ 완료 |
+| 16:45 | 테스트 실행 (138/138 통과) | ✅ 완료 |
+
+**생성된 파일**:
+- `src/evalvault/adapters/inbound/web/components/reports.py` - Reports 컴포넌트
+- `tests/unit/test_web_reports.py` - Reports 컴포넌트 테스트 (34개)
+
+**수정된 파일**:
+- `src/evalvault/adapters/inbound/web/components/__init__.py` - 컴포넌트 내보내기
+- `src/evalvault/adapters/inbound/web/app.py` - Reports 페이지 리팩토링
+
+**기능**:
+- 평가 실행 선택 (드롭다운)
+- 템플릿 선택 (basic, detailed)
+- 출력 형식 선택 (Markdown, HTML)
+- 포함 항목 설정 (요약, 메트릭 상세, NLP 분석, 인과 분석)
+- 보고서 미리보기
+- 보고서 다운로드 (MD/HTML)
+
+---
+
+## Phase 12 완료 요약
+
+| 하위 Phase | 테스트 | 상태 |
+|------------|-------|------|
+| 12.1 기반 설정 | 27개 | ✅ 완료 |
+| 12.2 Home 대시보드 | 24개 | ✅ 완료 |
+| 12.3 Evaluate 페이지 | 26개 | ✅ 완료 |
+| 12.4 History 페이지 | 27개 | ✅ 완료 |
+| 12.5 Reports 페이지 | 34개 | ✅ 완료 |
+| **총합** | **138개** | ✅ **완료** |

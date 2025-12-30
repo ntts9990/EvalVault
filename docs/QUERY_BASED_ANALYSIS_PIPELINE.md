@@ -1,0 +1,403 @@
+# Query-Based DAG Analysis Pipeline 설계 문서
+
+> 사용자 쿼리를 분석하여 자동으로 DAG 스타일 분석 파이프라인을 실행하고 보고서를 생성하는 시스템
+
+## 1. 개요
+
+### 1.1 문제 정의
+
+사용자가 RAG 시스템을 분석할 때 다음과 같은 니즈가 있음:
+- "형태소 분석이 제대로 되고 있는지 확인해보고 싶다"
+- "RRF와 다른 하이브리드 방식의 성능을 비교하고 싶다"
+- "Context Recall이 낮은 이유를 분석하고 싶다"
+- "전체 평가 결과를 요약해서 보고서로 만들어줘"
+
+현재 이러한 니즈를 충족하려면:
+1. 어떤 분석 도구를 사용해야 하는지 알아야 함
+2. 분석 도구를 순서대로 실행해야 함
+3. 결과를 해석하고 보고서로 정리해야 함
+
+### 1.2 솔루션
+
+**사용자 쿼리 → 의도 파악 → DAG 파이프라인 구성 → 자동 실행 → 보고서 생성**
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  User Query │───▶│Intent Router│───▶│DAG Executor │───▶│   Report    │
+│             │    │             │    │             │    │  Generator  │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                          │                   │
+                          ▼                   ▼
+                   ┌─────────────┐    ┌─────────────┐
+                   │  Analysis   │    │  Analysis   │
+                   │   Catalog   │    │   Results   │
+                   └─────────────┘    └─────────────┘
+```
+
+## 2. scratch/ragrefine 분석
+
+### 2.1 기존 구현체에서 차용할 개념
+
+| 구성요소 | 파일 | 설명 | 재사용 수준 |
+|---------|------|------|------------|
+| LangGraph State Machine | `agent/graph.py` | Intent 기반 라우팅, 노드 실행 | 아키텍처 차용 |
+| Report DAG | `analysis/report_graph.py` | 6단계 보고서 생성 파이프라인 | 패턴 차용 |
+| Analysis Tools | `agent/tools/analysis_tools.py` | 12개 분석 도구 (RAGAS, KeyBERT 등) | 인터페이스 참고 |
+| Data Pipeline | `analysis/data_pipeline.py` | CSV/Excel 로드 및 검증 | EvalVault 기존 로더 사용 |
+| Diagnostic Playbook | `analysis/diagnostic_playbook.py` | 패턴 기반 문제 진단 | 로직 일부 차용 |
+
+### 2.2 주요 차이점
+
+| 항목 | scratch/ragrefine | EvalVault 신규 구현 |
+|-----|-------------------|-------------------|
+| LLM | Ollama (gpt-oss:20b) | LLMPort 추상화 (OpenAI, Anthropic 등) |
+| 아키텍처 | 단일 모듈 | Hexagonal Architecture (Port/Adapter) |
+| UI | CLI + Flask API | Streamlit 웹 UI |
+| 상태 관리 | LangGraph MemorySaver | EvalVault Session + LangGraph |
+| 확장성 | 하드코딩된 분석 도구 | 플러그인 기반 분석 모듈 |
+
+## 3. 아키텍처 설계
+
+### 3.1 Hexagonal Architecture 통합
+
+```
+ports/inbound/
+├── analysis_pipeline_port.py      # 분석 파이프라인 포트 인터페이스
+
+ports/outbound/
+├── analysis_module_port.py        # 분석 모듈 포트 (플러그인)
+
+adapters/inbound/
+├── web/
+│   └── pages/
+│       └── analysis_assistant.py  # Streamlit 분석 어시스턴트 페이지
+
+adapters/outbound/
+├── analysis/
+│   ├── morpheme_analyzer.py       # 형태소 분석 어댑터
+│   ├── hybrid_search_comparator.py # 하이브리드 검색 비교 어댑터
+│   ├── ragas_analyzer.py          # RAGAS 분석 어댑터
+│   └── ...
+
+domain/
+├── services/
+│   ├── query_intent_classifier.py # 쿼리 의도 분류기
+│   ├── dag_pipeline_builder.py    # DAG 파이프라인 빌더
+│   └── report_generator.py        # 보고서 생성기
+├── entities/
+│   ├── analysis_intent.py         # 분석 의도 엔티티
+│   ├── analysis_pipeline.py       # 분석 파이프라인 엔티티
+│   └── analysis_result.py         # 분석 결과 엔티티
+```
+
+### 3.2 분석 의도 분류 (Intent Classification)
+
+```python
+class AnalysisIntent(Enum):
+    """사용자 쿼리에서 파악되는 분석 의도"""
+
+    # 검증 (Verification)
+    VERIFY_MORPHEME = "verify_morpheme"           # 형태소 분석 검증
+    VERIFY_EMBEDDING = "verify_embedding"         # 임베딩 품질 검증
+    VERIFY_RETRIEVAL = "verify_retrieval"         # 검색 품질 검증
+
+    # 비교 (Comparison)
+    COMPARE_SEARCH_METHODS = "compare_search"     # 검색 방식 비교 (RRF vs 다른 방식)
+    COMPARE_MODELS = "compare_models"             # 모델 비교
+    COMPARE_RUNS = "compare_runs"                 # 실행 결과 비교
+
+    # 분석 (Analysis)
+    ANALYZE_LOW_METRICS = "analyze_low_metrics"   # 낮은 메트릭 원인 분석
+    ANALYZE_PATTERNS = "analyze_patterns"         # 패턴 분석
+    ANALYZE_TRENDS = "analyze_trends"             # 시계열 추세 분석
+
+    # 보고서 (Report)
+    GENERATE_SUMMARY = "generate_summary"         # 요약 보고서
+    GENERATE_DETAILED = "generate_detailed"       # 상세 보고서
+    GENERATE_COMPARISON = "generate_comparison"   # 비교 보고서
+```
+
+### 3.3 DAG 파이프라인 구조
+
+```python
+@dataclass
+class AnalysisPipeline:
+    """분석 파이프라인 DAG 정의"""
+
+    intent: AnalysisIntent
+    nodes: list[AnalysisNode]
+    edges: list[tuple[str, str]]  # (source_node_id, target_node_id)
+
+    def to_langgraph(self) -> StateGraph:
+        """LangGraph StateGraph로 변환"""
+        ...
+
+@dataclass
+class AnalysisNode:
+    """분석 노드"""
+
+    id: str
+    name: str
+    module: str  # 분석 모듈 어댑터 이름
+    params: dict[str, Any]
+    depends_on: list[str]  # 의존 노드 ID
+```
+
+### 3.4 분석 모듈 카탈로그
+
+| 모듈 ID | 이름 | 의존성 | 설명 |
+|--------|------|-------|------|
+| `morpheme` | 형태소 분석기 | korean extra | kiwipiepy 기반 형태소 분석 |
+| `bm25` | BM25 검색 | korean extra | rank-bm25 기반 키워드 검색 |
+| `hybrid_rrf` | RRF 하이브리드 | morpheme, bm25 | Reciprocal Rank Fusion |
+| `hybrid_weighted` | 가중치 하이브리드 | morpheme, bm25 | 가중 합산 방식 |
+| `embedding_quality` | 임베딩 품질 | - | 임베딩 분포 및 유사도 분석 |
+| `ragas_eval` | RAGAS 평가 | - | 6개 메트릭 평가 |
+| `diagnostic` | 진단 플레이북 | ragas_eval | 패턴 기반 문제 진단 |
+| `causal` | 인과 분석 | ragas_eval | 메트릭 간 인과 관계 분석 |
+| `report` | 보고서 생성 | * | LLM 기반 종합 보고서 |
+
+## 4. 쿼리-파이프라인 매핑
+
+### 4.1 예시 쿼리와 생성되는 파이프라인
+
+#### 예시 1: "형태소 분석이 제대로 되고 있는지 확인"
+
+```yaml
+intent: VERIFY_MORPHEME
+pipeline:
+  nodes:
+    - id: load_data
+      module: data_loader
+    - id: morpheme_analysis
+      module: morpheme
+      depends_on: [load_data]
+    - id: quality_check
+      module: morpheme_quality_checker
+      depends_on: [morpheme_analysis]
+    - id: report
+      module: verification_report
+      depends_on: [quality_check]
+
+  execution_order:
+    load_data → morpheme_analysis → quality_check → report
+```
+
+#### 예시 2: "RRF와 다른 하이브리드 방식 성능 비교"
+
+```yaml
+intent: COMPARE_SEARCH_METHODS
+pipeline:
+  nodes:
+    - id: load_data
+      module: data_loader
+    - id: morpheme_analysis
+      module: morpheme
+      depends_on: [load_data]
+    - id: bm25_search
+      module: bm25
+      depends_on: [morpheme_analysis]
+    - id: embedding_search
+      module: embedding_retrieval
+      depends_on: [load_data]
+    - id: rrf_hybrid
+      module: hybrid_rrf
+      depends_on: [bm25_search, embedding_search]
+    - id: weighted_hybrid
+      module: hybrid_weighted
+      depends_on: [bm25_search, embedding_search]
+    - id: comparison
+      module: search_comparator
+      depends_on: [rrf_hybrid, weighted_hybrid]
+    - id: report
+      module: comparison_report
+      depends_on: [comparison]
+
+  execution_order:
+    load_data → morpheme_analysis → bm25_search ─┬─▶ rrf_hybrid ────┬─▶ comparison → report
+               └─▶ embedding_search ─┴─▶ weighted_hybrid ─┘
+```
+
+#### 예시 3: "Context Recall이 낮은 이유 분석"
+
+```yaml
+intent: ANALYZE_LOW_METRICS
+target_metric: context_recall
+pipeline:
+  nodes:
+    - id: load_data
+      module: data_loader
+    - id: ragas_eval
+      module: ragas_evaluator
+      depends_on: [load_data]
+    - id: low_samples
+      module: low_performer_extractor
+      params: {metric: context_recall, threshold: 0.5}
+      depends_on: [ragas_eval]
+    - id: diagnostic
+      module: diagnostic_playbook
+      depends_on: [ragas_eval]
+    - id: causal
+      module: causal_analyzer
+      depends_on: [ragas_eval]
+    - id: root_cause
+      module: root_cause_analyzer
+      depends_on: [low_samples, diagnostic, causal]
+    - id: report
+      module: analysis_report
+      depends_on: [root_cause]
+```
+
+## 5. MVP 구현 계획
+
+### Phase 14.1: 기반 인프라 (1주차)
+
+**목표**: 분석 파이프라인 포트/어댑터 기본 구조
+
+- [ ] `AnalysisPipelinePort` 인터페이스 정의
+- [ ] `AnalysisModulePort` 플러그인 인터페이스 정의
+- [ ] `AnalysisIntent` 엔티티 및 분류기 구현
+- [ ] `AnalysisPipeline` 엔티티 구현
+- [ ] 테스트 작성 (TDD)
+
+**생성 파일**:
+- `src/evalvault/ports/inbound/analysis_pipeline_port.py`
+- `src/evalvault/ports/outbound/analysis_module_port.py`
+- `src/evalvault/domain/entities/analysis_intent.py`
+- `src/evalvault/domain/entities/analysis_pipeline.py`
+- `tests/unit/test_analysis_pipeline.py`
+
+### Phase 14.2: 의도 분류기 (1주차)
+
+**목표**: 사용자 쿼리에서 분석 의도 추출
+
+- [ ] 키워드 기반 규칙 분류기 (MVP)
+- [ ] LLM 기반 분류기 (확장)
+- [ ] 의도별 파이프라인 템플릿 매핑
+- [ ] 테스트 작성
+
+**생성 파일**:
+- `src/evalvault/domain/services/query_intent_classifier.py`
+- `src/evalvault/domain/services/pipeline_template_registry.py`
+- `tests/unit/test_intent_classifier.py`
+
+### Phase 14.3: DAG 파이프라인 빌더 (1-2주차)
+
+**목표**: LangGraph 기반 DAG 파이프라인 구성 및 실행
+
+- [ ] `DAGPipelineBuilder` 서비스 구현
+- [ ] LangGraph StateGraph 통합
+- [ ] 노드 실행 및 결과 수집
+- [ ] 에러 핸들링 및 재시도 로직
+- [ ] 테스트 작성
+
+**생성 파일**:
+- `src/evalvault/domain/services/dag_pipeline_builder.py`
+- `src/evalvault/domain/services/dag_executor.py`
+- `tests/unit/test_dag_pipeline.py`
+
+### Phase 14.4: 분석 모듈 어댑터 (2주차)
+
+**목표**: 핵심 분석 모듈 구현
+
+MVP 범위:
+- [ ] 형태소 분석기 (morpheme_analyzer)
+- [ ] BM25 검색 (bm25_searcher)
+- [ ] 하이브리드 검색 비교 (hybrid_comparator)
+- [ ] 진단 플레이북 (diagnostic_adapter)
+
+**생성 파일**:
+- `src/evalvault/adapters/outbound/analysis/morpheme_analyzer.py`
+- `src/evalvault/adapters/outbound/analysis/bm25_searcher.py`
+- `src/evalvault/adapters/outbound/analysis/hybrid_comparator.py`
+- `src/evalvault/adapters/outbound/analysis/diagnostic_adapter.py`
+- `tests/unit/test_analysis_modules.py`
+
+### Phase 14.5: 보고서 생성기 (2주차)
+
+**목표**: 분석 결과를 보고서로 변환
+
+- [ ] Markdown 보고서 템플릿
+- [ ] HTML 보고서 렌더러
+- [ ] LLM 요약 통합 (선택)
+- [ ] 차트/시각화 통합
+- [ ] 테스트 작성
+
+**생성 파일**:
+- `src/evalvault/domain/services/report_generator.py`
+- `src/evalvault/adapters/inbound/web/components/report_viewer.py`
+- `tests/unit/test_report_generator.py`
+
+### Phase 14.6: 웹 UI 통합 (2-3주차)
+
+**목표**: Streamlit 분석 어시스턴트 페이지
+
+- [ ] 쿼리 입력 UI
+- [ ] 파이프라인 시각화 (노드 그래프)
+- [ ] 실시간 진행 상황 표시
+- [ ] 결과 보고서 렌더링
+- [ ] 보고서 다운로드 (PDF/HTML/Markdown)
+- [ ] 테스트 작성
+
+**생성 파일**:
+- `src/evalvault/adapters/inbound/web/pages/analysis_assistant.py`
+- `src/evalvault/adapters/inbound/web/components/pipeline_visualizer.py`
+- `tests/unit/test_web_analysis_assistant.py`
+
+## 6. 확장 계획
+
+### 6.1 추가 분석 모듈 (향후)
+
+| 모듈 | 설명 | 우선순위 |
+|-----|------|---------|
+| Topic Clustering | 토픽 클러스터링 | Medium |
+| KeyBERT Analysis | 키워드 추출 | Medium |
+| Temporal Analysis | 시계열 분석 | Low |
+| Causal Analysis | 인과 분석 | Low |
+| Network Graph | 네트워크 그래프 | Low |
+
+### 6.2 LLM 통합 (향후)
+
+- 의도 분류에 LLM 사용 (현재 키워드 기반)
+- 보고서 생성에 LLM 요약 통합
+- 대화형 분석 (follow-up 질문)
+
+### 6.3 플러그인 시스템 (향후)
+
+- 외부 분석 모듈 등록/해제
+- 커스텀 파이프라인 템플릿 저장
+- 분석 결과 캐싱
+
+## 7. 기술 스택
+
+| 구성요소 | 기술 | 이유 |
+|---------|------|-----|
+| DAG 실행 | LangGraph | 상태 관리, 조건부 라우팅, 체크포인팅 |
+| 형태소 분석 | kiwipiepy | 한국어 최적화, 순수 Python |
+| BM25 검색 | rank-bm25 | 가벼운 키워드 검색 |
+| 웹 UI | Streamlit | 빠른 프로토타이핑, Python 네이티브 |
+| 시각화 | Plotly | 인터랙티브 차트 |
+| 보고서 | Jinja2 + WeasyPrint | HTML/PDF 생성 |
+
+## 8. 성공 지표
+
+### 8.1 MVP 완료 기준
+
+- [ ] 최소 3가지 분석 의도 지원 (검증, 비교, 분석)
+- [ ] DAG 파이프라인 자동 구성 및 실행
+- [ ] Markdown 보고서 생성
+- [ ] 웹 UI 통합
+- [ ] 단위 테스트 80% 이상 커버리지
+
+### 8.2 사용자 경험 목표
+
+- 쿼리 입력 → 보고서 생성: 5분 이내
+- 파이프라인 시각화로 진행 상황 파악 가능
+- 보고서 다운로드 (PDF/HTML/Markdown)
+
+## 9. 참고 자료
+
+- [scratch/ragrefine/agent/graph.py](/scratch/ragrefine/agent/graph.py) - LangGraph 상태 머신 구현
+- [scratch/ragrefine/analysis/report_graph.py](/scratch/ragrefine/analysis/report_graph.py) - 보고서 DAG 구현
+- [scratch/ragrefine/agent/tools/analysis_tools.py](/scratch/ragrefine/agent/tools/analysis_tools.py) - 12개 분석 도구
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) - 공식 문서

@@ -1,0 +1,9 @@
+{
+  "model": "unknown",
+  "revision": "unknown",
+  "average": 0.7820762570762572,
+  "pass_rate": 0.825,
+  "korean-faithfulness-benchmark": 0.7666666666666667,
+  "korean-keyword-extraction-benchmark": 0.5795621045621046,
+  "korean-retrieval-benchmark": 1.0
+}
