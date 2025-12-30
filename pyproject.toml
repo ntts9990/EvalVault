@@ -82,6 +82,10 @@ postgres = [
 mlflow = [
     "mlflow>=2.0.0",
 ]
+korean = [
+    "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
+    "rank-bm25>=0.2.2",               # BM25 검색
+]
 
 [project.scripts]
 evalvault = "evalvault.adapters.inbound.cli:app"
