@@ -73,7 +73,15 @@ src/evalvault/
 
 ```bash
 # Install dependencies (uv sync 사용 필수)
-uv sync --extra dev
+uv sync --extra dev                              # 기본 개발 환경
+uv sync --extra dev --extra korean --extra web   # 전체 기능 개발 환경 (권장)
+
+# Optional extras:
+#   --extra korean  : 한국어 NLP (kiwipiepy, rank-bm25)
+#   --extra web     : Streamlit Web UI (streamlit, plotly)
+#   --extra postgres: PostgreSQL 지원
+#   --extra mlflow  : MLflow 트래커
+#   --extra anthropic: Anthropic LLM
 
 # Run all tests (항상 uv run 사용)
 uv run pytest tests/
@@ -225,7 +233,7 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 
 ## Current Implementation Status
 
-> Phase 1-7 모두 완료. 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
+> Phase 1-14 모두 완료. 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -236,14 +244,17 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | LLM Adapters | ✅ Complete | OpenAI, Ollama, Azure, Anthropic |
 | Storage Adapters | ✅ Complete | SQLite, PostgreSQL |
 | Tracker Adapters | ✅ Complete | Langfuse, MLflow |
-| CLI | ✅ Complete | run, metrics, config, history, compare, export, generate |
+| CLI | ✅ Complete | run, metrics, config, history, compare, export, generate, web, pipeline, benchmark |
 | Testset Generation | ✅ Complete | Basic + Knowledge Graph |
 | Experiment Management | ✅ Complete | A/B testing, comparison |
+| Korean NLP | ✅ Complete | KiwiTokenizer, BM25, Dense/Hybrid Retrieval |
+| Web UI | ✅ Complete | Streamlit Dashboard, Evaluate, History, Reports |
+| Analysis Pipeline | ✅ Complete | DAG-based query analysis, Intent classification |
 
 **Test Summary:**
-- Unit Tests: 470
+- Unit Tests: 1218
 - Integration Tests: 26
-- **Total: 496 tests passing**
+- **Total: 1244 tests passing**
 
 ## Documentation
 
