@@ -1,14 +1,14 @@
 # EvalVault Development Roadmap
 
 > Last Updated: 2025-12-30
-> Current Version: 1.3.0
-> Status: Phase 9 Korean RAG Optimization Complete ✅
+> Current Version: 1.5.0
+> Status: Phase 14 Query-Based DAG Analysis Pipeline Complete ✅
 
 ---
 
 ## Overview
 
-EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), Domain Memory Layering(Phase 8), 그리고 Korean RAG Optimization(Phase 9)이 완료되었습니다.
+EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), Domain Memory Layering(Phase 8), Korean RAG Optimization(Phase 9), Streamlit Web UI(Phase 10-13), 그리고 Query-Based DAG Analysis Pipeline(Phase 14)이 완료되었습니다.
 
 ### Progress Summary
 
@@ -22,8 +22,10 @@ EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(P
 | **Phase 2 NLP** | NLP Analysis | ✅ Complete | +97 |
 | **Phase 3 Causal** | Causal Analysis | ✅ Complete | +27 |
 | **Phase 8** | Domain Memory Layering | ✅ Complete | +113 |
-| **Phase 9** | Korean RAG Optimization | ✅ Complete (9.1-9.5) | +24 |
-| **Total** | | | **915** |
+| **Phase 9** | Korean RAG Optimization | ✅ Complete | +24 |
+| **Phase 10-13** | Streamlit Web UI | ✅ Complete | +138 |
+| **Phase 14** | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
+| **Total** | | | **1196** |
 
 ### Test Coverage Summary
 
@@ -381,6 +383,256 @@ evalvault generate documents.md --korean-chunker
 
 ---
 
+## Phase 10-13: Streamlit Web UI ✅
+
+> **Status**: Complete (2025-12-30)
+> **Tests**: +138
+> **Priority**: ✅ Complete
+
+평가 결과를 시각화하고 관리할 수 있는 웹 기반 대시보드입니다.
+
+### 구현된 기능
+
+| Sub-Phase | Description | Status |
+|-----------|-------------|--------|
+| Phase 10 | Web UI MVP Structure | ✅ Complete |
+| Phase 11 | Dashboard with Plotly Charts | ✅ Complete |
+| Phase 12.1 | Evaluate Page (File Upload) | ✅ Complete |
+| Phase 12.2 | History Page (Filtering & Export) | ✅ Complete |
+| Phase 13 | Reports Page (Template-based) | ✅ Complete |
+
+### 주요 파일
+
+```
+src/evalvault/adapters/inbound/web/
+├── __init__.py
+├── adapter.py              # WebUIAdapter (Streamlit 실행)
+├── app.py                  # 메인 Streamlit 앱
+├── session.py              # 세션 상태 관리
+├── components/
+│   ├── cards.py            # 카드 컴포넌트
+│   ├── charts.py           # Plotly 차트 (Bar, Radar, Trend)
+│   ├── evaluate.py         # 평가 실행 컴포넌트
+│   ├── history.py          # 히스토리 필터링/테이블
+│   ├── lists.py            # 리스트 컴포넌트
+│   ├── metrics.py          # 메트릭 표시 컴포넌트
+│   ├── progress.py         # 진행 표시 컴포넌트
+│   ├── reports.py          # 보고서 생성 컴포넌트
+│   ├── stats.py            # 통계 표시 컴포넌트
+│   └── upload.py           # 파일 업로드 컴포넌트
+├── pages/
+│   └── ...                 # 페이지별 라우팅
+└── styles/
+    └── ...                 # 스타일 정의
+
+tests/unit/
+├── test_web_ui.py          # UI 컴포넌트 테스트
+├── test_web_dashboard.py   # 대시보드 테스트
+├── test_web_evaluate.py    # 평가 페이지 테스트
+├── test_web_history.py     # 히스토리 페이지 테스트
+└── test_web_reports.py     # 보고서 페이지 테스트
+```
+
+### 기술 스택
+
+- **Streamlit**: Python 웹 프레임워크
+- **Plotly**: 인터랙티브 차트
+- **Pandas**: 데이터 처리
+
+### 주요 기능
+
+#### Dashboard (Phase 11)
+- 평가 결과 개요 카드
+- 메트릭별 성능 차트 (Bar, Radar)
+- 시간별 추세 차트
+- 최근 평가 목록
+
+#### Evaluate Page (Phase 12.1)
+- CSV/Excel/JSON 파일 업로드
+- 데이터 미리보기 및 검증
+- 메트릭 선택 UI
+- 실시간 평가 진행 표시
+
+#### History Page (Phase 12.2)
+- 평가 히스토리 테이블
+- 날짜/데이터셋/모델별 필터링
+- 결과 비교 기능
+- JSON/CSV 내보내기
+
+#### Reports Page (Phase 13)
+- 템플릿 기반 보고서 생성
+- Markdown/HTML 형식 지원
+- 사용자 정의 템플릿
+- 차트 포함 보고서
+
+### CLI 사용법
+
+```bash
+# Web UI 실행
+evalvault web
+
+# 특정 포트로 실행
+evalvault web --port 8502
+```
+
+---
+
+## Phase 14: Query-Based DAG Analysis Pipeline ✅
+
+> **Status**: Complete (2025-12-30)
+> **Tests**: +153
+> **Priority**: ✅ Complete
+
+사용자 쿼리를 분석하여 자동으로 DAG 기반 분석 파이프라인을 구성하고 실행합니다.
+
+### 구현된 기능
+
+| Sub-Phase | Description | Status | Tests |
+|-----------|-------------|--------|-------|
+| Phase 14.1 | Domain Entities | ✅ Complete | 70 |
+| Phase 14.2 | Intent Classifier & Template Registry | ✅ Complete | 39 |
+| Phase 14.3 | PipelineOrchestrator | ✅ Complete | 24 |
+| Phase 14.4 | Analysis Module Adapters | ✅ Complete | 20 |
+
+### 핵심 개념
+
+#### 분석 의도 (AnalysisIntent)
+사용자 쿼리에서 12가지 분석 의도를 자동 분류:
+
+| Category | Intent | Description |
+|----------|--------|-------------|
+| **Verification** | VERIFY_MORPHEME | 형태소 분석 검증 |
+| | VERIFY_EMBEDDING | 임베딩 품질 검증 |
+| | VERIFY_RETRIEVAL | 검색 품질 검증 |
+| **Comparison** | COMPARE_SEARCH_METHODS | 검색 방식 비교 (BM25 vs Dense vs Hybrid) |
+| | COMPARE_MODELS | LLM 모델 비교 |
+| | COMPARE_RUNS | 평가 결과 비교 |
+| **Analysis** | ANALYZE_LOW_METRICS | 낮은 메트릭 원인 분석 |
+| | ANALYZE_PATTERNS | 패턴 분석 |
+| | ANALYZE_TRENDS | 추세 분석 |
+| **Report** | GENERATE_SUMMARY | 요약 보고서 |
+| | GENERATE_DETAILED | 상세 보고서 |
+| | GENERATE_COMPARISON | 비교 보고서 |
+
+#### DAG 파이프라인
+의도에 따라 자동으로 분석 노드들의 DAG를 구성:
+
+```
+예: VERIFY_MORPHEME 의도
+┌──────────────┐    ┌────────────────────┐    ┌─────────────────────┐
+│ DataLoader   │───►│ MorphemeAnalyzer   │───►│ VerificationReport  │
+└──────────────┘    └────────────────────┘    └─────────────────────┘
+
+예: COMPARE_SEARCH_METHODS 의도
+                    ┌──────────────┐
+                    │ BM25Search   │────┐
+┌──────────────┐   ├──────────────┤    │    ┌────────────────────┐
+│ DataLoader   │───►│ DenseSearch  │────┼───►│ ComparisonReport   │
+└──────────────┘   ├──────────────┤    │    └────────────────────┘
+                    │ HybridSearch │────┘
+                    └──────────────┘
+```
+
+### 주요 파일
+
+```
+src/evalvault/
+├── domain/entities/
+│   └── analysis_pipeline.py       # AnalysisIntent, AnalysisNode, AnalysisPipeline,
+│                                  # NodeResult, PipelineResult, ModuleMetadata, ModuleCatalog
+├── domain/services/
+│   ├── intent_classifier.py       # KeywordIntentClassifier, IntentKeywordRegistry
+│   ├── pipeline_template_registry.py  # 의도별 파이프라인 템플릿
+│   └── pipeline_orchestrator.py   # PipelineOrchestrator, AnalysisPipelineService
+├── ports/
+│   ├── inbound/
+│   │   └── analysis_pipeline_port.py  # AnalysisPipelinePort
+│   └── outbound/
+│       ├── analysis_module_port.py    # AnalysisModulePort
+│       └── intent_classifier_port.py  # IntentClassifierPort
+├── adapters/outbound/analysis/
+│   ├── base_module.py             # BaseAnalysisModule
+│   ├── data_loader_module.py      # DataLoaderModule
+│   ├── statistical_analyzer_module.py  # StatisticalAnalyzerModule
+│   ├── summary_report_module.py   # SummaryReportModule
+│   ├── verification_report_module.py  # VerificationReportModule
+│   ├── comparison_report_module.py    # ComparisonReportModule
+│   └── analysis_report_module.py  # AnalysisReportModule
+
+tests/unit/
+├── test_analysis_pipeline.py      # 엔티티 테스트 (70개)
+├── test_intent_classifier.py      # 의도 분류기 테스트 (39개)
+├── test_pipeline_orchestrator.py  # 오케스트레이터 테스트 (24개)
+└── test_analysis_modules.py       # 모듈 어댑터 테스트 (20개)
+```
+
+### 사용 예시
+
+```python
+from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
+from evalvault.adapters.outbound.analysis import (
+    DataLoaderModule,
+    StatisticalAnalyzerModule,
+    SummaryReportModule,
+)
+
+# 서비스 초기화
+service = AnalysisPipelineService()
+
+# 모듈 등록
+service.register_module(DataLoaderModule())
+service.register_module(StatisticalAnalyzerModule())
+service.register_module(SummaryReportModule())
+
+# 쿼리 기반 자동 분석
+result = service.analyze("형태소 분석이 제대로 되고 있는지 확인해줘")
+
+# 결과 확인
+print(f"Intent: {result.intent}")  # VERIFY_MORPHEME
+print(f"Success: {result.all_succeeded}")
+print(f"Report: {result.final_output}")
+```
+
+### 비동기 병렬 실행
+
+독립적인 노드들은 자동으로 병렬 실행:
+
+```python
+import asyncio
+
+async def main():
+    result = await service.analyze_async(
+        "BM25와 Dense 검색을 비교해줘"
+    )
+    print(result.final_output)
+
+asyncio.run(main())
+```
+
+### 확장성
+
+새로운 분석 모듈을 쉽게 추가할 수 있는 플러그인 아키텍처:
+
+```python
+from evalvault.adapters.outbound.analysis import BaseAnalysisModule
+
+class MyCustomModule(BaseAnalysisModule):
+    module_id = "my_custom_module"
+    name = "My Custom Module"
+    description = "사용자 정의 분석 모듈"
+    input_types = ["data"]
+    output_types = ["result"]
+
+    def execute(self, inputs, params=None):
+        # 분석 로직 구현
+        return {"result": "custom analysis"}
+
+# 등록
+service.register_module(MyCustomModule())
+```
+
+---
+
 ## Future: Agent System Integration
 
 > **Status**: Research / Deferred
@@ -638,9 +890,9 @@ evalvault generate <documents> -n <num> -o <output>
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| Unit Tests | 776 | Domain, ports, adapters, services, analysis |
+| Unit Tests | 1170 | Domain, ports, adapters, services, analysis, web |
 | Integration Tests | 26 | End-to-end flows |
-| **Total** | **802** | All passing |
+| **Total** | **1196** | All passing |
 
 ### Test Files
 ```
@@ -666,7 +918,16 @@ tests/
 │   ├── test_nlp_adapter.py       # 97 tests (Phase 2 NLP)
 │   ├── test_causal_adapter.py    # 27 tests (Phase 3 Causal)
 │   ├── test_domain_memory.py     # 80 tests (Phase 8)
-│   └── test_benchmark_runner.py  # 24 tests (Phase 9.5)
+│   ├── test_benchmark_runner.py  # 24 tests (Phase 9.5)
+│   ├── test_web_ui.py            # 138 tests (Phase 10-13 Web UI)
+│   ├── test_web_dashboard.py     # (included in test_web_ui.py)
+│   ├── test_web_evaluate.py      # (included in test_web_ui.py)
+│   ├── test_web_history.py       # (included in test_web_ui.py)
+│   ├── test_web_reports.py       # (included in test_web_ui.py)
+│   ├── test_analysis_pipeline.py # 70 tests (Phase 14.1)
+│   ├── test_intent_classifier.py # 39 tests (Phase 14.2)
+│   ├── test_pipeline_orchestrator.py  # 24 tests (Phase 14.3)
+│   └── test_analysis_modules.py  # 20 tests (Phase 14.4)
 └── integration/
     ├── test_evaluation_flow.py   # 6 tests
     ├── test_data_flow.py         # 8 tests
@@ -686,7 +947,9 @@ tests/
 | 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화 |
 | 1.1.0 | 2025-12-29 | Phase 2 NLP + Phase 3 Causal Analysis |
 | 1.2.0 | 2025-12-29 | Phase 8 Domain Memory Layering |
-| 1.3.0 | 2025-12-30 | Phase 9 Korean RAG Optimization Complete |
+| 1.3.0 | 2025-12-30 | Phase 9 Korean RAG Optimization |
+| 1.4.0 | 2025-12-30 | Phase 10-13 Streamlit Web UI |
+| 1.5.0 | 2025-12-30 | Phase 14 Query-Based DAG Analysis Pipeline |
 
 ---
 
@@ -760,6 +1023,9 @@ src/evalvault/
 | CausalAnalysisPort | CausalAnalysisAdapter | ✅ Complete |
 | ReportPort | MarkdownReportAdapter | ✅ Complete |
 | DomainMemoryPort | SQLiteDomainMemoryAdapter | ✅ Complete |
+| AnalysisPipelinePort | PipelineOrchestrator | ✅ Complete |
+| AnalysisModulePort | DataLoader, StatisticalAnalyzer, ReportModules | ✅ Complete |
+| IntentClassifierPort | KeywordIntentClassifier | ✅ Complete |
 
 ---
 
