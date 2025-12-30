@@ -26,10 +26,13 @@ SQLite 또는 Langfuse에 결과를 저장합니다. OpenAI, Ollama, 폐쇄망 �
 - Langfuse 연동으로 트레이스 단위 분석
 - JSON/CSV/Excel 데이터 로더
 - Linux·macOS·Windows 호환
+- **Web UI**: Streamlit 대시보드로 평가, 이력, 리포트 관리
+- **Korean NLP**: Kiwi 형태소 분석, BM25/Dense/Hybrid 검색
 - **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (학습 피드백 루프)
 - **NLP Analysis**: 텍스트 통계, 질문 유형 분류, 키워드 추출
 - **Causal Analysis**: 인과 관계 분석 및 근본 원인 파악
 - **Knowledge Graph**: 문서에서 자동으로 테스트셋 생성
+- **Analysis Pipeline**: DAG 기반 쿼리 분석 및 의도 분류
 
 ## 빠른 시작
 
@@ -53,11 +56,14 @@ uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 - SQLite + PostgreSQL + Langfuse/MLflow 자동 결과 저장
 - Ollama 프로필을 통한 폐쇄망/온프레미스 지원
 - 간결한 CLI UX
+- **Web UI**: Streamlit 대시보드로 평가, 이력, 리포트 생성
+- **Korean NLP**: Kiwi 형태소 분석, BM25/Dense/Hybrid 검색
 - **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (학습 피드백 루프)
 - **NLP Analysis**: 텍스트 통계, 질문 유형 분류, 키워드 추출, 토픽 클러스터링
 - **Causal Analysis**: 인과 관계 분석 및 근본 원인 파악, 개선 제안 생성
 - **Knowledge Graph**: 문서에서 자동으로 테스트셋 생성
 - **Experiment Management**: A/B 테스트 및 그룹 간 메트릭 비교
+- **Analysis Pipeline**: DAG 기반 쿼리 분석 (12가지 의도 분류)
 
 ## 설치
 
@@ -72,8 +78,22 @@ uv pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
+
+# 기본 개발 환경
 uv sync --extra dev
+
+# 전체 기능 개발 환경 (권장)
+uv sync --extra dev --extra korean --extra web
 ```
+
+**선택적 Extras:**
+| Extra | 패키지 | 용도 |
+|-------|--------|------|
+| `korean` | kiwipiepy, rank-bm25 | 한국어 NLP (형태소 분석, BM25) |
+| `web` | streamlit, plotly | Streamlit Web UI 대시보드 |
+| `postgres` | psycopg | PostgreSQL 저장소 지원 |
+| `mlflow` | mlflow | MLflow 트래커 연동 |
+| `anthropic` | anthropic | Anthropic LLM 어댑터 |
 
 > **참고**: `.python-version` 파일이 Python 3.12를 지정합니다. uv가 Python 3.12를 자동으로 다운로드하여 사용합니다.
 
@@ -300,6 +320,18 @@ uv run evalvault config
 
 # 사용 가능한 메트릭 목록
 uv run evalvault metrics
+
+# Web UI 실행 (--extra web 필요)
+uv run evalvault web --port 8501
+
+# 쿼리 기반 분석 파이프라인 (--extra korean 필요)
+uv run evalvault pipeline analyze "요약해줘" --run-id <run_id>
+uv run evalvault pipeline intents     # 분석 의도 목록
+uv run evalvault pipeline templates   # 파이프라인 템플릿 목록
+
+# 벤치마크 실행
+uv run evalvault benchmark run --name korean-rag
+uv run evalvault benchmark list
 ```
 
 ## A/B 테스트 가이드
