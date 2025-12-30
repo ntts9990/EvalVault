@@ -21,6 +21,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# 숫자 패턴 (금액, 기간, 비율 등)
+NUMBER_PATTERNS = [
+    # 금액 패턴
+    r"(\d+(?:,\d{3})*)\s*(?:만원|천원|백원|원|억원)",
+    r"(\d+)\s*(?:만|천|백|억)\s*원",
+    # 기간 패턴
+    r"(\d+)\s*(?:년|개월|월|일|세)",
+    # 비율 패턴
+    r"(\d+(?:\.\d+)?)\s*%",
+    # 일반 숫자
+    r"(\d+(?:,\d{3})*(?:\.\d+)?)",
+]
+
+
+@dataclass
+class NumberWithUnit:
+    """숫자와 단위 정보."""
+
+    value: float
+    unit: str
+    original: str  # 원본 텍스트
+
 
 @dataclass
 class ClaimVerification:
@@ -43,12 +66,14 @@ class ClaimVerification:
         is_faithful: 컨텍스트에 충실한지 여부
         coverage: 키워드 겹침 비율 (0.0 ~ 1.0)
         matched_keywords: 겹친 키워드 목록
+        number_mismatch: 숫자 불일치 여부
     """
 
     claim: str
     is_faithful: bool
     coverage: float
     matched_keywords: list[str] = field(default_factory=list)
+    number_mismatch: bool = False
 
 
 @dataclass
@@ -111,6 +136,7 @@ class KoreanFaithfulnessChecker:
         *,
         min_coverage: float = 0.5,
         claim_pos_tags: list[str] | None = None,
+        check_numbers: bool = True,
     ) -> None:
         """KoreanFaithfulnessChecker 초기화.
 
@@ -118,10 +144,17 @@ class KoreanFaithfulnessChecker:
             tokenizer: KiwiTokenizer 인스턴스
             min_coverage: 충실함 판정을 위한 최소 키워드 겹침 비율 (기본: 0.5)
             claim_pos_tags: 주장 추출에 사용할 품사 태그 (기본: 명사, 동사, 형용사)
+            check_numbers: 숫자 값 비교 여부 (기본: True)
         """
         self._tokenizer = tokenizer
         self._min_coverage = min_coverage
         self._claim_pos_tags = claim_pos_tags or ["NNG", "NNP", "VV", "VA", "NNB"]
+        self._check_numbers = check_numbers
+        # 숫자+단위 패턴 컴파일
+        self._number_pattern = re.compile(
+            r"(\d+(?:,\d{3})*(?:\.\d+)?)\s*(만원|천원|백원|원|억원|만|천|백|억|년|개월|월|일|세|%)?",
+            re.UNICODE,
+        )
 
     def extract_claims(self, text: str) -> list[str]:
         """텍스트에서 주장(claim)을 추출합니다.
@@ -155,16 +188,82 @@ class KoreanFaithfulnessChecker:
 
         return claims
 
+    def extract_numbers(self, text: str) -> list[NumberWithUnit]:
+        """텍스트에서 숫자와 단위를 추출합니다.
+
+        Args:
+            text: 분석할 텍스트
+
+        Returns:
+            NumberWithUnit 리스트
+        """
+        numbers = []
+        for match in self._number_pattern.finditer(text):
+            value_str = match.group(1).replace(",", "")
+            unit = match.group(2) or ""
+            try:
+                value = float(value_str)
+                numbers.append(NumberWithUnit(value=value, unit=unit, original=match.group(0)))
+            except ValueError:
+                continue
+        return numbers
+
+    def check_number_mismatch(
+        self,
+        answer_text: str,
+        context_text: str,
+    ) -> tuple[bool, list[str]]:
+        """답변과 컨텍스트의 숫자 불일치를 확인합니다.
+
+        Args:
+            answer_text: 답변 텍스트
+            context_text: 컨텍스트 텍스트
+
+        Returns:
+            (불일치 여부, 불일치 상세 리스트)
+        """
+        answer_numbers = self.extract_numbers(answer_text)
+        context_numbers = self.extract_numbers(context_text)
+
+        if not answer_numbers:
+            return False, []
+
+        # 컨텍스트에서 동일 단위의 숫자들을 수집
+        context_by_unit: dict[str, set[float]] = {}
+        for num in context_numbers:
+            if num.unit not in context_by_unit:
+                context_by_unit[num.unit] = set()
+            context_by_unit[num.unit].add(num.value)
+
+        mismatches = []
+        for ans_num in answer_numbers:
+            # 같은 단위의 숫자가 컨텍스트에 있는지 확인
+            if (
+                ans_num.unit in context_by_unit
+                and ans_num.value not in context_by_unit[ans_num.unit]
+            ):
+                # 컨텍스트에 다른 값이 있음 = 불일치
+                ctx_values = context_by_unit[ans_num.unit]
+                mismatches.append(
+                    f"{ans_num.original} (context has: {', '.join(str(v) + ans_num.unit for v in ctx_values)})"
+                )
+
+        return len(mismatches) > 0, mismatches
+
     def verify_claim(
         self,
         claim: str,
         context_keywords: set[str],
+        context_text: str = "",
+        original_claim_text: str = "",
     ) -> ClaimVerification:
         """단일 주장을 컨텍스트 대비 검증합니다.
 
         Args:
             claim: 검증할 주장 (키워드 형태)
             context_keywords: 컨텍스트에서 추출된 키워드 집합
+            context_text: 원본 컨텍스트 텍스트 (숫자 비교용)
+            original_claim_text: 원본 주장 텍스트 (숫자 비교용)
 
         Returns:
             ClaimVerification 결과
@@ -186,12 +285,21 @@ class KoreanFaithfulnessChecker:
         coverage = len(matched) / len(claim_keywords)
 
         is_faithful = coverage >= self._min_coverage
+        number_mismatch = False
+
+        # 숫자 비교 (활성화된 경우)
+        if self._check_numbers and context_text and original_claim_text:
+            has_mismatch, _ = self.check_number_mismatch(original_claim_text, context_text)
+            if has_mismatch:
+                number_mismatch = True
+                is_faithful = False  # 숫자 불일치 시 불충실
 
         return ClaimVerification(
             claim=claim,
             is_faithful=is_faithful,
             coverage=coverage,
             matched_keywords=list(matched),
+            number_mismatch=number_mismatch,
         )
 
     def check_faithfulness(
@@ -223,8 +331,33 @@ class KoreanFaithfulnessChecker:
             self._tokenizer.extract_keywords(context_text, pos_tags=self._claim_pos_tags)
         )
 
+        # 전체 답변에서 숫자 불일치 먼저 확인
+        if self._check_numbers:
+            has_number_mismatch, mismatch_details = self.check_number_mismatch(answer, context_text)
+            if has_number_mismatch:
+                # 숫자 불일치가 있으면 불충실로 판정
+                return FaithfulnessResult(
+                    is_faithful=False,
+                    score=0.0,
+                    claim_results=[
+                        ClaimVerification(
+                            claim=answer,
+                            is_faithful=False,
+                            coverage=0.0,
+                            matched_keywords=[],
+                            number_mismatch=True,
+                        )
+                    ],
+                    total_claims=1,
+                    faithful_claims=0,
+                )
+
         # 답변에서 주장 추출
         claims = self.extract_claims(answer)
+        # 원본 문장도 보존 (숫자 비교용)
+        sentences = self._tokenizer.split_sentences(answer)
+        if not sentences:
+            sentences = [answer]
 
         if not claims:
             return FaithfulnessResult(
@@ -239,8 +372,14 @@ class KoreanFaithfulnessChecker:
         claim_results = []
         faithful_count = 0
 
-        for claim in claims:
-            result = self.verify_claim(claim, context_keywords)
+        for i, claim in enumerate(claims):
+            original_text = sentences[i] if i < len(sentences) else ""
+            result = self.verify_claim(
+                claim,
+                context_keywords,
+                context_text=context_text,
+                original_claim_text=original_text,
+            )
             claim_results.append(result)
             if result.is_faithful:
                 faithful_count += 1
