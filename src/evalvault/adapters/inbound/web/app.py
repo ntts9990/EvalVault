@@ -143,11 +143,11 @@ def render_home_page(adapter, session):
 
     with chart_col1:
         pass_rate_fig = create_pass_rate_chart(runs[:10])
-        st.plotly_chart(pass_rate_fig, use_container_width=True)
+        st.plotly_chart(pass_rate_fig, use_container_width=True, key="home_pass_rate_chart")
 
     with chart_col2:
         trend_fig = create_trend_chart(runs)
-        st.plotly_chart(trend_fig, use_container_width=True)
+        st.plotly_chart(trend_fig, use_container_width=True, key="home_trend_chart")
 
     # 지원 메트릭 섹션
     st.divider()
