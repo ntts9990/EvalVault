@@ -133,9 +133,9 @@ class TestRagasEvaluator:
             # Check aggregated metrics
             assert result.total_test_cases == 2
             assert result.passed_test_cases == 1  # Only tc-001 passes (0.9 >= 0.7)
-            assert result.strict_pass_rate == 0.5  # 테스트 케이스 기준 통과율
+            assert result.pass_rate == 0.5  # 테스트 케이스 기준 통과율 (1/2)
             # 메트릭 "faithfulness"의 평균: (0.9 + 0.5) / 2 = 0.7 >= 0.7 → 통과
-            assert result.pass_rate == 1.0  # 메트릭 기준 통과율
+            assert result.metric_pass_rate == 1.0  # 메트릭 기준 통과율 (1/1)
 
             # Check average score
             avg_faithfulness = result.get_avg_score("faithfulness")

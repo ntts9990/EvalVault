@@ -104,14 +104,26 @@ class EvaluationRun:
         return sum(1 for r in self.results if r.all_passed)
 
     @property
-    def strict_pass_rate(self) -> float:
-        """모든 메트릭 통과 기준 통과율 (strict quality gate)."""
+    def pass_rate(self) -> float:
+        """테스트 케이스 통과율.
+
+        모든 메트릭을 통과한 테스트 케이스의 비율을 계산합니다.
+        예: 10개 테스트 케이스 중 7개가 모든 메트릭을 통과하면 7/10 = 70%
+        """
         if not self.results:
             return 0.0
         return self.passed_test_cases / self.total_test_cases
 
     @property
-    def pass_rate(self) -> float:
+    def strict_pass_rate(self) -> float:
+        """모든 메트릭 통과 기준 통과율 (strict quality gate).
+
+        Alias for pass_rate. Deprecated.
+        """
+        return self.pass_rate
+
+    @property
+    def metric_pass_rate(self) -> float:
         """메트릭 기준 통과율 (개별 메트릭 통과 비율).
 
         각 메트릭의 평균 점수가 임계값을 넘는 비율을 계산합니다.
