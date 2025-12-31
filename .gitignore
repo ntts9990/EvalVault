@@ -144,3 +144,8 @@ dmypy.json
 .AppleDouble
 .LSOverride
 scratch/
+
+# Local development files (not for version control)
+agent/
+AGENT_SETUP_COMPLETE.md
+claude-progress.txt
