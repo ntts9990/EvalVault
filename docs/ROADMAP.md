@@ -1,16 +1,50 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2025-12-30
+> Last Updated: 2026-01-01
 > Current Version: 1.5.0
-> Status: Phase 14 Query-Based DAG Analysis Pipeline Complete ✅
+> Status: Phase 1-14 Complete ✅ | Focusing on Improvement & Future Features
 
 ---
 
-## Overview
+## 목차
 
-EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(Phase 2 NLP, Phase 3 Causal), Domain Memory Layering(Phase 8), Korean RAG Optimization(Phase 9), Streamlit Web UI(Phase 10-13), 그리고 Query-Based DAG Analysis Pipeline(Phase 14)이 완료되었습니다.
+1. [개요](#개요)
+2. [완료된 작업 (Phase 1-14)](#완료된-작업-phase-1-14)
+3. [현재 진행 중 (2026 Q1)](#현재-진행-중-2026-q1)
+4. [향후 계획 (2026 Q2-Q4)](#향후-계획-2026-q2-q4)
+5. [미래 연구 (2027+)](#미래-연구-2027)
 
-### Progress Summary
+---
+
+## 개요
+
+EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 1-14를 완료하여 안정적인 기반을 갖추었습니다. 이제 코드 품질 개선과 새로운 가치 창출에 집중합니다.
+
+### 현재 상태 요약
+
+| 지표 | 값 |
+|------|-----|
+| Version | 1.5.0 |
+| Tests | 1,352 passing |
+| Coverage | 89% |
+| LOC | ~59,000 |
+| Phases Completed | 14/14 (100%) |
+| PyPI | ✅ Published |
+| CI/CD | ✅ Cross-platform |
+
+### 문서 구조
+
+- **[COMPLETED.md](./COMPLETED.md)**: Phase 1-14 달성 기록 (상세)
+- **[IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)**: 코드 품질 개선 계획
+- **[ROADMAP.md](./ROADMAP.md)** (이 문서): 향후 개발 계획
+
+---
+
+## 완료된 작업 (Phase 1-14)
+
+> 상세 내용은 [COMPLETED.md](./COMPLETED.md) 참조
+
+### 완료 현황
 
 | Phase | Description | Status | Tests |
 |-------|-------------|--------|-------|
@@ -19,1038 +53,722 @@ EvalVault의 개발 로드맵입니다. Phase 1-7 Core System, Analysis 기능(P
 | Phase 5 | Storage & Domain | ✅ Complete | +42 |
 | Phase 6 | Advanced Features | ✅ Complete | +160 |
 | Phase 7 | Production Ready | ✅ Complete | +10 |
-| **Phase 2 NLP** | NLP Analysis | ✅ Complete | +97 |
-| **Phase 3 Causal** | Causal Analysis | ✅ Complete | +27 |
-| **Phase 8** | Domain Memory Layering | ✅ Complete | +113 |
-| **Phase 9** | Korean RAG Optimization | ✅ Complete | +24 |
-| **Phase 10-13** | Streamlit Web UI | ✅ Complete | +138 |
-| **Phase 14** | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
-| **Total** | | | **1196** |
+| Phase 2 NLP | NLP Analysis | ✅ Complete | +97 |
+| Phase 3 Causal | Causal Analysis | ✅ Complete | +27 |
+| Phase 8 | Domain Memory Layering | ✅ Complete | +113 |
+| Phase 9 | Korean RAG Optimization | ✅ Complete | +24 |
+| Phase 10-13 | Streamlit Web UI | ✅ Complete | +138 |
+| Phase 14 | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
+| **Total** | | **✅ 100%** | **1,352** |
 
-### Test Coverage Summary
+### 주요 달성 사항
 
-> **Status Update (2025-12-28)**: 테스트 커버리지 개선 계획 완료
-> - 전체 커버리지: 53% → **89%** 달성
-> - CLI 커버리지: 46% → **89%** (목표 80% 초과 달성)
-> - 총 테스트 수: **457개** (Unit 431 + Integration 26)
+#### 아키텍처
+- ✅ Hexagonal Architecture (Port/Adapter 패턴)
+- ✅ Domain-Driven Design
+- ✅ 확장 가능한 플러그인 시스템
 
----
+#### 기능
+- ✅ Multi-LLM (OpenAI, Azure, Anthropic, Ollama)
+- ✅ Multi-DB (SQLite, PostgreSQL)
+- ✅ Multi-Tracker (Langfuse, MLflow)
+- ✅ 6 Ragas Metrics + 1 Custom Metric
+- ✅ Korean NLP (형태소 분석, BM25, Dense, Hybrid)
+- ✅ Web UI (Streamlit 기반)
+- ✅ DAG Analysis Pipeline
 
-## Phase 2: NLP Analysis ✅
-
-> **Status**: Complete (2025-12-29)
-> **Tests**: +97
-
-평가 결과에 대한 자연어 처리 분석 기능입니다.
-
-### 구현된 기능
-
-| Sub-Phase | Description | Status |
-|-----------|-------------|--------|
-| Phase 2.3 | NLP Adapter (Hybrid: Rule + ML + LLM) | ✅ Complete |
-| Phase 2.4 | AnalysisService Integration | ✅ Complete |
-| Phase 2.5 | CLI Integration (`--nlp`, `--profile`) | ✅ Complete |
-| Phase 2.6 | Database Storage for NLP Analysis | ✅ Complete |
-| Phase 2.7 | Topic Clustering (K-Means + Embeddings) | ✅ Complete |
-| Phase 2.8 | Report Generation (Markdown/HTML) | ✅ Complete |
-
-### 주요 파일
-
-```
-src/evalvault/
-├── adapters/outbound/analysis/
-│   └── nlp_adapter.py          # NLP 분석 어댑터
-├── adapters/outbound/report/
-│   └── markdown_adapter.py     # Markdown/HTML 보고서 생성
-├── ports/outbound/
-│   ├── nlp_analysis_port.py    # NLP 분석 포트
-│   └── report_port.py          # 보고서 생성 포트
-└── domain/entities/
-    └── analysis.py             # NLPAnalysis, TextStats, TopicCluster 등
-```
-
-### CLI 사용법
-
-```bash
-# NLP 분석 실행
-evalvault analyze <run_id> --nlp --profile dev
-
-# 보고서 생성
-evalvault analyze <run_id> --nlp --report report.md
-evalvault analyze <run_id> --nlp --report report.html
-```
+#### 개발 인프라
+- ✅ 1,352 tests (89% coverage)
+- ✅ CI/CD (Ubuntu, macOS, Windows)
+- ✅ PyPI 자동 배포
+- ✅ Semantic Versioning
 
 ---
 
-## Phase 3: Causal Analysis ✅
+## 현재 진행 중 (2026 Q1)
 
-> **Status**: Complete (2025-12-29)
-> **Tests**: +27
+> **Focus**: 코드 품질 개선 및 사용성 향상
 
-평가 결과에서 인과 관계를 분석하여 근본 원인을 파악하고 개선 제안을 생성합니다.
+### P1: 코드 통합 및 중복 제거 (Week 1-2)
 
-### 구현된 기능
+**목표**: 코드 중복 30% 감소
 
-| Feature | Description |
-|---------|-------------|
-| Factor Extraction | 질문 길이, 컨텍스트 수, 키워드 겹침 등 인과 요인 추출 |
-| Factor-Metric Impact | 각 요인이 메트릭에 미치는 영향 분석 (상관분석) |
-| Causal Relationships | 유의미한 인과 관계 식별 |
-| Root Cause Analysis | 메트릭별 근본 원인 분석 |
-| Intervention Suggestions | 개선 제안 생성 |
-| Stratified Analysis | 요인값별 계층화 분석 (low/medium/high) |
+#### 1.1 LLM Adapter 통합 ✅ In Progress
+- [ ] `BaseLLMAdapter` 생성
+- [ ] 토큰 추적 공통화
+- [ ] 에러 핸들링 공통화
+- [ ] 기존 어댑터 리팩토링
 
-### 주요 파일
+**예상 효과**:
+- 코드 중복: -300 LOC
+- 새 LLM 추가 시간: 2시간 → 30분
 
-```
-src/evalvault/
-├── adapters/outbound/analysis/
-│   └── causal_adapter.py       # 인과 분석 어댑터
-├── ports/outbound/
-│   └── causal_analysis_port.py # 인과 분석 포트
-└── domain/entities/
-    └── analysis.py             # CausalAnalysis, FactorImpact, RootCause 등
-```
+#### 1.2 Storage Adapter 통합
+- [ ] `SQLQueries` 클래스 생성
+- [ ] `BaseSQLAdapter` 생성
+- [ ] 스키마 관리 통합
 
-### CLI 사용법
+**예상 효과**:
+- 코드 중복: -400 LOC
+- 새 DB 지원: 4시간 → 1시간
 
-```bash
-# 인과 분석 실행
-evalvault analyze <run_id> --causal
+#### 1.3 Analysis Adapter 통합
+- [ ] `AnalysisDataProcessor` 생성
+- [ ] `BaseAnalysisAdapter` 생성
+- [ ] 데이터 처리 로직 통합
 
-# NLP + 인과 분석 함께 실행
-evalvault analyze <run_id> --nlp --causal --report report.html
-```
-
-### 인과 요인 (Causal Factors)
-
-| Factor | Description |
-|--------|-------------|
-| `question_length` | 질문 길이 (단어 수) |
-| `answer_length` | 답변 길이 (단어 수) |
-| `context_count` | 컨텍스트 수 |
-| `context_length` | 컨텍스트 총 길이 |
-| `question_complexity` | 질문 복잡도 |
-| `has_ground_truth` | ground_truth 존재 여부 |
-| `keyword_overlap` | 질문-컨텍스트 키워드 겹침 |
+**예상 효과**:
+- 코드 중복: -200 LOC
 
 ---
 
-## Phase 8: Domain Memory Layering ✅
+### P2: 모듈 분리 (Week 3-4)
 
-> **Status**: Complete (2025-12-29)
-> **Tests**: +113
-> **Priority**: 🔥 High
+**목표**: 모듈 복잡도 50% 감소
 
-EvalVault의 현재 아키텍처(순차적 평가 파이프라인)에 맞는 실질적인 개선 사항입니다.
+#### 2.1 CLI 모듈 분리 ⚡ Quick Win
+- [ ] CLI 명령어별 파일 분리
+- [ ] 공통 유틸리티 추출
+- [ ] 명령어 라우팅 개선
 
-### 목표
-
-평가 결과에서 학습하여 엔티티 추출과 지식 그래프 생성의 정확도를 향상시킵니다.
-
-**중요한 설명:**
-- **Ragas 평가 자체는 매번 동일한 프롬프트를 사용합니다** (Ragas 메트릭의 고정된 프롬프트)
-- **학습 피드백 루프는 평가가 아닌 다른 컴포넌트에서 작동합니다:**
-  1. **KG 생성 및 테스트셋 생성**: EntityExtractor가 학습된 패턴을 사용하여 더 정확한 엔티티 추출
-  2. **도메인 지식 축적**: 평가 결과에서 검증된 사실(FactualFact)을 추출하여 도메인 지식베이스 구축
-  3. **패턴 학습**: 엔티티 타입별 신뢰도, 실패 패턴 등을 학습하여 다음 KG 생성에 반영
-
-**실제 작동 방식:**
+**구조**:
 ```
-평가 #1: Dataset → RagasEvaluator → EvaluationRun
-    └─> DomainLearningHook.on_evaluation_complete()
-            ├─> 엔티티 타입별 신뢰도 계산 (예: "organization" 타입 = 0.92)
-            └─> LearningMemory 저장
-
-평가 #2 (KG 기반 테스트셋 생성 시):
-    └─> KnowledgeGraphGenerator.build_graph(documents)
-            └─> EntityExtractor.extract_entities()
-                    └─> DomainMemoryAdapter.get_aggregated_reliability()
-                            └─> 학습된 신뢰도 점수를 가중치로 적용
-                                    └─> 더 정확한 엔티티 추출 → 더 나은 KG → 더 나은 테스트셋
+src/evalvault/adapters/inbound/cli/
+├── app.py
+├── commands/
+│   ├── run.py
+│   ├── analyze.py
+│   ├── history.py
+│   ├── generate.py
+│   ├── domain.py
+│   ├── gate.py
+│   ├── web.py
+│   └── pipeline.py
+└── utils/
+    ├── formatters.py
+    ├── validators.py
+    └── errors.py
 ```
 
-### 핵심 개념
+**예상 효과**:
+- 파일당 LOC: 1,500 → 150
+- 명령어 추가 시간: 50% 감소
 
-Agent Memory Survey의 Forms×Functions 가이드라인을 도입해 도메인 지식을 세 계층으로 구성합니다:
+---
 
-| 계층 | 목적 | 예시 |
-|------|------|------|
-| **Factual** | 검증된 정적 사실 | 용어 사전, 규정 문서 |
-| **Experiential** | 평가에서 학습한 패턴 | 엔티티 타입별 신뢰도, 실패 패턴 |
-| **Working** | 현재 실행 컨텍스트 | 세션 캐시, 활성 KG 바인딩 |
+### P4: 사용성 개선 (Week 5-6)
 
-### 구현된 기능
+**목표**: 신규 사용자 온보딩 시간 50% 단축
 
-| Sub-Phase | Description | Status | Tests |
-|-----------|-------------|--------|-------|
-| Phase 8.1 | Factual Memory Store | ✅ Complete | +40 |
-| Phase 8.2 | Dynamics: Evolution & Retrieval | ✅ Complete | +14 |
-| Phase 8.3 | Dynamics: Formation | ✅ Complete | +9 |
-| Phase 8.4 | Config & Multi-language | ✅ Complete | +33 |
-| Phase 8.5 | Forms: Planar/Hierarchical | ✅ Complete | +17 |
-| **Total** | | | **+113** |
+#### 4.1 CLI UX 개선 🔥 High Priority
 
-### 주요 파일
-
-```
-src/evalvault/
-├── domain/entities/
-│   └── memory.py                    # FactualFact, LearningMemory, BehaviorEntry
-├── domain/services/
-│   └── domain_learning_hook.py      # DomainLearningHook 서비스
-├── ports/outbound/
-│   ├── domain_memory_port.py        # DomainMemoryPort 인터페이스
-│   └── learning_hook_port.py         # DomainLearningHookPort 인터페이스
-├── adapters/outbound/domain_memory/
-│   ├── sqlite_adapter.py            # SQLiteDomainMemoryAdapter
-│   └── domain_memory_schema.sql     # 스키마 (FTS5 포함)
-└── config/
-    └── domain_config.py             # DomainMemoryConfig
-
-config/domains/insurance/
-├── memory.yaml                       # 도메인 메모리 설정
-├── terms_dictionary_ko.json          # 한국어 용어사전
-└── terms_dictionary_en.json          # 영어 용어사전
-```
-
-### CLI 사용법
-
+**명령어 별칭**:
 ```bash
-# 도메인 초기화
-evalvault domain init insurance --languages ko,en
+# 현재
+evalvault run data.csv --metrics faithfulness,answer_relevancy
 
-# 도메인 목록 조회
-evalvault domain list
-
-# 도메인 설정 조회
-evalvault domain show insurance
-
-# 용어사전 조회
-evalvault domain terms insurance --language ko --limit 10
+# 개선
+evalvault run data.csv -m faithfulness answer_relevancy
 ```
 
-### 구현 계획 (참고용 - 완료됨)
-
-#### Phase 8.1: Factual Memory Store (Week 1-2) ✅
-
-```
-src/evalvault/domain/entities/memory.py
-├── FactualFact (검증된 사실 엔티티)
-├── LearningMemory (학습된 패턴)
-└── DomainMemoryContext (워킹 메모리)
-
-src/evalvault/ports/outbound/domain_memory_port.py
-└── DomainMemoryPort (store_fact, query_facts, record_learning)
-
-src/evalvault/adapters/outbound/domain_memory/
-└── sqlite_adapter.py (SQLite 기반 메모리 저장소)
-```
-
-#### Phase 8.2: Config Extension (Week 2-3) ✅
-
-```yaml
-# config/domains/insurance/memory.yaml
-factual:
-  glossary: terms_dictionary.json
-  regulatory_rules: rules.md
-  languages: ["ko", "en"]  # 다국어 지원
-experiential:
-  reliability_scores: reliability.json
-  failure_modes: failures.json
-working:
-  run_cache: ${RUN_DIR}/memory.db
-  kg_binding: kg://insurance
-```
-
-**CLI 확장:**
+**프리셋 지원**:
 ```bash
-evalvault domain init <domain>      # 도메인 설정 초기화
-evalvault domain list               # 등록된 도메인 목록
-evalvault run ... --memory-layer working  # 특정 계층만 로드
+evalvault run data.csv --preset production
+# production = faithfulness + answer_relevancy + context_precision + context_recall
 ```
 
-#### Phase 8.3: Learning Integration (Week 3-4) ✅
+**작업 항목**:
+- [ ] 명령어 옵션 재설계
+- [ ] 짧은 별칭 추가
+- [ ] 프리셋 시스템 구현
+- [ ] 도움말 메시지 개선
 
-**DomainLearningHook 프로토콜** (결합도 최소화):
+#### 4.2 에러 메시지 개선 🔥 High Priority
+
+**현재**:
+```
+Error: The api_key client option must be set
+```
+
+**개선**:
+```
+❌ Error: OpenAI API key not found
+
+📝 How to fix:
+   1. Create a .env file
+   2. Add: OPENAI_API_KEY=your-key
+   3. Or: export OPENAI_API_KEY=your-key
+
+💡 Get key: https://platform.openai.com/api-keys
+```
+
+**작업 항목**:
+- [ ] 에러 메시지 템플릿 시스템
+- [ ] 모든 에러 케이스 재작성
+- [ ] 해결 방법 문서화
+
+#### 4.3 Progress Indicator ⚡ Quick Win
+
 ```python
-class DomainLearningHook(Protocol):
-    """평가 결과에서 학습하는 훅 인터페이스"""
-    def on_evaluation_complete(self, run: EvaluationRun) -> LearningMemory:
-        """평가 완료 시 패턴 학습"""
-        ...
+from rich.progress import track
 
-    def apply_learning(self, extractor: EntityExtractor) -> None:
-        """학습된 패턴을 추출기에 적용"""
+for test_case in track(dataset, description="Evaluating..."):
+    result = evaluate(test_case)
+```
+
+**작업 항목**:
+- [ ] Rich 라이브러리 통합
+- [ ] Progress bar 구현
+- [ ] ETA 표시 추가
+
+---
+
+### Quick Wins (즉시 실행 가능)
+
+> **Duration**: 1-2일
+
+#### QW1: 에러 메시지 개선 (1일) ✅
+```python
+class UserFriendlyError:
+    @staticmethod
+    def missing_api_key(provider: str) -> str:
+        return f"""
+❌ Error: {provider} API key not found
+📝 Fix: Add {provider.upper()}_API_KEY to .env
+💡 Get key: {PROVIDER_URLS[provider]}
+"""
+```
+
+#### QW2: Progress Bar 추가 (0.5일) ⚡
+```bash
+pip install rich
+```
+
+#### QW3: 명령어 별칭 (0.5일) ⚡
+```python
+@app.command()
+def run(
+    metrics: str = typer.Option(..., "-m", "--metrics"),
+    llm: str = typer.Option("openai", "-l", "--llm"),
+):
+    ...
+```
+
+#### QW4: 설정 검증 (1일) ✅
+```python
+class ConfigValidator:
+    def validate(self) -> list[str]:
+        issues = []
+        if not os.getenv("OPENAI_API_KEY"):
+            issues.append("OPENAI_API_KEY not set")
+        return issues
+```
+
+---
+
+## 향후 계획 (2026 Q2-Q4)
+
+### 2026 Q2 (4-6월): 성능 최적화 및 모듈화
+
+#### P3: 성능 최적화
+
+**3.1 평가 파이프라인 최적화**
+- [ ] 배치 처리 로직 개선
+- [ ] 비동기 평가 파이프라인
+- [ ] 캐싱 메커니즘 추가
+
+**목표**: 1000 TC 평가 시간 30분 → 10분
+
+**3.2 데이터 로딩 최적화**
+- [ ] 스트리밍 로더 구현
+- [ ] 대용량 파일 지원
+
+**목표**: 10MB 파일 메모리 사용량 100MB → 10MB
+
+**3.3 캐싱 개선**
+- [ ] LRU + TTL 하이브리드 캐시
+- [ ] 캐시 hit rate 측정
+
+**목표**: 캐시 hit rate 60% → 85%
+
+#### P2 (Part 2): 모듈 분리 완료
+
+**2.2 Web UI 재구조화**
+- [ ] 서비스 레이어 생성
+- [ ] 비즈니스 로직 분리
+- [ ] UI 컴포넌트 슬림화
+
+**2.3 Domain Services 분리**
+- [ ] 단일 책임 원칙 적용
+- [ ] 서비스 클래스 분리
+
+---
+
+### 2026 Q3 (7-9월): RAGAS 래퍼 탈피 - 고유 가치 강화
+
+> **Goal**: EvalVault만의 차별화된 가치 제공
+
+#### Phase 15: Custom Metric Framework
+
+**목표**: 사용자가 쉽게 커스텀 메트릭을 추가할 수 있는 프레임워크
+
+**구현 내용**:
+```python
+# 사용자 정의 메트릭
+from evalvault.domain.metrics import BaseMetric
+
+class MyCustomMetric(BaseMetric):
+    name = "my_custom_metric"
+    description = "My custom evaluation metric"
+
+    def score(self, test_case: TestCase) -> float:
+        # 커스텀 로직
+        return 0.85
+
+# 등록
+evalvault.register_metric(MyCustomMetric())
+
+# 사용
+evalvault run data.csv --metrics my_custom_metric
+```
+
+**작업 항목**:
+- [ ] `BaseMetric` 추상 클래스 설계
+- [ ] Metric Registry 구현
+- [ ] CLI 통합
+- [ ] 메트릭 플러그인 로더
+- [ ] 예제 메트릭 5개 작성
+
+**예상 기간**: 2주
+
+#### Phase 16: Auto-Prompting System
+
+**목표**: LLM 평가 시 자동으로 최적의 프롬프트 생성
+
+**구현 내용**:
+```python
+class AutoPrompter:
+    """자동 프롬프트 생성"""
+
+    def generate_prompt(
+        self,
+        metric: str,
+        test_case: TestCase,
+        domain: str = "general",
+    ) -> str:
+        """메트릭별 최적화된 프롬프트 생성"""
+        # 도메인 지식 활용
+        domain_context = self.domain_memory.get_context(domain)
+
+        # 메트릭별 템플릿
+        template = METRIC_TEMPLATES[metric]
+
+        # 프롬프트 생성
+        prompt = template.format(
+            question=test_case.question,
+            answer=test_case.answer,
+            context=test_case.contexts,
+            domain_context=domain_context,
+        )
+
+        return prompt
+```
+
+**작업 항목**:
+- [ ] 메트릭별 프롬프트 템플릿 수집
+- [ ] 도메인별 프롬프트 최적화
+- [ ] A/B 테스트로 프롬프트 성능 비교
+- [ ] 프롬프트 버전 관리
+
+**예상 기간**: 3주
+
+#### Phase 17: Improvement Suggestion Engine
+
+**목표**: 평가 결과를 분석하여 구체적인 개선 제안 제공
+
+**현재 상태**:
+- Phase 3 Causal Analysis로 근본 원인 파악
+- 하지만 제안이 일반적이고 구체성 부족
+
+**개선 방향**:
+```python
+class ImprovementEngine:
+    """개선 제안 엔진"""
+
+    def generate_suggestions(
+        self,
+        run: EvaluationRun,
+        use_llm: bool = True,
+    ) -> list[ImprovementSuggestion]:
+        """구체적인 개선 제안 생성"""
+        # 1. 패턴 분석
+        patterns = self.pattern_detector.detect(run)
+
+        # 2. 근본 원인 분석 (기존 Causal Analysis 활용)
+        root_causes = self.causal_analyzer.analyze(run)
+
+        # 3. 플레이북 기반 제안 생성
+        suggestions = []
+        for pattern in patterns:
+            playbook = self.playbook_registry.get(pattern.type)
+            suggestion = playbook.generate_suggestion(
+                pattern=pattern,
+                root_cause=root_causes.get(pattern.metric),
+                domain=run.domain,
+            )
+            suggestions.append(suggestion)
+
+        # 4. LLM 기반 제안 (선택적)
+        if use_llm:
+            enriched = self.llm_enricher.enrich(suggestions, run)
+            suggestions = enriched
+
+        return suggestions
+```
+
+**Playbook 예시**:
+```yaml
+# config/playbooks/faithfulness_playbook.yaml
+patterns:
+  - name: long_context_low_faithfulness
+    conditions:
+      - metric: faithfulness
+        threshold: 0.7
+      - feature: context_length
+        operator: ">"
+        value: 500
+    suggestions:
+      - action: chunk_context
+        priority: high
+        rationale: "긴 컨텍스트는 LLM이 충실하게 따르기 어렵습니다"
+        implementation:
+          - "DocumentChunker를 사용하여 컨텍스트를 500자 이하로 분할"
+          - "chunk_size=500, overlap=50 권장"
+        expected_improvement: "+15% faithfulness"
+        verification:
+          command: "evalvault run data.csv --chunk-size 500"
+```
+
+**작업 항목**:
+- [ ] Pattern Detector 구현
+- [ ] Playbook YAML 포맷 설계
+- [ ] 기본 Playbook 작성 (10개 패턴)
+- [ ] LLM 기반 제안 enrichment
+- [ ] CLI 통합 (`evalvault suggest <run_id>`)
+
+**예상 기간**: 3주
+
+---
+
+### 2026 Q4 (10-12월): 고급 기능 및 생태계 확장
+
+#### Phase 18: RAG Pipeline Integration
+
+**목표**: RAG 파이프라인을 직접 EvalVault에서 실행하고 평가
+
+**현재 한계**:
+- 사용자가 외부에서 RAG 파이프라인 실행 → 결과를 CSV로 저장 → EvalVault로 평가
+- 번거롭고 실수하기 쉬움
+
+**개선 방향**:
+```python
+# RAG 파이프라인 정의
+from evalvault.pipeline import RAGPipeline
+
+pipeline = RAGPipeline(
+    retriever=BM25Retriever(documents),
+    llm=OpenAI(model="gpt-4"),
+    prompt_template="...",
+)
+
+# 평가 + 파이프라인 실행을 한 번에
+result = evalvault.evaluate(
+    questions=["질문1", "질문2", ...],
+    pipeline=pipeline,
+    metrics=["faithfulness", "answer_relevancy"],
+)
+
+# 또는 CLI로
+evalvault run-pipeline config.yaml \
+  --questions questions.csv \
+  --metrics faithfulness
+```
+
+**작업 항목**:
+- [ ] `RAGPipeline` 추상 클래스 설계
+- [ ] Retriever 통합 (BM25, Dense, Hybrid)
+- [ ] LLM 통합 (기존 LLMPort 활용)
+- [ ] 파이프라인 설정 파일 포맷 (YAML)
+- [ ] CLI 통합
+- [ ] LangChain/LlamaIndex 호환성
+
+**예상 기간**: 4주
+
+#### Phase 19: Knowledge Graph 고도화
+
+**목표**: NetworkX 기반 고급 KG 기능 및 KG 기반 평가
+
+**현재 상태**:
+- Phase 6에서 기본 KG 생성 및 테스트셋 생성 완료
+- 하지만 KG 분석, 시각화, KG 기반 메트릭 부족
+
+**개선 방향**:
+
+**19.1 NetworkX 마이그레이션**
+```python
+# 현재: 단순 dict 기반 그래프
+class KnowledgeGraph:
+    nodes: dict[str, Entity]
+    edges: list[Relation]
+
+# 개선: NetworkX 기반
+import networkx as nx
+
+class KnowledgeGraph:
+    def __init__(self):
+        self.graph = nx.MultiDiGraph()
+
+    def add_entity(self, entity: Entity):
+        self.graph.add_node(
+            entity.id,
+            type=entity.type,
+            **entity.attributes
+        )
+
+    def add_relation(self, relation: Relation):
+        self.graph.add_edge(
+            relation.source,
+            relation.target,
+            type=relation.type,
+            **relation.attributes
+        )
+
+    # NetworkX 기능 활용
+    def shortest_path(self, source, target):
+        return nx.shortest_path(self.graph, source, target)
+
+    def centrality(self):
+        return nx.betweenness_centrality(self.graph)
+```
+
+**19.2 KG 기반 평가 메트릭**
+```python
+class KGCoverageMetric(BaseMetric):
+    """KG 커버리지 메트릭"""
+
+    def score(self, test_case: TestCase, kg: KnowledgeGraph) -> float:
+        """답변이 KG의 엔티티/관계를 얼마나 커버하는지"""
+        answer_entities = self.extract_entities(test_case.answer)
+        kg_entities = kg.get_entities()
+
+        coverage = len(answer_entities & kg_entities) / len(kg_entities)
+        return coverage
+
+class KGConsistencyMetric(BaseMetric):
+    """KG 일관성 메트릭"""
+
+    def score(self, test_case: TestCase, kg: KnowledgeGraph) -> float:
+        """답변이 KG의 관계와 일치하는지"""
+        claims = self.extract_claims(test_case.answer)
+
+        consistent_claims = 0
+        for claim in claims:
+            if self.verify_with_kg(claim, kg):
+                consistent_claims += 1
+
+        return consistent_claims / len(claims)
+```
+
+**19.3 KG 통계 및 분석**
+```python
+class KGAnalyzer:
+    """KG 분석기"""
+
+    def analyze(self, kg: KnowledgeGraph) -> KGStats:
+        """KG 통계 분석"""
+        return KGStats(
+            num_entities=kg.graph.number_of_nodes(),
+            num_relations=kg.graph.number_of_edges(),
+            entity_types=self._count_entity_types(kg),
+            relation_types=self._count_relation_types(kg),
+            centrality=self._calculate_centrality(kg),
+            clusters=self._detect_clusters(kg),
+            density=nx.density(kg.graph),
+        )
+
+    def visualize(self, kg: KnowledgeGraph, output: str):
+        """KG 시각화 (Plotly/Graphviz)"""
         ...
 ```
 
-### 성공 지표
+**19.4 CLI 통합**
+```bash
+# KG 생성
+evalvault kg build documents.md -o knowledge_graph.json
+
+# KG 분석
+evalvault kg analyze knowledge_graph.json
+
+# KG 시각화
+evalvault kg visualize knowledge_graph.json -o graph.html
+
+# KG 기반 평가
+evalvault run data.csv \
+  --kg knowledge_graph.json \
+  --metrics kg_coverage kg_consistency
+```
+
+**작업 항목**:
+- [ ] NetworkX 마이그레이션
+- [ ] KG 기반 메트릭 구현
+- [ ] KG 분석 기능
+- [ ] KG 시각화 (Plotly)
+- [ ] CLI 통합
+
+**예상 기간**: 4-5주
+
+---
+
+## 미래 연구 (2027+)
+
+> **Note**: 아래 기능들은 장기 연구 주제이며, 실제 필요성이 검증된 후 구현합니다.
+
+### Agent System Integration
+
+**전제 조건**: 멀티에이전트 아키텍처 도입
+
+**현재 구조**:
+```
+Dataset → RagasEvaluator → Results (순차 파이프라인)
+```
+
+**미래 구조**:
+```
+Dataset → [Planner Agent] → [Metric Agents] → [Insight Agent] → Results
+              ↑                    ↑                ↑
+              └────────────────────┴────────────────┘
+                      Agent Coordination
+```
+
+#### Coordination Profiler
+
+**목표**: Scaling Agent Systems 논문 기반, 멀티에이전트 오버헤드 정량화
+
+**CLI 스펙** (미래):
+```bash
+evalvault profile <dataset_path> \
+  --agents single|centralized|decentralized \
+  --max-calls 1000 \
+  --emit-policy
+```
+
+**우선순위**: Agent Architecture 도입 후
+
+#### Latent Evidence Bus
+
+**목표**: LatentMAS 스타일 KV cache / hidden state 공유
+
+**제약**:
+- OpenAI/Anthropic API: hidden state 미노출 → 불가능
+- HuggingFace/vLLM 로컬 모델: 가능 (별도 어댑터 필요)
+
+**현실적 범위**:
+- Q1: Anthropic Extended Thinking 캡처 (API 기반)
+- 이후: HuggingFace/vLLM 직접 통합 연구
+
+**우선순위**: Agent Architecture + 로컬 모델 인프라 확보 후
+
+---
+
+## 실행 로드맵 요약
+
+### 2026 Q1 (1-3월): 코드 품질 개선
+
+- Week 1-2: P1 코드 통합
+- Week 3-4: P2 모듈 분리 (Part 1)
+- Week 5-6: P4 사용성 개선
+
+### 2026 Q2 (4-6월): 성능 최적화
+
+- Week 7-8: P2 모듈 분리 (Part 2)
+- Week 9-10: P3 성능 최적화
+- Week 11-12: P5 & P6 테스트/문서화
+
+### 2026 Q3 (7-9월): 고유 가치 강화
+
+- Week 13-14: Phase 15 Custom Metric Framework
+- Week 15-17: Phase 16 Auto-Prompting System
+- Week 18-20: Phase 17 Improvement Suggestion Engine
+
+### 2026 Q4 (10-12월): 생태계 확장
+
+- Week 21-24: Phase 18 RAG Pipeline Integration
+- Week 25-29: Phase 19 Knowledge Graph 고도화
+
+### 2027+: 미래 연구
+
+- Agent System Integration
+- Coordination Profiler
+- Latent Evidence Bus
+
+---
+
+## 성공 지표
+
+### 코드 품질 (2026 Q1-Q2)
 
 | 지표 | Baseline | 목표 |
 |------|----------|------|
-| Entity Extraction Accuracy | 현재 측정 필요 | +10% |
-| 도메인 온보딩 시간 | 수동 설정 | CLI 자동화 |
-| 반복 실수율 | 측정 필요 | -30% |
+| 코드 중복률 | 15% | 10% |
+| 평균 모듈 크기 | 300 LOC | 150 LOC |
+| 테스트 실행 시간 | 14분 | 7분 |
+| 신규 사용자 온보딩 | 30분 | 15분 |
+
+### 성능 (2026 Q2)
+
+| 지표 | Baseline | 목표 |
+|------|----------|------|
+| 1000 TC 평가 시간 | 30분 | 10분 |
+| 캐시 hit rate | 60% | 85% |
+| 메모리 사용량 (10MB 파일) | 100MB | 10MB |
+
+### 고유 가치 (2026 Q3-Q4)
+
+| 지표 | Baseline | 목표 |
+|------|----------|------|
+| 커스텀 메트릭 추가 시간 | N/A | 30분 |
+| 개선 제안 구체성 | Low | High |
+| RAG 파이프라인 통합 | None | Full |
 
 ---
 
-## Phase 9: Korean RAG Optimization ✅
+## 참고 문서
 
-> **Status**: Complete (9.1-9.5)
-> **Priority**: ✅ Complete
-> **Goal**: 한국어 RAG 시스템의 성능을 정확하게 측정하고 분석하기 위한 평가 도구 제공
-> **Tests**: +24
-
-### 구현된 기능
-
-| Sub-Phase | Description | Status |
-|-----------|-------------|--------|
-| Phase 9.1 | Korean NLP Foundation (KiwiTokenizer) | ✅ Complete |
-| Phase 9.2 | Korean Keyword Extraction + Hybrid Search | ✅ Complete |
-| Phase 9.3 | Dense Embedding (BGE-m3-ko) | ✅ Complete |
-| Phase 9.4 | Korean RAG Evaluation (Faithfulness) | ✅ Complete |
-| Phase 9.5 | Benchmarks & Guidelines | ✅ Complete |
-
-### 주요 파일
-
-```
-src/evalvault/
-├── adapters/outbound/nlp/
-│   └── korean/
-│       ├── kiwi_tokenizer.py           # Kiwi 기반 토크나이저
-│       ├── korean_stopwords.py         # 한국어 불용어 사전
-│       ├── korean_bm25_retriever.py    # 형태소 분석 BM25 검색
-│       ├── korean_hybrid_retriever.py  # BM25 + Dense 하이브리드
-│       ├── korean_dense_retriever.py   # Dense 임베딩 검색
-│       └── korean_faithfulness.py      # Faithfulness 검증 도구
-├── domain/entities/
-│   └── benchmark.py                    # RAGTestCase, BenchmarkResult
-├── domain/services/
-│   └── benchmark_runner.py             # KoreanRAGBenchmarkRunner
-├── ports/outbound/
-│   └── korean_nlp_port.py              # 한국어 NLP 포트
-
-examples/benchmarks/
-├── run_korean_benchmark.py             # 벤치마크 실행 스크립트
-├── README.md                           # 벤치마크 가이드
-└── korean_rag/                         # 벤치마크 데이터셋
-
-tests/unit/
-└── test_benchmark_runner.py            # 24개 벤치마크 테스트
-```
-
-### 기술 스택
-
-- **형태소 분석**: Kiwi (kiwipiepy) - Pure Python, 빠른 속도, 높은 정확도
-- **임베딩 모델**: dragonkue/BGE-m3-ko - AutoRAG 벤치마크 1위 (+39.4% 성능 향상)
-- **검색**: BM25 + Dense 하이브리드 (Reciprocal Rank Fusion)
-
-### 통합 포인트
-
-1. **테스트셋 생성**: KoreanDocumentChunker로 의미 단위 청킹
-2. **NLP Analysis**: 형태소 분석 기반 키워드 추출 (정확도 60% → 85%+)
-3. **KG 생성**: 형태소 분석 기반 엔티티 추출 (정확도 70% → 90%+)
-4. **Domain Memory**: 사실 정규화로 중복 제거
-5. **평가 품질**: Faithfulness 검증 보조 (+5-10% 향상)
-
-### 예상 효과
-
-| 기능 | 개선율 |
-|------|--------|
-| 테스트셋 품질 | +15-20% |
-| 키워드 추출 정확도 | +25% (60% → 85%+) |
-| 엔티티 추출 정확도 | +20% (70% → 90%+) |
-| KG 품질 | +20-30% |
-| Domain Memory 정확도 | +10-15% |
-
-### CLI 사용법
-
-```bash
-# 한국어 최적화 옵션 사용
-evalvault generate documents.md --method knowledge_graph --korean
-
-# 한국어 토크나이저로 NLP 분석
-evalvault analyze <run_id> --nlp --korean
-
-# 한국어 청킹으로 테스트셋 생성
-evalvault generate documents.md --korean-chunker
-```
-
-### 상세 문서
-
-- `docs/PHASE9_KOREAN_RAG.md`: 전체 구현 계획 및 통합 전략
+- [COMPLETED.md](./COMPLETED.md): Phase 1-14 달성 기록
+- [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 코드 품질 개선 계획
+- [USER_GUIDE.md](./USER_GUIDE.md): 사용자 가이드
+- [ARCHITECTURE.md](./ARCHITECTURE.md): 아키텍처 문서
 
 ---
 
-## Phase 10-13: Streamlit Web UI ✅
+## 기여 방법
 
-> **Status**: Complete (2025-12-30)
-> **Tests**: +138
-> **Priority**: ✅ Complete
+EvalVault는 오픈소스 프로젝트입니다. 기여를 환영합니다!
 
-평가 결과를 시각화하고 관리할 수 있는 웹 기반 대시보드입니다.
+1. Issue에서 작업할 항목 선택 또는 새 Issue 생성
+2. Fork & Branch 생성
+3. 코드 작성 + 테스트 작성
+4. PR 생성
+5. Code Review 및 Merge
 
-### 구현된 기능
-
-| Sub-Phase | Description | Status |
-|-----------|-------------|--------|
-| Phase 10 | Web UI MVP Structure | ✅ Complete |
-| Phase 11 | Dashboard with Plotly Charts | ✅ Complete |
-| Phase 12.1 | Evaluate Page (File Upload) | ✅ Complete |
-| Phase 12.2 | History Page (Filtering & Export) | ✅ Complete |
-| Phase 13 | Reports Page (Template-based) | ✅ Complete |
-
-### 주요 파일
-
-```
-src/evalvault/adapters/inbound/web/
-├── __init__.py
-├── adapter.py              # WebUIAdapter (Streamlit 실행)
-├── app.py                  # 메인 Streamlit 앱
-├── session.py              # 세션 상태 관리
-├── components/
-│   ├── cards.py            # 카드 컴포넌트
-│   ├── charts.py           # Plotly 차트 (Bar, Radar, Trend)
-│   ├── evaluate.py         # 평가 실행 컴포넌트
-│   ├── history.py          # 히스토리 필터링/테이블
-│   ├── lists.py            # 리스트 컴포넌트
-│   ├── metrics.py          # 메트릭 표시 컴포넌트
-│   ├── progress.py         # 진행 표시 컴포넌트
-│   ├── reports.py          # 보고서 생성 컴포넌트
-│   ├── stats.py            # 통계 표시 컴포넌트
-│   └── upload.py           # 파일 업로드 컴포넌트
-├── pages/
-│   └── ...                 # 페이지별 라우팅
-└── styles/
-    └── ...                 # 스타일 정의
-
-tests/unit/
-├── test_web_ui.py          # UI 컴포넌트 테스트
-├── test_web_dashboard.py   # 대시보드 테스트
-├── test_web_evaluate.py    # 평가 페이지 테스트
-├── test_web_history.py     # 히스토리 페이지 테스트
-└── test_web_reports.py     # 보고서 페이지 테스트
-```
-
-### 기술 스택
-
-- **Streamlit**: Python 웹 프레임워크
-- **Plotly**: 인터랙티브 차트
-- **Pandas**: 데이터 처리
-
-### 주요 기능
-
-#### Dashboard (Phase 11)
-- 평가 결과 개요 카드
-- 메트릭별 성능 차트 (Bar, Radar)
-- 시간별 추세 차트
-- 최근 평가 목록
-
-#### Evaluate Page (Phase 12.1)
-- CSV/Excel/JSON 파일 업로드
-- 데이터 미리보기 및 검증
-- 메트릭 선택 UI
-- 실시간 평가 진행 표시
-
-#### History Page (Phase 12.2)
-- 평가 히스토리 테이블
-- 날짜/데이터셋/모델별 필터링
-- 결과 비교 기능
-- JSON/CSV 내보내기
-
-#### Reports Page (Phase 13)
-- 템플릿 기반 보고서 생성
-- Markdown/HTML 형식 지원
-- 사용자 정의 템플릿
-- 차트 포함 보고서
-
-### CLI 사용법
-
-```bash
-# Web UI 실행
-evalvault web
-
-# 특정 포트로 실행
-evalvault web --port 8502
-```
+**기여 가이드**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ---
 
-## Phase 14: Query-Based DAG Analysis Pipeline ✅
+## 라이선스
 
-> **Status**: Complete (2025-12-30)
-> **Tests**: +153
-> **Priority**: ✅ Complete
-
-사용자 쿼리를 분석하여 자동으로 DAG 기반 분석 파이프라인을 구성하고 실행합니다.
-
-### 구현된 기능
-
-| Sub-Phase | Description | Status | Tests |
-|-----------|-------------|--------|-------|
-| Phase 14.1 | Domain Entities | ✅ Complete | 70 |
-| Phase 14.2 | Intent Classifier & Template Registry | ✅ Complete | 39 |
-| Phase 14.3 | PipelineOrchestrator | ✅ Complete | 24 |
-| Phase 14.4 | Analysis Module Adapters | ✅ Complete | 20 |
-
-### 핵심 개념
-
-#### 분석 의도 (AnalysisIntent)
-사용자 쿼리에서 12가지 분석 의도를 자동 분류:
-
-| Category | Intent | Description |
-|----------|--------|-------------|
-| **Verification** | VERIFY_MORPHEME | 형태소 분석 검증 |
-| | VERIFY_EMBEDDING | 임베딩 품질 검증 |
-| | VERIFY_RETRIEVAL | 검색 품질 검증 |
-| **Comparison** | COMPARE_SEARCH_METHODS | 검색 방식 비교 (BM25 vs Dense vs Hybrid) |
-| | COMPARE_MODELS | LLM 모델 비교 |
-| | COMPARE_RUNS | 평가 결과 비교 |
-| **Analysis** | ANALYZE_LOW_METRICS | 낮은 메트릭 원인 분석 |
-| | ANALYZE_PATTERNS | 패턴 분석 |
-| | ANALYZE_TRENDS | 추세 분석 |
-| **Report** | GENERATE_SUMMARY | 요약 보고서 |
-| | GENERATE_DETAILED | 상세 보고서 |
-| | GENERATE_COMPARISON | 비교 보고서 |
-
-#### DAG 파이프라인
-의도에 따라 자동으로 분석 노드들의 DAG를 구성:
-
-```
-예: VERIFY_MORPHEME 의도
-┌──────────────┐    ┌────────────────────┐    ┌─────────────────────┐
-│ DataLoader   │───►│ MorphemeAnalyzer   │───►│ VerificationReport  │
-└──────────────┘    └────────────────────┘    └─────────────────────┘
-
-예: COMPARE_SEARCH_METHODS 의도
-                    ┌──────────────┐
-                    │ BM25Search   │────┐
-┌──────────────┐   ├──────────────┤    │    ┌────────────────────┐
-│ DataLoader   │───►│ DenseSearch  │────┼───►│ ComparisonReport   │
-└──────────────┘   ├──────────────┤    │    └────────────────────┘
-                    │ HybridSearch │────┘
-                    └──────────────┘
-```
-
-### 주요 파일
-
-```
-src/evalvault/
-├── domain/entities/
-│   └── analysis_pipeline.py       # AnalysisIntent, AnalysisNode, AnalysisPipeline,
-│                                  # NodeResult, PipelineResult, ModuleMetadata, ModuleCatalog
-├── domain/services/
-│   ├── intent_classifier.py       # KeywordIntentClassifier, IntentKeywordRegistry
-│   ├── pipeline_template_registry.py  # 의도별 파이프라인 템플릿
-│   └── pipeline_orchestrator.py   # PipelineOrchestrator, AnalysisPipelineService
-├── ports/
-│   ├── inbound/
-│   │   └── analysis_pipeline_port.py  # AnalysisPipelinePort
-│   └── outbound/
-│       ├── analysis_module_port.py    # AnalysisModulePort
-│       └── intent_classifier_port.py  # IntentClassifierPort
-├── adapters/outbound/analysis/
-│   ├── base_module.py             # BaseAnalysisModule
-│   ├── data_loader_module.py      # DataLoaderModule
-│   ├── statistical_analyzer_module.py  # StatisticalAnalyzerModule
-│   ├── summary_report_module.py   # SummaryReportModule
-│   ├── verification_report_module.py  # VerificationReportModule
-│   ├── comparison_report_module.py    # ComparisonReportModule
-│   └── analysis_report_module.py  # AnalysisReportModule
-
-tests/unit/
-├── test_analysis_pipeline.py      # 엔티티 테스트 (70개)
-├── test_intent_classifier.py      # 의도 분류기 테스트 (39개)
-├── test_pipeline_orchestrator.py  # 오케스트레이터 테스트 (24개)
-└── test_analysis_modules.py       # 모듈 어댑터 테스트 (20개)
-```
-
-### 사용 예시
-
-```python
-from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
-from evalvault.adapters.outbound.analysis import (
-    DataLoaderModule,
-    StatisticalAnalyzerModule,
-    SummaryReportModule,
-)
-
-# 서비스 초기화
-service = AnalysisPipelineService()
-
-# 모듈 등록
-service.register_module(DataLoaderModule())
-service.register_module(StatisticalAnalyzerModule())
-service.register_module(SummaryReportModule())
-
-# 쿼리 기반 자동 분석
-result = service.analyze("형태소 분석이 제대로 되고 있는지 확인해줘")
-
-# 결과 확인
-print(f"Intent: {result.intent}")  # VERIFY_MORPHEME
-print(f"Success: {result.all_succeeded}")
-print(f"Report: {result.final_output}")
-```
-
-### 비동기 병렬 실행
-
-독립적인 노드들은 자동으로 병렬 실행:
-
-```python
-import asyncio
-
-async def main():
-    result = await service.analyze_async(
-        "BM25와 Dense 검색을 비교해줘"
-    )
-    print(result.final_output)
-
-asyncio.run(main())
-```
-
-### 확장성
-
-새로운 분석 모듈을 쉽게 추가할 수 있는 플러그인 아키텍처:
-
-```python
-from evalvault.adapters.outbound.analysis import BaseAnalysisModule
-
-class MyCustomModule(BaseAnalysisModule):
-    module_id = "my_custom_module"
-    name = "My Custom Module"
-    description = "사용자 정의 분석 모듈"
-    input_types = ["data"]
-    output_types = ["result"]
-
-    def execute(self, inputs, params=None):
-        # 분석 로직 구현
-        return {"result": "custom analysis"}
-
-# 등록
-service.register_module(MyCustomModule())
-```
+MIT License
 
 ---
 
-## Future: Agent System Integration
-
-> **Status**: Research / Deferred
-> **Prerequisite**: 멀티에이전트 아키텍처 도입
-
-현재 EvalVault는 **순차적 평가 파이프라인**입니다. 아래 기능들은 **진정한 멀티에이전트 시스템** 도입 후에 의미가 있습니다.
-
-### 전제 조건: Agent Architecture
-
-```
-현재 구조 (에이전트 없음):
-  Dataset → RagasEvaluator → Results
-
-미래 구조 (에이전트 시스템):
-  Dataset → [Planner Agent] → [Metric Agents] → [Insight Agent] → Results
-                  ↑                    ↑                ↑
-                  └────────────────────┴────────────────┘
-                           Agent Coordination
-```
-
-### Coordination Profiler & Policy Guard
-
-**전제**: 프로파일링할 에이전트 간 조율이 존재해야 함
-
-- **목표**: Scaling Agent Systems 논문 기반, 멀티에이전트 오버헤드 정량화
-- **CLI 스펙** (미래):
-  ```bash
-  evalvault profile <dataset_path> \
-    --agents single|centralized|decentralized \
-    --max-calls 1000 \
-    --emit-policy
-  ```
-- **baseline_score 정의**: 동일 데이터셋에 대해 단일 에이전트 재실행 결과
-- **우선순위**: Agent Architecture 도입 후 1.5 스프린트
-
-### Latent Evidence Bus
-
-**전제**: 에이전트 간 hidden state 공유가 필요해야 함
-
-- **목표**: LatentMAS 스타일 KV cache / hidden state 공유
-- **API 제약**:
-  - OpenAI/Anthropic/Azure API: hidden state 미노출 → **불가능**
-  - HuggingFace/vLLM 로컬 모델: **가능** (별도 어댑터 필요)
-- **현실적 범위**:
-  - Q1: Anthropic Extended Thinking 캡처만 (API 기반)
-  - 이후: HuggingFace/vLLM 직접 통합 연구
-- **우선순위**: Agent Architecture + 로컬 모델 인프라 확보 후
-
-### 로드맵
-
-```
-2026 Q1: Domain Memory Layering (현재 시스템에 적용)
-2026 Q2: Agent Architecture 설계 및 프로토타입
-2026 Q3: Coordination Profiler (에이전트 시스템에 적용)
-2026 Q4: Latent Evidence Bus 연구 (로컬 모델 기반)
-```
-
----
-
-## Completed Phases
-
-### Phase 1-3: Core System ✅
-
-**Status**: Complete (2024-12-24)
-
-| Component | Status | Description |
-|-----------|--------|-------------|
-| Domain Entities | ✅ | TestCase, Dataset, EvaluationRun, MetricScore |
-| Port Interfaces | ✅ | LLMPort, DatasetPort, StoragePort, TrackerPort, EvaluatorPort |
-| Data Loaders | ✅ | CSV, Excel, JSON loaders |
-| RagasEvaluator | ✅ | Async evaluation with 4 core metrics |
-| OpenAI Adapter | ✅ | LangChain integration with token tracking |
-| Langfuse Adapter | ✅ | Trace/score logging, SDK v3 support |
-| CLI Interface | ✅ | run, metrics, config commands |
-
----
-
-### Phase 4: Foundation Enhancement ✅
-
-**Status**: Complete (2024-12-24)
-
-| Task | Description | Status | Files |
-|------|-------------|--------|-------|
-| TASK-4.3 | FactualCorrectness Metric | ✅ DONE | `evaluator.py`, `settings.py` |
-| TASK-4.4 | SemanticSimilarity Metric | ✅ DONE | `evaluator.py`, `settings.py` |
-| TASK-4.5a | Azure OpenAI Adapter | ✅ DONE | `src/evalvault/adapters/outbound/llm/azure_adapter.py` |
-| TASK-4.5b | Anthropic Claude Adapter | ✅ DONE | `src/evalvault/adapters/outbound/llm/anthropic_adapter.py` |
-
-#### Implemented Features
-
-**New Metrics**:
-- `factual_correctness` - ground_truth 대비 사실적 정확성
-- `semantic_similarity` - 답변과 ground_truth 간 의미적 유사도
-
----
-
-### Phase 5: Storage & Domain ✅
-
-**Status**: Complete (2024-12-24)
-
-| Task | Description | Status | Files |
-|------|-------------|--------|-------|
-| TASK-5.1 | SQLite Storage Adapter | ✅ DONE | `sqlite_adapter.py`, `schema.sql` |
-| TASK-5.2 | History CLI Commands | ✅ DONE | `cli.py` (history, compare, export) |
-| TASK-5.3 | InsuranceTermAccuracy Metric | ✅ DONE | `src/evalvault/domain/metrics/insurance.py` |
-| TASK-5.4 | Basic Testset Generation | ✅ DONE | `testset_generator.py`, `document_chunker.py` |
-
-#### Implemented Features
-
-**SQLite Storage** (`src/evalvault/adapters/outbound/storage/sqlite_adapter.py`):
-- `save_run(run)` - 평가 결과 저장
-- `get_run(run_id)` - 단일 결과 조회
-- `list_runs(limit, dataset_name, model_name)` - 필터링된 목록 조회
-- `delete_run(run_id)` - 결과 삭제
-
-**CLI Commands**:
-- `evalvault history` - 평가 히스토리 조회
-- `evalvault compare <run_id1> <run_id2>` - 두 평가 결과 비교
-- `evalvault export <run_id> -o <file>` - 결과 JSON 내보내기
-- `evalvault generate <documents> -n <num>` - 테스트셋 생성
-
-**InsuranceTermAccuracy** (`src/evalvault/domain/metrics/insurance.py`):
-- 보험 도메인 특화 용어 정확도 평가
-- 용어 사전 기반 매칭 (`terms_dictionary.json`)
-- Ragas Metric 인터페이스 호환
-
-**Testset Generation** (`src/evalvault/domain/services/testset_generator.py`):
-- `BasicTestsetGenerator` - LLM 없이 기본 테스트셋 생성
-- `DocumentChunker` - 문서 청킹 유틸리티
-- factual/reasoning 질문 유형 지원
-
----
-
-### Phase 6: Advanced Features ✅
-
-**Status**: Complete (2025-12-24)
-
-| Task | Description | Status | Files |
-|------|-------------|--------|-------|
-| TASK-6.1 | Knowledge Graph Testset Generation | ✅ DONE | `kg_generator.py`, `entity_extractor.py` |
-| TASK-6.2 | Experiment Management System | ✅ DONE | `experiment.py`, `experiment_manager.py` |
-| TASK-6.4 | PostgreSQL Storage Adapter | ✅ DONE | `postgres_adapter.py` |
-| TASK-6.5 | MLflow Tracker Adapter | ✅ DONE | `mlflow_adapter.py` |
-| TASK-6.6 | Azure OpenAI Adapter | ✅ DONE | `azure_adapter.py` |
-| TASK-6.7 | Anthropic Claude Adapter | ✅ DONE | `anthropic_adapter.py` |
-
----
-
-#### Implemented Features
-
-**Knowledge Graph Generator** (`src/evalvault/domain/services/kg_generator.py`):
-- `KnowledgeGraph` - 지식 그래프 데이터 구조
-- `KnowledgeGraphGenerator` - 문서 기반 그래프 생성
-- Multi-hop 질문 생성 지원
-- Entity 타입별 질문 생성
-
-**Entity Extractor** (`src/evalvault/domain/services/entity_extractor.py`):
-- 보험 도메인 엔티티 추출 (회사, 상품, 금액, 기간, 보장)
-- 관계 추출 (PROVIDES, COVERS, HAS_AMOUNT 등)
-
-**Experiment Management** (`src/evalvault/domain/services/experiment_manager.py`):
-- `Experiment`, `ExperimentGroup` 엔티티
-- A/B 테스트 그룹 비교
-- 메트릭 통계 분석 및 결과 요약
-
-**PostgreSQL Adapter** (`src/evalvault/adapters/outbound/storage/postgres_adapter.py`):
-- asyncpg 기반 비동기 PostgreSQL 지원
-- StoragePort 인터페이스 호환
-
-**MLflow Adapter** (`src/evalvault/adapters/outbound/tracker/mlflow_adapter.py`):
-- MLflow 실험 추적 연동
-- TrackerPort 인터페이스 호환
-
-**Azure OpenAI Adapter** (`src/evalvault/adapters/outbound/llm/azure_adapter.py`):
-- Azure OpenAI Service 연동
-- LLMPort 인터페이스 호환
-
-**Anthropic Adapter** (`src/evalvault/adapters/outbound/llm/anthropic_adapter.py`):
-- Anthropic Claude API 연동
-- OpenAI embeddings fallback 지원
-- LLMPort 인터페이스 호환
-
----
-
-### Phase 7: Production Ready ✅
-
-**Status**: Complete (2025-12-28)
-
-| Task | Description | Status | Files |
-|------|-------------|--------|-------|
-| TASK-7.1 | Performance Optimization | ✅ DONE | `evaluator.py` (parallel, batch_size) |
-| TASK-7.2 | Docker Containerization | ✅ DONE | `Dockerfile`, `docker-compose.yml` |
-
-#### Implemented Features
-
-**Performance Optimization**:
-- `--parallel` CLI 옵션으로 병렬 평가 활성화
-- `--batch-size` 옵션으로 배치 크기 조절
-- 대규모 데이터셋 평가 성능 향상
-
-**Docker Support**:
-- Multi-stage build로 최적화된 이미지
-- `docker-compose.yml`로 PostgreSQL + EvalVault 스택 구성
-- 비root 사용자로 보안 강화
-
----
-
-## Future Enhancements
-
-> YAGNI 원칙에 따라, 아래 기능은 실제 사용자 요구가 있을 때 구현합니다.
-> 현재는 CLI + Langfuse/MLflow UI 조합으로 대부분의 사용 사례를 충족합니다.
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| API Server (FastAPI) | HTTP API 노출 | ⏸️ Deferred (Langfuse/MLflow UI 활용) |
-| Dashboard Web UI | 평가 결과 시각화 | ⏸️ Deferred (Langfuse/MLflow UI 활용) |
-| Kubernetes Deployment | K8s 배포 지원 | ⏸️ Deferred (Docker로 충분) |
-
----
-
-## Supported Metrics (Current)
-
-| Metric | Type | Ground Truth | Embeddings | Status |
-|--------|------|--------------|------------|--------|
-| `faithfulness` | Ragas | No | No | ✅ |
-| `answer_relevancy` | Ragas | No | Yes | ✅ |
-| `context_precision` | Ragas | Yes | No | ✅ |
-| `context_recall` | Ragas | Yes | No | ✅ |
-| `factual_correctness` | Ragas | Yes | No | ✅ |
-| `semantic_similarity` | Ragas | Yes | Yes | ✅ |
-| `insurance_term_accuracy` | Custom | Yes | No | ✅ |
-
----
-
-## CLI Commands (Current)
-
-```bash
-# Core Commands
-evalvault run <dataset> --metrics <metrics> [--langfuse]
-evalvault metrics
-evalvault config
-
-# History Commands
-evalvault history [--limit N] [--dataset NAME] [--model NAME]
-evalvault compare <run_id1> <run_id2>
-evalvault export <run_id> -o <file>
-
-# Generation Commands
-evalvault generate <documents> -n <num> -o <output>
-```
-
----
-
-## Test Summary
-
-| Category | Count | Description |
-|----------|-------|-------------|
-| Unit Tests | 1170 | Domain, ports, adapters, services, analysis, web |
-| Integration Tests | 26 | End-to-end flows |
-| **Total** | **1196** | All passing |
-
-### Test Files
-```
-tests/
-├── unit/
-│   ├── test_entities.py          # 19 tests
-│   ├── test_data_loaders.py      # 21 tests
-│   ├── test_evaluator.py         # 13 tests (including parallel)
-│   ├── test_langfuse_tracker.py  # 18 tests
-│   ├── test_openai_adapter.py    # 4 tests
-│   ├── test_ports.py             # 24 tests
-│   ├── test_cli.py               # 58 tests
-│   ├── test_insurance_metric.py  # 18 tests
-│   ├── test_sqlite_storage.py    # 18 tests
-│   ├── test_testset_generator.py # 16 tests
-│   ├── test_kg_generator.py      # 27 tests (Phase 6)
-│   ├── test_entity_extractor.py  # 20 tests (Phase 6)
-│   ├── test_experiment.py        # 21 tests (Phase 6)
-│   ├── test_postgres_storage.py  # 19 tests (Phase 6)
-│   ├── test_mlflow_tracker.py    # 17 tests (Phase 6)
-│   ├── test_azure_adapter.py     # 18 tests (Phase 6)
-│   ├── test_anthropic_adapter.py # 19 tests (Phase 6)
-│   ├── test_nlp_adapter.py       # 97 tests (Phase 2 NLP)
-│   ├── test_causal_adapter.py    # 27 tests (Phase 3 Causal)
-│   ├── test_domain_memory.py     # 80 tests (Phase 8)
-│   ├── test_benchmark_runner.py  # 24 tests (Phase 9.5)
-│   ├── test_web_ui.py            # 138 tests (Phase 10-13 Web UI)
-│   ├── test_web_dashboard.py     # (included in test_web_ui.py)
-│   ├── test_web_evaluate.py      # (included in test_web_ui.py)
-│   ├── test_web_history.py       # (included in test_web_ui.py)
-│   ├── test_web_reports.py       # (included in test_web_ui.py)
-│   ├── test_analysis_pipeline.py # 70 tests (Phase 14.1)
-│   ├── test_intent_classifier.py # 39 tests (Phase 14.2)
-│   ├── test_pipeline_orchestrator.py  # 24 tests (Phase 14.3)
-│   └── test_analysis_modules.py  # 20 tests (Phase 14.4)
-└── integration/
-    ├── test_evaluation_flow.py   # 6 tests
-    ├── test_data_flow.py         # 8 tests
-    ├── test_langfuse_flow.py     # 5 tests
-    └── test_storage_flow.py      # 7 tests
-```
-
----
-
-## Version History
-
-| Version | Date | Description |
-|---------|------|-------------|
-| 0.1.0 | 2024-12-24 | Phase 3 Complete - Core System |
-| 0.2.0 | 2024-12-24 | Phase 5 Complete - Storage & Domain |
-| 0.3.0 | 2025-12-24 | Phase 6 Complete - Advanced Features |
-| 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화 |
-| 1.1.0 | 2025-12-29 | Phase 2 NLP + Phase 3 Causal Analysis |
-| 1.2.0 | 2025-12-29 | Phase 8 Domain Memory Layering |
-| 1.3.0 | 2025-12-30 | Phase 9 Korean RAG Optimization |
-| 1.4.0 | 2025-12-30 | Phase 10-13 Streamlit Web UI |
-| 1.5.0 | 2025-12-30 | Phase 14 Query-Based DAG Analysis Pipeline |
-
----
-
-## CI/CD & Release
-
-### Cross-Platform CI
-
-| Platform | Python | Status |
-|----------|--------|--------|
-| Ubuntu | 3.12, 3.13 | ✅ |
-| macOS | 3.12 | ✅ |
-| Windows | 3.12 | ✅ |
-
-### Automatic Versioning (python-semantic-release)
-
-main 브랜치에 머지되면 Conventional Commits 규칙에 따라 자동으로 버전이 결정되고 PyPI에 배포됩니다:
-
-| Commit Type | Version Bump | Example |
-|-------------|--------------|---------|
-| `feat:` | Minor (0.x.0) | `feat: Add new metric` |
-| `fix:`, `perf:` | Patch (0.0.x) | `fix: Correct calculation` |
-| Other | No release | `docs:`, `chore:`, `ci:`, etc. |
-
-### Release Workflow
-
-1. PR 생성 → CI 테스트 (Ubuntu, macOS, Windows)
-2. PR 머지 → main 브랜치 푸시
-3. Release 워크플로우 실행:
-   - Conventional Commits 분석
-   - 버전 태그 생성 (예: v1.0.1)
-   - PyPI 배포
-   - GitHub Release 생성
-
----
-
-## Architecture
-
-```
-src/evalvault/
-├── domain/
-│   ├── entities/         # TestCase, Dataset, EvaluationRun, MetricScore, Experiment
-│   ├── services/         # RagasEvaluator, TestsetGenerator, KGGenerator, ExperimentManager
-│   └── metrics/          # InsuranceTermAccuracy (custom metrics)
-├── ports/
-│   ├── inbound/          # EvaluatorPort
-│   └── outbound/         # LLMPort, DatasetPort, StoragePort, TrackerPort
-├── adapters/
-│   ├── inbound/          # CLI (Typer)
-│   └── outbound/
-│       ├── dataset/      # CSV, Excel, JSON loaders
-│       ├── llm/          # OpenAI, Azure OpenAI, Anthropic adapters
-│       ├── storage/      # SQLite, PostgreSQL adapters
-│       └── tracker/      # Langfuse, MLflow adapters
-└── config/               # Settings (pydantic-settings)
-```
-
-### Port/Adapter Implementation Status
-
-| Port | Adapter | Status |
-|------|---------|--------|
-| LLMPort | OpenAIAdapter | ✅ Complete |
-| LLMPort | AzureOpenAIAdapter | ✅ Complete |
-| LLMPort | AnthropicAdapter | ✅ Complete |
-| DatasetPort | CSV/Excel/JSON Loaders | ✅ Complete |
-| TrackerPort | LangfuseAdapter | ✅ Complete |
-| TrackerPort | MLflowAdapter | ✅ Complete |
-| StoragePort | SQLiteAdapter | ✅ Complete |
-| StoragePort | PostgreSQLAdapter | ✅ Complete |
-| EvaluatorPort | RagasEvaluator | ✅ Complete |
-| NLPAnalysisPort | NLPAnalysisAdapter | ✅ Complete |
-| CausalAnalysisPort | CausalAnalysisAdapter | ✅ Complete |
-| ReportPort | MarkdownReportAdapter | ✅ Complete |
-| DomainMemoryPort | SQLiteDomainMemoryAdapter | ✅ Complete |
-| AnalysisPipelinePort | PipelineOrchestrator | ✅ Complete |
-| AnalysisModulePort | DataLoader, StatisticalAnalyzer, ReportModules | ✅ Complete |
-| IntentClassifierPort | KeywordIntentClassifier | ✅ Complete |
-
----
-
-## Quality Standards (SLA)
-
-### Metric Thresholds
-
-| Metric | Minimum | Target | Excellent |
-|--------|---------|--------|-----------|
-| Faithfulness | 0.60 | 0.80 | 0.90 |
-| Answer Relevancy | 0.65 | 0.80 | 0.90 |
-| Context Precision | 0.60 | 0.75 | 0.85 |
-| Context Recall | 0.60 | 0.80 | 0.90 |
-| Factual Correctness | 0.70 | 0.85 | 0.95 |
-| Semantic Similarity | 0.70 | 0.85 | 0.95 |
-
-### System Requirements
-
-- **Throughput**: 100 test cases / 5 minutes
-- **Result Storage**: Dual storage (SQLite + Langfuse)
-- **Reproducibility**: Deterministic results (temperature=0)
-
----
-
-## References
-
-- [Ragas Documentation](https://docs.ragas.io/)
-- [Langfuse Documentation](https://langfuse.com/docs)
+**Last Updated**: 2026-01-01

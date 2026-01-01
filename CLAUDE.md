@@ -252,9 +252,10 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | Analysis Pipeline | ✅ Complete | DAG-based query analysis, Intent classification |
 
 **Test Summary:**
-- Unit Tests: 1218
-- Integration Tests: 26
-- **Total: 1244 tests passing**
+- Unit Tests: 1,261
+- Integration Tests: 91
+- **Total: 1,352 tests passing**
+- **Test Coverage: 89%**
 
 ## Documentation
 
@@ -262,5 +263,7 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 |----------|-------------|
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 설치, 설정, 메트릭 설명, 문제 해결 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal Architecture 상세 설명 |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 로드맵, 현재 상태, 품질 기준 (SLA) |
+| [docs/COMPLETED.md](docs/COMPLETED.md) | Phase 1-14 완료 내역, 기술 스펙, 아키텍처 현황 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-2027 개발 로드맵 (Phase 15-19+) |
+| [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 (P1-P6 우선순위) |
 | [docs/KG_IMPROVEMENT_PLAN.md](docs/KG_IMPROVEMENT_PLAN.md) | Knowledge Graph 개선 계획 |
