@@ -558,6 +558,9 @@ EvalVault/
 |------|-------------|
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Installation, configuration, troubleshooting |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal architecture deep dive |
+| [docs/COMPLETED.md](docs/COMPLETED.md) | Phase 1-14 achievements and technical specs |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-2027 development roadmap |
+| [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) | Code quality improvement plan |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 
 ## Development
@@ -565,6 +568,7 @@ EvalVault/
 ```bash
 # Tests (always use uv run)
 uv run pytest tests/ -v
+# Total: 1,352 tests (1,261 unit + 91 integration) | Coverage: 89%
 
 # E2E scenarios (requires external APIs)
 uv run pytest tests/integration/test_e2e_scenarios.py -v

@@ -13,7 +13,7 @@ EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, servic
 - `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness`: smoke-test the CLI; extend with `--profile dev` or `--langfuse`.
 - `uv run evalvault web`: launch Streamlit Web UI (requires `--extra web`).
 - `uv run evalvault pipeline analyze "요약해줘"`: run query-based analysis pipeline (requires `--extra korean`).
-- `uv run pytest tests -v`: primary suite (1244 tests); target `tests/integration/test_e2e_scenarios.py` only when external APIs are configured.
+- `uv run pytest tests -v`: primary suite (1352 tests: 1261 unit + 91 integration); target `tests/integration/test_e2e_scenarios.py` only when external APIs are configured.
 - `uv run ruff check src/ tests/ && uv run ruff format src/ tests/`: keep style/lint errors out of CI (line length 100).
 - `docker compose -f docker-compose.langfuse.yml up`: optional Langfuse playground for tracing comparisons.
 

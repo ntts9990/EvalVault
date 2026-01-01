@@ -550,6 +550,9 @@ EvalVault/
 |------|------|
 | [USER_GUIDE.md](USER_GUIDE.md) | 설치, 설정, 문제 해결 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 헥사고날 아키텍처 상세 |
+| [COMPLETED.md](COMPLETED.md) | Phase 1-14 완료 내역 및 기술 스펙 |
+| [ROADMAP.md](ROADMAP.md) | 2026-2027 개발 로드맵 |
+| [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | 기여 가이드 |
 
 ## 개발
@@ -557,6 +560,8 @@ EvalVault/
 ```bash
 # 테스트 (항상 uv run 사용)
 uv run pytest tests/ -v
+# 총 1,352개 테스트 (1,261 유닛 + 91 통합) | 커버리지: 89%
+
 uv run pytest tests/integration/test_e2e_scenarios.py -v   # 외부 API 필요
 
 # 린트 & 포맷팅
