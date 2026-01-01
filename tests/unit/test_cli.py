@@ -148,8 +148,8 @@ class TestCLIRun:
         # Run command
         result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
 
-        # Assert
-        assert result.exit_code == 0
+        # Assert with better error message
+        assert result.exit_code == 0, f"CLI failed with output: {result.stdout}"
         assert "test-dataset" in result.stdout or "faithfulness" in result.stdout
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
