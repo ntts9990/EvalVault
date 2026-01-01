@@ -743,7 +743,7 @@ class TestCLIRunEdgeCases:
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.Settings")
-    @patch(f"{RUN_COMMAND_MODULE}.LangfuseAdapter")
+    @patch("evalvault.adapters.outbound.tracker.langfuse_adapter.LangfuseAdapter")
     def test_run_with_langfuse_logging(
         self,
         mock_langfuse_cls,

@@ -1,7 +1,7 @@
 [project]
 name = "evalvault"
 version = "0.1.0"
-description = "RAG evaluation system using Ragas with Langfuse tracing"
+description = "RAG evaluation system using Ragas with Phoenix/Langfuse tracing"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
@@ -16,12 +16,15 @@ keywords = [
     "evaluation",
     "ragas",
     "langfuse",
+    "phoenix",
+    "opentelemetry",
     "llm",
     "retrieval-augmented-generation",
     "nlp",
     "machine-learning",
     "ai",
     "testing",
+    "observability",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -83,6 +86,12 @@ postgres = [
 ]
 mlflow = [
     "mlflow>=2.0.0",
+]
+phoenix = [
+    "arize-phoenix>=8.0.0",
+    "openinference-instrumentation-langchain>=0.1.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
 ]
 korean = [
     "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
