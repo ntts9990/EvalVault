@@ -1,24 +1,25 @@
 """Anthropic Claude LLM adapter for Ragas evaluation."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from openai import AsyncOpenAI
-from ragas.llms import llm_factory
 
 from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
+from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIEmbeddingsWithLegacy
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import ThinkingConfig
 
+try:  # Optional dependency
+    from anthropic import AsyncAnthropic
+except ImportError:  # pragma: no cover - handled at runtime
+    AsyncAnthropic = None  # type: ignore[arg-type]
+
 
 class ThinkingTokenTrackingAsyncAnthropic:
-    """AsyncAnthropic wrapper with token tracking and extended thinking support.
-
-    Wraps anthropic.AsyncAnthropic to:
-    - Track token usage from responses
-    - Inject extended thinking parameters for reasoning models
-    - Maintain compatibility with Ragas llm_factory
-    """
+    """AsyncAnthropic wrapper with token tracking and extended thinking support."""
 
     def __init__(
         self,
@@ -26,16 +27,7 @@ class ThinkingTokenTrackingAsyncAnthropic:
         thinking_budget: int | None = None,
         **kwargs: Any,
     ):
-        """Initialize thinking-aware Anthropic client.
-
-        Args:
-            usage_tracker: Token usage tracker
-            thinking_budget: Token budget for extended thinking (None to disable)
-            **kwargs: Additional arguments passed to AsyncAnthropic
-        """
-        try:
-            from anthropic import AsyncAnthropic
-        except ImportError:
+        if AsyncAnthropic is None:
             raise ImportError(
                 "anthropic package is required for Anthropic adapter. "
                 "Install with: uv pip install 'evalvault[anthropic]'"
@@ -57,7 +49,6 @@ class ThinkingTokenTrackingAsyncAnthropic:
                 inner_self._tracker = tracker
 
             async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
-                # Inject extended thinking parameters if configured
                 if thinking_budget is not None and "thinking" not in kwargs:
                     kwargs["thinking"] = {
                         "type": "enabled",
@@ -66,7 +57,6 @@ class ThinkingTokenTrackingAsyncAnthropic:
 
                 response = await inner_self._messages.create(**kwargs)
 
-                # Extract usage from Anthropic response
                 if hasattr(response, "usage") and response.usage:
                     inner_self._tracker.add(
                         prompt=response.usage.input_tokens or 0,
@@ -80,38 +70,12 @@ class ThinkingTokenTrackingAsyncAnthropic:
 
 
 class AnthropicAdapter(BaseLLMAdapter):
-    """Anthropic Claude 어댑터.
-
-    Ragas에서 Anthropic을 사용하기 위해 ragas.llms.llm_factory를 활용합니다.
-    Embeddings는 Anthropic이 제공하지 않으므로 OpenAI Embeddings를 fallback으로 사용합니다.
-
-    Extended Thinking:
-        anthropic_thinking_budget 설정으로 extended thinking을 활성화할 수 있습니다.
-        이 기능은 Claude 3.5 Sonnet (20241022) 이상에서 지원됩니다.
-
-    Example:
-        >>> settings = Settings(
-        ...     anthropic_api_key="sk-ant-...",
-        ...     anthropic_model="claude-3-5-sonnet-20241022",
-        ...     anthropic_thinking_budget=10000,  # Enable extended thinking
-        ...     openai_api_key="sk-...",  # for embeddings
-        ... )
-        >>> adapter = AnthropicAdapter(settings)
-        >>> llm = adapter.as_ragas_llm()
-        >>> embeddings = adapter.as_ragas_embeddings()
-    """
+    """Anthropic Claude 어댑터."""
 
     provider_name = "anthropic"
 
     def __init__(self, settings: Settings):
-        """Initialize Anthropic adapter.
-
-        Args:
-            settings: Application settings containing Anthropic configuration
-
-        Raises:
-            LLMConfigurationError: If ANTHROPIC_API_KEY is not provided
-        """
+        """Initialize Anthropic adapter."""
         self._settings = settings
         self._thinking_budget = settings.anthropic_thinking_budget
         thinking_config = ThinkingConfig(
@@ -131,19 +95,14 @@ class AnthropicAdapter(BaseLLMAdapter):
             }
         )
 
-        # Create token-tracking Anthropic client with thinking support
-        self._client = ThinkingTokenTrackingAsyncAnthropic(
+        anthropic_client = ThinkingTokenTrackingAsyncAnthropic(
             usage_tracker=self._token_usage,
             thinking_budget=self._thinking_budget,
             api_key=settings.anthropic_api_key,
         )
 
-        # Create Ragas LLM using llm_factory with client (Ragas 0.4.x API)
-        ragas_llm = llm_factory(
-            model=settings.anthropic_model,
-            provider="anthropic",
-            client=self._client._client,  # Pass the actual AsyncAnthropic client
-            max_tokens=8192,  # Claude default
+        ragas_llm = create_instructor_llm(
+            "anthropic", settings.anthropic_model, anthropic_client._client
         )
         self._set_ragas_llm(ragas_llm)
 
@@ -157,17 +116,7 @@ class AnthropicAdapter(BaseLLMAdapter):
             self._set_ragas_embeddings(embeddings)
 
     def as_ragas_embeddings(self):
-        """Return the Ragas embeddings instance.
-
-        Anthropic doesn't provide embeddings, so this returns OpenAI embeddings
-        configured in the settings. OpenAI API key must be set for this to work.
-
-        Returns:
-            Ragas embeddings instance (OpenAI fallback)
-
-        Raises:
-            ValueError: If OpenAI API key is not provided for embeddings
-        """
+        """Return the Ragas embeddings instance."""
         if self._ragas_embeddings is None:
             raise ValueError(
                 "Embeddings not available. Anthropic doesn't provide embeddings. "
@@ -176,9 +125,5 @@ class AnthropicAdapter(BaseLLMAdapter):
         return super().as_ragas_embeddings()
 
     def get_thinking_budget(self) -> int | None:
-        """Get the extended thinking token budget.
-
-        Returns:
-            Token budget for extended thinking, or None if disabled
-        """
+        """Get the extended thinking token budget."""
         return self._thinking_budget

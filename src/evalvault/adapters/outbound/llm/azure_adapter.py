@@ -1,10 +1,10 @@
 """Azure OpenAI LLM adapter for Ragas evaluation."""
 
-from openai import AsyncAzureOpenAI
 from ragas.embeddings.base import embedding_factory
-from ragas.llms import llm_factory
 
 from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
+from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
+from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncAzureOpenAI
 from evalvault.config.settings import Settings
 
 
@@ -42,20 +42,14 @@ class AzureOpenAIAdapter(BaseLLMAdapter):
         self._model_name = f"azure/{settings.azure_deployment}"
 
         # Create Azure OpenAI client
-        self._client = AsyncAzureOpenAI(
+        self._client = TokenTrackingAsyncAzureOpenAI(
+            usage_tracker=self._token_usage,
             azure_endpoint=settings.azure_endpoint,
             api_key=settings.azure_api_key,
             api_version=settings.azure_api_version,
         )
 
-        # Create Ragas LLM using llm_factory
-        ragas_llm = llm_factory(
-            model=settings.azure_deployment,
-            provider="azure_openai",
-            azure_endpoint=settings.azure_endpoint,
-            api_key=settings.azure_api_key,
-            api_version=settings.azure_api_version,
-        )
+        ragas_llm = create_instructor_llm("openai", settings.azure_deployment, self._client)
         self._set_ragas_llm(ragas_llm)
 
         # Create Ragas embeddings if configured

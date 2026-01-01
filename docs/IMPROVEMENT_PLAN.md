@@ -1,8 +1,8 @@
 # EvalVault 개선 계획서
 
 > Last Updated: 2026-01-01
-> Version: 3.1
-> Focus: 병렬 AI 에이전트 기반 코드 품질 개선, RAG Observability 통합, 성능 최적화
+> Version: 3.2
+> Focus: 병렬 AI 에이전트 기반 코드 품질 개선, RAG Observability 통합, Domain Memory 활용, 성능 최적화
 
 ---
 
@@ -31,6 +31,7 @@
    - [P5: 테스트 개선](#p5-테스트-개선)
    - [P6: 문서화 개선](#p6-문서화-개선)
    - [P7: RAG Observability (Phoenix 통합)](#p7-rag-observability-phoenix-통합)
+   - [P8: Domain Memory 활용](#p8-domain-memory-활용-신규)
 6. [병렬 실행 로드맵](#병렬-실행-로드맵)
 7. [에이전트 메모리 시스템](#에이전트-메모리-시스템)
 8. [Quick Wins](#quick-wins)
@@ -586,7 +587,7 @@ docs/tutorials/
 
 ### P7: RAG Observability (Phoenix 통합)
 
-> **Priority**: 🔥 High (신규)
+> **Priority**: 🔥 High
 > **담당 에이전트**: `observability`, `rag-data`
 > **참조**: `docs/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md`
 
@@ -743,6 +744,327 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 - **총 수익: $93,000/월**
 
 **ROI**: 1년 기준 **55배**
+
+---
+
+### P8: Domain Memory 활용 (신규)
+
+> **Priority**: 🟡 Medium
+> **담당 에이전트**: `architecture`, `rag-data`
+> **참조**: 이 섹션은 자체 완결적으로 작성되어 별도 문서 참조 없이 개발 가능
+
+#### 8.1 현재 상태 분석
+
+**구현 완료 (저장/검색):**
+
+| 기능 | 구현 위치 | 상태 |
+|------|-----------|------|
+| 사실(Fact) 추출/저장 | `DomainLearningHook` | ✅ |
+| 학습 패턴 저장 | `DomainLearningHook` | ✅ |
+| 행동 패턴 저장 | `DomainLearningHook` | ✅ |
+| FTS5 사실 검색 | `SQLiteDomainMemoryAdapter.search_facts()` | ✅ |
+| 행동 검색 | `SQLiteDomainMemoryAdapter.search_behaviors()` | ✅ |
+| 하이브리드 검색 | `SQLiteDomainMemoryAdapter.hybrid_search()` | ✅ |
+| 중복 통합 | `consolidate_facts()` | ✅ |
+| 오래된 메모리 삭제 | `forget_obsolete()` | ✅ |
+| 검증 점수 감소 | `decay_verification_scores()` | ✅ |
+
+**미구현 (활용):**
+
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| CLI 메모리 조회 명령어 | `evalvault domain memory stats/search/behaviors` | Phase 1 |
+| 평가 시 메모리 활용 | 평가 전 학습 패턴 조회, 평가 중 사실 참조 | Phase 1 |
+| 분석 시 메모리 활용 | 과거 분석 결과와 비교, 인사이트 생성 | Phase 2 |
+| 개선 가이드 시 메모리 활용 | 성공한 행동 패턴 포함 | Phase 2 |
+| 자동 최적화 | 메모리 기반 평가 전략 자동 조정 | Phase 3 |
+
+#### 8.2 핵심 구현 파일
+
+```
+src/evalvault/
+├── domain/services/
+│   └── domain_learning_hook.py    # DomainLearningHook (메모리 형성)
+├── adapters/outbound/domain_memory/
+│   └── sqlite_adapter.py          # SQLiteDomainMemoryAdapter (저장/검색)
+└── ports/outbound/
+    └── domain_memory_port.py      # DomainMemoryPort (인터페이스)
+```
+
+#### 8.3 Phase 1: CLI 명령어 추가 (즉시 구현 가능)
+
+**목표**: 저장된 메모리를 CLI에서 조회할 수 있게 함
+
+**구현할 CLI 명령어:**
+
+```bash
+# 메모리 통계 조회
+evalvault domain memory stats --domain insurance
+
+# 사실 검색
+evalvault domain memory search "보험료" --domain insurance --limit 10
+
+# 행동 패턴 조회
+evalvault domain memory behaviors --domain insurance --min-success 0.8
+
+# 학습 메모리 조회
+evalvault domain memory learnings --domain insurance --limit 10
+
+# Evolution 실행 (통합/삭제/감소)
+evalvault domain memory evolve --domain insurance
+```
+
+**구현 위치**: `src/evalvault/adapters/inbound/cli/commands/domain.py`
+
+```python
+# 추가할 서브커맨드 예시
+@domain_app.command("memory")
+def memory_command(
+    action: str = typer.Argument(..., help="stats|search|behaviors|learnings|evolve"),
+    query: str = typer.Argument(None),
+    domain: str = typer.Option("insurance", "--domain", "-d"),
+    language: str = typer.Option("ko", "--language", "-l"),
+    limit: int = typer.Option(10, "--limit", "-n"),
+    min_success: float = typer.Option(0.0, "--min-success"),
+):
+    """도메인 메모리 조회 및 관리"""
+    from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+        SQLiteDomainMemoryAdapter,
+    )
+
+    adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+
+    if action == "stats":
+        stats = adapter.get_stats(domain=domain, language=language)
+        # 통계 출력
+    elif action == "search":
+        facts = adapter.search_facts(
+            query=query, domain=domain, language=language, limit=limit
+        )
+        # 사실 목록 출력
+    elif action == "behaviors":
+        behaviors = adapter.search_behaviors(
+            context="", domain=domain, language=language, limit=limit
+        )
+        # 성공률 필터링 후 출력
+    elif action == "learnings":
+        learnings = adapter.list_learnings(
+            domain=domain, language=language, limit=limit
+        )
+        # 학습 메모리 출력
+    elif action == "evolve":
+        from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+        hook = DomainLearningHook(adapter)
+        result = hook.run_evolution(domain=domain, language=language)
+        # {"consolidated": 5, "forgotten": 2, "decayed": 10}
+```
+
+#### 8.4 Phase 2: 평가 과정에서 메모리 활용
+
+**목표**: 과거 평가에서 학습한 패턴을 활용하여 평가 품질 향상
+
+**구현 패턴: MemoryAwareEvaluator**
+
+```python
+# src/evalvault/domain/services/memory_aware_evaluator.py
+from evalvault.domain.services.ragas_evaluator import RagasEvaluator
+from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
+
+class MemoryAwareEvaluator:
+    """메모리를 활용하는 평가기"""
+
+    def __init__(
+        self,
+        evaluator: RagasEvaluator,
+        memory_port: DomainMemoryPort,
+    ):
+        self.evaluator = evaluator
+        self.memory_port = memory_port
+
+    async def evaluate_with_memory(
+        self,
+        dataset: Dataset,
+        domain: str,
+        language: str = "ko",
+    ) -> EvaluationRun:
+        # 1. 과거 학습 패턴 조회 (평가 전)
+        reliability = self.memory_port.get_aggregated_reliability(
+            domain=domain,
+            language=language,
+        )
+        # {"faithfulness": 0.85, "answer_relevancy": 0.78, ...}
+
+        # 2. 신뢰도 낮은 메트릭에 더 집중
+        adjusted_thresholds = self._adjust_by_reliability(reliability)
+
+        # 3. 평가 실행
+        run = await self.evaluator.evaluate(
+            dataset=dataset,
+            thresholds=adjusted_thresholds,
+        )
+
+        return run
+
+    def augment_context_with_facts(
+        self,
+        question: str,
+        original_context: str,
+        domain: str,
+        language: str,
+    ) -> str:
+        """평가 중: 저장된 사실로 컨텍스트 보강"""
+        facts = self.memory_port.search_facts(
+            query=question,
+            domain=domain,
+            language=language,
+            limit=5,
+        )
+
+        if not facts:
+            return original_context
+
+        fact_texts = [
+            f"{fact.subject} {fact.predicate} {fact.object}"
+            for fact in facts
+        ]
+
+        return original_context + "\n\n[관련 사실]\n" + "\n".join(fact_texts)
+```
+
+#### 8.5 Phase 3: 분석/개선 가이드 시 메모리 활용
+
+**목표**: 저장된 메모리를 기반으로 더 정확한 분석 및 개선 제안 생성
+
+**구현 패턴: MemoryBasedAnalysis**
+
+```python
+# src/evalvault/domain/services/memory_based_analysis.py
+
+class MemoryBasedAnalysis:
+    """메모리 기반 분석"""
+
+    def __init__(self, memory_port: DomainMemoryPort):
+        self.memory_port = memory_port
+
+    def generate_insights(
+        self,
+        evaluation_run: EvaluationRun,
+        domain: str,
+        language: str,
+    ) -> dict:
+        # 과거 학습 메모리와 비교
+        historical = self.memory_port.list_learnings(
+            domain=domain,
+            language=language,
+            limit=10,
+        )
+
+        # 트렌드 분석
+        current_metrics = self._extract_metrics(evaluation_run)
+        trends = self._analyze_trends(current_metrics, historical)
+
+        # 관련 사실 기반 인사이트
+        facts = self.memory_port.hybrid_search(
+            query=evaluation_run.run_id,
+            domain=domain,
+            language=language,
+        )
+
+        return {
+            "trends": trends,
+            "related_facts": facts,
+            "recommendations": self._generate_recommendations(trends, facts),
+        }
+
+    def apply_successful_behaviors(
+        self,
+        test_case: TestCase,
+        domain: str,
+        language: str,
+    ) -> list[str]:
+        """성공한 행동 패턴을 개선 가이드에 포함"""
+        behaviors = self.memory_port.search_behaviors(
+            context=test_case.question,
+            domain=domain,
+            language=language,
+            limit=5,
+        )
+
+        actions = []
+        for behavior in behaviors:
+            if behavior.success_rate >= 0.8:
+                actions.extend(behavior.action_sequence)
+
+        return actions
+```
+
+#### 8.6 기존 API 참조
+
+**메모리 저장 (이미 구현됨):**
+
+```python
+from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+    SQLiteDomainMemoryAdapter,
+)
+
+# 초기화
+memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+hook = DomainLearningHook(memory_adapter)
+
+# 평가 완료 후 메모리 형성
+result = await hook.on_evaluation_complete(
+    evaluation_run=run,
+    domain="insurance",
+    language="ko",
+)
+```
+
+**메모리 검색 (이미 구현됨):**
+
+```python
+# 사실 검색 (FTS5)
+facts = memory_adapter.search_facts(
+    query="보험료",
+    domain="insurance",
+    language="ko",
+    limit=10,
+)
+
+# 행동 검색
+behaviors = memory_adapter.search_behaviors(
+    context="보험료를 조회하는 질문",
+    domain="insurance",
+    language="ko",
+    limit=5,
+)
+
+# 하이브리드 검색 (Factual + Experiential + Behavior)
+results = memory_adapter.hybrid_search(
+    query="보험료 계산",
+    domain="insurance",
+    language="ko",
+)
+```
+
+**메모리 관리 (이미 구현됨):**
+
+```python
+# Evolution 실행: 통합, 삭제, 감소
+result = hook.run_evolution(domain="insurance", language="ko")
+# {"consolidated": 5, "forgotten": 2, "decayed": 10}
+```
+
+#### 8.7 구현 우선순위 및 담당
+
+| Phase | 작업 | 담당 에이전트 | 예상 소요 |
+|-------|------|--------------|----------|
+| **Phase 1** | CLI 메모리 명령어 추가 | `architecture` | 1-2일 |
+| **Phase 1** | 평가 전 학습 패턴 조회 | `rag-data` | 2-3일 |
+| **Phase 2** | 컨텍스트 사실 보강 | `rag-data` | 3-4일 |
+| **Phase 2** | 행동 패턴 개선 가이드 통합 | `rag-data` | 2-3일 |
+| **Phase 3** | 트렌드 분석 | `rag-data` | 3-4일 |
+| **Phase 3** | 자동 최적화 | `architecture` | 5-7일 |
 
 ---
 
@@ -1101,5 +1423,5 @@ def run(
 ---
 
 **Last Updated**: 2026-01-01
-**Version**: 3.0
+**Version**: 3.2
 **Maintainer**: Coordinator Agent

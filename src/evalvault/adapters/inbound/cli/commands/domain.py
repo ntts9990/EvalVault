@@ -9,13 +9,18 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+    SQLiteDomainMemoryAdapter,
+)
 from evalvault.config.domain_config import (
     generate_domain_template,
     list_domains,
     load_domain_config,
     save_domain_config,
 )
+from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 
+from ..utils.options import memory_db_option
 from ..utils.validators import parse_csv_option, validate_choices
 
 
@@ -104,6 +109,250 @@ def create_domain_app(console: Console) -> typer.Typer:
         console.print(f"  1. Edit {config_path} to customize settings")
         console.print("  2. Add terms to terms_dictionary_*.json files")
         console.print(f"  3. Use 'evalvault domain show {domain}' to view config\n")
+
+    memory_app = typer.Typer(name="memory", help="Domain memory utilities.")
+    domain_app.add_typer(memory_app, name="memory")
+
+    def _load_memory_adapter(db_path: Path) -> SQLiteDomainMemoryAdapter:
+        return SQLiteDomainMemoryAdapter(db_path)
+
+    def _truncate(text: str, max_length: int = 40) -> str:
+        if len(text) <= max_length:
+            return text
+        return text[: max_length - 3] + "..."
+
+    def _format_list(values: list[str], max_items: int = 3) -> str:
+        if not values:
+            return "-"
+        display = ", ".join(values[:max_items])
+        if len(values) > max_items:
+            display += "..."
+        return display
+
+    @memory_app.command("stats")
+    def memory_stats(
+        domain: str | None = typer.Option(
+            None,
+            "--domain",
+            "-d",
+            help="Filter by domain (leave empty for global stats).",
+        ),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """Show aggregated domain memory statistics."""
+
+        adapter = _load_memory_adapter(memory_db)
+        stats = adapter.get_statistics(domain=domain)
+        title = f"Domain Memory Stats ({domain})" if domain else "Domain Memory Stats"
+        table = Table(title=title, show_header=False, box=None, padding=(0, 1))
+        table.add_column("Category", style="bold")
+        table.add_column("Count", justify="right")
+        table.add_row("Facts", str(stats.get("facts", 0)))
+        table.add_row("Learnings", str(stats.get("learnings", 0)))
+        table.add_row("Behaviors", str(stats.get("behaviors", 0)))
+        table.add_row("Contexts", str(stats.get("contexts", 0)))
+        console.print(table)
+        console.print(
+            f"[dim]Database:[/dim] {memory_db}  |  [dim]Domain:[/dim] {domain or 'all'}\n"
+        )
+
+    @memory_app.command("search")
+    def memory_search(
+        query: str = typer.Argument(..., help="키워드 또는 문장 형태의 검색 쿼리."),
+        domain: str = typer.Option("insurance", "--domain", "-d", help="도메인 이름."),
+        language: str = typer.Option("ko", "--language", "-l", help="언어 코드."),
+        limit: int = typer.Option(10, "--limit", "-n", help="최대 결과 수."),
+        min_score: float = typer.Option(
+            0.0,
+            "--min-score",
+            help="최소 검증 점수 필터 (0.0~1.0).",
+        ),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """Search factual facts stored in domain memory."""
+
+        if not 0.0 <= min_score <= 1.0:
+            console.print("[red]Error:[/red] --min-score must be between 0.0 and 1.0.")
+            raise typer.Exit(1)
+
+        adapter = _load_memory_adapter(memory_db)
+        facts = adapter.search_facts(
+            query=query,
+            domain=domain,
+            language=language,
+            limit=limit * 2,
+        )
+        results = [fact for fact in facts if fact.verification_score >= min_score][:limit]
+
+        if not results:
+            console.print("[yellow]No matching facts found.[/yellow]\n")
+            return
+
+        table = Table(title="Factual Facts", header_style="bold cyan")
+        table.add_column("Fact ID", style="dim", overflow="fold")
+        table.add_column("Subject")
+        table.add_column("Predicate")
+        table.add_column("Object")
+        table.add_column("Score", justify="right")
+        table.add_column("Verified", justify="right")
+
+        for fact in results:
+            table.add_row(
+                fact.fact_id,
+                _truncate(fact.subject),
+                _truncate(fact.predicate),
+                _truncate(fact.object),
+                f"{fact.verification_score:.2f}",
+                str(fact.verification_count),
+            )
+
+        console.print(table)
+        console.print(f"[dim]Query:[/dim] {query}  |  [dim]Domain:[/dim] {domain}\n")
+
+    @memory_app.command("behaviors")
+    def memory_behaviors(
+        context: str = typer.Option(
+            "",
+            "--context",
+            "-c",
+            help="행동 검색에 사용할 컨텍스트 (옵션).",
+        ),
+        domain: str = typer.Option("insurance", "--domain", "-d", help="도메인 이름."),
+        language: str = typer.Option("ko", "--language", "-l", help="언어 코드."),
+        limit: int = typer.Option(5, "--limit", "-n", help="최대 결과 수."),
+        min_success: float = typer.Option(
+            0.0,
+            "--min-success",
+            help="최소 성공률 필터 (0.0~1.0).",
+        ),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """List reusable behaviors from domain memory."""
+
+        if not 0.0 <= min_success <= 1.0:
+            console.print("[red]Error:[/red] --min-success must be between 0.0 and 1.0.")
+            raise typer.Exit(1)
+
+        adapter = _load_memory_adapter(memory_db)
+        behaviors = adapter.search_behaviors(
+            context=context or "",
+            domain=domain,
+            language=language,
+            limit=limit * 3,
+        )
+        results = [b for b in behaviors if b.success_rate >= min_success][:limit]
+
+        if not results:
+            console.print("[yellow]No behaviors matched the filters.[/yellow]\n")
+            return
+
+        table = Table(title="Behavior Patterns", header_style="bold cyan")
+        table.add_column("Behavior ID", style="dim", overflow="fold")
+        table.add_column("Description")
+        table.add_column("Success", justify="right")
+        table.add_column("Token Δ", justify="right")
+        table.add_column("Actions")
+
+        for behavior in results:
+            action_preview = ", ".join(behavior.action_sequence[:3])
+            if len(behavior.action_sequence) > 3:
+                action_preview += "..."
+            table.add_row(
+                behavior.behavior_id,
+                _truncate(behavior.description, max_length=50),
+                f"{behavior.success_rate:.2f}",
+                str(behavior.token_savings),
+                action_preview or "-",
+            )
+
+        console.print(table)
+        console.print(
+            f"[dim]Context provided:[/dim] {'yes' if context else 'no'}"
+            f"  |  [dim]Domain:[/dim] {domain}\n"
+        )
+
+    @memory_app.command("learnings")
+    def memory_learnings(
+        domain: str = typer.Option("insurance", "--domain", "-d", help="도메인 이름."),
+        language: str = typer.Option("ko", "--language", "-l", help="언어 코드."),
+        limit: int = typer.Option(5, "--limit", "-n", help="최대 결과 수."),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """Display experiential learning entries stored in memory."""
+
+        adapter = _load_memory_adapter(memory_db)
+        learnings = adapter.list_learnings(domain=domain, language=language, limit=limit)
+
+        if not learnings:
+            console.print("[yellow]No learning memories found for this domain.[/yellow]\n")
+            return
+
+        table = Table(title="Learning Memories", header_style="bold cyan")
+        table.add_column("Learning ID", style="dim", overflow="fold")
+        table.add_column("Run ID", overflow="fold")
+        table.add_column("Success Patterns")
+        table.add_column("Failed Patterns")
+
+        for learning in learnings:
+            table.add_row(
+                learning.learning_id,
+                learning.run_id or "-",
+                _format_list(learning.successful_patterns),
+                _format_list(learning.failed_patterns),
+            )
+
+        console.print(table)
+        console.print(f"[dim]Domain:[/dim] {domain}  |  [dim]Language:[/dim] {language}\n")
+
+    @memory_app.command("evolve")
+    def memory_evolve(
+        domain: str = typer.Option(..., "--domain", "-d", help="도메인 이름."),
+        language: str = typer.Option("ko", "--language", "-l", help="언어 코드."),
+        dry_run: bool = typer.Option(
+            False,
+            "--dry-run",
+            help="데이터 변경 없이 예상 작업만 출력합니다.",
+        ),
+        yes: bool = typer.Option(
+            False,
+            "--yes",
+            "-y",
+            help="확인 프롬프트를 건너뜁니다.",
+        ),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """Run consolidation/cleanup on stored memories."""
+
+        adapter = _load_memory_adapter(memory_db)
+
+        if dry_run:
+            stats = adapter.get_statistics(domain=domain)
+            console.print(
+                "[cyan]Dry run:[/cyan] consolidation, forgetting, and decay would run with "
+                f"{stats.get('facts', 0)} facts and {stats.get('behaviors', 0)} behaviors."
+            )
+            console.print("[dim]Use --yes to skip confirmation when executing for real.[/dim]\n")
+            return
+
+        if not yes:
+            confirmed = typer.confirm(
+                f"Run memory evolution for domain '{domain}'? This operation modifies stored data."
+            )
+            if not confirmed:
+                console.print("[yellow]Cancelled memory evolution.[/yellow]\n")
+                return
+
+        hook = DomainLearningHook(adapter)
+        result = hook.run_evolution(domain=domain, language=language)
+
+        table = Table(title="Evolution Result", header_style="bold cyan")
+        table.add_column("Operation")
+        table.add_column("Count", justify="right")
+        table.add_row("Consolidated", str(result.get("consolidated", 0)))
+        table.add_row("Forgotten", str(result.get("forgotten", 0)))
+        table.add_row("Decayed", str(result.get("decayed", 0)))
+        console.print(table)
+        console.print(f"[green]Domain memory evolution completed for '{domain}'.[/green]\n")
 
     @domain_app.command("list")
     def domain_list_cmd() -> None:

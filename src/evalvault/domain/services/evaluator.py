@@ -31,6 +31,7 @@ from evalvault.domain.entities import (
     TestCaseResult,
 )
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
+from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
@@ -356,8 +357,6 @@ class RagasEvaluator:
         Returns:
             테스트 케이스별 평가 결과
         """
-        import asyncio
-
         results: dict[str, TestCaseEvalResult] = {}
         total_samples = len(ragas_samples)
 
@@ -367,39 +366,32 @@ class RagasEvaluator:
 
         batch_start_time = datetime.now()
 
-        # 배치 단위로 병렬 처리
-        for batch_start in range(0, total_samples, batch_size):
-            batch_end = min(batch_start + batch_size, total_samples)
-            batch_samples = ragas_samples[batch_start:batch_end]
-            batch_test_cases = dataset.test_cases[batch_start:batch_end]
+        async def worker(sample):
+            return await self._score_single_sample(sample, ragas_metrics)
 
-            # 배치 내 태스크 생성
-            tasks = []
-            for sample in batch_samples:
-                task = self._score_single_sample(sample, ragas_metrics)
-                tasks.append(task)
+        batched_scores = await run_in_batches(
+            ragas_samples,
+            worker=worker,
+            batch_size=batch_size,
+            return_exceptions=True,
+        )
 
-            # 배치 병렬 실행
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for test_case, scores_or_error in zip(dataset.test_cases, batched_scores, strict=True):
+            if isinstance(scores_or_error, Exception):
+                scores = {m.name: 0.0 for m in ragas_metrics}
+            else:
+                scores = scores_or_error
 
-            # 결과 수집
-            for test_case, scores_or_error in zip(batch_test_cases, batch_results, strict=True):
-                if isinstance(scores_or_error, Exception):
-                    # 에러 발생 시 빈 점수로 처리
-                    scores = {m.name: 0.0 for m in ragas_metrics}
-                else:
-                    scores = scores_or_error
-
-                results[test_case.id] = TestCaseEvalResult(
-                    scores=scores,
-                    tokens_used=0,  # 병렬 처리 시 개별 추적 불가 - 나중에 평균으로 분배
-                    prompt_tokens=0,
-                    completion_tokens=0,
-                    cost_usd=0.0,
-                    started_at=batch_start_time,
-                    finished_at=datetime.now(),
-                    latency_ms=0,
-                )
+            results[test_case.id] = TestCaseEvalResult(
+                scores=scores,
+                tokens_used=0,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                started_at=batch_start_time,
+                finished_at=datetime.now(),
+                latency_ms=0,
+            )
 
         # 전체 토큰 사용량 가져와서 테스트 케이스별로 평균 분배
         if hasattr(llm, "get_and_reset_token_usage"):

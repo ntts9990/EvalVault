@@ -358,6 +358,215 @@ class TestIntentKeywordRegistry:
         assert "커스텀" in keywords
         assert "테스트" in keywords
 
+    def test_registry_add_keywords_to_new_intent(self):
+        """새로운 의도에 키워드 추가."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.intent_classifier import IntentKeywordRegistry
+
+        registry = IntentKeywordRegistry()
+        # Clear existing keywords for testing
+        registry._keywords = {}
+
+        # Add keywords to a new intent
+        registry.add_keywords(AnalysisIntent.VERIFY_MORPHEME, ["새로운", "키워드"])
+
+        keywords = registry.get_keywords(AnalysisIntent.VERIFY_MORPHEME)
+        assert "새로운" in keywords
+        assert "키워드" in keywords
+
+    def test_registry_get_keywords_for_unknown_intent(self):
+        """알 수 없는 의도에 대한 빈 키워드 반환."""
+        from evalvault.domain.services.intent_classifier import IntentKeywordRegistry
+
+        registry = IntentKeywordRegistry()
+        # Clear all keywords
+        registry._keywords = {}
+
+        # Should return empty set for unknown intent
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+
+        keywords = registry.get_keywords(AnalysisIntent.VERIFY_MORPHEME)
+        assert keywords == set()
+
+    def test_registry_match_query_empty(self):
+        """빈 쿼리에 대한 매칭."""
+        from evalvault.domain.services.intent_classifier import IntentKeywordRegistry
+
+        registry = IntentKeywordRegistry()
+        matches = registry.match_query("")
+
+        # May return matches if any keywords match empty string, or empty
+        assert isinstance(matches, list)
+
+    def test_registry_match_query_case_insensitive(self):
+        """대소문자 구분 없는 매칭."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.intent_classifier import IntentKeywordRegistry
+
+        registry = IntentKeywordRegistry()
+
+        # Test with uppercase query
+        matches = registry.match_query("EMBEDDING 분석")
+
+        assert len(matches) > 0
+        # Should match VERIFY_EMBEDDING intent
+        intent_ids = [m[0] for m in matches]
+        assert AnalysisIntent.VERIFY_EMBEDDING in intent_ids
+
+    def test_registry_match_query_phrase_scoring(self):
+        """긴 키워드(구)에 대한 높은 점수."""
+        from evalvault.domain.services.intent_classifier import IntentKeywordRegistry
+
+        registry = IntentKeywordRegistry()
+
+        # "비교 보고서" is a phrase (2 words), should get higher score
+        matches = registry.match_query("비교 보고서를 만들어줘")
+
+        assert len(matches) > 0
+        # First match should have score > 2 for phrase
+        top_intent, top_score = matches[0]
+        assert top_score >= 2
+
+
+# =============================================================================
+# IntentClassificationResult Tests
+# =============================================================================
+
+
+class TestIntentClassificationResult:
+    """IntentClassificationResult 테스트 - 분류 결과 데이터 클래스."""
+
+    def test_result_creation(self):
+        """결과 생성."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.85,
+            keywords=["형태소", "분석"],
+            alternative_intents=[
+                (AnalysisIntent.VERIFY_EMBEDDING, 0.6),
+            ],
+        )
+
+        assert result.intent == AnalysisIntent.VERIFY_MORPHEME
+        assert result.confidence == 0.85
+        assert result.keywords == ["형태소", "분석"]
+        assert len(result.alternative_intents) == 1
+
+    def test_result_is_confident_property_true(self):
+        """신뢰도 0.7 이상일 때 is_confident=True."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.75,
+        )
+
+        assert result.is_confident is True
+
+    def test_result_is_confident_property_false(self):
+        """신뢰도 0.7 미만일 때 is_confident=False."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.65,
+        )
+
+        assert result.is_confident is False
+
+    def test_result_is_confident_boundary(self):
+        """신뢰도 정확히 0.7일 때 is_confident=True."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.7,
+        )
+
+        assert result.is_confident is True
+
+    def test_result_has_alternatives_true(self):
+        """대안 의도가 있을 때 has_alternatives=True."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.8,
+            alternative_intents=[
+                (AnalysisIntent.VERIFY_EMBEDDING, 0.5),
+            ],
+        )
+
+        assert result.has_alternatives is True
+
+    def test_result_has_alternatives_false(self):
+        """대안 의도가 없을 때 has_alternatives=False."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.9,
+            alternative_intents=[],
+        )
+
+        assert result.has_alternatives is False
+
+    def test_result_default_values(self):
+        """기본값 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.VERIFY_MORPHEME,
+            confidence=0.5,
+        )
+
+        assert result.keywords == []
+        assert result.alternative_intents == []
+
+    def test_result_with_multiple_alternatives(self):
+        """여러 대안 의도."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.ports.outbound.intent_classifier_port import (
+            IntentClassificationResult,
+        )
+
+        result = IntentClassificationResult(
+            intent=AnalysisIntent.COMPARE_SEARCH_METHODS,
+            confidence=0.6,
+            alternative_intents=[
+                (AnalysisIntent.COMPARE_MODELS, 0.5),
+                (AnalysisIntent.COMPARE_RUNS, 0.4),
+                (AnalysisIntent.ANALYZE_LOW_METRICS, 0.3),
+            ],
+        )
+
+        assert len(result.alternative_intents) == 3
+        assert result.alternative_intents[0][0] == AnalysisIntent.COMPARE_MODELS
+        assert result.alternative_intents[0][1] == 0.5
+
 
 # =============================================================================
 # PipelineTemplateRegistry Tests
@@ -433,3 +642,161 @@ class TestPipelineTemplateRegistry:
         templates = registry.list_all()
 
         assert len(templates) > 0
+
+    def test_registry_has_all_intents(self):
+        """모든 의도에 대한 템플릿이 등록되어 있는지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+
+        for intent in AnalysisIntent:
+            template = registry.get_template(intent)
+            assert template is not None, f"No template for {intent}"
+            assert template.intent == intent
+
+    def test_analyze_low_metrics_template_structure(self):
+        """ANALYZE_LOW_METRICS 템플릿 구조 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        template = registry.get_template(AnalysisIntent.ANALYZE_LOW_METRICS)
+
+        assert template is not None
+        # This template should have multiple analysis stages
+        assert len(template.nodes) >= 4
+        # Should include data loading, evaluation, and analysis nodes
+        node_ids = {n.id for n in template.nodes}
+        assert "load_data" in node_ids
+        assert "report" in node_ids
+
+    def test_compare_search_template_has_parallel_nodes(self):
+        """COMPARE_SEARCH_METHODS 템플릿에 병렬 노드가 있는지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        template = registry.get_template(AnalysisIntent.COMPARE_SEARCH_METHODS)
+
+        assert template is not None
+        # Should have BM25 and embedding search that can run in parallel
+        node_ids = {n.id for n in template.nodes}
+        assert "bm25_search" in node_ids
+        assert "embedding_search" in node_ids
+
+        # These should depend on different parent nodes or same root
+        bm25_node = template.get_node("bm25_search")
+        embedding_node = template.get_node("embedding_search")
+
+        # Verify neither depends on the other (parallel execution possible)
+        assert "embedding_search" not in bm25_node.depends_on
+        assert "bm25_search" not in embedding_node.depends_on
+
+    def test_generate_detailed_template_has_multiple_analysis_paths(self):
+        """GENERATE_DETAILED 템플릿에 여러 분석 경로가 있는지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        template = registry.get_template(AnalysisIntent.GENERATE_DETAILED)
+
+        assert template is not None
+        # Should include statistics, NLP, and causal analysis
+        node_modules = {n.module for n in template.nodes}
+        assert "statistical_analyzer" in node_modules
+        assert "nlp_analyzer" in node_modules
+        assert "causal_analyzer" in node_modules
+
+    def test_template_root_nodes(self):
+        """템플릿의 루트 노드 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        template = registry.get_template(AnalysisIntent.VERIFY_MORPHEME)
+
+        roots = template.root_nodes
+        assert len(roots) >= 1
+        # First node should be a data loader typically
+        root_modules = {n.module for n in roots}
+        assert "data_loader" in root_modules
+
+    def test_template_leaf_nodes(self):
+        """템플릿의 리프 노드 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        template = registry.get_template(AnalysisIntent.GENERATE_SUMMARY)
+
+        leaves = template.leaf_nodes
+        assert len(leaves) >= 1
+        # Last node should be a report generator
+        leaf_ids = {n.id for n in leaves}
+        assert "report" in leaf_ids
+
+    def test_all_templates_are_valid_dags(self):
+        """모든 템플릿이 유효한 DAG인지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+
+        for intent in AnalysisIntent:
+            template = registry.get_template(intent)
+            assert template.validate(), f"Invalid DAG for {intent}"
+            # Topological order should include all nodes
+            order = template.topological_order()
+            assert len(order) == len(template.nodes), f"Incomplete order for {intent}"
+
+    def test_list_all_returns_tuples(self):
+        """list_all이 (intent, pipeline) 튜플 목록을 반환하는지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import (
+            AnalysisIntent,
+            AnalysisPipeline,
+        )
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+        templates = registry.list_all()
+
+        for item in templates:
+            assert isinstance(item, tuple)
+            assert len(item) == 2
+            intent, pipeline = item
+            assert isinstance(intent, AnalysisIntent)
+            assert isinstance(pipeline, AnalysisPipeline)
+
+    def test_template_nodes_have_valid_dependencies(self):
+        """템플릿 노드의 의존성이 유효한지 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+        from evalvault.domain.services.pipeline_template_registry import (
+            PipelineTemplateRegistry,
+        )
+
+        registry = PipelineTemplateRegistry()
+
+        for intent in AnalysisIntent:
+            template = registry.get_template(intent)
+            node_ids = {n.id for n in template.nodes}
+
+            for node in template.nodes:
+                for dep_id in node.depends_on:
+                    assert dep_id in node_ids, f"Invalid dependency {dep_id} in {intent} template"

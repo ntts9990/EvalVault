@@ -1,0 +1,32 @@
+"""Helpers to construct InstructorLLM instances regardless of ragas version."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import instructor
+from ragas.llms.base import InstructorLLM
+
+
+def create_instructor_llm(
+    provider: str, model: str, client: Any, **model_args: Any
+) -> InstructorLLM:
+    """Create an InstructorLLM for the given provider using a patched client."""
+    provider_name = provider.lower()
+
+    if provider_name in {"openai", "azure", "ollama"}:
+        patched_client = instructor.from_openai(client)
+        provider_id = "openai"
+    elif provider_name == "anthropic":
+        patched_client = instructor.from_anthropic(client)
+        provider_id = "anthropic"
+    elif provider_name == "litellm":
+        patched_client = instructor.from_litellm(client)
+        provider_id = "litellm"
+    else:  # pragma: no cover - future providers
+        raise ValueError(
+            f"Unsupported instructor provider '{provider}'. "
+            "Supported providers: openai, anthropic, litellm."
+        )
+
+    return InstructorLLM(client=patched_client, model=model, provider=provider_id, **model_args)

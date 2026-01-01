@@ -186,10 +186,16 @@ class RetrievalData:
             attrs["retrieval.avg_score"] = self.avg_score
         if self.top_score is not None:
             attrs["retrieval.top_score"] = self.top_score
+        if self.score_gap is not None:
+            attrs["retrieval.score_gap"] = self.score_gap
         if self.rerank_method:
             attrs["retrieval.rerank_method"] = self.rerank_method
         if self.rerank_time_ms:
             attrs["retrieval.rerank_time_ms"] = self.rerank_time_ms
+        if self.total_docs_searched is not None:
+            attrs["retrieval.total_docs_searched"] = self.total_docs_searched
+        if self.similarity_threshold is not None:
+            attrs["retrieval.similarity_threshold"] = self.similarity_threshold
         return attrs
 
 
@@ -260,10 +266,15 @@ class GenerationData:
             attrs["generation.max_tokens"] = self.max_tokens
         if self.cost_usd is not None:
             attrs["generation.cost_usd"] = self.cost_usd
+        if self.cost_per_token is not None:
+            attrs["generation.cost_per_token"] = self.cost_per_token
         if self.stop_reason:
             attrs["generation.stop_reason"] = self.stop_reason
         if self.tokens_per_second:
             attrs["generation.tokens_per_second"] = self.tokens_per_second
+        if self.metadata:
+            for key, value in self.metadata.items():
+                attrs[f"generation.meta.{key}"] = value
         return attrs
 
 

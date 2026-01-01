@@ -1,6 +1,7 @@
 """Tests for CLI interface."""
 
 import json
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
 
@@ -16,6 +17,13 @@ from evalvault.domain.entities import (
     TestCaseResult,
 )
 from tests.unit.conftest import get_test_model
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text for cross-platform testing."""
+    ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_pattern.sub("", text)
+
 
 runner = CliRunner()
 RUN_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.run"
@@ -102,7 +110,7 @@ class TestCLIRun:
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
-    @patch(f"{CONFIG_COMMAND_MODULE}.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_valid_dataset(
         self,
         mock_settings_cls,
@@ -140,8 +148,8 @@ class TestCLIRun:
         # Run command
         result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
 
-        # Assert
-        assert result.exit_code == 0
+        # Assert with better error message
+        assert result.exit_code == 0, f"CLI failed with output: {result.stdout}"
         assert "test-dataset" in result.stdout or "faithfulness" in result.stdout
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
@@ -223,6 +231,106 @@ class TestCLIRun:
         )
 
         assert result.exit_code == 0
+
+    @patch(f"{RUN_COMMAND_MODULE}.MemoryBasedAnalysis")
+    @patch(f"{RUN_COMMAND_MODULE}.MemoryAwareEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_with_domain_memory_options(
+        self,
+        mock_settings_cls,
+        mock_get_llm_adapter,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_memory_adapter_cls,
+        mock_memory_eval_cls,
+        mock_memory_analysis_cls,
+        tmp_path,
+    ):
+        """Domain Memory 옵션이 활성화되면 관련 서비스가 호출된다."""
+        from datetime import datetime, timedelta
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_endpoint = "http://localhost:6006"
+        mock_settings_cls.return_value = mock_settings
+
+        dataset = Dataset(
+            name="domain-dataset",
+            version="0.1.0",
+            metadata={},
+            test_cases=[TestCase(id="tc-1", question="질문", answer="답", contexts=[])],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        end = start + timedelta(seconds=1)
+        mock_run = EvaluationRun(
+            dataset_name="domain-dataset",
+            dataset_version="0.1.0",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            thresholds={"faithfulness": 0.7},
+            started_at=start,
+            finished_at=end,
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.8, threshold=0.7)],
+                )
+            ],
+        )
+
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm_adapter.return_value = MagicMock()
+
+        mock_memory_adapter = MagicMock()
+        mock_memory_adapter.get_aggregated_reliability.return_value = {"faithfulness": 0.65}
+        mock_memory_adapter_cls.return_value = mock_memory_adapter
+
+        mock_memory_eval = MagicMock()
+        mock_memory_eval.evaluate_with_memory = AsyncMock(return_value=mock_run)
+        mock_memory_eval.augment_context_with_facts.return_value = "[관련 사실]\n- Fact"
+        mock_memory_eval_cls.return_value = mock_memory_eval
+
+        mock_analysis = mock_memory_analysis_cls.return_value
+        mock_analysis.generate_insights.return_value = {
+            "trends": {"faithfulness": {"delta": 0.1, "baseline": 0.6, "current": 0.7}},
+            "recommendations": ["컨텍스트를 보강하세요."],
+        }
+
+        test_file = tmp_path / "cases.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(test_file),
+                "--metrics",
+                "faithfulness",
+                "--use-domain-memory",
+                "--memory-domain",
+                "insurance",
+                "--augment-context",
+            ],
+        )
+
+        assert result.exit_code == 0
+        mock_memory_adapter_cls.assert_called_once()
+        mock_memory_eval.evaluate_with_memory.assert_awaited()
+        mock_analysis.generate_insights.assert_called_once()
+        assert "Domain Memory Insights" in result.stdout
 
 
 class TestCLIMetrics:
@@ -420,6 +528,81 @@ class TestCLIRunEdgeCases:
         )
         assert result.exit_code == 1
         assert "Invalid metrics" in result.stdout
+
+    @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.log_phoenix_traces")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_logs_phoenix_traces(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_log_traces,
+        mock_phoenix_adapter,
+        tmp_path,
+    ):
+        """--tracker phoenix 사용 시 RAG trace 로깅이 호출된다."""
+        from datetime import datetime, timedelta
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings_cls.return_value = mock_settings
+
+        dataset = Dataset(
+            name="phoenix-dataset",
+            version="0.1.0",
+            test_cases=[TestCase(id="tc-1", question="Q", answer="A", contexts=["ctx"])],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        mock_run = EvaluationRun(
+            dataset_name="phoenix-dataset",
+            dataset_version="0.1.0",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                    contexts=["ctx"],
+                    question="Q",
+                    answer="A",
+                )
+            ],
+        )
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        tracker = MagicMock()
+        tracker.log_evaluation_run.return_value = "trace-123"
+        mock_phoenix_adapter.return_value = tracker
+
+        test_file = tmp_path / "phoenix.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+
+        result = runner.invoke(
+            app,
+            ["run", str(test_file), "--metrics", "faithfulness", "--tracker", "phoenix"],
+        )
+
+        assert result.exit_code == 0
+        tracker.log_evaluation_run.assert_called_once()
+        mock_log_traces.assert_called_once_with(tracker, mock_run)
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1562,7 +1745,7 @@ class TestCLIAnalyzeNLP:
         """analyze 명령 help에 --nlp 옵션 표시."""
         result = runner.invoke(app, ["analyze", "--help"])
         assert result.exit_code == 0
-        assert "--nlp" in result.stdout
+        assert "--nlp" in strip_ansi(result.stdout)
 
     @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_analyze_run_not_found(self, mock_storage_cls, tmp_path):
@@ -2008,8 +2191,9 @@ class TestCLIAnalyzePlaybook:
         """analyze 명령 help에 --playbook 옵션 표시."""
         result = runner.invoke(app, ["analyze", "--help"])
         assert result.exit_code == 0
-        assert "--playbook" in result.stdout
-        assert "--enable-llm" in result.stdout
+        stdout = strip_ansi(result.stdout)
+        assert "--playbook" in stdout
+        assert "--enable-llm" in stdout
 
     @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")

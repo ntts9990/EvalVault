@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from evalvault.domain.entities import EvaluationRun, GenerationData, RetrievalData
+from evalvault.domain.entities import EvaluationRun, GenerationData, RAGTraceData, RetrievalData
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 if TYPE_CHECKING:
@@ -87,6 +87,10 @@ class PhoenixAdapter(TrackerPort):
         except ImportError as e:
             raise ImportError(
                 "Phoenix dependencies not installed. Install with: uv sync --extra phoenix"
+            ) from e
+        except Exception as e:  # pragma: no cover - network/setup issues
+            raise RuntimeError(
+                "Failed to initialize Phoenix tracer. Check endpoint configuration and dependencies."
             ) from e
 
     def start_trace(self, name: str, metadata: dict[str, Any] | None = None) -> str:
@@ -432,6 +436,13 @@ class PhoenixAdapter(TrackerPort):
                     event_attrs["doc.rerank_score"] = doc.rerank_score
                 if doc.rerank_rank is not None:
                     event_attrs["doc.rerank_rank"] = doc.rerank_rank
+                if doc.chunk_id:
+                    event_attrs["doc.chunk_id"] = doc.chunk_id
+                preview = doc.content[:200] if doc.content else ""
+                if preview:
+                    event_attrs["doc.preview"] = preview
+                if doc.metadata:
+                    event_attrs["doc.metadata"] = json.dumps(doc.metadata, default=str)
                 span.add_event(f"retrieved_doc_{i}", attributes=event_attrs)
 
     def log_generation(
@@ -489,6 +500,42 @@ class PhoenixAdapter(TrackerPort):
             # Set prompt template if available
             if data.prompt_template:
                 span.set_attribute("generation.prompt_template", data.prompt_template[:max_len])
+
+    def log_rag_trace(self, data: RAGTraceData) -> str:
+        """Log a full RAG trace (retrieval + generation) to Phoenix."""
+
+        self._ensure_initialized()
+        metadata = {"event_type": "rag_trace", "total_time_ms": data.total_time_ms}
+        if data.query:
+            metadata["query"] = data.query
+        if data.metadata:
+            metadata.update(data.metadata)
+
+        should_end = False
+        trace_id = data.trace_id
+        if trace_id and trace_id in self._active_spans:
+            span = self._active_spans[trace_id]
+        else:
+            trace_name = f"rag-trace-{(data.query or 'run')[:12]}"
+            trace_id = self.start_trace(trace_name, metadata=metadata)
+            span = self._active_spans[trace_id]
+            should_end = True
+
+        for key, value in data.to_span_attributes().items():
+            span.set_attribute(key, value)
+
+        if data.retrieval:
+            self.log_retrieval(trace_id, data.retrieval)
+        if data.generation:
+            self.log_generation(trace_id, data.generation)
+        if data.final_answer:
+            preview = data.final_answer[:1000]
+            span.set_attribute("rag.final_answer", preview)
+
+        if should_end:
+            self.end_trace(trace_id)
+
+        return trace_id
 
     def shutdown(self) -> None:
         """Shutdown the tracer provider and flush remaining data."""
