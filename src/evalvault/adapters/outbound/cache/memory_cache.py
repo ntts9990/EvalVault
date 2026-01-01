@@ -47,7 +47,7 @@ class MemoryCacheAdapter:
             value, expires_at = self._cache[key]
 
             # TTL 체크
-            if expires_at < time.time():
+            if expires_at <= time.time():
                 del self._cache[key]
                 self._misses += 1
                 return None
@@ -118,7 +118,9 @@ class MemoryCacheAdapter:
         """
         with self._lock:
             now = time.time()
-            expired_keys = [key for key, (_, expires_at) in self._cache.items() if expires_at < now]
+            expired_keys = [
+                key for key, (_, expires_at) in self._cache.items() if expires_at <= now
+            ]
 
             for key in expired_keys:
                 del self._cache[key]
