@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+from evalvault.domain.entities.analysis import StatisticalAnalysis
 
 
 class SummaryReportModule(BaseAnalysisModule):
@@ -40,19 +41,35 @@ class SummaryReportModule(BaseAnalysisModule):
         """
         stats_output = inputs.get("statistical_analyzer", {})
         statistics = stats_output.get("statistics", {})
-        summary = stats_output.get("summary", {})
+        summary = stats_output.get("summary", {}) or {}
+        analysis_id = stats_output.get("analysis_id")
+        insights = stats_output.get("insights", [])
+        metric_pass_rates = stats_output.get("metric_pass_rates", {})
+        low_performers = stats_output.get("low_performers", [])
+        analysis: StatisticalAnalysis | None = stats_output.get("analysis")
+
+        overall_pass_rate = summary.get("overall_pass_rate", 0.0)
 
         # Markdown 보고서 생성
         report_lines = [
             "# 평가 결과 요약 보고서",
-            "",
-            "## 개요",
-            f"- 분석된 메트릭 수: {summary.get('total_metrics', 0)}",
-            f"- 전체 평균 점수: {summary.get('average_score', 0):.2%}",
-            "",
-            "## 메트릭별 통계",
-            "",
         ]
+
+        if analysis_id:
+            report_lines.extend(["", f"- 분석 ID: `{analysis_id}`"])
+
+        report_lines.extend(
+            [
+                "",
+                "## 개요",
+                f"- 분석된 메트릭 수: {summary.get('total_metrics', 0)}",
+                f"- 전체 평균 점수: {summary.get('average_score', 0):.2%}",
+                f"- 전체 통과율: {overall_pass_rate:.2%}",
+                "",
+                "## 메트릭별 통계",
+                "",
+            ]
+        )
 
         for metric_name, stats in statistics.items():
             report_lines.extend(
@@ -66,11 +83,42 @@ class SummaryReportModule(BaseAnalysisModule):
                 ]
             )
 
+        if metric_pass_rates:
+            report_lines.extend(
+                [
+                    "## 메트릭 통과율",
+                    "",
+                ]
+            )
+            for metric, rate in metric_pass_rates.items():
+                report_lines.append(f"- {metric}: {rate:.2%}")
+            report_lines.append("")
+
+        if insights:
+            report_lines.extend(["## 주요 인사이트", ""])
+            for insight in insights:
+                report_lines.append(f"- {insight}")
+            report_lines.append("")
+
+        if low_performers:
+            report_lines.extend(["## 주의가 필요한 테스트 케이스", ""])
+            for lp in low_performers[:5]:
+                report_lines.append(
+                    f"- {lp.get('test_case_id', 'unknown')} ({lp.get('metric_name')}): "
+                    f"{lp.get('score', 0):.2%} / threshold {lp.get('threshold', 0):.2%}"
+                )
+            report_lines.append("")
+
         report = "\n".join(report_lines)
 
         return {
             "report": report,
             "format": "markdown",
+            "analysis_id": analysis_id,
             "statistics": statistics,
             "summary": summary,
+            "insights": insights,
+            "metric_pass_rates": metric_pass_rates,
+            "low_performers": low_performers,
+            "analysis": analysis,
         }

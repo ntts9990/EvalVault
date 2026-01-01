@@ -2159,6 +2159,79 @@ class TestCLIAnalyzePlaybook:
             mock_playbook.assert_not_called()
 
 
+class TestPipelineCommands:
+    """Pipeline 서브커맨드 테스트."""
+
+    @patch("evalvault.adapters.outbound.analysis.SummaryReportModule")
+    @patch("evalvault.adapters.outbound.analysis.StatisticalAnalyzerModule")
+    @patch("evalvault.adapters.outbound.analysis.DataLoaderModule")
+    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch("evalvault.domain.services.pipeline_orchestrator.AnalysisPipelineService")
+    def test_pipeline_analyze_saves_statistical_analysis(
+        self,
+        mock_service_cls,
+        mock_storage_cls,
+        mock_data_loader_cls,
+        mock_stat_module_cls,
+        mock_summary_module_cls,
+        tmp_path,
+    ):
+        """pipeline analyze 실행 시 통계 분석을 저장한다."""
+        from evalvault.domain.entities.analysis import StatisticalAnalysis
+        from evalvault.domain.entities.analysis_pipeline import (
+            AnalysisIntent,
+            NodeExecutionStatus,
+            NodeResult,
+            PipelineResult,
+        )
+
+        mock_storage = MagicMock()
+        mock_storage.save_analysis.return_value = "analysis-123"
+        mock_storage_cls.return_value = mock_storage
+
+        mock_data_loader_cls.return_value = MagicMock(module_id="data_loader")
+        mock_stat_module_cls.return_value = MagicMock(module_id="statistical_analyzer")
+        mock_summary_module_cls.return_value = MagicMock(module_id="summary_report")
+
+        pipeline_result = PipelineResult(
+            pipeline_id="pipe-1",
+            intent=AnalysisIntent.GENERATE_SUMMARY,
+        )
+        stats_output = {"analysis": StatisticalAnalysis(run_id="run-77")}
+        pipeline_result.add_node_result(
+            NodeResult(
+                node_id="statistical_analyzer",
+                status=NodeExecutionStatus.COMPLETED,
+                output=stats_output,
+            )
+        )
+        pipeline_result.mark_complete(
+            final_output={"summary_report": {"report": "OK"}}, total_duration_ms=12
+        )
+
+        mock_service = MagicMock()
+        mock_service.get_intent.return_value = AnalysisIntent.GENERATE_SUMMARY
+        mock_service.analyze.return_value = pipeline_result
+        mock_service_cls.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            [
+                "pipeline",
+                "analyze",
+                "요약해줘",
+                "--db",
+                str(tmp_path / "pipeline.db"),
+                "--run",
+                "run-77",
+            ],
+        )
+
+        assert result.exit_code == 0
+        mock_service.register_module.assert_any_call(mock_data_loader_cls.return_value)
+        mock_storage.save_analysis.assert_called_once()
+
+
 class TestPerformPlaybookAnalysis:
     """_perform_playbook_analysis 함수 테스트."""
 

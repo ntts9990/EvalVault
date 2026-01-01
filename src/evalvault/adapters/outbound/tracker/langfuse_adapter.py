@@ -271,7 +271,7 @@ class LangfuseAdapter(TrackerPort):
             "started_at": run.started_at.isoformat(),
             "total_test_cases": run.total_test_cases,
             "passed_test_cases": run.passed_test_cases,
-            "pass_rate": run.pass_rate,
+            "pass_rate": run.metric_pass_rate,
             "total_tokens": run.total_tokens,
             "metrics_evaluated": run.metrics_evaluated,
             "thresholds": run.thresholds,
@@ -290,7 +290,7 @@ class LangfuseAdapter(TrackerPort):
         tags = [
             f"dataset:{run.dataset_name}",
             f"model:{run.model_name}",
-            "passed" if run.pass_rate >= 1.0 else "failed",
+            "passed" if run.metric_pass_rate >= 1.0 else "failed",
         ]
         # Add metric tags
         for metric_name in run.metrics_evaluated:

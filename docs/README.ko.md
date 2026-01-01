@@ -83,13 +83,14 @@ cd EvalVault
 uv sync --extra dev
 
 # 전체 기능 개발 환경 (권장)
-uv sync --extra dev --extra korean --extra web
+uv sync --extra dev --extra analysis --extra korean --extra web
 ```
 
 **선택적 Extras:**
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
-| `korean` | kiwipiepy, rank-bm25 | 한국어 NLP (형태소 분석, BM25) |
+| `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 NLP (형태소 분석/임베딩) |
+| `analysis` | scikit-learn | 통계/NLP 분석 파이프라인 |
 | `web` | streamlit, plotly | Streamlit Web UI 대시보드 |
 | `postgres` | psycopg | PostgreSQL 저장소 지원 |
 | `mlflow` | mlflow | MLflow 트래커 연동 |
@@ -546,13 +547,14 @@ EvalVault/
 
 ## 문서
 
-| 문서 | 설명 |
+| 파일 | 설명 |
 |------|------|
-| [USER_GUIDE.md](USER_GUIDE.md) | 설치, 설정, 문제 해결 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 헥사고날 아키텍처 상세 |
-| [COMPLETED.md](COMPLETED.md) | Phase 1-14 완료 내역 및 기술 스펙 |
-| [ROADMAP.md](ROADMAP.md) | 2026-2027 개발 로드맵 |
-| [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 |
+| [docs/USER_GUIDE.md](USER_GUIDE.md) | 설치, 설정, 문제 해결 |
+| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Hexagonal Architecture 상세 가이드 |
+| [docs/ARCHITECTURE_C4.md](ARCHITECTURE_C4.md) | C4 Model 기반 아키텍처 문서 |
+| [docs/COMPLETED.md](COMPLETED.md) | Phase 1-14 완료 내역 및 기술 스펙 |
+| [docs/ROADMAP.md](ROADMAP.md) | 2026-2027 개발 로드맵 |
+| [docs/IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | 기여 가이드 |
 
 ## 개발

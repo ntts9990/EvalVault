@@ -57,32 +57,61 @@
 │                                   │                    │                                   │
 │  adapters/inbound/                │                    │  adapters/outbound/               │
 │  ├── __init__.py                  │                    │  ├── __init__.py                  │
-│  └── cli.py                       │                    │  ├── dataset/                     │
-│      └── Typer 기반 CLI            │                    │  │   ├── __init__.py              │
-│          - run 명령                │                    │  │   ├── base.py                  │
-│          - generate 명령           │                    │  │   ├── csv_loader.py             │
-│          - history 명령             │                    │  │   ├── excel_loader.py           │
-│          - compare 명령             │                    │  │   ├── json_loader.py            │
-│          - experiment 명령들        │                    │  │   └── loader_factory.py        │
+│  ├── cli.py                       │                    │  ├── dataset/                     │
+│  │   └── Typer 기반 CLI            │                    │  │   ├── __init__.py              │
+│  │       - run 명령                │                    │  │   ├── base.py                  │
+│  │       - generate 명령           │                    │  │   ├── csv_loader.py             │
+│  │       - history 명령             │                    │  │   ├── excel_loader.py           │
+│  │       - compare 명령             │                    │  │   ├── json_loader.py            │
+│  │       - experiment 명령들        │                    │  │   └── loader_factory.py        │
+│  │       - pipeline 명령            │                    │  │                                 │
+│  │       - benchmark 명령          │                    │  ├── llm/                          │
+│  │       - domain 명령              │                    │  │   ├── __init__.py               │
+│  │                                 │                    │  │   ├── anthropic_adapter.py      │
+│  │  └── web/                       │                    │  │   ├── azure_adapter.py          │
+│  │      ├── adapter.py             │                    │  │   ├── ollama_adapter.py         │
+│  │      ├── app.py                │                    │  │   ├── openai_adapter.py         │
+│  │      ├── components/           │                    │  │   └── llm_relation_augmenter.py │
+│  │      │   ├── cards.py          │                    │  │                                 │
+│  │      │   ├── charts.py         │                    │  ├── storage/                      │
+│  │      │   ├── evaluate.py       │                    │  │   ├── __init__.py               │
+│  │      │   ├── history.py        │                    │  │   ├── postgres_adapter.py       │
+│  │      │   ├── reports.py        │                    │  │   ├── sqlite_adapter.py         │
+│  │      │   └── upload.py         │                    │  │   ├── postgres_schema.sql       │
+│  │      └── session.py            │                    │  │   └── schema.sql                   │
 │                                   │                    │  │                                 │
-│                                   │                    │  ├── llm/                          │
+│                                   │                    │  ├── tracker/                      │
 │                                   │                    │  │   ├── __init__.py               │
-│                                   │                    │  │   ├── anthropic_adapter.py      │
-│                                   │                    │  │   ├── azure_adapter.py          │
-│                                   │                    │  │   ├── ollama_adapter.py         │
-│                                   │                    │  │   └── openai_adapter.py         │
+│                                   │                    │  │   ├── langfuse_adapter.py       │
+│                                   │                    │  │   └── mlflow_adapter.py         │
 │                                   │                    │  │                                 │
-│                                   │                    │  ├── storage/                      │
-│                                   │                    │  │   ├── __init__.py               │
-│                                   │                    │  │   ├── postgres_adapter.py       │
+│                                   │                    │  ├── analysis/                     │
+│                                   │                    │  │   ├── statistical_adapter.py    │
+│                                   │                    │  │   ├── nlp_adapter.py            │
+│                                   │                    │  │   ├── causal_adapter.py         │
+│                                   │                    │  │   └── [분석 모듈들]              │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── cache/                        │
+│                                   │                    │  │   └── memory_cache.py            │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── domain_memory/                │
 │                                   │                    │  │   ├── sqlite_adapter.py         │
-│                                   │                    │  │   ├── postgres_schema.sql       │
-│                                   │      │   │   │   │   └── schema.sql                   │
+│                                   │                    │  │   └── domain_memory_schema.sql  │
 │                                   │                    │  │                                 │
-│                                   │                    │  └── tracker/                      │
-│                                   │                    │      ├── __init__.py               │
-│                                   │                    │      ├── langfuse_adapter.py       │
-│                                   │                    │      └── mlflow_adapter.py         │
+│                                   │                    │  ├── improvement/                  │
+│                                   │                    │  │   ├── pattern_detector.py         │
+│                                   │                    │  │   ├── insight_generator.py      │
+│                                   │                    │  │   └── playbook_loader.py         │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── nlp/                           │
+│                                   │                    │  │   └── korean/                    │
+│                                   │                    │  │       ├── bm25_retriever.py     │
+│                                   │                    │  │       ├── dense_retriever.py    │
+│                                   │                    │  │       └── hybrid_retriever.py   │
+│                                   │                    │  │                                 │
+│                                   │                    │  └── report/                        │
+│                                   │                    │      ├── llm_report_generator.py   │
+│                                   │                    │      └── markdown_adapter.py      │
 └───────────────────────────────────┘                    └───────────────────────────────────┘
          │                                                          │
          │                                                          │
@@ -118,36 +147,74 @@
 │                                   │                    │                                   │
 │  ports/inbound/                   │                    │  ports/outbound/                 │
 │  ├── __init__.py                  │                    │  ├── __init__.py                  │
-│  └── evaluator_port.py            │                    │  ├── dataset_port.py               │
-│      └── EvaluatorPort            │                    │  │   └── DatasetPort               │
-│          Protocol {                │                    │  │       Protocol {                │
-│            evaluate()               │                    │  │         load()                  │
-│          }                         │                    │  │         supports()             │
-│                                   │                    │  │       }                          │
-│                                   │                    │  │                                 │
-│                                   │                    │  ├── llm_port.py                     │
-│                                   │                    │  │   └── LLMPort                   │
-│                                   │                    │  │       ABC {                     │
-│                                   │                    │  │         get_model_name()        │
-│                                   │                    │  │         as_ragas_llm()          │
-│                                   │                    │  │       }                          │
-│                                   │                    │  │                                 │
-│                                   │                    │  ├── storage_port.py               │
-│                                   │                    │  │   └── StoragePort               │
-│                                   │                    │  │       Protocol {                 │
-│                                   │                    │  │         save_run()              │
-│                                   │                    │  │         get_run()               │
+│  ├── evaluator_port.py            │                    │  ├── dataset_port.py               │
+│  │   └── EvaluatorPort            │                    │  │   └── DatasetPort               │
+│  │       Protocol {                │                    │  │       Protocol {                │
+│  │         evaluate()               │                    │  │         load()                  │
+│  │       }                         │                    │  │         supports()             │
+│  │                                 │                    │  │       }                          │
+│  ├── analysis_pipeline_port.py    │                    │  │                                 │
+│  │   └── AnalysisPipelinePort    │                    │  ├── llm_port.py                     │
+│  │       Protocol {                │                    │  │   └── LLMPort                   │
+│  │         build_pipeline()         │                    │  │       ABC {                     │
+│  │         execute()                │                    │  │         get_model_name()        │
+│  │       }                         │                    │  │         as_ragas_llm()          │
+│  │                                 │                    │  │       }                          │
+│  ├── learning_hook_port.py        │                    │  │                                 │
+│  │   └── LearningHookPort         │                    │  ├── storage_port.py               │
+│  │                                 │                    │  │   └── StoragePort               │
+│  └── web_port.py                  │                    │  │       Protocol {                 │
+│      └── WebUIPort                 │                    │  │         save_run()              │
+│                                                           │  │         get_run()               │
 │                                   │                    │  │         list_runs()              │
 │                                   │                    │  │       }                          │
 │                                   │                    │  │                                 │
-│                                   │                    │  └── tracker_port.py               │
-│                                   │                    │      └── TrackerPort                │
-│                                   │                    │          Protocol {                 │
-│                                   │                    │            start_trace()           │
-│                                   │                    │            add_span()               │
-│                                   │                    │            log_score()              │
-│                                   │                    │            log_evaluation_run()    │
-│                                   │                    │          }                          │
+│                                   │                    │  ├── tracker_port.py               │
+│                                   │                    │  │   └── TrackerPort                │
+│                                   │                    │  │       Protocol {                 │
+│                                   │                    │  │         start_trace()           │
+│                                   │                    │  │         log_evaluation_run()    │
+│                                   │                    │  │       }                          │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── analysis_port.py              │
+│                                   │                    │  │   └── AnalysisPort              │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── analysis_module_port.py       │
+│                                   │                    │  │   └── AnalysisModulePort        │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── analysis_cache_port.py         │
+│                                   │                    │  │   └── AnalysisCachePort         │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── nlp_analysis_port.py          │
+│                                   │                    │  │   └── NLPAnalysisPort           │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── causal_analysis_port.py       │
+│                                   │                    │  │   └── CausalAnalysisPort       │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── domain_memory_port.py         │
+│                                   │                    │  │   └── DomainMemoryPort          │
+│                                   │                    │  │       (Factual/Experiential/    │
+│                                   │                    │  │        Behavior 레이어)         │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── improvement_port.py           │
+│                                   │                    │  │   └── PatternDetectorPort       │
+│                                   │                    │  │   └── InsightGeneratorPort      │
+│                                   │                    │  │   └── PlaybookPort              │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── korean_nlp_port.py            │
+│                                   │                    │  │   └── KoreanNLPPort            │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── embedding_port.py             │
+│                                   │                    │  │   └── EmbeddingPort            │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── relation_augmenter_port.py   │
+│                                   │                    │  │   └── RelationAugmenterPort    │
+│                                   │                    │  │                                 │
+│                                   │                    │  ├── intent_classifier_port.py     │
+│                                   │                    │  │   └── IntentClassifierPort      │
+│                                   │                    │  │                                 │
+│                                   │                    │  └── report_port.py                │
+│                                   │                    │      └── ReportPort                │
 └───────────────────────────────────┘                    └───────────────────────────────────┘
          │                                                          │
          │                                                          │
@@ -187,11 +254,40 @@
 │  │   │       - A/B 테스트 관리                                                       │
 │  │   │       - 그룹별 메트릭 비교                                                    │
 │  │   │                                                                              │
-│  │   └── result.py                     ─ Result 엔티티                              │
-│  │       └── EvaluationRun, TestCaseResult, MetricScore                            │
-│  │           - 평가 결과 집계                                                        │
-│  │           - 통과/실패 판정                                                        │
-│  │           - 메트릭 점수 관리                                                      │
+│  │   ├── result.py                     ─ Result 엔티티                              │
+│  │   │   └── EvaluationRun, TestCaseResult, MetricScore                            │
+│  │   │       - 평가 결과 집계                                                        │
+│  │   │       - 통과/실패 판정                                                        │
+│  │   │       - 메트릭 점수 관리                                                      │
+│  │   │                                                                              │
+│  │   ├── analysis.py                    ─ Analysis 엔티티                           │
+│  │   │   └── AnalysisBundle, ComparisonResult, MetaAnalysisResult                   │
+│  │   │       - 통계/NLP/인과 분석 결과                                               │
+│  │   │       - 비교 및 메타 분석                                                     │
+│  │   │                                                                              │
+│  │   ├── analysis_pipeline.py           ─ Analysis Pipeline 엔티티                 │
+│  │   │   └── AnalysisPipeline, AnalysisNode, AnalysisContext                        │
+│  │   │       - DAG 기반 분석 파이프라인                                              │
+│  │   │       - 의도 분류 및 템플릿 관리                                              │
+│  │   │                                                                              │
+│  │   ├── benchmark.py                  ─ Benchmark 엔티티                         │
+│  │   │   └── BenchmarkRun, BenchmarkResult                                          │
+│  │   │       - 벤치마크 실행 및 결과                                                 │
+│  │   │                                                                              │
+│  │   ├── improvement.py                 ─ Improvement 엔티티                        │
+│  │   │   └── ImprovementReport, ImprovementAction, PatternEvidence                 │
+│  │   │       - 개선 가이드 및 액션                                                  │
+│  │   │       - 패턴 탐지 결과                                                        │
+│  │   │                                                                              │
+│  │   ├── kg.py                          ─ Knowledge Graph 엔티티                     │
+│  │   │   └── KnowledgeGraph, Entity, Relation                                       │
+│  │   │       - 지식 그래프 구조                                                     │
+│  │   │       - 엔티티 및 관계 표현                                                   │
+│  │   │                                                                              │
+│  │   └── memory.py                      ─ Domain Memory 엔티티                       │
+│  │       └── FactualFact, LearningMemory, BehaviorEntry                             │
+│  │           - 도메인 메모리 (Factual/Experiential/Behavior)                        │
+│  │           - Formation/Evolution/Retrieval dynamics                               │
 │  │                                                                                  │
 │  ├── metrics/                            (평가 메트릭)                                │
 │  │   ├── __init__.py                                                               │
@@ -248,11 +344,38 @@
 │      │       - 사실, 패턴, 행동 추출                                                 │
 │      │       - 메모리 진화 관리 (Evolution)                                         │
 │      │                                                                              │
-│      └── analysis_service.py           ─ 분석 서비스                               │
-│          └── AnalysisService                                                       │
-│              - 통계 분석 오케스트레이션                                              │
-│              - NLP/인과 분석 통합                                                    │
-│              - 메타 분석 및 비교                                                     │
+│      ├── analysis_service.py           ─ 분석 서비스                               │
+│      │   └── AnalysisService                                                       │
+│      │       - 통계 분석 오케스트레이션                                              │
+│      │       - NLP/인과 분석 통합                                                    │
+│      │       - 메타 분석 및 비교                                                     │
+│      │                                                                              │
+│      ├── pipeline_orchestrator.py      ─ 파이프라인 오케스트레이터                 │
+│      │   └── PipelineOrchestrator                                                  │
+│      │       - DAG 기반 분석 파이프라인 실행                                        │
+│      │       - 모듈 카탈로그 및 템플릿 관리                                          │
+│      │       - 의도 분류 및 파이프라인 빌드                                         │
+│      │                                                                              │
+│      ├── pipeline_template_registry.py  ─ 파이프라인 템플릿 레지스트리             │
+│      │   └── PipelineTemplateRegistry                                             │
+│      │       - 분석 의도별 템플릿 관리                                              │
+│      │       - 템플릿 검증 및 등록                                                  │
+│      │                                                                              │
+│      ├── intent_classifier.py           ─ 의도 분류 서비스                         │
+│      │   └── KeywordIntentClassifier                                               │
+│      │       - 사용자 쿼리에서 분석 의도 추출                                       │
+│      │       - 키워드 기반 분류                                                     │
+│      │                                                                              │
+│      ├── improvement_guide_service.py  ─ 개선 가이드 서비스                        │
+│      │   └── ImprovementGuideService                                               │
+│      │       - 규칙 기반 패턴 탐지                                                  │
+│      │       - LLM 기반 인사이트 생성                                               │
+│      │       - 하이브리드 분석 및 리포트 생성                                       │
+│      │                                                                              │
+│      └── benchmark_runner.py           ─ 벤치마크 러너 서비스                      │
+│          └── BenchmarkRunner                                                       │
+│              - 한국어 RAG 벤치마크 실행                                             │
+│              - 메트릭 비교 및 리더보드 생성                                         │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -470,6 +593,125 @@ class RagasEvaluator:
 - `LLMPort` (포트 인터페이스) - 구체적인 LLM 구현에 의존하지 않음
 - `Dataset`, `EvaluationRun` (도메인 엔티티)
 
+**AnalysisService 서비스**
+
+```python
+class AnalysisService:
+    """분석 서비스.
+
+    여러 분석 어댑터를 조합하여 종합 분석을 제공합니다.
+    """
+
+    def __init__(
+        self,
+        analysis_adapter: AnalysisPort,
+        nlp_adapter: NLPAnalysisPort | None = None,
+        causal_adapter: CausalAnalysisPort | None = None,
+        cache_adapter: AnalysisCachePort | None = None,
+    ):
+        ...
+
+    def analyze_run(
+        self,
+        run: EvaluationRun,
+        *,
+        include_nlp: bool = False,
+        include_causal: bool = False,
+        use_cache: bool = True,
+    ) -> AnalysisBundle:
+        """평가 실행에 대한 종합 분석을 수행합니다."""
+        ...
+```
+
+**책임:**
+- 통계 분석 오케스트레이션
+- NLP 분석 통합 (선택적)
+- 인과 분석 통합 (선택적)
+- 분석 결과 캐싱
+
+**의존성:**
+- `AnalysisPort`, `NLPAnalysisPort`, `CausalAnalysisPort` (포트 인터페이스)
+- `AnalysisCachePort` (캐시 포트)
+
+**PipelineOrchestrator 서비스**
+
+```python
+@dataclass
+class PipelineOrchestrator:
+    """파이프라인 오케스트레이터.
+
+    DAG 기반 분석 파이프라인을 빌드하고 실행합니다.
+    """
+
+    module_catalog: ModuleCatalog
+    template_registry: PipelineTemplateRegistry
+    intent_classifier: KeywordIntentClassifier
+    _modules: dict[str, AnalysisModulePort]
+
+    def build_pipeline(
+        self,
+        intent: AnalysisIntent,
+        context: AnalysisContext,
+    ) -> AnalysisPipeline:
+        """의도와 컨텍스트에 따라 파이프라인 빌드"""
+        ...
+
+    async def execute_pipeline(
+        self,
+        pipeline: AnalysisPipeline,
+        context: AnalysisContext,
+    ) -> PipelineResult:
+        """파이프라인 실행"""
+        ...
+```
+
+**책임:**
+- DAG 기반 분석 파이프라인 구성
+- 모듈 카탈로그 관리
+- 템플릿 레지스트리 관리
+- 의도 분류 및 파이프라인 빌드
+- 비동기 파이프라인 실행
+
+**의존성:**
+- `AnalysisModulePort` (포트 인터페이스)
+- `AnalysisPipeline`, `AnalysisNode` (도메인 엔티티)
+
+**ImprovementGuideService 서비스**
+
+```python
+class ImprovementGuideService:
+    """개선 가이드 서비스.
+
+    Rule-based Pattern Detector와 LLM-based Insight Generator를
+    결합하여 하이브리드 분석을 수행합니다.
+    """
+
+    def __init__(
+        self,
+        pattern_detector: PatternDetectorPort,
+        insight_generator: InsightGeneratorPort | None = None,
+        playbook: PlaybookPort | None = None,
+    ):
+        ...
+
+    def generate_report(
+        self,
+        run: EvaluationRun,
+        metrics: list[str] | None = None,
+    ) -> ImprovementReport:
+        """개선 리포트 생성"""
+        ...
+```
+
+**책임:**
+- 규칙 기반 패턴 탐지
+- LLM 기반 인사이트 생성
+- 플레이북 기반 액션 제안
+- 하이브리드 분석 및 리포트 생성
+
+**의존성:**
+- `PatternDetectorPort`, `InsightGeneratorPort`, `PlaybookPort` (포트 인터페이스)
+
 **ExperimentManager 서비스**
 
 ```python
@@ -644,6 +886,76 @@ class TrackerPort(Protocol):
     def log_evaluation_run(self, run: EvaluationRun) -> str:
         """평가 실행을 trace로 기록합니다."""
         ...
+```
+
+**AnalysisPipelinePort**
+
+```python
+class AnalysisPipelinePort(Protocol):
+    """분석 파이프라인 포트 인터페이스."""
+
+    def build_pipeline(
+        self,
+        intent: AnalysisIntent,
+        context: AnalysisContext,
+    ) -> AnalysisPipeline:
+        """의도와 컨텍스트에 따라 분석 파이프라인을 구성합니다."""
+        ...
+
+    async def execute_async(
+        self,
+        pipeline: AnalysisPipeline,
+        context: AnalysisContext,
+    ) -> PipelineResult:
+        """분석 파이프라인을 비동기로 실행합니다."""
+        ...
+```
+
+**DomainMemoryPort**
+
+```python
+class DomainMemoryPort(Protocol):
+    """도메인 메모리 저장소 인터페이스.
+
+    세 가지 메모리 레이어를 관리합니다:
+    - Factual Layer: 검증된 도메인 사실 (SPO 트리플)
+    - Experiential Layer: 평가에서 학습된 패턴
+    - Working Layer: 현재 세션의 활성 컨텍스트
+    """
+
+    def save_fact(self, fact: FactualFact) -> str: ...
+    def save_learning(self, learning: LearningMemory) -> str: ...
+    def save_behavior(self, behavior: BehaviorEntry) -> str: ...
+    def hybrid_search(...) -> dict[str, list]: ...
+```
+
+**특징:**
+- Factual/Experiential/Behavior 레이어 관리
+- Formation/Evolution/Retrieval dynamics 지원
+- Knowledge Graph 통합 (Phase 5)
+
+**ImprovementPort (패턴 탐지 및 인사이트 생성)**
+
+```python
+class PatternDetectorPort(Protocol):
+    """패턴 탐지 인터페이스."""
+
+    def detect_patterns(
+        self,
+        run: EvaluationRun,
+        metrics: Sequence[str] | None = None,
+    ) -> Mapping[str, list[PatternEvidence]]: ...
+
+class InsightGeneratorPort(Protocol):
+    """LLM 인사이트 생성 인터페이스."""
+
+    def analyze_batch_failures(
+        self,
+        failures: Sequence[FailureSample],
+        metric_name: str,
+        avg_score: float,
+        threshold: float,
+    ) -> ClaimImprovementProtocol: ...
 ```
 
 ### 3.3 Adapters Layer (어댑터 계층)
@@ -822,6 +1134,104 @@ class LangfuseAdapter(TrackerPort):
 - 추적 시스템 API 호출
 - 도메인 엔티티 → 추적 형식 변환
 
+**Web Adapter (Streamlit)**
+
+```python
+class WebUIAdapter:
+    """웹 UI 어댑터.
+
+    Streamlit 기반 웹 UI를 제공합니다.
+    """
+
+    def run_evaluation(
+        self,
+        request: EvalRequest,
+        *,
+        on_progress: Callable[[EvalProgress], None] | None = None,
+    ) -> EvaluationRun:
+        """웹 UI에서 평가 실행"""
+        ...
+
+    def get_run_history(...) -> list[EvaluationRun]: ...
+    def generate_llm_report(...) -> str: ...
+```
+
+**책임:**
+- Streamlit 웹 UI 제공
+- 평가 실행 및 진행률 표시
+- 결과 시각화 및 리포트 생성
+- 파일 업로드 및 검증
+
+**Analysis Adapters (통계/NLP/인과 분석)**
+
+```python
+class StatisticalAnalysisAdapter(AnalysisPort):
+    """통계 분석 어댑터."""
+
+    def analyze_statistics(self, run: EvaluationRun) -> StatisticalResult:
+        """통계 분석 수행"""
+        ...
+
+class NLPAnalysisAdapter(NLPAnalysisPort):
+    """NLP 분석 어댑터."""
+
+    def analyze(self, run: EvaluationRun) -> NLPResult:
+        """NLP 분석 수행"""
+        ...
+
+class CausalAnalysisAdapter(CausalAnalysisPort):
+    """인과 분석 어댑터."""
+
+    def analyze_causality(self, run: EvaluationRun) -> CausalResult:
+        """인과 분석 수행"""
+        ...
+```
+
+**책임:**
+- 통계 분석 (평균, 분산, 분포 등)
+- NLP 분석 (감성, 주제, 키워드 등)
+- 인과 분석 (인과 관계 추론)
+
+**Domain Memory Adapter**
+
+```python
+class SQLiteDomainMemoryAdapter(DomainMemoryPort):
+    """SQLite 기반 도메인 메모리 어댑터."""
+
+    def save_fact(self, fact: FactualFact) -> str: ...
+    def save_learning(self, learning: LearningMemory) -> str: ...
+    def save_behavior(self, behavior: BehaviorEntry) -> str: ...
+    def hybrid_search(...) -> dict[str, list]: ...
+```
+
+**책임:**
+- Factual/Experiential/Behavior 레이어 저장
+- 메모리 검색 및 통합
+- Knowledge Graph 연동
+
+**Improvement Adapters**
+
+```python
+class PatternDetector(PatternDetectorPort):
+    """규칙 기반 패턴 탐지기."""
+
+    def detect_patterns(
+        self,
+        run: EvaluationRun,
+        metrics: Sequence[str] | None = None,
+    ) -> Mapping[str, list[PatternEvidence]]: ...
+
+class InsightGenerator(InsightGeneratorPort):
+    """LLM 기반 인사이트 생성기."""
+
+    def analyze_batch_failures(...) -> ClaimImprovementProtocol: ...
+```
+
+**책임:**
+- 플레이북 기반 패턴 탐지
+- LLM 기반 인사이트 생성
+- 개선 액션 제안
+
 ---
 
 ## 4. 데이터 흐름 분석
@@ -993,7 +1403,136 @@ class LangfuseAdapter(TrackerPort):
      │  - JSON 파일로 저장
 ```
 
-### 4.4 의존성 주입 흐름 (Dependency Injection Flow)
+### 4.4 분석 파이프라인 흐름 (Analysis Pipeline Flow)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        분석 파이프라인 실행 흐름                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+[1] 사용자 쿼리 입력
+    │  예: "요약해줘", "비교해줘", "검증해줘"
+    │
+    ▼
+[2] CLI/Web Adapter
+    │  - 쿼리 파싱
+    │
+    └─> [3] PipelineOrchestrator
+            │
+            ├─> [4] IntentClassifier
+            │       │  - 키워드 기반 의도 분류
+            │       │  - AnalysisIntent 추출
+            │       │
+            │       └─> [5] AnalysisIntent
+            │               (VERIFY, COMPARE, ANALYZE, GENERATE 등)
+            │
+            ├─> [6] TemplateRegistry
+            │       │  - 의도별 템플릿 조회
+            │       │
+            │       └─> [7] AnalysisPipeline 템플릿
+            │               - 노드 및 엣지 정의
+            │
+            └─> [8] Pipeline 빌드
+                    │  - 템플릿 복사
+                    │  - 컨텍스트 주입
+                    │
+                    └─> [9] AnalysisPipeline 엔티티
+
+[10] 파이프라인 실행
+     │
+     ▼
+[11] PipelineOrchestrator.execute_pipeline()
+     │  - DAG 토폴로지 정렬
+     │  - 의존성 순서대로 실행
+     │
+     ├─> [12] AnalysisModule 실행
+     │       │  - StatisticalAnalysisModule
+     │       │  - NLPAnalysisModule
+     │       │  - CausalAnalysisModule
+     │       │  - ReportModule
+     │       │
+     │       └─> [13] NodeResult
+     │
+     └─> [14] PipelineResult
+             │  - 모든 노드 결과 집계
+             │  - 최종 리포트 생성
+```
+
+### 4.5 도메인 메모리 형성 흐름 (Domain Memory Formation Flow)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        도메인 메모리 형성 흐름                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+[1] 평가 완료
+    │
+    ▼
+[2] DomainLearningHook.on_evaluation_complete()
+    │
+    ├─> [3] Factual Layer 형성
+    │       │  - 평가 결과에서 SPO 트리플 추출
+    │       │  - 높은 신뢰도 사실만 저장
+    │       │
+    │       └─> [4] DomainMemoryPort.save_fact()
+    │               └─> [5] SQLiteDomainMemoryAdapter
+    │                       └─> [6] 도메인 메모리 DB
+    │
+    ├─> [7] Experiential Layer 형성
+    │       │  - 성공/실패 패턴 추출
+    │       │  - 메트릭별 점수 분포 학습
+    │       │
+    │       └─> [8] DomainMemoryPort.save_learning()
+    │
+    └─> [9] Behavior Layer 형성
+            │  - 재사용 가능한 행동 패턴 추출
+            │  - 성공률 기반 필터링
+            │
+            └─> [10] DomainMemoryPort.save_behavior()
+
+[11] 메모리 활용
+     │  - 향후 평가에서 메모리 검색
+     │  - Knowledge Graph 연동
+```
+
+### 4.6 개선 가이드 생성 흐름 (Improvement Guide Flow)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        개선 가이드 생성 흐름                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+[1] 평가 실행 결과
+    │
+    ▼
+[2] ImprovementGuideService.generate_report()
+    │
+    ├─> [3] PatternDetector.detect_patterns()
+    │       │  - 플레이북 규칙 기반 탐지
+    │       │  - 낮은 메트릭 점수 패턴 분석
+    │       │
+    │       └─> [4] PatternEvidence 리스트
+    │
+    ├─> [5] InsightGenerator.analyze_batch_failures()
+    │       │  - LLM 기반 심층 분석
+    │       │  - 실패 샘플 일괄 분석
+    │       │
+    │       └─> [6] ClaimImprovementProtocol
+    │               - 전체 평가
+    │               - 우선순위 개선 사항
+    │
+    └─> [7] ImprovementReport 생성
+            │  - 패턴 탐지 결과 통합
+            │  - LLM 인사이트 통합
+            │  - 액션 우선순위 결정
+            │
+            └─> [8] ImprovementReport 엔티티
+                    - 개선 액션 목록
+                    - 예상 개선 효과
+                    - 구현 힌트
+```
+
+### 4.7 의존성 주입 흐름 (Dependency Injection Flow)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -1347,6 +1886,80 @@ class XMLDatasetLoader(BaseDatasetLoader):
 _LOADERS.append(XMLDatasetLoader)
 ```
 
+#### 7.1.4 새로운 분석 모듈 추가
+
+**단계:**
+1. `AnalysisModulePort` 구현
+2. `BaseAnalysisModule` 상속
+3. `PipelineOrchestrator`에 등록
+
+**예시:**
+```python
+# 1. 분석 모듈 구현
+class CustomAnalysisModule(BaseAnalysisModule):
+    module_id = "custom_analysis"
+    name = "Custom Analysis"
+
+    def execute(
+        self,
+        context: AnalysisContext,
+        inputs: dict[str, Any],
+    ) -> NodeResult:
+        # 분석 로직
+        ...
+
+# 2. 오케스트레이터에 등록
+orchestrator = PipelineOrchestrator()
+orchestrator.register_module(CustomAnalysisModule())
+```
+
+#### 7.1.5 새로운 분석 의도 추가
+
+**단계:**
+1. `AnalysisIntent` enum에 추가
+2. 템플릿 정의
+3. `PipelineTemplateRegistry`에 등록
+
+**예시:**
+```python
+# 1. 의도 추가
+class AnalysisIntent(str, Enum):
+    CUSTOM_ANALYSIS = "custom_analysis"  # 새 의도
+
+# 2. 템플릿 정의
+template = AnalysisPipeline(
+    intent=AnalysisIntent.CUSTOM_ANALYSIS,
+    nodes=[...],
+    edges=[...],
+)
+
+# 3. 레지스트리에 등록
+registry = PipelineTemplateRegistry()
+registry.register_template(template)
+```
+
+#### 7.1.6 새로운 저장소 추가
+
+**단계:**
+1. `StoragePort` 또는 `DomainMemoryPort` 구현
+2. 어댑터 클래스 생성
+3. Factory에 등록
+
+**예시:**
+```python
+# 1. 저장소 어댑터 구현
+class MongoDBStorageAdapter(StoragePort):
+    def save_run(self, run: EvaluationRun) -> str:
+        # MongoDB 저장 로직
+        ...
+
+# 2. Factory에 등록
+def get_storage_adapter(settings: Settings) -> StoragePort:
+    if settings.storage_type == "mongodb":
+        return MongoDBStorageAdapter(settings)
+    # ...
+```
+
 ### 7.2 테스트 가능성 (Testability)
 
 #### 7.2.1 포트 인터페이스를 통한 모킹
@@ -1401,6 +2014,9 @@ EvalVault는 **Hexagonal Architecture**, **Clean Architecture**, **Domain-Driven
 3. **유지보수성**: 각 계층의 책임이 명확하여 코드 이해 및 수정이 용이
 4. **독립성**: 도메인 로직이 외부 프레임워크나 라이브러리에 의존하지 않음
 5. **유연성**: 다양한 LLM 제공자, 저장소, 추적 시스템을 쉽게 교체 가능
+6. **모듈성**: DAG 기반 분석 파이프라인으로 복잡한 분석 워크플로우 구성 가능
+7. **학습 능력**: 도메인 메모리 시스템으로 평가 결과에서 지속적으로 학습
+8. **개선 가이드**: 규칙 기반 및 LLM 기반 하이브리드 분석으로 실질적인 개선 제안
 
 ### 8.2 아키텍처 원칙 요약
 
@@ -1409,8 +2025,36 @@ EvalVault는 **Hexagonal Architecture**, **Clean Architecture**, **Domain-Driven
 - **도메인 중심**: 핵심 비즈니스 로직은 도메인 계층에 집중
 - **인터페이스 분리**: 각 포트는 단일 책임을 가짐
 - **의존성 주입**: 구체적인 구현이 아닌 인터페이스에 의존
+- **템플릿 기반 구성**: 분석 파이프라인을 템플릿으로 재사용 가능하게 구성
+- **메모리 기반 학습**: 평가 결과를 도메인 메모리로 저장하여 지속적 학습
 
-이 아키텍처는 소프트웨어의 복잡성을 관리하고, 변경에 유연하게 대응하며, 장기적인 유지보수를 용이하게 합니다.
+### 8.3 현재 아키텍처의 주요 특징
+
+#### 8.3.1 다층 분석 시스템
+- **통계 분석**: 기본적인 통계 지표 계산
+- **NLP 분석**: 자연어 처리 기반 심층 분석
+- **인과 분석**: 인과 관계 추론 및 원인 분석
+- **메타 분석**: 여러 실행 결과 비교 및 종합 분석
+
+#### 8.3.2 DAG 기반 파이프라인
+- **의도 분류**: 사용자 쿼리에서 분석 의도 자동 추출
+- **템플릿 기반**: 의도별 미리 정의된 파이프라인 템플릿
+- **모듈화**: 각 분석 단계를 독립적인 모듈로 구성
+- **비동기 실행**: 의존성 순서에 따른 효율적인 실행
+
+#### 8.3.3 도메인 메모리 시스템
+- **Factual Layer**: 검증된 도메인 사실 저장 (SPO 트리플)
+- **Experiential Layer**: 평가에서 학습된 패턴 저장
+- **Behavior Layer**: 재사용 가능한 행동 패턴 저장
+- **Formation/Evolution/Retrieval**: 메모리 형성, 진화, 검색 dynamics
+
+#### 8.3.4 개선 가이드 시스템
+- **규칙 기반 탐지**: 플레이북 기반 빠른 패턴 탐지
+- **LLM 기반 분석**: 심층적인 인사이트 생성
+- **하이브리드 분석**: 두 방법을 결합한 종합 리포트
+- **액션 우선순위**: 개선 효과와 구현 난이도 기반 우선순위 결정
+
+이 아키텍처는 소프트웨어의 복잡성을 관리하고, 변경에 유연하게 대응하며, 장기적인 유지보수를 용이하게 합니다. 특히 분석 파이프라인과 도메인 메모리 시스템을 통해 RAG 평가의 지속적인 개선을 지원합니다.
 
 ---
 

@@ -128,6 +128,14 @@ def main() -> int:
             print(f"  Warning: Failed to initialize Ollama adapter: {e}")
             print("  Falling back to HuggingFace embedding model")
 
+    toolkit = None
+    try:
+        from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+        toolkit = KoreanNLPToolkit()
+    except ImportError:
+        print("Warning: Korean NLP extras not installed. Benchmarks will run in baseline mode.")
+
     # 벤치마크 러너 초기화
     runner = KoreanRAGBenchmarkRunner(
         use_korean_tokenizer=True,
@@ -136,6 +144,7 @@ def main() -> int:
         use_hybrid_search=args.hybrid,
         ollama_adapter=ollama_adapter,
         embedding_profile=args.embedding_profile,
+        nlp_toolkit=toolkit,
     )
 
     # 출력 디렉토리 생성

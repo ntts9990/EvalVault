@@ -16,6 +16,7 @@ import re
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from evalvault.adapters.outbound.analysis.common import BaseAnalysisAdapter
 from evalvault.domain.entities.analysis import (
     KeywordInfo,
     NLPAnalysis,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class NLPAnalysisAdapter:
+class NLPAnalysisAdapter(BaseAnalysisAdapter):
     """하이브리드 NLP 분석 어댑터.
 
     NLPAnalysisPort 인터페이스를 구현합니다.
@@ -133,6 +134,7 @@ class NLPAnalysisAdapter:
             use_llm_classification: LLM 기반 질문 분류 사용 여부
             korean_tokenizer: 한국어 형태소 분석기 (KiwiTokenizer)
         """
+        super().__init__()
         self._llm_adapter = llm_adapter
         self._use_embeddings = use_embeddings and llm_adapter is not None
         self._use_llm_classification = use_llm_classification and llm_adapter is not None
@@ -144,12 +146,10 @@ class NLPAnalysisAdapter:
         if not run.results:
             return NLPAnalysis(run_id=run.run_id)
 
-        questions = [r.question for r in run.results if r.question]
-        answers = [r.answer for r in run.results if r.answer]
-        contexts = []
-        for r in run.results:
-            if r.contexts:
-                contexts.extend(r.contexts)
+        text_fields = self.processor.collect_text_fields(run)
+        questions = text_fields["questions"]
+        answers = text_fields["answers"]
+        contexts = text_fields["contexts"]
 
         question_stats = self._calculate_text_stats(questions) if questions else None
         answer_stats = self._calculate_text_stats(answers) if answers else None

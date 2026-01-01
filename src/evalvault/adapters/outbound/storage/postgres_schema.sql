@@ -80,3 +80,30 @@ CREATE TABLE IF NOT EXISTS experiment_groups (
 );
 
 CREATE INDEX IF NOT EXISTS idx_groups_experiment_id ON experiment_groups(experiment_id);
+
+-- Analysis results table
+CREATE TABLE IF NOT EXISTS analysis_results (
+    analysis_id UUID PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    analysis_type VARCHAR(50) NOT NULL,
+    result_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_run_id ON analysis_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_type ON analysis_results(analysis_type);
+
+-- Analysis reports table
+CREATE TABLE IF NOT EXISTS analysis_reports (
+    report_id UUID PRIMARY KEY,
+    run_id UUID REFERENCES evaluation_runs(run_id) ON DELETE SET NULL,
+    experiment_id UUID REFERENCES experiments(experiment_id) ON DELETE SET NULL,
+    report_type VARCHAR(50) NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    content TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
+CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);

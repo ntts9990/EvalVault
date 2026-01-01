@@ -1,15 +1,13 @@
 """OpenAI LLM adapter for Ragas evaluation."""
 
-import threading
-from dataclasses import dataclass, field
 from typing import Any
 
 from openai import AsyncOpenAI
 from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 from ragas.llms import llm_factory
 
+from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
 from evalvault.config.settings import Settings
-from evalvault.ports.outbound.llm_port import LLMPort
 
 
 class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
@@ -35,39 +33,6 @@ class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         """Async embed multiple documents."""
         return await self.aembed_texts(texts)
-
-
-@dataclass
-class TokenUsage:
-    """Thread-safe token usage tracker."""
-
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
-
-    def add(self, prompt: int, completion: int, total: int) -> None:
-        """Add token counts (thread-safe)."""
-        with self._lock:
-            self.prompt_tokens += prompt
-            self.completion_tokens += completion
-            self.total_tokens += total
-
-    def reset(self) -> None:
-        """Reset all counters."""
-        with self._lock:
-            self.prompt_tokens = 0
-            self.completion_tokens = 0
-            self.total_tokens = 0
-
-    def get_and_reset(self) -> tuple[int, int, int]:
-        """Get current counts and reset (atomic operation)."""
-        with self._lock:
-            result = (self.prompt_tokens, self.completion_tokens, self.total_tokens)
-            self.prompt_tokens = 0
-            self.completion_tokens = 0
-            self.total_tokens = 0
-            return result
 
 
 class TokenTrackingAsyncOpenAI(AsyncOpenAI):
@@ -108,7 +73,7 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
         return TrackingChat(self._original_chat, self._usage_tracker)
 
 
-class OpenAIAdapter(LLMPort):
+class OpenAIAdapter(BaseLLMAdapter):
     """OpenAI LLM adapter using Ragas native interface.
 
     This adapter uses Ragas's llm_factory and embedding_factory to provide
@@ -122,11 +87,8 @@ class OpenAIAdapter(LLMPort):
             settings: Application settings containing OpenAI configuration
         """
         self._settings = settings
-        self._model_name = settings.openai_model
+        super().__init__(model_name=settings.openai_model)
         self._embedding_model_name = settings.openai_embedding_model
-
-        # Token usage tracker
-        self._token_usage = TokenUsage()
 
         # Build OpenAI client kwargs
         client_kwargs = {}
@@ -141,51 +103,19 @@ class OpenAIAdapter(LLMPort):
             **client_kwargs,
         )
 
-        # Create Ragas LLM using llm_factory with tracking client
-        # gpt-5-nano/mini: 400K context, 128K max output tokens
-        self._ragas_llm = llm_factory(
+        ragas_llm = llm_factory(
             model=self._model_name,
             provider="openai",
             client=self._client,
             max_tokens=32768,  # gpt-5 series supports up to 128K output tokens
         )
+        self._set_ragas_llm(ragas_llm)
 
-        # Create Ragas embeddings using OpenAIEmbeddingsWithLegacy with tracking client
-        # Uses our wrapper that adds embed_query/embed_documents for compatibility
-        self._ragas_embeddings = OpenAIEmbeddingsWithLegacy(
+        embeddings = OpenAIEmbeddingsWithLegacy(
             model=self._embedding_model_name,
             client=self._client,
         )
-
-    def get_model_name(self) -> str:
-        """Get the model name being used.
-
-        Returns:
-            Model identifier (e.g., 'gpt-5-nano')
-        """
-        return self._model_name
-
-    def as_ragas_llm(self):
-        """Return the Ragas LLM instance.
-
-        Returns the Ragas-native LLM created via llm_factory for use
-        with Ragas metrics evaluation.
-
-        Returns:
-            Ragas LLM instance configured with settings
-        """
-        return self._ragas_llm
-
-    def as_ragas_embeddings(self):
-        """Return the Ragas embeddings instance.
-
-        Returns the Ragas-native embeddings created via embedding_factory
-        for use with Ragas metrics like answer_relevancy.
-
-        Returns:
-            Ragas embeddings instance configured with settings
-        """
-        return self._ragas_embeddings
+        self._set_ragas_embeddings(embeddings)
 
     def get_embedding_model_name(self) -> str:
         """Get the embedding model name being used.
@@ -194,32 +124,6 @@ class OpenAIAdapter(LLMPort):
             Embedding model identifier (e.g., 'text-embedding-3-small')
         """
         return self._embedding_model_name
-
-    def get_token_usage(self) -> tuple[int, int, int]:
-        """Get current token usage counts.
-
-        Returns:
-            Tuple of (prompt_tokens, completion_tokens, total_tokens)
-        """
-        return (
-            self._token_usage.prompt_tokens,
-            self._token_usage.completion_tokens,
-            self._token_usage.total_tokens,
-        )
-
-    def get_and_reset_token_usage(self) -> tuple[int, int, int]:
-        """Get token usage and reset counters (atomic operation).
-
-        Use this between test cases to get per-test-case token counts.
-
-        Returns:
-            Tuple of (prompt_tokens, completion_tokens, total_tokens)
-        """
-        return self._token_usage.get_and_reset()
-
-    def reset_token_usage(self) -> None:
-        """Reset token usage counters."""
-        self._token_usage.reset()
 
     async def agenerate_text(self, prompt: str) -> str:
         """Generate text from a prompt (async).

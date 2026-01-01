@@ -15,6 +15,7 @@ from typing import Literal
 import numpy as np
 from scipy import stats
 
+from evalvault.adapters.outbound.analysis.common import BaseAnalysisAdapter
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.analysis import (
     ComparisonResult,
@@ -27,11 +28,18 @@ from evalvault.domain.entities.analysis import (
 logger = logging.getLogger(__name__)
 
 
-class StatisticalAnalysisAdapter:
+class StatisticalAnalysisAdapter(BaseAnalysisAdapter):
     """통계 분석 어댑터.
 
     AnalysisPort 인터페이스를 구현합니다.
     """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def analyze(self, run: EvaluationRun, **kwargs):
+        """BaseAnalysisAdapter 규약: 기본 분석 진입점."""
+        return self.analyze_statistics(run, **kwargs)
 
     def analyze_statistics(
         self,
@@ -49,7 +57,7 @@ class StatisticalAnalysisAdapter:
             )
 
         # 메트릭별 점수 추출
-        metric_scores = self._extract_metric_scores(run)
+        metric_scores = self.processor.extract_metric_scores(run)
 
         # 메트릭별 통계 요약
         metrics_summary = {}
@@ -76,7 +84,7 @@ class StatisticalAnalysisAdapter:
 
         # Pass rate 분석
         overall_pass_rate = run.pass_rate
-        metric_pass_rates = self._calculate_metric_pass_rates(run)
+        metric_pass_rates = self.processor.calculate_metric_pass_rates(run)
 
         # 인사이트 생성
         insights = self._generate_insights(
@@ -106,8 +114,8 @@ class StatisticalAnalysisAdapter:
         test_type: Literal["t-test", "mann-whitney"] = "t-test",
     ) -> list[ComparisonResult]:
         """두 실행을 통계적으로 비교합니다."""
-        scores_a = self._extract_metric_scores(run_a)
-        scores_b = self._extract_metric_scores(run_b)
+        scores_a = self.processor.extract_metric_scores(run_a)
+        scores_b = self.processor.extract_metric_scores(run_b)
 
         # 비교할 메트릭 결정 (공통 메트릭)
         if metrics is None:
@@ -156,18 +164,6 @@ class StatisticalAnalysisAdapter:
             return 0.0
 
         return float(mean_diff / pooled_std)
-
-    def _extract_metric_scores(self, run: EvaluationRun) -> dict[str, list[float]]:
-        """EvaluationRun에서 메트릭별 점수를 추출합니다."""
-        metric_scores: dict[str, list[float]] = {}
-
-        for result in run.results:
-            for metric in result.metrics:
-                if metric.name not in metric_scores:
-                    metric_scores[metric.name] = []
-                metric_scores[metric.name].append(metric.score)
-
-        return metric_scores
 
     def _calculate_metric_stats(self, scores: list[float]) -> MetricStats:
         """점수 목록에서 통계를 계산합니다."""
@@ -308,21 +304,6 @@ class StatisticalAnalysisAdapter:
             causes.append("Answer meaning differs from ground truth")
 
         return causes
-
-    def _calculate_metric_pass_rates(self, run: EvaluationRun) -> dict[str, float]:
-        """메트릭별 통과율을 계산합니다."""
-        metric_passed: dict[str, list[bool]] = {}
-
-        for result in run.results:
-            for metric in result.metrics:
-                if metric.name not in metric_passed:
-                    metric_passed[metric.name] = []
-                metric_passed[metric.name].append(metric.passed)
-
-        return {
-            name: sum(passed) / len(passed) if passed else 0.0
-            for name, passed in metric_passed.items()
-        }
 
     def _compare_metric(
         self,

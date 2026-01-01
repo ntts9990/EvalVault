@@ -147,6 +147,8 @@ class AnalysisNode:
 
 | 모듈 ID | 이름 | 의존성 | 설명 |
 |--------|------|-------|------|
+| `data_loader` | 데이터 로더 | storage | StoragePort를 통해 EvaluationRun/metrics 로드 |
+| `statistical_analyzer` | 통계 분석기 | data_loader | `StatisticalAnalysisAdapter.analyze()` 호출 |
 | `morpheme` | 형태소 분석기 | korean extra | kiwipiepy 기반 형태소 분석 |
 | `bm25` | BM25 검색 | korean extra | rank-bm25 기반 키워드 검색 |
 | `hybrid_rrf` | RRF 하이브리드 | morpheme, bm25 | Reciprocal Rank Fusion |
@@ -156,6 +158,10 @@ class AnalysisNode:
 | `diagnostic` | 진단 플레이북 | ragas_eval | 패턴 기반 문제 진단 |
 | `causal` | 인과 분석 | ragas_eval | 메트릭 간 인과 관계 분석 |
 | `report` | 보고서 생성 | * | LLM 기반 종합 보고서 |
+
+`data_loader` → `statistical_analyzer` 구간은 베이스 분석 어댑터와 직접 연동됩니다.
+- DataLoaderModule은 StoragePort(예: SQLite/SQLiteStorageAdapter)를 사용해 `run_id` 기반 EvaluationRun을 불러오고, 로드된 객체와 메트릭 시리즈를 다음 노드에 전달합니다.
+- StatisticalAnalyzerModule은 `StatisticalAnalysisAdapter`를 주입받아 `analyze(run)`을 실행하고, 생성된 `StatisticalAnalysis`를 요약/통계 딕셔너리로 직렬화하여 후속 보고서 모듈이 그대로 소비하도록 합니다.
 
 ## 4. 쿼리-파이프라인 매핑
 
@@ -247,6 +253,30 @@ pipeline:
       module: analysis_report
       depends_on: [root_cause]
 ```
+
+### 4.5 AI Agent 작업 가이드
+
+1. **템플릿 파악**
+   `python scripts/pipeline_template_inspect.py --intent analyze_low_metrics` 명령으로
+   의도별 DAG 노드와 의존성을 확인합니다. `--intent all` 옵션을 주면 모든 템플릿을
+   스캔할 수 있어 새로운 자동화 시나리오를 설계할 때 빠르게 참조할 수 있습니다.
+
+2. **모듈 계약 확인**
+   모든 분석 모듈은 `BaseAnalysisModule`을 상속하고 `module_id`, `metadata`를 채워야 합니다.
+   `PipelineOrchestrator.register_module()`는 이 metadata를 `ModuleCatalog`에 적재하므로,
+   새 모듈을 추가할 때는 register 호출을 잊지 말아야 하며, metadata가 누락되면
+   템플릿 검증 및 스크립트 생성이 실패합니다.
+
+3. **파이프라인 빌드 & 실행**
+   `AnalysisPipelineService`(또는 `PipelineOrchestrator`)를 사용하여
+   `register_module → build_pipeline(intent, context) → execute(pipeline, context)` 순으로
+   실행합니다. Web/CLI 어댑터도 동일한 방식으로 동작하므로, AI 코딩 에이전트가 동일한
+   순서를 자동화에 재사용할 수 있습니다.
+
+4. **의존성 주입 규칙**
+   분석 모듈은 외부 API 접근 시 반드시 outbound port를 통해 의존성을 주입받아야 하며,
+   모듈 metadata의 `requires`/`optional_requires` 필드를 채워 템플릿 레벨에서
+   의존성 그래프를 추적할 수 있도록 해야 합니다.
 
 ## 5. MVP 구현 계획
 

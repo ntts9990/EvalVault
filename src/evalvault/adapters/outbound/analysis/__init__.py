@@ -11,6 +11,10 @@ from evalvault.adapters.outbound.analysis.analysis_report_module import (
 # Phase 14: 파이프라인 모듈 어댑터
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
 from evalvault.adapters.outbound.analysis.causal_adapter import CausalAnalysisAdapter
+from evalvault.adapters.outbound.analysis.common import (
+    AnalysisDataProcessor,
+    BaseAnalysisAdapter,
+)
 from evalvault.adapters.outbound.analysis.comparison_report_module import (
     ComparisonReportModule,
 )
@@ -34,6 +38,8 @@ __all__ = [
     "CausalAnalysisAdapter",
     "NLPAnalysisAdapter",
     "StatisticalAnalysisAdapter",
+    "BaseAnalysisAdapter",
+    "AnalysisDataProcessor",
     # Phase 14
     "BaseAnalysisModule",
     "DataLoaderModule",

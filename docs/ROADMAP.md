@@ -307,6 +307,11 @@ class ConfigValidator:
 ### 2026 Q3 (7-9월): RAGAS 래퍼 탈피 - 고유 가치 강화
 
 > **Goal**: EvalVault만의 차별화된 가치 제공
+>
+> **전략적 방향**: 단순 RAGAS 래퍼를 넘어서는 평가 OS로 진화
+> - 메트릭 엔진 독립성 확보
+> - 지식/데이터 레이어 내재화
+> - 운영 자동화와 피드백 루프 구축
 
 #### Phase 15: Custom Metric Framework
 

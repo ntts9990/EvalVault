@@ -2965,6 +2965,7 @@ def pipeline_analyze(
         StatisticalAnalyzerModule,
         SummaryReportModule,
     )
+    from evalvault.domain.entities.analysis import StatisticalAnalysis
     from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
     console.print("\n[bold]Pipeline Analysis[/bold]\n")
@@ -2974,7 +2975,8 @@ def pipeline_analyze(
     service = AnalysisPipelineService()
 
     # Register modules
-    service.register_module(DataLoaderModule())
+    storage = SQLiteStorageAdapter(db_path=db_path)
+    service.register_module(DataLoaderModule(storage=storage))
     service.register_module(StatisticalAnalyzerModule())
     service.register_module(SummaryReportModule())
 
@@ -2986,28 +2988,42 @@ def pipeline_analyze(
     with console.status("[bold green]Running analysis pipeline..."):
         result = service.analyze(query, run_id=run_id)
 
+    saved_analysis_id: str | None = None
+    stats_node = result.get_node_result("statistical_analyzer")
+    if stats_node and isinstance(stats_node.output, dict):
+        analysis_obj = stats_node.output.get("analysis")
+        if isinstance(analysis_obj, StatisticalAnalysis):
+            try:
+                saved_analysis_id = storage.save_analysis(analysis_obj)
+            except Exception as exc:  # pragma: no cover - best effort for CLI UX
+                console.print(f"[yellow]Warning: Failed to store analysis result ({exc})[/yellow]")
+
     # Display results
     if result.is_complete:
         console.print("[green]Pipeline completed successfully![/green]")
         console.print(f"Duration: {result.total_duration_ms}ms")
         console.print(f"Nodes executed: {len(result.node_results)}")
+        if saved_analysis_id:
+            console.print(f"Analysis saved as [blue]{saved_analysis_id}[/blue]")
 
         # Show final output
         if result.final_output:
             console.print("\n[bold]Results:[/bold]")
-            for node_id, output in result.final_output.items():
-                if isinstance(output, dict) and "report" in output:
-                    console.print(Panel(output["report"], title=node_id))
+            for node_id, node_output in result.final_output.items():
+                if isinstance(node_output, dict) and "report" in node_output:
+                    console.print(Panel(node_output["report"], title=node_id))
                 else:
-                    console.print(f"  {node_id}: {output}")
+                    console.print(f"  {node_id}: {node_output}")
     else:
         console.print("[red]Pipeline failed.[/red]")
         for node_id, node_result in result.node_results.items():
             if node_result.error:
                 console.print(f"  [red]{node_id}:[/red] {node_result.error}")
 
+    output_path = output
+
     # Save to file if requested
-    if output:
+    if output_path:
         import json
 
         data = {
@@ -3017,9 +3033,9 @@ def pipeline_analyze(
             "duration_ms": result.total_duration_ms,
             "final_output": result.final_output,
         }
-        with open(output, "w", encoding="utf-8") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        console.print(f"\n[green]Results saved to {output}[/green]")
+        console.print(f"\n[green]Results saved to {output_path}[/green]")
 
     console.print()
 
@@ -3125,7 +3141,19 @@ def benchmark_run(
     try:
         from evalvault.domain.services.benchmark_runner import KoreanRAGBenchmarkRunner
 
-        runner = KoreanRAGBenchmarkRunner()
+        toolkit = None
+        if name == "korean-rag":
+            try:
+                from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+                toolkit = KoreanNLPToolkit()
+            except ImportError:
+                console.print(
+                    "[yellow]Warning:[/yellow] Korean NLP extras not installed. "
+                    "Falling back to baseline algorithms."
+                )
+
+        runner = KoreanRAGBenchmarkRunner(nlp_toolkit=toolkit)
 
         with console.status("[bold green]Running benchmark..."):
             results = runner.run_all()
@@ -3197,7 +3225,7 @@ def benchmark_list():
         "korean-rag",
         "Korean RAG system benchmark",
         "~10",
-        "kiwipiepy, sentence-transformers",
+        "kiwipiepy, rank-bm25, sentence-transformers (install with --extra korean)",
     )
 
     console.print(table)

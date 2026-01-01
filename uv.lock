@@ -750,14 +750,15 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "ragas" },
     { name = "rich" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
     { name = "truststore" },
     { name = "typer" },
     { name = "xlrd" },
 ]
 
 [package.optional-dependencies]
+analysis = [
+    { name = "scikit-learn" },
+]
 anthropic = [
     { name = "anthropic" },
 ]
@@ -774,6 +775,7 @@ dev = [
 korean = [
     { name = "kiwipiepy" },
     { name = "rank-bm25" },
+    { name = "sentence-transformers" },
 ]
 mlflow = [
     { name = "mlflow" },
@@ -814,15 +816,15 @@ requires-dist = [
     { name = "rank-bm25", marker = "extra == 'korean'", specifier = ">=0.2.2" },
     { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scikit-learn", specifier = ">=1.8.0" },
-    { name = "sentence-transformers", specifier = ">=5.2.0" },
+    { name = "scikit-learn", marker = "extra == 'analysis'", specifier = ">=1.8.0" },
+    { name = "sentence-transformers", marker = "extra == 'korean'", specifier = ">=5.2.0" },
     { name = "streamlit", marker = "extra == 'web'", specifier = ">=1.40.0" },
     { name = "truststore", specifier = ">=0.10.4" },
     { name = "typer" },
     { name = "watchdog", marker = "extra == 'web'", specifier = ">=3.0.0" },
     { name = "xlrd" },
 ]
-provides-extras = ["dev", "anthropic", "postgres", "mlflow", "korean", "web"]
+provides-extras = ["dev", "analysis", "anthropic", "postgres", "mlflow", "korean", "web"]
 
 [[package]]
 name = "execnet"

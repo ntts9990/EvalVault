@@ -52,8 +52,6 @@ dependencies = [
     "xlrd", # For reading .xls files (Excel 97-2003)
     "chardet", # For automatic encoding detection in CSV files
     "truststore>=0.10.4",
-    "scikit-learn>=1.8.0",
-    "sentence-transformers>=5.2.0",
 ]
 
 [project.urls]
@@ -74,6 +72,9 @@ dev = [
     "pytest-html",      # HTML test reports
     "ruff",
 ]
+analysis = [
+    "scikit-learn>=1.8.0",
+]
 anthropic = [
     "anthropic",
 ]
@@ -86,6 +87,7 @@ mlflow = [
 korean = [
     "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
     "rank-bm25>=0.2.2",               # BM25 검색
+    "sentence-transformers>=5.2.0",
 ]
 web = [
     "streamlit>=1.40.0",
