@@ -339,7 +339,7 @@ class PipelineTemplateRegistry:
                 id="causal",
                 name="인과 분석",
                 module="causal_analyzer",
-                depends_on=["ragas_eval"],
+                depends_on=["load_data", "ragas_eval"],
             ),
             AnalysisNode(
                 id="root_cause",
@@ -477,7 +477,7 @@ class PipelineTemplateRegistry:
                 id="causal_analysis",
                 name="인과 분석",
                 module="causal_analyzer",
-                depends_on=["statistics"],
+                depends_on=["load_data", "statistics"],
             ),
             AnalysisNode(
                 id="report",

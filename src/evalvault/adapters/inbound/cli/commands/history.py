@@ -11,6 +11,8 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 
+from ..utils.options import db_option
+
 
 def register_history_commands(app: typer.Typer, console: Console) -> None:
     """Attach history/compare/export commands to the root Typer app."""
@@ -35,11 +37,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             "-m",
             help="Filter by model name.",
         ),
-        db_path: Path = typer.Option(
-            Path("evalvault.db"),
-            "--db",
-            help="Path to database file.",
-        ),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Show evaluation run history."""
         console.print("\n[bold]Evaluation History[/bold]\n")
@@ -77,11 +75,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
     def compare(
         run_id1: str = typer.Argument(..., help="First run ID to compare."),
         run_id2: str = typer.Argument(..., help="Second run ID to compare."),
-        db_path: Path = typer.Option(
-            Path("evalvault.db"),
-            "--db",
-            help="Path to database file.",
-        ),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Compare two evaluation runs."""
         console.print("\n[bold]Comparing Evaluation Runs[/bold]\n")
@@ -148,11 +142,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             "-o",
             help="Output file path (JSON format).",
         ),
-        db_path: Path = typer.Option(
-            Path("evalvault.db"),
-            "--db",
-            help="Path to database file.",
-        ),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Export evaluation run to JSON file."""
         console.print(f"\n[bold]Exporting Run {run_id}[/bold]\n")

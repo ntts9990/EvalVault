@@ -19,6 +19,10 @@ from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.evaluator import RagasEvaluator
 
+from ..utils.formatters import format_score, format_status
+from ..utils.options import db_option, profile_option
+from ..utils.validators import parse_csv_option, validate_choices
+
 
 def register_run_commands(
     app: typer.Typer,
@@ -41,11 +45,8 @@ def register_run_commands(
             "-m",
             help="Comma-separated list of metrics to evaluate.",
         ),
-        profile: str | None = typer.Option(
-            None,
-            "--profile",
-            "-p",
-            help="Model profile (dev, prod, openai). Overrides .env setting.",
+        profile: str | None = profile_option(
+            help_text="Model profile (dev, prod, openai). Overrides .env setting.",
         ),
         model: str | None = typer.Option(
             None,
@@ -64,10 +65,9 @@ def register_run_commands(
             "-l",
             help="Log results to Langfuse.",
         ),
-        db_path: Path | None = typer.Option(
-            None,
-            "--db",
-            help="Path to SQLite database file for storing results.",
+        db_path: Path | None = db_option(
+            default=None,
+            help_text="Path to SQLite database file for storing results.",
         ),
         verbose: bool = typer.Option(
             False,
@@ -86,14 +86,8 @@ def register_run_commands(
         ),
     ) -> None:
         """Run RAG evaluation on a dataset."""
-        metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
-
-        # Validate metrics
-        invalid_metrics = [m for m in metric_list if m not in available_metrics]
-        if invalid_metrics:
-            console.print(f"[red]Error:[/red] Invalid metrics: {', '.join(invalid_metrics)}")
-            console.print(f"Available metrics: {', '.join(available_metrics)}")
-            raise typer.Exit(1)
+        metric_list = parse_csv_option(metrics)
+        validate_choices(metric_list, available_metrics, console, value_label="metric")
 
         settings = Settings()
 
@@ -205,13 +199,11 @@ def register_run_commands(
             avg_score = result.get_avg_score(metric)
             threshold = result.thresholds.get(metric, 0.7)
             passed = avg_score >= threshold
-            status = "[green]PASS[/green]" if passed else "[red]FAIL[/red]"
-            score_color = "green" if passed else "red"
             table.add_row(
                 metric,
-                f"[{score_color}]{avg_score:.3f}[/{score_color}]",
+                format_score(avg_score, passed),
                 f"{threshold:.2f}",
-                status,
+                format_status(passed),
             )
 
         console.print(table)
@@ -219,12 +211,13 @@ def register_run_commands(
         if verbose:
             console.print("\n[bold]Detailed Results[/bold]\n")
             for tc_result in result.results:
-                status = "[green]PASS[/green]" if tc_result.all_passed else "[red]FAIL[/red]"
+                status = format_status(tc_result.all_passed)
                 console.print(f"  {tc_result.test_case_id}: {status}")
                 for metric in tc_result.metrics:
-                    m_status = "[green]+[/green]" if metric.passed else "[red]-[/red]"
+                    m_status = format_status(metric.passed, success_text="+", failure_text="-")
+                    score = format_score(metric.score, metric.passed)
                     console.print(
-                        f"    {m_status} {metric.name}: {metric.score:.3f} (threshold: {metric.threshold})"
+                        f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                     )
 
     def _log_to_langfuse(settings: Settings, result, console: Console) -> None:

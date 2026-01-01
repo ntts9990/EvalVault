@@ -11,6 +11,8 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 
+from ..utils.options import db_option
+
 
 def register_pipeline_commands(app: typer.Typer, console) -> None:
     """Attach pipeline-related commands to the root Typer app."""
@@ -32,11 +34,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             "-o",
             help="Output file for results (JSON format).",
         ),
-        db_path: Path = typer.Option(
-            Path("evalvault.db"),
-            "--db",
-            help="Path to database file.",
-        ),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Analyze evaluation results using natural language query."""
         from evalvault.adapters.outbound.analysis import (

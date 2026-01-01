@@ -431,13 +431,15 @@ class BaseLLMAdapter(ABC):
 - ✅ `commands/experiment.py`: Experiment CRUD/비교 흐름을 모듈화하고 `app.py`에서는 Typer wiring만 수행
 - ✅ `commands/domain.py` / `commands/benchmark.py` / `commands/kg.py`: 도메인/벤치마크/KG 서브앱 분리 및 `_display_kg_stats`, `_load_documents_from_source` 헬퍼를 `__init__`에서 재노출
 - ✅ `cli/utils/formatters.py`, `cli/utils/validators.py`: 공통 테이블 포맷/메트릭·언어 검증 로직을 추출해 run/gate/domain/generate/analyze/experiment 명령에서 재사용
+- ✅ `commands/config.py` / `commands/langfuse.py` / `commands/web.py`: 루트 명령을 모듈화해 `app.py`는 Typer wiring만 수행하고, Langfuse 대시보드/웹 UI/metrics/config 출력을 각각 전담
+- ✅ `cli/utils/options.py`: `--profile(-p)`/`--db(-D)` 옵션을 공유 팩토리로 정의해 모든 명령이 동일한 alias/도움말을 재사용
 - `app.py`는 이제 Typer 앱 초기화, 공용 명령(metrics/config/web/langfuse)만 유지하며 나머지는 `commands/*`로 위임
 - 테스트:
   - `uv run pytest tests/unit/test_cli.py -k "analyze or pipeline" -v` (10 passed)
   - `uv run pytest tests/unit/test_cli.py -k "generate or gate" -v` (15 passed)
   - `uv run pytest tests/unit/test_cli.py -k "experiment or benchmark or kg" -v` (16 passed)
   - `uv run pytest tests/unit/test_cli.py -v` (82 passed)
-- 다음 단계: metrics/config/web/langfuse 등 루트 명령도 서브앱/함수로 이전하고 공통 Typer 옵션 그룹(예: --profile/--db)을 alias화해 CLI UX를 정리
+- 다음 단계: Typer 콜백/전체 앱 구성을 패키지 수준에서 더 세분화해 서브커맨드 자동 등록, 공통 옵션 그룹 프리셋(--profile, --db 등)을 문서화하고, CLI 도움말 예제/사용법을 docs/CLI_GUIDE.md 형태로 제공
 
 **목표 구조**:
 ```

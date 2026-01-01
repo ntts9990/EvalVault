@@ -11,6 +11,9 @@ from rich.table import Table
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.domain.services.experiment_manager import ExperimentManager
 
+from ..utils.options import db_option
+from ..utils.validators import parse_csv_option
+
 
 def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     """Attach experiment-related commands to the root Typer app."""
@@ -26,14 +29,15 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
             "-m",
             help="Comma-separated list of metrics to compare.",
         ),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Create a new experiment for A/B testing."""
 
         console.print("\n[bold]Creating Experiment[/bold]\n")
         storage = SQLiteStorageAdapter(db_path=db_path)
         manager = ExperimentManager(storage)
-        metric_list = [m.strip() for m in metrics.split(",")] if metrics else None
+        metric_list = parse_csv_option(metrics)
+        metric_list = metric_list or None
         experiment = manager.create_experiment(
             name=name,
             description=description,
@@ -54,7 +58,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
         experiment_id: str = typer.Option(..., "--id", help="Experiment ID."),
         group_name: str = typer.Option(..., "--group", "-g", help="Group name (control, variant)."),
         description: str = typer.Option("", "--description", "-d", help="Group description."),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Add a group to an experiment."""
 
@@ -74,7 +78,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
         experiment_id: str = typer.Option(..., "--id", help="Experiment ID."),
         group_name: str = typer.Option(..., "--group", "-g", help="Group name."),
         run_id: str = typer.Option(..., "--run", "-r", help="Run ID to add to the group."),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Add an evaluation run to an experiment group."""
 
@@ -97,7 +101,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
             "-s",
             help="Filter by status (draft, running, completed, archived).",
         ),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """List experiments."""
 
@@ -137,7 +141,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     @app.command()
     def experiment_compare(
         experiment_id: str = typer.Option(..., "--id", help="Experiment ID."),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Compare groups inside an experiment."""
 
@@ -188,7 +192,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     def experiment_conclude(
         experiment_id: str = typer.Option(..., "--id", help="Experiment ID."),
         conclusion: str = typer.Option(..., "--conclusion", "-c", help="Experiment conclusion."),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Conclude an experiment and record findings."""
 
@@ -205,7 +209,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     @app.command()
     def experiment_summary(
         experiment_id: str = typer.Option(..., "--id", help="Experiment ID."),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Path to database file."),
+        db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Show experiment summary."""
 

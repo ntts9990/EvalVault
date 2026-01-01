@@ -22,6 +22,9 @@ from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdap
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.analysis_service import AnalysisService
 
+from ..utils.options import db_option, profile_option
+from ..utils.validators import parse_csv_option
+
 _console = Console()
 
 
@@ -47,12 +50,9 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             None, "--report", "-r", help="Output report file (*.md or *.html)"
         ),
         save: bool = typer.Option(False, "--save", help="Save analysis to database"),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
-        profile: str | None = typer.Option(
-            None,
-            "--profile",
-            "-p",
-            help="Model profile for NLP embeddings (dev, prod, openai)",
+        db_path: Path = db_option(help_text="Database path"),
+        profile: str | None = profile_option(
+            help_text="Model profile for NLP embeddings (dev, prod, openai)",
         ),
     ) -> None:
         """Analyze an evaluation run and show statistical insights."""
@@ -143,7 +143,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         test: str = typer.Option(
             "t-test", "--test", "-t", help="Statistical test (t-test, mann-whitney)"
         ),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+        db_path: Path = db_option(help_text="Database path"),
     ) -> None:
         """Compare two evaluation runs statistically."""
 
@@ -156,9 +156,9 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             _console.print(f"[red]Error: {exc}[/red]")
             raise typer.Exit(1) from exc
 
-        metric_list = None
-        if metrics:
-            metric_list = [m.strip() for m in metrics.split(",")]
+        metric_list = parse_csv_option(metrics)
+        if not metric_list:
+            metric_list = None
 
         analysis_adapter = StatisticalAnalysisAdapter()
         service = AnalysisService(analysis_adapter)

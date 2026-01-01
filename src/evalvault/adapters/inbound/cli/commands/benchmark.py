@@ -9,6 +9,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from ..utils.formatters import format_score, format_status
+
 
 def create_benchmark_app(console: Console) -> typer.Typer:
     """Create the Typer sub-application for benchmark commands."""
@@ -67,10 +69,12 @@ def create_benchmark_app(console: Console) -> typer.Typer:
 
             passed = 0
             for result in results:
-                status = "[green]PASS[/green]" if result.passed else "[red]FAIL[/red]"
+                status = format_status(result.passed)
                 if result.passed:
                     passed += 1
-                score = f"{result.score:.2f}" if result.score is not None else "-"
+                score = format_score(
+                    result.score, result.passed if result.score is not None else None, precision=2
+                )
                 details = (
                     result.details[:40] + "..." if len(result.details) > 40 else result.details
                 )

@@ -116,6 +116,7 @@ def sample_nlp_analysis():
         QuestionType,
         QuestionTypeStats,
         TextStats,
+        TopicCluster,
     )
 
     return NLPAnalysis(
@@ -143,6 +144,15 @@ def sample_nlp_analysis():
             )
         ],
         top_keywords=[KeywordInfo(keyword="보험", frequency=3, tfidf_score=0.9)],
+        topic_clusters=[
+            TopicCluster(
+                cluster_id=1,
+                keywords=["보험료", "갱신"],
+                document_count=6,
+                avg_scores={"faithfulness": 0.72},
+                representative_questions=["보험료 갱신 주기를 알려줘"],
+            )
+        ],
         insights=["질문 유형은 사실형이 우세합니다."],
     )
 
@@ -912,3 +922,31 @@ class TestPostgreSQLAnalysisStorage:
 
         assert retrieved is not None
         assert retrieved.run_id == sample_nlp_analysis.run_id
+
+    def test_get_nlp_analysis_reconstructs_topic_clusters(
+        self, mock_psycopg, mock_connection, sample_nlp_analysis
+    ):
+        """TopicCluster 정보 복원."""
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        data = adapter._serialize_nlp_analysis(sample_nlp_analysis)  # type: ignore[attr-defined]
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            "analysis_id": "nlp-analysis-run-001-aaaa",
+            "run_id": sample_nlp_analysis.run_id,
+            "result_data": json.dumps(data),
+        }
+        mock_connection.execute.return_value = mock_cursor
+
+        retrieved = adapter.get_nlp_analysis("nlp-analysis-run-001-aaaa")
+
+        assert len(retrieved.topic_clusters) == 1
+        cluster = retrieved.topic_clusters[0]
+        assert cluster.keywords == ["보험료", "갱신"]
+        assert cluster.avg_scores["faithfulness"] == 0.72
+        assert cluster.representative_questions[0].startswith("보험료")

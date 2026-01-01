@@ -16,6 +16,8 @@ from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.kg_generator import KnowledgeGraphGenerator
 
+from ..utils.options import profile_option
+
 
 def create_kg_app(console: Console) -> typer.Typer:
     """Create the Typer sub-application for knowledge graph commands."""
@@ -30,12 +32,7 @@ def create_kg_app(console: Console) -> typer.Typer:
             readable=True,
             help="단일 파일 또는 디렉터리. 디렉터리는 .txt/.md 파일을 재귀적으로 읽습니다.",
         ),
-        profile: str | None = typer.Option(
-            None,
-            "--profile",
-            "-p",
-            help="LLM 프로필 (필요 시).",
-        ),
+        profile: str | None = profile_option(help_text="LLM 프로필 (필요 시)."),
         use_llm: bool = typer.Option(
             False,
             "--use-llm",

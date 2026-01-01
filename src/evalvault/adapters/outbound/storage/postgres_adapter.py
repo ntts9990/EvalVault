@@ -23,6 +23,7 @@ from evalvault.domain.entities.analysis import (
     QuestionTypeStats,
     StatisticalAnalysis,
     TextStats,
+    TopicCluster,
 )
 from evalvault.domain.entities.experiment import Experiment
 
@@ -564,18 +565,27 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
 
         top_keywords = [KeywordInfo(**kw) for kw in result_data.get("top_keywords", [])]
 
-        analysis = NLPAnalysis(
+        topic_clusters = [
+            TopicCluster(
+                cluster_id=tc.get("cluster_id", idx),
+                keywords=list(tc.get("keywords", [])),
+                document_count=tc.get("document_count", 0),
+                avg_scores=tc.get("avg_scores", {}),
+                representative_questions=tc.get("representative_questions", []),
+            )
+            for idx, tc in enumerate(result_data.get("topic_clusters", []))
+        ]
+
+        return NLPAnalysis(
             run_id=run_id,
             question_stats=question_stats,
             answer_stats=answer_stats,
             context_stats=context_stats,
             question_types=question_types,
             top_keywords=top_keywords,
+            topic_clusters=topic_clusters,
             insights=result_data.get("insights", []),
         )
-        if topic_clusters := result_data.get("topic_clusters"):
-            analysis.topic_clusters = topic_clusters
-        return analysis
 
     def _ensure_json(self, value: Any) -> dict[str, Any]:
         """JSONB 값을 dict로 변환."""
