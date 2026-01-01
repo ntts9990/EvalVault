@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.entities import EvaluationRun, GenerationData, RetrievalData
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 if TYPE_CHECKING:
@@ -376,6 +376,119 @@ class PhoenixAdapter(TrackerPort):
                 )
             if result.latency_ms:
                 span.set_attribute("timing.latency_ms", result.latency_ms)
+
+    def log_retrieval(
+        self,
+        trace_id: str,
+        data: RetrievalData,
+    ) -> None:
+        """Log retrieval data as a child span.
+
+        검색 단계의 상세 데이터를 OpenTelemetry span으로 기록합니다.
+        Phoenix UI에서 검색 품질 분석이 가능합니다.
+
+        Args:
+            trace_id: Parent trace ID
+            data: RetrievalData entity with retrieval details
+
+        Raises:
+            ValueError: If trace_id is not found
+
+        Example:
+            >>> adapter.log_retrieval(trace_id, RetrievalData(
+            ...     query="보험 보장금액은?",
+            ...     retrieval_method="hybrid",
+            ...     top_k=5,
+            ...     candidates=[...],
+            ... ))
+        """
+        if trace_id not in self._active_spans:
+            raise ValueError(f"Trace not found: {trace_id}")
+
+        self._ensure_initialized()
+
+        from opentelemetry import trace
+
+        parent_span = self._active_spans[trace_id]
+        context = trace.set_span_in_context(parent_span)
+
+        with self._tracer.start_span("retrieval", context=context) as span:
+            # Set retrieval attributes
+            for key, value in data.to_span_attributes().items():
+                span.set_attribute(key, value)
+
+            # Set query
+            if data.query:
+                span.set_attribute("retrieval.query", data.query)
+
+            # Log each retrieved document as an event
+            for i, doc in enumerate(data.candidates):
+                event_attrs = {
+                    "doc.rank": doc.rank,
+                    "doc.score": doc.score,
+                    "doc.source": doc.source,
+                }
+                if doc.rerank_score is not None:
+                    event_attrs["doc.rerank_score"] = doc.rerank_score
+                if doc.rerank_rank is not None:
+                    event_attrs["doc.rerank_rank"] = doc.rerank_rank
+                span.add_event(f"retrieved_doc_{i}", attributes=event_attrs)
+
+    def log_generation(
+        self,
+        trace_id: str,
+        data: GenerationData,
+    ) -> None:
+        """Log generation data as a child span.
+
+        생성 단계의 상세 데이터를 OpenTelemetry span으로 기록합니다.
+        Phoenix UI에서 토큰 사용량, 레이턴시 분석이 가능합니다.
+
+        Args:
+            trace_id: Parent trace ID
+            data: GenerationData entity with generation details
+
+        Raises:
+            ValueError: If trace_id is not found
+
+        Example:
+            >>> adapter.log_generation(trace_id, GenerationData(
+            ...     model="gpt-5-nano",
+            ...     prompt="...",
+            ...     response="...",
+            ...     input_tokens=150,
+            ...     output_tokens=50,
+            ... ))
+        """
+        if trace_id not in self._active_spans:
+            raise ValueError(f"Trace not found: {trace_id}")
+
+        self._ensure_initialized()
+
+        from opentelemetry import trace
+
+        parent_span = self._active_spans[trace_id]
+        context = trace.set_span_in_context(parent_span)
+
+        with self._tracer.start_span("generation", context=context) as span:
+            # Set generation attributes
+            for key, value in data.to_span_attributes().items():
+                span.set_attribute(key, value)
+
+            # Set prompt/response (truncate if too long)
+            max_len = 10000
+            if data.prompt:
+                prompt = data.prompt[:max_len] if len(data.prompt) > max_len else data.prompt
+                span.set_attribute("generation.prompt", prompt)
+            if data.response:
+                response = (
+                    data.response[:max_len] if len(data.response) > max_len else data.response
+                )
+                span.set_attribute("generation.response", response)
+
+            # Set prompt template if available
+            if data.prompt_template:
+                span.set_attribute("generation.prompt_template", data.prompt_template[:max_len])
 
     def shutdown(self) -> None:
         """Shutdown the tracer provider and flush remaining data."""
