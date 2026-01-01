@@ -88,6 +88,34 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 ## 현재 진행 중 (2026 Q1)
 
 > **Focus**: 코드 품질 개선 및 사용성 향상
+>
+> **개발 자동화**: AI 에이전트 기반 병렬 개발 워크플로우 도입
+
+### 개발 자동화 에이전트 시스템
+
+Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병렬화합니다.
+
+**에이전트 구성**:
+| Agent | 역할 | 담당 P-Level |
+|-------|------|-------------|
+| `architecture` | 코드 구조, 헥사고날 아키텍처 | P0, P1, P2 |
+| `observability` | Phoenix 통합, OpenTelemetry | P7 |
+| `rag-data` | RAG 데이터 수집, 메트릭 | P7 |
+| `performance` | 캐싱, 배치 처리 | P3 |
+| `testing` | 테스트 최적화, 커버리지 | P5 |
+| `documentation` | 튜토리얼, API 문서 | P6 |
+| `coordinator` | 병렬 워크플로우 관리 | All |
+
+**병렬 실행 그룹**:
+- **Group A (독립)**: performance, testing, documentation - 동시 실행 가능
+- **Group B (순차)**: observability → rag-data (의존성)
+- **Group C (내부 순서)**: architecture (P0 → P1 → P2)
+
+**메모리 시스템**: `agent/memory/`에 에이전트별 세션 로그, 공유 결정사항, 의존성 추적
+
+**참조**: [agent/README.md](../agent/README.md), [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)
+
+---
 
 ### P1: 코드 통합 및 중복 제거 (Week 1-2)
 
@@ -750,9 +778,10 @@ evalvault profile <dataset_path> \
 ## 참고 문서
 
 - [COMPLETED.md](./COMPLETED.md): Phase 1-14 달성 기록
-- [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 코드 품질 개선 계획
+- [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 코드 품질 개선 계획 (병렬 에이전트 워크플로우 포함)
 - [USER_GUIDE.md](./USER_GUIDE.md): 사용자 가이드
 - [ARCHITECTURE.md](./ARCHITECTURE.md): 아키텍처 문서
+- [agent/README.md](../agent/README.md): 자율 에이전트 시스템 사용 가이드
 
 ---
 
