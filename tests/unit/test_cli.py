@@ -110,7 +110,7 @@ class TestCLIRun:
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
-    @patch(f"{CONFIG_COMMAND_MODULE}.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_valid_dataset(
         self,
         mock_settings_cls,
