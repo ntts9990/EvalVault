@@ -1,0 +1,32 @@
+Application Specification
+=========================
+
+Project: EvalVault Web UI Evaluation Features
+Goal: End-to-end testing and verification of all Web UI evaluation features (Step 1-5)
+
+All Web UI evaluation features (Step 1-5) are already implemented:
+
+1. Dependency injection (create_adapter) - adapter.py:664-696
+2. File upload to Dataset conversion (create_dataset_from_upload) - adapter.py:300
+3. Dataset evaluation (run_evaluation_with_dataset) - adapter.py:397
+4. Evaluate page execution logic - app.py:392-484
+5. Reports page with real metrics - app.py:641+
+
+Current Status:
+- 1335/1335 tests passing
+- 38/38 Web UI unit tests passing
+- All lint checks passing
+
+Testing Tasks:
+1. Create comprehensive integration tests for Web UI evaluation flow
+2. Test file upload → dataset conversion → evaluation → storage → reports
+3. Verify error handling and edge cases
+4. Test with different file formats (JSON, CSV, Excel)
+5. Test parallel vs sequential evaluation
+6. Test LLM report generation
+7. Document test coverage and findings
+8. Create end-to-end test scenarios
+
+Architecture: Hexagonal Architecture (Ports & Adapters)
+Testing Framework: pytest
+Test Location: tests/integration/test_web_ui_evaluation.py (new)
