@@ -39,6 +39,23 @@ def db_option(
     )
 
 
+def memory_db_option(
+    *,
+    default: str | Path | None = Path("evalvault_memory.db"),
+    help_text: str = "Path to Domain Memory SQLite database.",
+) -> Path:
+    """Shared option factory for the domain memory database path."""
+
+    normalized_default = _normalize_path(default) or Path("evalvault_memory.db")
+    return typer.Option(
+        normalized_default,
+        "--memory-db",
+        "-M",
+        help=help_text,
+        show_default=True,
+    )
+
+
 def _normalize_path(value: str | Path | None) -> Path | None:
     if value is None:
         return None

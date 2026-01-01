@@ -2,11 +2,11 @@
 
 from typing import Any
 
-from openai import AsyncOpenAI
 from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
-from ragas.llms import llm_factory
 
-from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
+from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
+from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
+from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncOpenAI
 from evalvault.config.settings import Settings
 
 
@@ -35,44 +35,6 @@ class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
         return await self.aembed_texts(texts)
 
 
-class TokenTrackingAsyncOpenAI(AsyncOpenAI):
-    """AsyncOpenAI wrapper that tracks token usage from responses."""
-
-    def __init__(self, usage_tracker: TokenUsage, **kwargs: Any):
-        super().__init__(**kwargs)
-        self._usage_tracker = usage_tracker
-        self._original_chat = self.chat
-
-        # Wrap chat.completions.create to capture usage
-        self.chat = self._create_tracking_chat()
-
-    def _create_tracking_chat(self) -> Any:
-        """Create a chat wrapper that tracks token usage."""
-
-        class TrackingCompletions:
-            def __init__(inner_self, completions: Any, tracker: TokenUsage):  # noqa: N805
-                inner_self._completions = completions
-                inner_self._tracker = tracker
-
-            async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
-                response = await inner_self._completions.create(**kwargs)
-                # Extract usage from response
-                if hasattr(response, "usage") and response.usage:
-                    inner_self._tracker.add(
-                        prompt=response.usage.prompt_tokens or 0,
-                        completion=response.usage.completion_tokens or 0,
-                        total=response.usage.total_tokens or 0,
-                    )
-                return response
-
-        class TrackingChat:
-            def __init__(inner_self, chat: Any, tracker: TokenUsage):  # noqa: N805
-                inner_self._chat = chat
-                inner_self.completions = TrackingCompletions(chat.completions, tracker)
-
-        return TrackingChat(self._original_chat, self._usage_tracker)
-
-
 class OpenAIAdapter(BaseLLMAdapter):
     """OpenAI LLM adapter using Ragas native interface.
 
@@ -92,8 +54,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         super().__init__(model_name=settings.openai_model)
         self._embedding_model_name = settings.openai_embedding_model
 
-        # Build OpenAI client kwargs
-        client_kwargs = {}
+        client_kwargs: dict[str, Any] = {}
         if settings.openai_api_key:
             client_kwargs["api_key"] = settings.openai_api_key
         if settings.openai_base_url:
@@ -105,12 +66,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             **client_kwargs,
         )
 
-        ragas_llm = llm_factory(
-            model=self._model_name,
-            provider="openai",
-            client=self._client,
-            max_tokens=32768,  # gpt-5 series supports up to 128K output tokens
-        )
+        ragas_llm = create_instructor_llm("openai", self._model_name, self._client)
         self._set_ragas_llm(ragas_llm)
 
         embeddings = OpenAIEmbeddingsWithLegacy(

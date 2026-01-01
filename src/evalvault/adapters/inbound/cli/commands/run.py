@@ -6,7 +6,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import typer
 from rich.console import Console
@@ -14,14 +14,25 @@ from rich.panel import Panel
 from rich.table import Table
 
 from evalvault.adapters.outbound.dataset import get_loader
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.settings import Settings, apply_profile
+from evalvault.domain.entities import (
+    Dataset,
+    EvaluationRun,
+    GenerationData,
+    RAGTraceData,
+    RetrievalData,
+    RetrievedDocument,
+)
 from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 from ..utils.formatters import format_score, format_status
-from ..utils.options import db_option, profile_option
+from ..utils.options import db_option, memory_db_option, profile_option
 from ..utils.validators import parse_csv_option, validate_choices
 
 TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
@@ -78,6 +89,29 @@ def register_run_commands(
         db_path: Path | None = db_option(
             default=None,
             help_text="Path to SQLite database file for storing results.",
+        ),
+        use_domain_memory: bool = typer.Option(
+            False,
+            "--use-domain-memory",
+            help="Leverage Domain Memory for threshold adjustment and insights.",
+        ),
+        memory_domain: str | None = typer.Option(
+            None,
+            "--memory-domain",
+            help="Domain name for Domain Memory (defaults to dataset metadata).",
+        ),
+        memory_language: str = typer.Option(
+            "ko",
+            "--memory-language",
+            help="Language code for Domain Memory lookups (default: ko).",
+        ),
+        memory_db: Path = memory_db_option(
+            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+        ),
+        memory_augment_context: bool = typer.Option(
+            False,
+            "--augment-context",
+            help="Append retrieved factual memories to each test case context.",
         ),
         verbose: bool = typer.Option(
             False,
@@ -144,6 +178,50 @@ def register_run_commands(
                 raise typer.Exit(1) from exc
 
         evaluator = RagasEvaluator()
+        llm_adapter = get_llm_adapter(settings)
+
+        memory_adapter: SQLiteDomainMemoryAdapter | None = None
+        memory_evaluator: MemoryAwareEvaluator | None = None
+        memory_domain_name = memory_domain or ds.metadata.get("domain") or "default"
+        memory_required = use_domain_memory or memory_domain is not None or memory_augment_context
+
+        if memory_required:
+            try:
+                memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
+                memory_evaluator = MemoryAwareEvaluator(
+                    evaluator=evaluator, memory_port=memory_adapter
+                )
+                console.print(
+                    f"[dim]Domain Memory enabled for '{memory_domain_name}' ({memory_language}).[/dim]"
+                )
+                if memory_adapter:
+                    reliability = memory_adapter.get_aggregated_reliability(
+                        domain=memory_domain_name,
+                        language=memory_language,
+                    )
+                    if reliability:
+                        console.print(
+                            "[dim]Reliability snapshot:[/dim] "
+                            + ", ".join(f"{k}={v:.2f}" for k, v in reliability.items())
+                        )
+            except Exception as exc:  # pragma: no cover - best-effort memory hookup
+                console.print(
+                    f"[yellow]Warning:[/yellow] Domain Memory initialization failed: {exc}"
+                )
+                memory_evaluator = None
+                memory_adapter = None
+
+        if memory_evaluator and memory_augment_context:
+            enriched = enrich_dataset_with_memory(
+                dataset=ds,
+                memory_evaluator=memory_evaluator,
+                domain=memory_domain_name,
+                language=memory_language,
+            )
+            if enriched:
+                console.print(
+                    f"[dim]Appended Domain Memory facts to {enriched} test case(s).[/dim]"
+                )
 
         if ds.thresholds:
             console.print("[dim]Thresholds from dataset:[/dim]")
@@ -156,21 +234,44 @@ def register_run_commands(
             status_msg = f"[bold green]Running parallel evaluation (batch_size={batch_size})..."
         with console.status(status_msg):
             try:
-                result = asyncio.run(
-                    evaluator.evaluate(
-                        dataset=ds,
-                        metrics=metric_list,
-                        llm=get_llm_adapter(settings),
-                        thresholds=None,
-                        parallel=parallel,
-                        batch_size=batch_size,
+                if memory_evaluator and use_domain_memory:
+                    result = asyncio.run(
+                        memory_evaluator.evaluate_with_memory(
+                            dataset=ds,
+                            metrics=metric_list,
+                            llm=llm_adapter,
+                            thresholds=None,
+                            parallel=parallel,
+                            batch_size=batch_size,
+                            domain=memory_domain_name,
+                            language=memory_language,
+                        )
                     )
-                )
+                else:
+                    result = asyncio.run(
+                        evaluator.evaluate(
+                            dataset=ds,
+                            metrics=metric_list,
+                            llm=llm_adapter,
+                            thresholds=None,
+                            parallel=parallel,
+                            batch_size=batch_size,
+                        )
+                    )
             except Exception as exc:  # pragma: no cover - surfaced to CLI
                 console.print(f"[red]Error during evaluation:[/red] {exc}")
                 raise typer.Exit(1) from exc
 
         _display_results(result, console, verbose)
+
+        if memory_adapter and memory_required:
+            analyzer = MemoryBasedAnalysis(memory_port=memory_adapter)
+            insights = analyzer.generate_insights(
+                evaluation_run=result,
+                domain=memory_domain_name,
+                language=memory_language,
+            )
+            _display_memory_insights(insights, console)
 
         # Handle deprecated --langfuse flag
         effective_tracker = tracker
@@ -237,6 +338,40 @@ def register_run_commands(
                     console.print(
                         f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                     )
+
+    def _display_memory_insights(insights: dict[str, Any], console: Console) -> None:
+        """Render Domain Memory insights panel."""
+
+        if not insights:
+            return
+
+        recommendations = insights.get("recommendations") or []
+        trends = insights.get("trends") or {}
+        if not recommendations and not trends:
+            return
+
+        trend_lines: list[str] = []
+        for metric, info in list(trends.items())[:3]:
+            delta = info.get("delta", 0.0)
+            baseline = info.get("baseline", 0.0)
+            current = info.get("current", 0.0)
+            trend_lines.append(
+                f"- {metric}: Δ {delta:+.2f} (current {current:.2f} / baseline {baseline:.2f})"
+            )
+
+        recommendation_lines = [f"- {rec}" for rec in recommendations[:3]]
+        if not trend_lines and not recommendation_lines:
+            return
+
+        panel_body = ""
+        if trend_lines:
+            panel_body += "[bold]Trend Signals[/bold]\n" + "\n".join(trend_lines) + "\n"
+        if recommendation_lines:
+            if panel_body:
+                panel_body += "\n"
+            panel_body += "[bold]Recommendations[/bold]\n" + "\n".join(recommendation_lines)
+
+        console.print(Panel(panel_body, title="Domain Memory Insights", border_style="magenta"))
 
     def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> TrackerPort | None:
         """Get the appropriate tracker adapter based on type."""
@@ -305,12 +440,21 @@ def register_run_commands(
             return
 
         tracker_name = tracker_type.capitalize()
+        trace_id: str | None = None
         with console.status(f"[bold green]Logging to {tracker_name}..."):
             try:
                 trace_id = tracker.log_evaluation_run(result)
                 console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
             except Exception as exc:  # pragma: no cover - telemetry best-effort
                 console.print(f"[yellow]Warning:[/yellow] Failed to log to {tracker_name}: {exc}")
+                return
+
+        if tracker_type == "phoenix":
+            extra = log_phoenix_traces(tracker, result)
+            if extra:
+                console.print(
+                    f"[dim]Recorded {extra} Phoenix RAG trace(s) for detailed observability.[/dim]"
+                )
 
     def _save_to_db(db_path: Path, result, console: Console) -> None:
         """Persist evaluation run to SQLite database."""
@@ -353,4 +497,91 @@ def register_run_commands(
                 console.print(f"[red]Error saving results:[/red] {exc}")
 
 
-__all__ = ["register_run_commands"]
+def enrich_dataset_with_memory(
+    *,
+    dataset: Dataset,
+    memory_evaluator: MemoryAwareEvaluator,
+    domain: str,
+    language: str,
+) -> int:
+    """Append memory-derived facts to dataset contexts."""
+
+    enriched = 0
+    for test_case in dataset.test_cases:
+        augmented = memory_evaluator.augment_context_with_facts(
+            question=test_case.question,
+            original_context="",
+            domain=domain,
+            language=language,
+        ).strip()
+        if augmented and augmented not in test_case.contexts:
+            test_case.contexts.append(augmented)
+            enriched += 1
+    return enriched
+
+
+def log_phoenix_traces(
+    tracker: TrackerPort,
+    run: EvaluationRun,
+    max_traces: int = 20,
+) -> int:
+    """Log per-test-case RAG traces when Phoenix adapter supports it."""
+
+    log_trace = getattr(tracker, "log_rag_trace", None)
+    if not callable(log_trace):
+        return 0
+
+    count = 0
+    for result in run.results:
+        retrieval_data = None
+        if result.contexts:
+            docs = []
+            for idx, ctx in enumerate(result.contexts, start=1):
+                docs.append(
+                    RetrievedDocument(
+                        content=ctx,
+                        score=max(0.1, 1 - 0.05 * (idx - 1)),
+                        rank=idx,
+                        source=f"context_{idx}",
+                    )
+                )
+            retrieval_data = RetrievalData(
+                query=result.question or "",
+                retrieval_method="dataset",
+                top_k=len(docs),
+                retrieval_time_ms=result.latency_ms or 0,
+                candidates=docs,
+            )
+
+        generation_data = GenerationData(
+            model=run.model_name,
+            prompt=result.question or "",
+            response=result.answer or "",
+            generation_time_ms=result.latency_ms or 0,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=result.tokens_used,
+        )
+
+        rag_trace = RAGTraceData(
+            query=result.question or "",
+            retrieval=retrieval_data,
+            generation=generation_data,
+            final_answer=result.answer or "",
+            total_time_ms=result.latency_ms or 0,
+            metadata={"run_id": run.run_id, "test_case_id": result.test_case_id},
+        )
+
+        try:
+            log_trace(rag_trace)
+            count += 1
+        except Exception:  # pragma: no cover - telemetry best effort
+            break
+
+        if count >= max_traces:
+            break
+
+    return count
+
+
+__all__ = ["register_run_commands", "enrich_dataset_with_memory", "log_phoenix_traces"]
