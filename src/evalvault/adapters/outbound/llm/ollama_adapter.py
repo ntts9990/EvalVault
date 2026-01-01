@@ -97,6 +97,8 @@ class OllamaAdapter(BaseLLMAdapter):
         _base_url: Ollama 서버 URL
     """
 
+    provider_name = "ollama"
+
     def __init__(self, settings: Settings):
         """Initialize Ollama adapter.
 

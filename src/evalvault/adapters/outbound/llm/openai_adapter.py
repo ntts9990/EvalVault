@@ -80,6 +80,8 @@ class OpenAIAdapter(BaseLLMAdapter):
     a consistent interface for Ragas metrics evaluation without deprecation warnings.
     """
 
+    provider_name = "openai"
+
     def __init__(self, settings: Settings):
         """Initialize OpenAI adapter.
 

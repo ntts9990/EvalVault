@@ -8,6 +8,43 @@ from typing import Any
 
 from evalvault.ports.outbound.llm_port import LLMPort, ThinkingConfig
 
+# Provider-specific help URLs
+PROVIDER_HELP_URLS: dict[str, str] = {
+    "openai": "https://platform.openai.com/api-keys",
+    "azure": "https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub",
+    "anthropic": "https://console.anthropic.com/settings/keys",
+    "ollama": "https://ollama.com/download",
+}
+
+
+class LLMConfigurationError(ValueError):
+    """LLM configuration error with user-friendly message.
+
+    Provides clear error messages with actionable steps to fix configuration issues.
+    """
+
+    def __init__(
+        self,
+        setting_name: str,
+        provider: str = "unknown",
+        help_text: str | None = None,
+    ):
+        self.setting_name = setting_name
+        self.provider = provider
+
+        help_url = PROVIDER_HELP_URLS.get(provider, "")
+        help_line = f"Get key: {help_url}" if help_url else ""
+        extra_help = f"\n   {help_text}" if help_text else ""
+
+        message = (
+            f"{setting_name} is required for {provider.title()}\n"
+            f"How to fix:\n"
+            f"   1. Create .env file or set environment variable\n"
+            f"   2. Add: {setting_name}=your-value{extra_help}\n"
+            f"{help_line}"
+        )
+        super().__init__(message)
+
 
 @dataclass
 class TokenUsage:
@@ -43,7 +80,17 @@ class TokenUsage:
 
 
 class BaseLLMAdapter(LLMPort):
-    """Common functionality for LLM adapters."""
+    """Common functionality for LLM adapters.
+
+    Provides shared infrastructure for all LLM adapters:
+    - Token usage tracking
+    - Ragas LLM/Embeddings management
+    - Thinking/reasoning configuration
+    - Settings validation helpers
+    """
+
+    # Override in subclasses to specify the provider name
+    provider_name: str = "unknown"
 
     def __init__(
         self,
@@ -56,6 +103,34 @@ class BaseLLMAdapter(LLMPort):
         self._ragas_embeddings: Any | None = None
         self._token_usage = TokenUsage()
         self._thinking_config = thinking_config or ThinkingConfig(enabled=False)
+
+    # -- Settings validation helpers --------------------------------------------
+    def _validate_required_settings(
+        self,
+        settings: dict[str, tuple[Any, str | None]],
+    ) -> None:
+        """Validate required settings and raise user-friendly errors.
+
+        Args:
+            settings: Dict mapping setting names to (value, help_text) tuples.
+                      If value is falsy, raises LLMConfigurationError.
+
+        Raises:
+            LLMConfigurationError: If any required setting is missing
+
+        Example:
+            self._validate_required_settings({
+                "AZURE_ENDPOINT": (settings.azure_endpoint, "Azure OpenAI endpoint URL"),
+                "AZURE_API_KEY": (settings.azure_api_key, None),
+            })
+        """
+        for setting_name, (value, help_text) in settings.items():
+            if not value:
+                raise LLMConfigurationError(
+                    setting_name=setting_name,
+                    provider=self.provider_name,
+                    help_text=help_text,
+                )
 
     # -- Helpers for subclasses -------------------------------------------------
     def _set_ragas_llm(self, llm: Any) -> None:

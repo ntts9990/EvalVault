@@ -8,7 +8,8 @@ import pytest
 # Skip all tests in this module if anthropic is not installed
 pytest.importorskip("anthropic")
 
-from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter, TokenUsage
+from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
+from evalvault.adapters.outbound.llm.base import TokenUsage
 from evalvault.config.settings import Settings
 
 

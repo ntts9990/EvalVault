@@ -15,6 +15,8 @@ class AzureOpenAIAdapter(BaseLLMAdapter):
     providing the same LLMPort interface as the standard OpenAI adapter.
     """
 
+    provider_name = "azure"
+
     def __init__(self, settings: Settings):
         """Initialize Azure OpenAI adapter.
 
@@ -22,18 +24,22 @@ class AzureOpenAIAdapter(BaseLLMAdapter):
             settings: Application settings containing Azure OpenAI configuration
 
         Raises:
-            ValueError: If required Azure settings are missing
+            LLMConfigurationError: If required Azure settings are missing
         """
         self._settings = settings
-        super().__init__(model_name=f"azure/{settings.azure_deployment}")
+        super().__init__(model_name=f"azure/{settings.azure_deployment or 'unset'}")
 
-        # Validate Azure settings
-        if not settings.azure_endpoint:
-            raise ValueError("AZURE_ENDPOINT is required for Azure OpenAI")
-        if not settings.azure_api_key:
-            raise ValueError("AZURE_API_KEY is required for Azure OpenAI")
-        if not settings.azure_deployment:
-            raise ValueError("AZURE_DEPLOYMENT is required for Azure OpenAI")
+        # Validate Azure settings using common helper
+        self._validate_required_settings(
+            {
+                "AZURE_ENDPOINT": (settings.azure_endpoint, "Azure OpenAI endpoint URL"),
+                "AZURE_API_KEY": (settings.azure_api_key, None),
+                "AZURE_DEPLOYMENT": (settings.azure_deployment, "Azure OpenAI deployment name"),
+            }
+        )
+
+        # Update model name after validation
+        self._model_name = f"azure/{settings.azure_deployment}"
 
         # Create Azure OpenAI client
         self._client = AsyncAzureOpenAI(
