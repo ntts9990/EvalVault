@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import asdict, is_dataclass
+from enum import Enum
 from typing import Any
 
 from evalvault.domain.entities import EvaluationRun
@@ -78,6 +80,52 @@ class AnalysisDataProcessor:
         """평가 실행이 최소 샘플 수를 충족하는지 확인합니다."""
         return len(run.results) >= minimum
 
+    def to_serializable(self, value: Any) -> Any:
+        """데이터 클래스를 포함한 객체를 직렬화 가능한 형태로 변환."""
+        if value is None:
+            return None
+        if is_dataclass(value):
+            return self.to_serializable(asdict(value))
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, dict):
+            return {key: self.to_serializable(val) for key, val in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self.to_serializable(item) for item in value]
+        return value
+
+    def build_output_payload(
+        self,
+        analysis: Any | None,
+        *,
+        summary: dict[str, Any] | None = None,
+        statistics: dict[str, Any] | None = None,
+        insights: Iterable[str] | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """파이프라인 모듈이 공통 포맷으로 결과를 노출하도록 정규화."""
+        resolved_insights: list[str] = []
+        if insights is not None:
+            resolved_insights = list(insights)
+        elif analysis is not None and hasattr(analysis, "insights"):
+            resolved_insights = list(getattr(analysis, "insights", []) or [])
+
+        payload: dict[str, Any] = {
+            "analysis": analysis,
+            "summary": summary or {},
+            "statistics": statistics or {},
+            "insights": resolved_insights,
+        }
+
+        if analysis is not None:
+            payload["analysis_id"] = getattr(analysis, "analysis_id", None)
+            payload["run_id"] = getattr(analysis, "run_id", None)
+
+        if extra:
+            payload.update(extra)
+
+        return payload
+
 
 class BaseAnalysisAdapter(ABC):
     """분석 어댑터 공통 베이스 클래스."""
@@ -93,3 +141,21 @@ class BaseAnalysisAdapter(ABC):
     def has_enough_samples(self, run: EvaluationRun, *, minimum: int = 1) -> bool:
         """분석에 필요한 최소 샘플 수 확인."""
         return self.processor.ensure_min_samples(run, minimum=minimum)
+
+    def build_module_output(
+        self,
+        analysis: Any | None,
+        *,
+        summary: dict[str, Any] | None = None,
+        statistics: dict[str, Any] | None = None,
+        insights: Iterable[str] | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """분석 모듈이 재사용 가능한 공통 출력 포맷을 가질 수 있도록 조립."""
+        return self.processor.build_output_payload(
+            analysis,
+            summary=summary,
+            statistics=statistics,
+            insights=insights,
+            extra=extra,
+        )

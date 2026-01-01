@@ -5,10 +5,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+from evalvault.adapters.outbound.analysis.common import (
+    AnalysisDataProcessor,
+    BaseAnalysisAdapter,
+)
 from evalvault.adapters.outbound.analysis.statistical_adapter import (
     StatisticalAnalysisAdapter,
 )
@@ -33,6 +36,7 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
 
     def __init__(self, adapter: StatisticalAnalysisAdapter | None = None) -> None:
         self._adapter = adapter or StatisticalAnalysisAdapter()
+        self._processor = AnalysisDataProcessor()
 
     def execute(
         self,
@@ -60,15 +64,27 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
             analysis = self._adapter.analyze(pseudo_run)
 
         if analysis is None:
-            return {
-                "statistics": {},
-                "summary": {"total_metrics": 0, "average_score": 0.0},
-                "analysis": None,
-            }
+            return self._empty_output()
 
-        output = self._serialize_analysis(analysis)
-        output["analysis"] = analysis
-        return output
+        statistics = self._build_statistics(analysis)
+        summary = self._build_summary(analysis, statistics)
+        processor = self._processor
+
+        return self._build_output(
+            analysis,
+            summary=summary,
+            statistics=statistics,
+            insights=analysis.insights,
+            extra={
+                "correlation_metrics": list(analysis.correlation_metrics),
+                "correlation_matrix": list(analysis.correlation_matrix),
+                "significant_correlations": processor.to_serializable(
+                    analysis.significant_correlations
+                ),
+                "low_performers": processor.to_serializable(analysis.low_performers),
+                "metric_pass_rates": dict(analysis.metric_pass_rates),
+            },
+        )
 
     def _build_run_from_metrics(self, metrics: dict[str, list[float]]) -> EvaluationRun:
         """메트릭 딕셔너리를 EvaluationRun으로 변환합니다."""
@@ -87,9 +103,20 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
 
         return run
 
-    def _serialize_analysis(self, analysis: StatisticalAnalysis) -> dict[str, Any]:
-        """StatisticalAnalysis 객체를 파이프라인 출력 형태로 직렬화."""
-        statistics = {metric: asdict(stats) for metric, stats in analysis.metrics_summary.items()}
+    def _build_statistics(self, analysis: StatisticalAnalysis) -> dict[str, Any]:
+        """메트릭별 통계를 직렬화."""
+        processor = self._processor
+        return {
+            metric: processor.to_serializable(stats)
+            for metric, stats in analysis.metrics_summary.items()
+        }
+
+    def _build_summary(
+        self,
+        analysis: StatisticalAnalysis,
+        statistics: dict[str, Any],
+    ) -> dict[str, Any]:
+        """요약 정보를 계산."""
         total_metrics = len(statistics)
         average_score = (
             sum(stat["mean"] for stat in statistics.values()) / total_metrics
@@ -98,18 +125,49 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
         )
 
         return {
-            "analysis_id": analysis.analysis_id,
-            "run_id": analysis.run_id,
-            "statistics": statistics,
-            "summary": {
-                "total_metrics": total_metrics,
-                "average_score": round(average_score, 4),
-                "overall_pass_rate": analysis.overall_pass_rate,
-            },
-            "correlation_metrics": analysis.correlation_metrics,
-            "correlation_matrix": analysis.correlation_matrix,
-            "significant_correlations": [asdict(c) for c in analysis.significant_correlations],
-            "low_performers": [asdict(lp) for lp in analysis.low_performers],
-            "insights": list(analysis.insights),
-            "metric_pass_rates": analysis.metric_pass_rates,
+            "total_metrics": total_metrics,
+            "average_score": round(average_score, 4),
+            "overall_pass_rate": analysis.overall_pass_rate,
         }
+
+    def _empty_output(self) -> dict[str, Any]:
+        """데이터가 없을 때의 기본 출력."""
+        return self._build_output(
+            None,
+            summary={},
+            statistics={},
+            insights=[],
+            extra={
+                "correlation_metrics": [],
+                "correlation_matrix": [],
+                "significant_correlations": [],
+                "low_performers": [],
+                "metric_pass_rates": {},
+            },
+        )
+
+    def _build_output(
+        self,
+        analysis: StatisticalAnalysis | None,
+        *,
+        summary: dict[str, Any],
+        statistics: dict[str, Any],
+        insights: list[str],
+        extra: dict[str, Any],
+    ) -> dict[str, Any]:
+        """BaseAnalysisAdapter가 없을 때도 동일 포맷으로 출력."""
+        if isinstance(self._adapter, BaseAnalysisAdapter):
+            return self._adapter.build_module_output(
+                analysis,
+                summary=summary,
+                statistics=statistics,
+                insights=insights,
+                extra=extra,
+            )
+        return self._processor.build_output_payload(
+            analysis,
+            summary=summary,
+            statistics=statistics,
+            insights=insights,
+            extra=extra,
+        )

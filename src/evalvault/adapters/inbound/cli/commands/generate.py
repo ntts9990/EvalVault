@@ -14,6 +14,8 @@ from evalvault.domain.services.testset_generator import (
     GenerationConfig,
 )
 
+from ..utils.validators import validate_choice
+
 
 def register_generate_commands(app: typer.Typer, console: Console) -> None:
     """Attach the `generate` command to the given Typer app."""
@@ -57,10 +59,8 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Generate a synthetic test dataset from documents."""
 
-        if method not in ["basic", "knowledge_graph"]:
-            console.print(f"[red]Error:[/red] Invalid method: {method}")
-            console.print("Available methods: basic, knowledge_graph")
-            raise typer.Exit(1)
+        allowed_methods = ("basic", "knowledge_graph")
+        validate_choice(method, allowed_methods, console, value_label="method")
 
         console.print("\n[bold]EvalVault[/bold] - Testset Generation")
         console.print(f"Documents: [cyan]{len(documents)}[/cyan]")

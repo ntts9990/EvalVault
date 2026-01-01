@@ -16,6 +16,8 @@ from evalvault.config.domain_config import (
     save_domain_config,
 )
 
+from ..utils.validators import parse_csv_option, validate_choices
+
 
 def create_domain_app(console: Console) -> typer.Typer:
     """Create the domain Typer sub-application."""
@@ -46,13 +48,15 @@ def create_domain_app(console: Console) -> typer.Typer:
     ) -> None:
         """Initialize domain memory configuration."""
 
-        lang_list = [lang.strip() for lang in languages.split(",")]
-        valid_languages = {"ko", "en"}
-        invalid_langs = [lang for lang in lang_list if lang not in valid_languages]
-        if invalid_langs:
-            console.print(f"[red]Error:[/red] Invalid languages: {', '.join(invalid_langs)}")
-            console.print(f"Supported languages: {', '.join(valid_languages)}")
-            raise typer.Exit(1)
+        lang_list = parse_csv_option(languages)
+        valid_languages = ("ko", "en")
+        validate_choices(
+            lang_list,
+            valid_languages,
+            console,
+            value_label="language",
+            available_label="language",
+        )
 
         config_dir = Path("config/domains")
         domain_dir = config_dir / domain

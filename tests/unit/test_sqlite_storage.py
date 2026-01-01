@@ -392,6 +392,7 @@ class TestSQLiteStorageNLPAnalysis:
             QuestionType,
             QuestionTypeStats,
             TextStats,
+            TopicCluster,
         )
 
         return NLPAnalysis(
@@ -427,6 +428,15 @@ class TestSQLiteStorageNLPAnalysis:
             top_keywords=[
                 KeywordInfo(keyword="보험", frequency=5, tfidf_score=0.8),
                 KeywordInfo(keyword="보장금액", frequency=3, tfidf_score=0.6),
+            ],
+            topic_clusters=[
+                TopicCluster(
+                    cluster_id=0,
+                    keywords=["보험", "갱신"],
+                    document_count=4,
+                    avg_scores={"faithfulness": 0.7},
+                    representative_questions=["보험 갱신 주기를 알려줘"],
+                )
             ],
             insights=["High vocabulary diversity", "Questions are well-formed"],
         )
@@ -479,6 +489,19 @@ class TestSQLiteStorageNLPAnalysis:
 
         assert len(retrieved.insights) == 2
         assert "High vocabulary diversity" in retrieved.insights
+
+    def test_get_nlp_analysis_reconstructs_topic_clusters(
+        self, storage_adapter, sample_nlp_analysis
+    ):
+        """TopicCluster 복원 확인."""
+        analysis_id = storage_adapter.save_nlp_analysis(sample_nlp_analysis)
+        retrieved = storage_adapter.get_nlp_analysis(analysis_id)
+
+        assert len(retrieved.topic_clusters) == 1
+        cluster = retrieved.topic_clusters[0]
+        assert cluster.keywords == ["보험", "갱신"]
+        assert cluster.avg_scores["faithfulness"] == 0.7
+        assert cluster.representative_questions[0].startswith("보험 갱신")
 
     def test_get_nlp_analysis_raises_key_error(self, storage_adapter):
         """존재하지 않는 분석 조회 시 KeyError."""

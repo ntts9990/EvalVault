@@ -18,6 +18,17 @@ from evalvault.domain.entities import (
 from tests.unit.conftest import get_test_model
 
 runner = CliRunner()
+RUN_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.run"
+HISTORY_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.history"
+ANALYZE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.analyze"
+PIPELINE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.pipeline"
+GATE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.gate"
+GENERATE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.generate"
+EXPERIMENT_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.experiment"
+KG_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.kg"
+BENCHMARK_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.benchmark"
+CONFIG_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.config"
+LANGFUSE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.langfuse"
 
 
 class TestCLIVersion:
@@ -88,10 +99,10 @@ class TestCLIRun:
         result = runner.invoke(app, ["run", "nonexistent.csv"])
         assert result.exit_code != 0
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{CONFIG_COMMAND_MODULE}.Settings")
     def test_run_with_valid_dataset(
         self,
         mock_settings_cls,
@@ -133,10 +144,10 @@ class TestCLIRun:
         assert result.exit_code == 0
         assert "test-dataset" in result.stdout or "faithfulness" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_multiple_metrics(
         self,
         mock_settings_cls,
@@ -246,8 +257,8 @@ class TestKGCLI:
         assert result.exit_code == 0
         assert "Knowledge Graph Overview" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.LangfuseAdapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{KG_COMMAND_MODULE}.LangfuseAdapter")
+    @patch(f"{KG_COMMAND_MODULE}.Settings")
     def test_kg_stats_logs_to_langfuse(self, mock_settings_cls, mock_langfuse, tmp_path):
         """Langfuse 설정이 있으면 자동으로 로깅된다."""
         sample_file = tmp_path / "doc.txt"
@@ -296,7 +307,7 @@ class TestKGCLI:
 class TestCLIConfig:
     """CLI config 명령 테스트."""
 
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_config_show(self, mock_settings_cls):
         """config 명령으로 현재 설정 출력."""
         test_model = get_test_model()
@@ -321,7 +332,7 @@ class TestCLIConfig:
 class TestLangfuseDashboard:
     """Langfuse dashboard 명령 테스트."""
 
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}.Settings")
     def test_dashboard_requires_credentials(self, mock_settings_cls):
         mock_settings = MagicMock()
         mock_settings.langfuse_public_key = None
@@ -332,8 +343,8 @@ class TestLangfuseDashboard:
         assert result.exit_code != 0
         assert "credentials" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli._fetch_langfuse_traces")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}._fetch_langfuse_traces")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}.Settings")
     def test_dashboard_outputs_table(self, mock_settings_cls, mock_fetch):
         mock_settings = MagicMock()
         mock_settings.langfuse_public_key = "pub"
@@ -358,8 +369,8 @@ class TestLangfuseDashboard:
         assert "trace-1" in result.stdout
         mock_fetch.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli._fetch_langfuse_traces")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}._fetch_langfuse_traces")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}.Settings")
     def test_dashboard_handles_http_error(self, mock_settings_cls, mock_fetch):
         mock_settings = MagicMock()
         mock_settings.langfuse_public_key = "pub"
@@ -380,8 +391,8 @@ class TestLangfuseDashboard:
         assert result.exit_code == 0
         assert "public API not available" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli._fetch_langfuse_traces")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}._fetch_langfuse_traces")
+    @patch(f"{LANGFUSE_COMMAND_MODULE}.Settings")
     def test_dashboard_no_traces_found(self, mock_settings_cls, mock_fetch):
         """No traces found 메시지 테스트."""
         mock_settings = MagicMock()
@@ -410,10 +421,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 1
         assert "Invalid metrics" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_profile(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -461,7 +472,7 @@ class TestCLIRunEdgeCases:
         test_file = tmp_path / "test.csv"
         test_file.write_text("id,question,answer,contexts\n")
 
-        with patch("evalvault.adapters.inbound.cli.apply_profile") as mock_apply:
+        with patch(f"{RUN_COMMAND_MODULE}.apply_profile") as mock_apply:
             mock_apply.return_value = mock_settings
             result = runner.invoke(
                 app, ["run", str(test_file), "--profile", "prod", "--metrics", "faithfulness"]
@@ -470,7 +481,7 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 0
         assert "prod" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_missing_openai_key(self, mock_settings_cls, tmp_path):
         """OpenAI API 키 누락 시 에러."""
         mock_settings = MagicMock()
@@ -486,10 +497,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 1
         assert "OPENAI_API_KEY" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_ollama_provider(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -541,10 +552,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 0
         assert "ollama" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_verbose_output(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -598,10 +609,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 0
         assert "tc-001" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_output_file(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -659,11 +670,11 @@ class TestCLIRunEdgeCases:
         data = json.loads(output_file.read_text(encoding="utf-8"))
         assert "results" in data
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_run_with_db_save(
         self,
         mock_storage_cls,
@@ -728,11 +739,11 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 0
         mock_storage.save_run.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
-    @patch("evalvault.adapters.inbound.cli.LangfuseAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.LangfuseAdapter")
     def test_run_with_langfuse_logging(
         self,
         mock_langfuse_cls,
@@ -800,8 +811,8 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 0
         mock_tracker.log_evaluation_run.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_dataset_load_error(self, mock_settings_cls, mock_get_loader, tmp_path):
         """데이터셋 로드 에러 테스트."""
         mock_settings = MagicMock()
@@ -821,10 +832,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 1
         assert "Error loading dataset" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_evaluation_error(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -858,10 +869,10 @@ class TestCLIRunEdgeCases:
         assert result.exit_code == 1
         assert "Error during evaluation" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.get_loader")
-    @patch("evalvault.adapters.inbound.cli.RagasEvaluator")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
     def test_run_with_parallel(
         self, mock_settings_cls, mock_get_llm, mock_evaluator_cls, mock_get_loader, tmp_path
     ):
@@ -938,7 +949,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "limit" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_history_no_runs(self, mock_storage_cls, tmp_path):
         """실행 이력이 없을 때 테스트."""
         mock_storage = MagicMock()
@@ -949,7 +960,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "No evaluation runs found" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_history_with_runs(self, mock_storage_cls, tmp_path):
         """실행 이력 조회 테스트."""
         from datetime import datetime
@@ -970,7 +981,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "test-datas" in result.stdout  # Truncated in table
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_history_with_filters(self, mock_storage_cls, tmp_path):
         """필터링 옵션 테스트."""
         mock_storage = MagicMock()
@@ -1005,7 +1016,7 @@ class TestCLICompare:
         result = runner.invoke(app, ["compare", "--help"])
         assert result.exit_code == 0
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_compare_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -1018,7 +1029,7 @@ class TestCLICompare:
         )
         assert result.exit_code == 1
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_compare_two_runs(self, mock_storage_cls, tmp_path):
         """두 실행 결과 비교 테스트."""
 
@@ -1058,7 +1069,7 @@ class TestCLIExport:
         result = runner.invoke(app, ["export", "--help"])
         assert result.exit_code == 0
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_export_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -1078,7 +1089,7 @@ class TestCLIExport:
         )
         assert result.exit_code == 1
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_export_run_to_file(self, mock_storage_cls, tmp_path):
         """실행 결과 내보내기 테스트."""
         mock_run = MagicMock()
@@ -1187,8 +1198,8 @@ class TestCLIExperiment:
         result = runner.invoke(app, ["experiment-create", "--help"])
         assert result.exit_code == 0
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_create(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 생성 테스트."""
 
@@ -1223,8 +1234,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "Created experiment" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_group(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험에 그룹 추가 테스트."""
         mock_manager = MagicMock()
@@ -1247,8 +1258,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.add_group_to_experiment.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_group_not_found(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """존재하지 않는 실험에 그룹 추가 테스트."""
         mock_manager = MagicMock()
@@ -1269,8 +1280,8 @@ class TestCLIExperiment:
         )
         assert result.exit_code == 1
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_run(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 그룹에 run 추가 테스트."""
         mock_manager = MagicMock()
@@ -1293,8 +1304,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.add_run_to_experiment_group.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_list(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 목록 조회 테스트."""
         mock_manager = MagicMock()
@@ -1308,8 +1319,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "No experiments found" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_list_with_experiments(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 목록 조회 테스트 (실험 있음)."""
 
@@ -1330,8 +1341,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "Test Exp" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_compare(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 그룹 비교 테스트."""
         from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
@@ -1360,8 +1371,8 @@ class TestCLIExperiment:
         )
         assert result.exit_code == 0
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_compare_no_data(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """비교 데이터 없을 때 테스트."""
         from evalvault.domain.entities.experiment import Experiment
@@ -1379,8 +1390,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "No comparison data" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_conclude(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 종료 테스트."""
         mock_manager = MagicMock()
@@ -1401,8 +1412,8 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.conclude_experiment.assert_called_once()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.ExperimentManager")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_summary(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 요약 테스트."""
         mock_manager = MagicMock()
@@ -1553,7 +1564,7 @@ class TestCLIAnalyzeNLP:
         assert result.exit_code == 0
         assert "--nlp" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_analyze_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -1567,10 +1578,10 @@ class TestCLIAnalyzeNLP:
         assert result.exit_code == 1
         assert "not found" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
     def test_analyze_without_nlp(
         self, mock_service_cls, mock_cache_cls, mock_stat_cls, mock_storage_cls, tmp_path
     ):
@@ -1611,13 +1622,13 @@ class TestCLIAnalyzeNLP:
         call_kwargs = mock_service.analyze_run.call_args[1]
         assert call_kwargs["include_nlp"] is False
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.NLPAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.NLPAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.Settings")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
     def test_analyze_with_nlp(
         self,
         mock_service_cls,
@@ -1700,14 +1711,14 @@ class TestCLIAnalyzeNLP:
         call_kwargs = mock_service.analyze_run.call_args[1]
         assert call_kwargs["include_nlp"] is True
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.NLPAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.get_llm_adapter")
-    @patch("evalvault.adapters.inbound.cli.Settings")
-    @patch("evalvault.adapters.inbound.cli.apply_profile")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.NLPAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.Settings")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.apply_profile")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
     def test_analyze_with_nlp_and_profile(
         self,
         mock_service_cls,
@@ -1772,7 +1783,7 @@ class TestCLIGate:
         assert "baseline" in result.stdout.lower()
         assert "format" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -1786,7 +1797,7 @@ class TestCLIGate:
         assert result.exit_code == 3
         assert "not found" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_pass(self, mock_storage_cls, tmp_path):
         """모든 메트릭 통과 테스트."""
         mock_run = MagicMock()
@@ -1807,7 +1818,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "PASSED" in result.stdout or "passed" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_fail(self, mock_storage_cls, tmp_path):
         """메트릭 미달 테스트."""
         mock_run = MagicMock()
@@ -1828,7 +1839,7 @@ class TestCLIGate:
         assert result.exit_code == 1
         assert "FAILED" in result.stdout or "failed" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_custom_threshold(self, mock_storage_cls, tmp_path):
         """커스텀 임계값 테스트."""
         mock_run = MagicMock()
@@ -1849,7 +1860,7 @@ class TestCLIGate:
         )
         assert result.exit_code == 1
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_json_output(self, mock_storage_cls, tmp_path):
         """JSON 출력 테스트."""
         mock_run = MagicMock()
@@ -1872,7 +1883,7 @@ class TestCLIGate:
         assert data["status"] == "passed"
         assert data["all_thresholds_passed"] is True
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_github_actions_output(self, mock_storage_cls, tmp_path):
         """GitHub Actions 출력 테스트."""
         mock_run = MagicMock()
@@ -1893,7 +1904,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "::set-output" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_with_baseline(self, mock_storage_cls, tmp_path):
         """베이스라인 비교 테스트."""
         mock_run = MagicMock()
@@ -1919,7 +1930,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "Baseline" in result.stdout or "baseline" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_regression_detected(self, mock_storage_cls, tmp_path):
         """회귀 감지 테스트."""
         mock_run = MagicMock()
@@ -1954,7 +1965,7 @@ class TestCLIGate:
         assert result.exit_code == 2  # Regression detected
         assert "regression" in result.stdout.lower()
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_baseline_not_found(self, mock_storage_cls, tmp_path):
         """베이스라인 미발견 테스트."""
         mock_run = MagicMock()
@@ -1970,7 +1981,7 @@ class TestCLIGate:
         )
         assert result.exit_code == 3
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_gate_invalid_threshold_format(self, mock_storage_cls, tmp_path):
         """잘못된 임계값 형식 테스트."""
         mock_run = MagicMock()
@@ -2000,11 +2011,11 @@ class TestCLIAnalyzePlaybook:
         assert "--playbook" in result.stdout
         assert "--enable-llm" in result.stdout
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
-    @patch("evalvault.adapters.inbound.cli._perform_playbook_analysis")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}._perform_playbook_analysis")
     def test_analyze_with_playbook(
         self,
         mock_playbook_analysis,
@@ -2056,11 +2067,11 @@ class TestCLIAnalyzePlaybook:
         assert call_args[0] == mock_run  # run
         assert call_args[1] is False  # enable_llm
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
-    @patch("evalvault.adapters.inbound.cli._perform_playbook_analysis")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}._perform_playbook_analysis")
     def test_analyze_with_playbook_and_llm(
         self,
         mock_playbook_analysis,
@@ -2111,10 +2122,10 @@ class TestCLIAnalyzePlaybook:
         call_args = mock_playbook_analysis.call_args[0]
         assert call_args[1] is True  # enable_llm
 
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
-    @patch("evalvault.adapters.inbound.cli.StatisticalAnalysisAdapter")
-    @patch("evalvault.adapters.inbound.cli.MemoryCacheAdapter")
-    @patch("evalvault.adapters.inbound.cli.AnalysisService")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
     def test_analyze_without_playbook(
         self,
         mock_service_cls,
@@ -2150,7 +2161,7 @@ class TestCLIAnalyzePlaybook:
         mock_service.analyze_run.return_value = mock_bundle
         mock_service_cls.return_value = mock_service
 
-        with patch("evalvault.adapters.inbound.cli._perform_playbook_analysis") as mock_playbook:
+        with patch(f"{ANALYZE_COMMAND_MODULE}._perform_playbook_analysis") as mock_playbook:
             result = runner.invoke(
                 app,
                 ["analyze", "run-123", "--db", str(tmp_path / "test.db")],
@@ -2165,7 +2176,7 @@ class TestPipelineCommands:
     @patch("evalvault.adapters.outbound.analysis.SummaryReportModule")
     @patch("evalvault.adapters.outbound.analysis.StatisticalAnalyzerModule")
     @patch("evalvault.adapters.outbound.analysis.DataLoaderModule")
-    @patch("evalvault.adapters.inbound.cli.SQLiteStorageAdapter")
+    @patch(f"{PIPELINE_COMMAND_MODULE}.SQLiteStorageAdapter")
     @patch("evalvault.domain.services.pipeline_orchestrator.AnalysisPipelineService")
     def test_pipeline_analyze_saves_statistical_analysis(
         self,

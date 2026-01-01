@@ -11,6 +11,8 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 
+from ..utils.formatters import format_diff, format_score, format_status
+
 
 def register_gate_commands(app: typer.Typer, console: Console) -> None:
     """Attach the `gate` command to the given Typer app."""
@@ -169,34 +171,35 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
                 table.add_column("Regression", justify="center")
 
             for metric_result in results:
-                status = "[green]PASS[/green]" if metric_result["passed"] else "[red]FAIL[/red]"
-                score_color = "green" if metric_result["passed"] else "red"
+                score_text = format_score(metric_result["score"], metric_result["passed"])
+                status = format_status(metric_result["passed"])
                 if baseline_run:
                     baseline_score = metric_result.get("baseline_score", "-")
-                    diff = metric_result.get("diff", 0)
-                    diff_str = (
-                        f"[{'green' if diff >= 0 else 'red'}]{diff:+.3f}[/]"
-                        if isinstance(diff, float)
-                        else "-"
+                    baseline_display = (
+                        format_score(baseline_score)
+                        if isinstance(baseline_score, float)
+                        else str(baseline_score)
                     )
-                    reg_status = (
-                        "[red]YES[/red]" if metric_result.get("regression") else "[green]NO[/green]"
+                    diff_value = metric_result.get("diff")
+                    diff_str = format_diff(diff_value if isinstance(diff_value, float) else None)
+                    reg_status = format_status(
+                        not metric_result.get("regression", False),
+                        success_text="NO",
+                        failure_text="YES",
                     )
                     table.add_row(
                         metric_result["metric"],
-                        f"[{score_color}]{metric_result['score']:.3f}[/{score_color}]",
+                        score_text,
                         f"{metric_result['threshold']:.2f}",
                         status,
-                        f"{baseline_score:.3f}"
-                        if isinstance(baseline_score, float)
-                        else baseline_score,
+                        baseline_display,
                         diff_str,
                         reg_status,
                     )
                 else:
                     table.add_row(
                         metric_result["metric"],
-                        f"[{score_color}]{metric_result['score']:.3f}[/{score_color}]",
+                        score_text,
                         f"{metric_result['threshold']:.2f}",
                         status,
                     )

@@ -5,6 +5,8 @@ TDD Red Phase - 테스트 먼저 작성.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 # =============================================================================
 # BaseAnalysisModule Tests
 # =============================================================================
@@ -383,6 +385,190 @@ class TestSummaryReportModule:
         assert "tc-low" in result["report"]
         assert result["low_performers"]
         assert result["analysis"] is analysis
+
+
+# =============================================================================
+# NLPAnalyzerModule Tests
+# =============================================================================
+
+
+class TestNLPAnalyzerModule:
+    """NLPAnalyzerModule 테스트 - NLP 분석 모듈."""
+
+    def test_execute_with_run(self):
+        """EvaluationRun이 주어졌을 때 어댑터 호출."""
+        from evalvault.adapters.outbound.analysis.nlp_analyzer_module import (
+            NLPAnalyzerModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.analysis import (
+            KeywordInfo,
+            NLPAnalysis,
+            QuestionType,
+            QuestionTypeStats,
+            TextStats,
+            TopicCluster,
+        )
+
+        mock_adapter = MagicMock()
+        analysis = NLPAnalysis(
+            run_id="run-42",
+            question_stats=TextStats(
+                char_count=100,
+                word_count=20,
+                sentence_count=2,
+                avg_word_length=4.0,
+                unique_word_ratio=0.75,
+            ),
+            question_types=[
+                QuestionTypeStats(
+                    question_type=QuestionType.FACTUAL,
+                    count=5,
+                    percentage=0.5,
+                )
+            ],
+            top_keywords=[KeywordInfo(keyword="보험", frequency=3, tfidf_score=0.9)],
+            topic_clusters=[TopicCluster(cluster_id=1, keywords=["보험"], document_count=10)],
+            insights=["확률형 질문 비중이 높음"],
+        )
+        mock_adapter.analyze.return_value = analysis
+
+        module = NLPAnalyzerModule(adapter=mock_adapter)
+        run = EvaluationRun(run_id="run-42")
+        inputs = {"__context__": {"query": "패턴 분석"}, "data_loader": {"run": run}}
+
+        result = module.execute(inputs)
+
+        assert result["analysis"] is analysis
+        assert result["insights"] == ["확률형 질문 비중이 높음"]
+        assert result["summary"]["run_id"] == "run-42"
+        assert result["question_types"][0]["question_type"] == QuestionType.FACTUAL.value
+        assert "statistics" in result
+        assert result["statistics"]["text_stats"]["questions"]["char_count"] == 100
+        assert "question_stats_preview" in result["summary"]
+        mock_adapter.analyze.assert_called_once()
+
+    def test_execute_without_run_returns_empty(self):
+        """run 정보가 없으면 빈 결과."""
+        from evalvault.adapters.outbound.analysis.nlp_analyzer_module import (
+            NLPAnalyzerModule,
+        )
+
+        module = NLPAnalyzerModule(adapter=MagicMock())
+        result = module.execute({"__context__": {}, "data_loader": {}})
+
+        assert result["analysis"] is None
+        assert result["insights"] == []
+        assert result["summary"] == {}
+        assert result["statistics"] == {}
+
+
+# =============================================================================
+# CausalAnalyzerModule Tests
+# =============================================================================
+
+
+class TestCausalAnalyzerModule:
+    """CausalAnalyzerModule 테스트 - 인과 분석 모듈."""
+
+    def test_execute_with_run(self):
+        """EvaluationRun이 주어졌을 때 인과 분석 수행."""
+        from evalvault.adapters.outbound.analysis.causal_analyzer_module import (
+            CausalAnalyzerModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.analysis import (
+            CausalAnalysis,
+            CausalFactorType,
+            FactorImpact,
+            FactorStats,
+            ImpactDirection,
+            ImpactStrength,
+            InterventionSuggestion,
+            RootCause,
+            StratifiedGroup,
+        )
+
+        mock_adapter = MagicMock()
+        analysis = CausalAnalysis(run_id="run-99")
+        analysis.factor_stats = {
+            CausalFactorType.QUESTION_LENGTH: FactorStats(
+                factor_type=CausalFactorType.QUESTION_LENGTH,
+                mean=10,
+                std=2,
+                min=6,
+                max=15,
+                median=9,
+            )
+        }
+        analysis.factor_impacts = [
+            FactorImpact(
+                factor_type=CausalFactorType.QUESTION_LENGTH,
+                metric_name="faithfulness",
+                direction=ImpactDirection.NEGATIVE,
+                strength=ImpactStrength.MODERATE,
+                correlation=-0.45,
+                p_value=0.01,
+                is_significant=True,
+                effect_size=0.5,
+                stratified_groups=[
+                    StratifiedGroup(
+                        group_name="long",
+                        lower_bound=12,
+                        upper_bound=20,
+                        count=5,
+                        avg_scores={"faithfulness": 0.6},
+                    )
+                ],
+                interpretation="긴 질문에서 충실도가 떨어짐",
+            )
+        ]
+        analysis.root_causes = [
+            RootCause(
+                metric_name="faithfulness",
+                primary_causes=[CausalFactorType.QUESTION_LENGTH],
+                contributing_factors=[],
+                explanation="질문 길이 증가가 주요 원인",
+            )
+        ]
+        analysis.interventions = [
+            InterventionSuggestion(
+                target_metric="faithfulness",
+                intervention="긴 질문 분리",
+                expected_impact="+0.05",
+                related_factors=[CausalFactorType.QUESTION_LENGTH],
+            )
+        ]
+        analysis.insights = ["긴 질문에서 오류 비중 증가"]
+        mock_adapter.analyze.return_value = analysis
+
+        module = CausalAnalyzerModule(adapter=mock_adapter)
+        run = EvaluationRun(run_id="run-99")
+        inputs = {"__context__": {"query": "원인 분석"}, "data_loader": {"run": run}}
+
+        result = module.execute(inputs)
+
+        assert result["analysis"] is analysis
+        assert result["factor_stats"]["question_length"]["mean"] == 10
+        assert result["significant_impacts"][0]["metric_name"] == "faithfulness"
+        assert result["insights"] == ["긴 질문에서 오류 비중 증가"]
+        assert result["statistics"]["factor_stats"]["question_length"]["mean"] == 10
+        assert result["statistics"]["significant_impacts"][0]["metric_name"] == "faithfulness"
+        mock_adapter.analyze.assert_called_once()
+
+    def test_execute_without_run_returns_empty(self):
+        """run 정보가 없으면 빈 결과."""
+        from evalvault.adapters.outbound.analysis.causal_analyzer_module import (
+            CausalAnalyzerModule,
+        )
+
+        module = CausalAnalyzerModule(adapter=MagicMock())
+        result = module.execute({"__context__": {}, "data_loader": {}})
+
+        assert result["analysis"] is None
+        assert result["insights"] == []
+        assert result["summary"] == {}
+        assert result["statistics"] == {}
 
 
 # =============================================================================

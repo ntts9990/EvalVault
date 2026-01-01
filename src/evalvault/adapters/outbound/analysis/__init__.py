@@ -11,6 +11,9 @@ from evalvault.adapters.outbound.analysis.analysis_report_module import (
 # Phase 14: 파이프라인 모듈 어댑터
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
 from evalvault.adapters.outbound.analysis.causal_adapter import CausalAnalysisAdapter
+from evalvault.adapters.outbound.analysis.causal_analyzer_module import (
+    CausalAnalyzerModule,
+)
 from evalvault.adapters.outbound.analysis.common import (
     AnalysisDataProcessor,
     BaseAnalysisAdapter,
@@ -20,6 +23,7 @@ from evalvault.adapters.outbound.analysis.comparison_report_module import (
 )
 from evalvault.adapters.outbound.analysis.data_loader_module import DataLoaderModule
 from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
+from evalvault.adapters.outbound.analysis.nlp_analyzer_module import NLPAnalyzerModule
 from evalvault.adapters.outbound.analysis.statistical_adapter import (
     StatisticalAnalysisAdapter,
 )
@@ -44,6 +48,8 @@ __all__ = [
     "BaseAnalysisModule",
     "DataLoaderModule",
     "StatisticalAnalyzerModule",
+    "NLPAnalyzerModule",
+    "CausalAnalyzerModule",
     "SummaryReportModule",
     "VerificationReportModule",
     "ComparisonReportModule",
