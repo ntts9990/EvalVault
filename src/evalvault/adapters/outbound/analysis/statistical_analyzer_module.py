@@ -5,9 +5,16 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+from evalvault.adapters.outbound.analysis.statistical_adapter import (
+    StatisticalAnalysisAdapter,
+)
+from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.entities.analysis import StatisticalAnalysis
+from evalvault.domain.entities.result import MetricScore, TestCaseResult
 
 
 class StatisticalAnalyzerModule(BaseAnalysisModule):
@@ -24,6 +31,9 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
     requires = ["data_loader"]
     tags = ["analysis", "statistics"]
 
+    def __init__(self, adapter: StatisticalAnalysisAdapter | None = None) -> None:
+        self._adapter = adapter or StatisticalAnalysisAdapter()
+
     def execute(
         self,
         inputs: dict[str, Any],
@@ -38,52 +48,68 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
         Returns:
             통계 분석 결과
         """
-        # data_loader 출력에서 메트릭 데이터 가져오기
         data_loader_output = inputs.get("data_loader", {})
+        run = data_loader_output.get("run")
         metrics = data_loader_output.get("metrics", {})
 
-        statistics = {}
-        total_mean = 0.0
-        metric_count = 0
+        analysis = None
+        if isinstance(run, EvaluationRun):
+            analysis = self._adapter.analyze(run)
+        elif metrics:
+            pseudo_run = self._build_run_from_metrics(metrics)
+            analysis = self._adapter.analyze(pseudo_run)
 
-        for metric_name, values in metrics.items():
-            if not values:
-                continue
-
-            # 기본 통계 계산
-            n = len(values)
-            mean = sum(values) / n
-            sorted_values = sorted(values)
-            median = (
-                sorted_values[n // 2]
-                if n % 2 == 1
-                else (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
-            )
-            min_val = min(values)
-            max_val = max(values)
-
-            # 표준편차 계산
-            variance = sum((x - mean) ** 2 for x in values) / n
-            std = variance**0.5
-
-            statistics[metric_name] = {
-                "count": n,
-                "mean": round(mean, 4),
-                "median": round(median, 4),
-                "std": round(std, 4),
-                "min": round(min_val, 4),
-                "max": round(max_val, 4),
+        if analysis is None:
+            return {
+                "statistics": {},
+                "summary": {"total_metrics": 0, "average_score": 0.0},
+                "analysis": None,
             }
 
-            total_mean += mean
-            metric_count += 1
+        output = self._serialize_analysis(analysis)
+        output["analysis"] = analysis
+        return output
 
-        summary = {
-            "total_metrics": metric_count,
-            "average_score": round(total_mean / metric_count, 4) if metric_count > 0 else 0.0,
-        }
+    def _build_run_from_metrics(self, metrics: dict[str, list[float]]) -> EvaluationRun:
+        """메트릭 딕셔너리를 EvaluationRun으로 변환합니다."""
+        run = EvaluationRun(metrics_evaluated=list(metrics.keys()))
+        max_len = max(len(values) for values in metrics.values())
+
+        for idx in range(max_len):
+            metric_scores: list[MetricScore] = []
+            for metric_name, values in metrics.items():
+                if idx < len(values):
+                    metric_scores.append(MetricScore(name=metric_name, score=values[idx]))
+            if metric_scores:
+                run.results.append(
+                    TestCaseResult(test_case_id=f"auto-{idx}", metrics=metric_scores)
+                )
+
+        return run
+
+    def _serialize_analysis(self, analysis: StatisticalAnalysis) -> dict[str, Any]:
+        """StatisticalAnalysis 객체를 파이프라인 출력 형태로 직렬화."""
+        statistics = {metric: asdict(stats) for metric, stats in analysis.metrics_summary.items()}
+        total_metrics = len(statistics)
+        average_score = (
+            sum(stat["mean"] for stat in statistics.values()) / total_metrics
+            if total_metrics
+            else 0.0
+        )
 
         return {
+            "analysis_id": analysis.analysis_id,
+            "run_id": analysis.run_id,
             "statistics": statistics,
-            "summary": summary,
+            "summary": {
+                "total_metrics": total_metrics,
+                "average_score": round(average_score, 4),
+                "overall_pass_rate": analysis.overall_pass_rate,
+            },
+            "correlation_metrics": analysis.correlation_metrics,
+            "correlation_matrix": analysis.correlation_matrix,
+            "significant_correlations": [asdict(c) for c in analysis.significant_correlations],
+            "low_performers": [asdict(lp) for lp in analysis.low_performers],
+            "insights": list(analysis.insights),
+            "metric_pass_rates": analysis.metric_pass_rates,
         }

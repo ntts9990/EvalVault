@@ -1,48 +1,14 @@
 """Anthropic Claude LLM adapter for Ragas evaluation."""
 
-import threading
-from dataclasses import dataclass, field
 from typing import Any
 
 from openai import AsyncOpenAI
 from ragas.llms import llm_factory
 
+from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIEmbeddingsWithLegacy
 from evalvault.config.settings import Settings
-from evalvault.ports.outbound.llm_port import LLMPort, ThinkingConfig
-
-
-@dataclass
-class TokenUsage:
-    """Thread-safe token usage tracker."""
-
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
-
-    def add(self, prompt: int, completion: int, total: int) -> None:
-        """Add token counts (thread-safe)."""
-        with self._lock:
-            self.prompt_tokens += prompt
-            self.completion_tokens += completion
-            self.total_tokens += total
-
-    def reset(self) -> None:
-        """Reset all counters."""
-        with self._lock:
-            self.prompt_tokens = 0
-            self.completion_tokens = 0
-            self.total_tokens = 0
-
-    def get_and_reset(self) -> tuple[int, int, int]:
-        """Get current counts and reset (atomic operation)."""
-        with self._lock:
-            result = (self.prompt_tokens, self.completion_tokens, self.total_tokens)
-            self.prompt_tokens = 0
-            self.completion_tokens = 0
-            self.total_tokens = 0
-            return result
+from evalvault.ports.outbound.llm_port import ThinkingConfig
 
 
 class ThinkingTokenTrackingAsyncAnthropic:
@@ -113,7 +79,7 @@ class ThinkingTokenTrackingAsyncAnthropic:
         return ThinkingTrackingMessages(original_messages, self._usage_tracker)
 
 
-class AnthropicAdapter(LLMPort):
+class AnthropicAdapter(BaseLLMAdapter):
     """Anthropic Claude 어댑터.
 
     Ragas에서 Anthropic을 사용하기 위해 ragas.llms.llm_factory를 활용합니다.
@@ -145,8 +111,16 @@ class AnthropicAdapter(LLMPort):
             ValueError: If ANTHROPIC_API_KEY is not provided
         """
         self._settings = settings
-        self._token_usage = TokenUsage()
         self._thinking_budget = settings.anthropic_thinking_budget
+        thinking_config = ThinkingConfig(
+            enabled=self._thinking_budget is not None,
+            budget_tokens=self._thinking_budget,
+            think_level=None,
+        )
+        super().__init__(
+            model_name=settings.anthropic_model,
+            thinking_config=thinking_config,
+        )
 
         # Validate Anthropic settings
         if not settings.anthropic_api_key:
@@ -160,40 +134,22 @@ class AnthropicAdapter(LLMPort):
         )
 
         # Create Ragas LLM using llm_factory with client (Ragas 0.4.x API)
-        self._ragas_llm = llm_factory(
+        ragas_llm = llm_factory(
             model=settings.anthropic_model,
             provider="anthropic",
             client=self._client._client,  # Pass the actual AsyncAnthropic client
             max_tokens=8192,  # Claude default
         )
+        self._set_ragas_llm(ragas_llm)
 
         # Anthropic doesn't provide embeddings, use OpenAI as fallback
-        self._ragas_embeddings = None
         if settings.openai_api_key:
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-            self._ragas_embeddings = OpenAIEmbeddingsWithLegacy(
+            embeddings = OpenAIEmbeddingsWithLegacy(
                 model=settings.openai_embedding_model,
                 client=openai_client,
             )
-
-    def get_model_name(self) -> str:
-        """Get the model name being used.
-
-        Returns:
-            Model identifier (e.g., 'claude-3-5-sonnet-20241022')
-        """
-        return self._settings.anthropic_model
-
-    def as_ragas_llm(self):
-        """Return the Ragas LLM instance.
-
-        Returns the Ragas-native LLM created via llm_factory for use
-        with Ragas metrics evaluation.
-
-        Returns:
-            Ragas LLM instance configured with Anthropic settings
-        """
-        return self._ragas_llm
+            self._set_ragas_embeddings(embeddings)
 
     def as_ragas_embeddings(self):
         """Return the Ragas embeddings instance.
@@ -212,45 +168,7 @@ class AnthropicAdapter(LLMPort):
                 "Embeddings not available. Anthropic doesn't provide embeddings. "
                 "Set OPENAI_API_KEY to use OpenAI embeddings as fallback."
             )
-        return self._ragas_embeddings
-
-    def get_token_usage(self) -> tuple[int, int, int]:
-        """Get current token usage counts.
-
-        Returns:
-            Tuple of (prompt_tokens, completion_tokens, total_tokens)
-        """
-        return (
-            self._token_usage.prompt_tokens,
-            self._token_usage.completion_tokens,
-            self._token_usage.total_tokens,
-        )
-
-    def get_and_reset_token_usage(self) -> tuple[int, int, int]:
-        """Get token usage and reset counters (atomic operation).
-
-        Use this between test cases to get per-test-case token counts.
-
-        Returns:
-            Tuple of (prompt_tokens, completion_tokens, total_tokens)
-        """
-        return self._token_usage.get_and_reset()
-
-    def reset_token_usage(self) -> None:
-        """Reset token usage counters."""
-        self._token_usage.reset()
-
-    def get_thinking_config(self) -> ThinkingConfig:
-        """Get thinking/reasoning configuration for this adapter.
-
-        Returns:
-            ThinkingConfig with Anthropic extended thinking settings
-        """
-        return ThinkingConfig(
-            enabled=self._thinking_budget is not None,
-            budget_tokens=self._thinking_budget,
-            think_level=None,  # Not used for Anthropic
-        )
+        return super().as_ragas_embeddings()
 
     def get_thinking_budget(self) -> int | None:
         """Get the extended thinking token budget.

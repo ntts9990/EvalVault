@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy import stats
 
+from evalvault.adapters.outbound.analysis.common import BaseAnalysisAdapter
 from evalvault.domain.entities.analysis import (
     CausalAnalysis,
     CausalFactorType,
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class CausalAnalysisAdapter:
+class CausalAnalysisAdapter(BaseAnalysisAdapter):
     """인과 분석 어댑터.
 
     평가 결과에서 인과 관계를 분석하여 근본 원인을 파악하고
@@ -51,6 +52,7 @@ class CausalAnalysisAdapter:
             min_group_size: 그룹별 최소 샘플 수
             korean_tokenizer: 한국어 형태소 분석기 (KiwiTokenizer)
         """
+        super().__init__()
         self._num_strata = num_strata
         self._min_group_size = min_group_size
         self._korean_tokenizer = korean_tokenizer
@@ -67,6 +69,10 @@ class CausalAnalysisAdapter:
                 logger.info("Korean keyword overlap enabled with morphological analysis")
             except ImportError:
                 logger.warning("Korean NLP module not available, using basic keyword overlap")
+
+    def analyze(self, run: EvaluationRun, **kwargs):
+        """BaseAnalysisAdapter 규약."""
+        return self.analyze_causality(run, **kwargs)
 
     def analyze_causality(
         self,
@@ -108,7 +114,7 @@ class CausalAnalysisAdapter:
         factor_stats = self._calculate_factor_stats(factors)
 
         # 메트릭 점수 추출
-        metric_scores = self._extract_metric_scores(run, metrics)
+        metric_scores = self.processor.extract_metric_scores(run, metrics)
 
         # 요인-메트릭 영향 분석
         factor_impacts = self._analyze_factor_impacts(
@@ -314,19 +320,6 @@ class CausalAnalysisAdapter:
             )
 
         return stats_dict
-
-    def _extract_metric_scores(
-        self, run: EvaluationRun, metrics: list[str]
-    ) -> dict[str, list[float]]:
-        """메트릭별 점수 추출."""
-        scores: dict[str, list[float]] = defaultdict(list)
-
-        for tc_result in run.results:
-            for metric_score in tc_result.metrics:
-                if metric_score.name in metrics:
-                    scores[metric_score.name].append(metric_score.score)
-
-        return dict(scores)
 
     def _analyze_factor_impacts(
         self,

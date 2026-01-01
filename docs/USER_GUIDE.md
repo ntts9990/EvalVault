@@ -715,6 +715,85 @@ evalvault run data.json --metrics faithfulness --verbose
 
 ---
 
+## 고급 기능 및 조합
+
+### 고급 분석 기능
+
+#### NLP 분석
+```bash
+# NLP 분석 포함 평가
+evalvault run data.json --metrics faithfulness --analyze-nlp
+
+# 질문 유형, 키워드, 토픽 클러스터 분석
+```
+
+#### 인과 분석
+```bash
+# 인과 분석 포함 평가
+evalvault run data.json --metrics faithfulness --analyze-causal
+
+# 근본 원인 분석 및 개선 제안
+```
+
+#### 통합 분석
+```bash
+# 모든 분석 포함
+evalvault analyze <run_id> --include-nlp --include-causal
+```
+
+### 도메인 메모리 활용
+
+도메인 메모리는 평가 결과에서 학습한 지식을 축적하여 향후 평가에 활용합니다.
+
+```python
+# 평가 후 메모리 형성
+from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+
+hook = DomainLearningHook(memory_adapter)
+hook.on_evaluation_complete(run, domain="insurance", language="ko")
+
+# 학습된 패턴 조회
+reliability = memory_adapter.get_aggregated_reliability("insurance", "ko")
+```
+
+### 분석 파이프라인
+
+쿼리 기반 DAG 분석 파이프라인을 사용하여 복잡한 분석을 자동화합니다.
+
+```bash
+# 의도 분류 기반 분석
+evalvault pipeline analyze "요약해줘" --run-id <run_id>
+
+# 사용 가능한 의도 목록
+evalvault pipeline intents
+
+# 파이프라인 템플릿 목록
+evalvault pipeline templates
+```
+
+### 개선 가이드 생성
+
+평가 결과를 분석하여 구체적인 개선 제안을 생성합니다.
+
+```bash
+# 개선 가이드 생성
+evalvault improve <run_id> --output improvement.md
+```
+
+### Knowledge Graph 기반 테스트셋 생성
+
+문서에서 지식 그래프를 생성하고 이를 기반으로 테스트셋을 생성합니다.
+
+```bash
+# KG 생성
+evalvault kg build documents.md -o knowledge_graph.json
+
+# KG 기반 테스트셋 생성
+evalvault generate documents.md --method knowledge_graph -n 50
+```
+
+---
+
 ## 부록
 
 ### A. 환경 변수 전체 목록

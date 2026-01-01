@@ -6,6 +6,21 @@ from evalvault.ports.outbound.causal_analysis_port import CausalAnalysisPort
 from evalvault.ports.outbound.dataset_port import DatasetPort
 from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
 from evalvault.ports.outbound.embedding_port import EmbeddingPort, EmbeddingResult
+from evalvault.ports.outbound.improvement_port import (
+    ActionDefinitionProtocol,
+    ClaimImprovementProtocol,
+    InsightGeneratorPort,
+    MetricPlaybookProtocol,
+    PatternDefinitionProtocol,
+    PatternDetectorPort,
+    PlaybookPort,
+)
+from evalvault.ports.outbound.korean_nlp_port import (
+    FaithfulnessResultProtocol,
+    KoreanNLPToolkitPort,
+    RetrieverPort,
+    RetrieverResultProtocol,
+)
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.nlp_analysis_port import NLPAnalysisPort
 from evalvault.ports.outbound.relation_augmenter_port import RelationAugmenterPort
@@ -21,10 +36,21 @@ __all__ = [
     "DomainMemoryPort",
     "EmbeddingPort",
     "EmbeddingResult",
+    "PatternDetectorPort",
+    "InsightGeneratorPort",
+    "PlaybookPort",
+    "ActionDefinitionProtocol",
+    "PatternDefinitionProtocol",
+    "MetricPlaybookProtocol",
+    "ClaimImprovementProtocol",
     "LLMPort",
     "NLPAnalysisPort",
     "RelationAugmenterPort",
     "ReportPort",
     "StoragePort",
     "TrackerPort",
+    "KoreanNLPToolkitPort",
+    "FaithfulnessResultProtocol",
+    "RetrieverPort",
+    "RetrieverResultProtocol",
 ]

@@ -45,6 +45,7 @@ from evalvault.adapters.outbound.nlp.korean.korean_stopwords import (
     STOPWORD_POS_TAGS,
     is_stopword,
 )
+from evalvault.adapters.outbound.nlp.korean.toolkit import KoreanNLPToolkit
 
 __all__ = [
     # Tokenizer
@@ -74,4 +75,6 @@ __all__ = [
     "FaithfulnessResult",
     "ClaimVerification",
     "SemanticSimilarityResult",
+    # Toolkit
+    "KoreanNLPToolkit",
 ]

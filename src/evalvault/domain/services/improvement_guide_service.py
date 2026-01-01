@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import TYPE_CHECKING
 
+from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.improvement import (
     EffortLevel,
     EvidenceSource,
@@ -21,18 +21,13 @@ from evalvault.domain.entities.improvement import (
     RAGComponent,
     RAGImprovementGuide,
 )
-
-if TYPE_CHECKING:
-    from evalvault.adapters.outbound.improvement.insight_generator import (
-        InsightGenerator,
-    )
-    from evalvault.adapters.outbound.improvement.pattern_detector import PatternDetector
-    from evalvault.adapters.outbound.improvement.playbook_loader import (
-        ActionDefinition,
-        PatternDefinition,
-        Playbook,
-    )
-    from evalvault.domain.entities import EvaluationRun
+from evalvault.ports.outbound.improvement_port import (
+    ActionDefinitionProtocol,
+    InsightGeneratorPort,
+    PatternDefinitionProtocol,
+    PatternDetectorPort,
+    PlaybookPort,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +46,9 @@ class ImprovementGuideService:
 
     def __init__(
         self,
-        pattern_detector: PatternDetector,
-        insight_generator: InsightGenerator | None = None,
-        playbook: Playbook | None = None,
+        pattern_detector: PatternDetectorPort,
+        insight_generator: InsightGeneratorPort | None = None,
+        playbook: PlaybookPort | None = None,
         *,
         enable_llm_enrichment: bool = True,
         max_llm_samples: int = 5,
@@ -235,7 +230,7 @@ class ImprovementGuideService:
         self,
         metric: str,
         pattern_type: str,
-    ) -> PatternDefinition | None:
+    ) -> PatternDefinitionProtocol | None:
         """플레이북에서 패턴 정의 찾기."""
         if not self._playbook:
             return None
@@ -262,7 +257,7 @@ class ImprovementGuideService:
 
     def _convert_action(
         self,
-        action_def: ActionDefinition,
+        action_def: ActionDefinitionProtocol,
         pattern: PatternEvidence,
     ) -> ImprovementAction:
         """액션 정의를 ImprovementAction으로 변환."""

@@ -1,5 +1,6 @@
 """Unit tests for PostgreSQL storage adapter."""
 
+import json
 import sys
 from datetime import datetime
 from unittest.mock import MagicMock, patch
@@ -75,6 +76,74 @@ def sample_run():
                 ground_truth="50,000 won",
             ),
         ],
+    )
+
+
+@pytest.fixture
+def sample_statistical_analysis():
+    """Create a sample StatisticalAnalysis for testing."""
+    from evalvault.domain.entities.analysis import MetricStats, StatisticalAnalysis
+
+    analysis = StatisticalAnalysis(
+        run_id="analysis-run-001",
+        metrics_summary={
+            "faithfulness": MetricStats(
+                mean=0.82,
+                std=0.03,
+                min=0.78,
+                max=0.87,
+                median=0.82,
+                percentile_25=0.8,
+                percentile_75=0.85,
+                count=4,
+            )
+        },
+        insights=["Keep pushing faithfulness above 85%"],
+        correlation_matrix=[[1.0]],
+        correlation_metrics=["faithfulness"],
+        metric_pass_rates={"faithfulness": 0.75},
+        overall_pass_rate=0.7,
+    )
+    return analysis
+
+
+@pytest.fixture
+def sample_nlp_analysis():
+    """Create a sample NLPAnalysis for testing."""
+    from evalvault.domain.entities.analysis import (
+        KeywordInfo,
+        NLPAnalysis,
+        QuestionType,
+        QuestionTypeStats,
+        TextStats,
+    )
+
+    return NLPAnalysis(
+        run_id="analysis-run-001",
+        question_stats=TextStats(
+            char_count=120,
+            word_count=24,
+            sentence_count=3,
+            avg_word_length=5.0,
+            unique_word_ratio=0.6,
+        ),
+        answer_stats=TextStats(
+            char_count=200,
+            word_count=40,
+            sentence_count=4,
+            avg_word_length=5.0,
+            unique_word_ratio=0.55,
+        ),
+        question_types=[
+            QuestionTypeStats(
+                question_type=QuestionType.FACTUAL,
+                count=3,
+                percentage=0.6,
+                avg_scores={"faithfulness": 0.8},
+            )
+        ],
+        top_keywords=[KeywordInfo(keyword="보험", frequency=3, tfidf_score=0.9)],
+        insights=["질문 유형은 사실형이 우세합니다."],
     )
 
 
@@ -698,3 +767,148 @@ class TestPostgreSQLExperimentStorage:
 
         assert mock_connection.execute.called
         assert mock_connection.commit.called
+
+
+class TestPostgreSQLAnalysisStorage:
+    """Analysis storage tests for PostgreSQL adapter."""
+
+    def test_save_analysis_returns_id(
+        self, mock_psycopg, mock_connection, sample_statistical_analysis
+    ):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        analysis_id = adapter.save_analysis(sample_statistical_analysis)
+
+        assert analysis_id == sample_statistical_analysis.analysis_id
+        assert mock_connection.execute.called
+        assert mock_connection.commit.called
+
+    def test_get_analysis_returns_object(
+        self, mock_psycopg, mock_connection, sample_statistical_analysis
+    ):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        data = adapter._serialize_analysis(sample_statistical_analysis)  # type: ignore[attr-defined]
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            "analysis_id": sample_statistical_analysis.analysis_id,
+            "run_id": sample_statistical_analysis.run_id,
+            "analysis_type": sample_statistical_analysis.analysis_type.value,
+            "result_data": json.dumps(data),
+            "created_at": datetime(2025, 1, 1, 10, 0, 0),
+        }
+        mock_connection.execute.return_value = mock_cursor
+
+        retrieved = adapter.get_analysis(sample_statistical_analysis.analysis_id)
+
+        assert retrieved.run_id == sample_statistical_analysis.run_id
+        assert "faithfulness" in retrieved.metrics_summary
+
+    def test_get_analysis_by_run_returns_list(
+        self, mock_psycopg, mock_connection, sample_statistical_analysis
+    ):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        data = adapter._serialize_analysis(sample_statistical_analysis)  # type: ignore[attr-defined]
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [
+            {
+                "analysis_id": sample_statistical_analysis.analysis_id,
+                "run_id": sample_statistical_analysis.run_id,
+                "analysis_type": sample_statistical_analysis.analysis_type.value,
+                "result_data": json.dumps(data),
+                "created_at": datetime(2025, 1, 1, 10, 0, 0),
+            }
+        ]
+        mock_connection.execute.return_value = mock_cursor
+
+        analyses = adapter.get_analysis_by_run(sample_statistical_analysis.run_id)
+
+        assert len(analyses) == 1
+        assert analyses[0].analysis_id == sample_statistical_analysis.analysis_id
+
+    def test_delete_analysis_returns_bool(self, mock_psycopg, mock_connection):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_cursor.rowcount = 1
+        mock_connection.execute.return_value = mock_cursor
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        assert adapter.delete_analysis("analysis-123") is True
+
+    def test_save_nlp_analysis_returns_id(self, mock_psycopg, mock_connection, sample_nlp_analysis):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        analysis_id = adapter.save_nlp_analysis(sample_nlp_analysis)
+
+        assert analysis_id.startswith("nlp-analysis-run-001-")
+        assert mock_connection.commit.called
+
+    def test_get_nlp_analysis_returns_object(
+        self, mock_psycopg, mock_connection, sample_nlp_analysis
+    ):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        data = adapter._serialize_nlp_analysis(sample_nlp_analysis)  # type: ignore[attr-defined]
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            "analysis_id": "nlp-analysis-run-001-aaaa",
+            "run_id": sample_nlp_analysis.run_id,
+            "result_data": json.dumps(data),
+        }
+        mock_connection.execute.return_value = mock_cursor
+
+        retrieved = adapter.get_nlp_analysis("nlp-analysis-run-001-aaaa")
+
+        assert retrieved.run_id == sample_nlp_analysis.run_id
+        assert retrieved.question_stats is not None
+
+    def test_get_nlp_analysis_by_run_returns_latest(
+        self, mock_psycopg, mock_connection, sample_nlp_analysis
+    ):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        data = adapter._serialize_nlp_analysis(sample_nlp_analysis)  # type: ignore[attr-defined]
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"result_data": json.dumps(data)}
+        mock_connection.execute.return_value = mock_cursor
+
+        retrieved = adapter.get_nlp_analysis_by_run(sample_nlp_analysis.run_id)
+
+        assert retrieved is not None
+        assert retrieved.run_id == sample_nlp_analysis.run_id

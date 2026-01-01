@@ -84,13 +84,14 @@ cd EvalVault
 uv sync --extra dev
 
 # Full development environment (recommended)
-uv sync --extra dev --extra korean --extra web
+uv sync --extra dev --extra analysis --extra korean --extra web
 ```
 
 **Optional Extras:**
 | Extra | Packages | Purpose |
 |-------|----------|---------|
-| `korean` | kiwipiepy, rank-bm25 | Korean NLP (morphological analysis, BM25) |
+| `korean` | kiwipiepy, rank-bm25, sentence-transformers | Korean NLP (tokenizer, BM25, Dense retriever) |
+| `analysis` | scikit-learn | Statistical/NLP analysis pipeline |
 | `web` | streamlit, plotly | Streamlit Web UI Dashboard |
 | `postgres` | psycopg | PostgreSQL storage support |
 | `mlflow` | mlflow | MLflow tracker integration |

@@ -22,6 +22,7 @@ References:
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -35,6 +36,9 @@ from evalvault.domain.entities.benchmark import (
     RAGTestCaseResult,
     TaskType,
 )
+from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,6 +83,7 @@ class KoreanRAGBenchmarkRunner:
         use_hybrid_search: bool = False,
         ollama_adapter: Any = None,
         embedding_profile: str | None = None,
+        nlp_toolkit: KoreanNLPToolkitPort | None = None,
     ) -> None:
         """벤치마크 러너 초기화.
 
@@ -96,70 +101,38 @@ class KoreanRAGBenchmarkRunner:
         self.use_hybrid_search = use_hybrid_search
         self.ollama_adapter = ollama_adapter
         self.embedding_profile = embedding_profile
-        self._tokenizer = None
-        self._faithfulness_checker = None
-        self._semantic_similarity = None
-        self._dense_retriever = None
+        self._nlp_toolkit = nlp_toolkit
 
-    @property
-    def tokenizer(self) -> Any:
-        """KiwiTokenizer 인스턴스 (lazy loading)."""
-        if self._tokenizer is None and self.use_korean_tokenizer:
+    def _extract_keywords(self, text: str) -> set[str]:
+        if self.use_korean_tokenizer and self._nlp_toolkit:
             try:
-                from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
+                return set(self._nlp_toolkit.extract_keywords(text))
+            except Exception:  # pragma: no cover - best effort
+                logger.warning("Korean keyword extraction failed, falling back to whitespace split")
+        return {w for w in text.split() if w}
 
-                self._tokenizer = KiwiTokenizer()
-            except ImportError:
-                self._tokenizer = None
-        return self._tokenizer
-
-    @property
-    def faithfulness_checker(self) -> Any:
-        """KoreanFaithfulnessChecker 인스턴스 (lazy loading)."""
-        if self._faithfulness_checker is None:
+    def _check_faithfulness(self, answer: str, contexts: list[str]):
+        if self.use_korean_tokenizer and self._nlp_toolkit:
             try:
-                from evalvault.adapters.outbound.nlp.korean import (
-                    KoreanFaithfulnessChecker,
-                )
+                return self._nlp_toolkit.check_faithfulness(answer=answer, contexts=contexts)
+            except Exception:  # pragma: no cover
+                logger.warning("Faithfulness checker failure, falling back to simple comparison")
+        return None
 
-                self._faithfulness_checker = KoreanFaithfulnessChecker(tokenizer=self.tokenizer)
-            except ImportError:
-                self._faithfulness_checker = None
-        return self._faithfulness_checker
-
-    @property
-    def semantic_similarity(self) -> Any:
-        """KoreanSemanticSimilarity 인스턴스 (lazy loading)."""
-        if self._semantic_similarity is None:
-            try:
-                from evalvault.adapters.outbound.nlp.korean import (
-                    KoreanSemanticSimilarity,
-                )
-
-                self._semantic_similarity = KoreanSemanticSimilarity(tokenizer=self.tokenizer)
-            except ImportError:
-                self._semantic_similarity = None
-        return self._semantic_similarity
-
-    @property
-    def dense_retriever(self) -> Any:
-        """KoreanDenseRetriever 인스턴스 (lazy loading, Qwen3-Embedding 지원)."""
-        if self._dense_retriever is None and self.use_hybrid_search:
-            try:
-                from evalvault.adapters.outbound.nlp.korean import KoreanDenseRetriever
-
-                if self.ollama_adapter and self.embedding_profile:
-                    # Qwen3-Embedding with Matryoshka
-                    self._dense_retriever = KoreanDenseRetriever(
-                        profile=self.embedding_profile,
-                        ollama_adapter=self.ollama_adapter,
-                    )
-                else:
-                    # Default HuggingFace model
-                    self._dense_retriever = KoreanDenseRetriever()
-            except ImportError:
-                self._dense_retriever = None
-        return self._dense_retriever
+    def _build_retriever(self, documents: list[str]):
+        if not self._nlp_toolkit:
+            return None
+        try:
+            return self._nlp_toolkit.build_retriever(
+                documents,
+                use_hybrid=self.use_hybrid_search,
+                ollama_adapter=self.ollama_adapter,
+                embedding_profile=self.embedding_profile,
+                verbose=self.verbose,
+            )
+        except Exception:  # pragma: no cover
+            logger.warning("Korean retriever initialization failed, using fallback keyword search")
+            return None
 
     def load_test_data(self, file_path: str | Path) -> dict[str, Any]:
         """테스트 데이터 로드."""
@@ -211,11 +184,11 @@ class KoreanRAGBenchmarkRunner:
             error = None
 
             try:
-                if self.faithfulness_checker:
-                    faith_result = self.faithfulness_checker.check_faithfulness(
-                        answer=tc.get("answer", ""),
-                        contexts=tc.get("contexts", []),
-                    )
+                faith_result = self._check_faithfulness(
+                    tc.get("answer", ""),
+                    tc.get("contexts", []),
+                )
+                if faith_result:
                     metrics["faithfulness"] = faith_result.score
                     # Calculate average coverage from claim results
                     if faith_result.claim_results:
@@ -316,13 +289,7 @@ class KoreanRAGBenchmarkRunner:
             error = None
 
             try:
-                # 형태소 분석 기반 키워드 추출
-                if self.tokenizer:
-                    extracted = set(self.tokenizer.extract_keywords(text))
-                else:
-                    # Fallback: 공백 기반
-                    extracted = set(text.split())
-
+                extracted = self._extract_keywords(text)
                 rag_case.actual_output = ",".join(extracted)
 
                 # Precision, Recall, F1 계산
@@ -405,45 +372,8 @@ class KoreanRAGBenchmarkRunner:
         )
 
         # 검색기 초기화
-        retriever = None
         doc_contents = [d.get("content", "") for d in documents]
-
-        try:
-            if self.use_hybrid_search:
-                # 하이브리드 검색 (BM25 + Dense Embedding)
-                from evalvault.adapters.outbound.nlp.korean import KoreanHybridRetriever
-
-                if self.tokenizer:
-                    embedding_func = None
-                    if self.dense_retriever:
-                        embedding_func = self.dense_retriever.get_embedding_func()
-                        if self.verbose:
-                            print(
-                                f"  Using hybrid search with {self.dense_retriever.model_name} "
-                                f"(dim={self.dense_retriever.dimension})"
-                            )
-
-                    retriever = KoreanHybridRetriever(
-                        tokenizer=self.tokenizer,
-                        embedding_func=embedding_func,
-                        bm25_weight=0.4,
-                        dense_weight=0.6,
-                    )
-                    retriever.index(doc_contents, compute_embeddings=embedding_func is not None)
-            else:
-                # BM25 전용 검색
-                from evalvault.adapters.outbound.nlp.korean import KoreanBM25Retriever
-
-                if self.tokenizer:
-                    retriever = KoreanBM25Retriever(tokenizer=self.tokenizer)
-                    retriever.index(doc_contents)
-                else:
-                    # tokenizer 없으면 기본 BM25로 fallback
-                    # KoreanBM25Retriever는 tokenizer 필수이므로 None인 경우 스킵
-                    pass
-
-        except ImportError:
-            pass
+        retriever = self._build_retriever(doc_contents)
 
         doc_id_map = {d.get("doc_id"): i for i, d in enumerate(documents)}
 
@@ -663,8 +593,6 @@ class KoreanRAGBenchmarkRunner:
 
         # 형태소 분석 모드로 실행
         self.use_korean_tokenizer = True
-        self._tokenizer = None  # Reset
-        self._faithfulness_checker = None
 
         if task_type == "faithfulness":
             optimized_result = self.run_faithfulness_benchmark(test_file)
@@ -675,8 +603,6 @@ class KoreanRAGBenchmarkRunner:
 
         # 기준선 모드로 실행
         self.use_korean_tokenizer = False
-        self._tokenizer = None
-        self._faithfulness_checker = None
 
         if task_type == "faithfulness":
             baseline_result = self.run_faithfulness_benchmark(test_file)

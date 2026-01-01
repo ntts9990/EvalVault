@@ -79,6 +79,66 @@ CLI 명령어: 15개
 
 ## 개선 계획
 
+### P0: 아키텍처 안전망 (신규 리팩토링 패키지)
+
+> **Purpose**: 추가 개발 전에 Hexagonal 규율과 의존성 정책을 복구하여 AI 코딩 에이전트/휴먼 모두가 일관된 작업 단위를 수행할 수 있도록 합니다.
+> **진행 절차**: 아래 태스크 카드를 순서대로 실행하면 됩니다. 각 카드는 “어디를 고칠지 → 어떻게 고칠지 → 어떻게 검증할지”를 동일한 포맷으로 제공합니다.
+
+#### 0.1 Domain ↔ Adapter 의존성 역전 고정
+
+- **Goal**: 도메인 서비스가 adapter 구현을 직접 import하지 않고, 새 outbound port를 통해 의존성을 주입받도록 변경.
+- **Scope**:
+  - `src/evalvault/domain/services/improvement_guide_service.py:25-174`
+  - `src/evalvault/domain/services/benchmark_runner.py:105-256`
+- **Plan (순차 실행)**:
+  1. `ports/outbound/improvement_*` 와 `ports/outbound/korean_nlp_*` 형태의 새 Protocol을 정의하고, 기존 adapter에 구현 클래스를 추가로 얹습니다.
+  2. 서비스 생성자 시그니처를 포트 기반으로 바꾸고, CLI/Web adapter에서 해당 포트를 의존성 주입합니다.
+  3. 서비스 단위 테스트에서 mock 포트를 사용하도록 업데이트합니다 (`tests/unit/domain/services/...`).
+- **Validation Checklist**:
+  - `rg "from evalvault.adapters" src/evalvault/domain` 실행 시 import 결과 0건인지 확인.
+  - 관련 테스트(`tests/unit/domain/services/test_improvement_guide_service.py`, `tests/unit/test_evaluator.py`, `tests/integration/test_full_workflow.py`)가 모두 통과.
+  - **현황 업데이트 (2026-01-02)**:
+    - `src/evalvault/ports/outbound/improvement_port.py`와 `src/evalvault/ports/outbound/korean_nlp_port.py`에 Protocol을 정의했고, `ImprovementGuideService`/`KoreanRAGBenchmarkRunner`는 어댑터 구현체 대신 해당 포트를 생성자 인자로 받도록 고정했습니다. CLI/Streamlit 어댑터는 패턴 감지기·한국어 NLP 도구를 포트 시그니처에 맞춰 생성해 의존성 역전을 유지합니다.
+    - `rg "from evalvault.adapters" src/evalvault/domain` 실행 결과 0건 상태를 지속적으로 확인하며, 도메인 계층이 더 이상 adapter 모듈을 import하지 않음을 보증합니다.
+    - Mock 포트 단위 테스트(`tests/unit/domain/services/test_improvement_guide_service.py`, `tests/unit/test_evaluator.py`)와 풀 워크플로 통합 테스트(`tests/integration/test_full_workflow.py`)를 `uv run pytest tests/unit/domain/services/test_improvement_guide_service.py tests/unit/test_evaluator.py tests/integration/test_full_workflow.py -v` 로 재실행하여 리팩토링 이후에도 경계가 깨지지 않음을 검증했습니다.
+
+#### 0.2 기본 의존성 다이어트 & Extras 재구성
+
+- **Goal**: `sentence-transformers`, `keybert` 등 무거운 패키지를 기본 설치에서 제외하고 extras(korean/web 등)에 재배치하여 YAGNI를 준수.
+- **Scope**:
+  - `pyproject.toml:40-95`
+  - `docs/README*.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_ROADMAP.md` (설치 가이드 반영)
+- **Plan**:
+  1. `project.dependencies`에서 heavy 패키지를 제거하고 `project.optional-dependencies.korean` 혹은 신규 `analysis` extra에 이동.
+  2. `uv sync`/설치 안내문에 “필요 시 --extra analysis” 스타일 안내를 추가.
+  3. 필요 시 코드에서 lazy import (`importlib.import_module`)로 전환하여 extras 미설치 시에도 친절한 오류 메시지 제공.
+- **Validation Checklist**:
+  - `uv pip install .` (기본) 시 불필요한 대형 모델 다운로드가 발생하지 않는지 확인.
+  - `tests/unit/test_korean_retrieval.py` 등 extras 의존 테스트는 `uv run pytest -m korean` 같은 선택 실행 가이드로 분리.
+  - **현황 업데이트 (2026-01-02)**:
+    - `pyproject.toml` 기본 의존성은 RAG 평가에 필요한 최소 패키지로만 유지하고, `analysis`, `korean`, `web`, `postgres`, `mlflow`, `anthropic` extras 아래로 대용량 NLP/웹/DB 스택을 이동시켰습니다. 코어 설치(`uv sync --extra dev`) 시에는 모델 다운로드가 발생하지 않고, 필요 시 `uv sync --extra dev --extra korean --extra web` 과 같이 선택 설치하도록 README/DOCS 안내를 정비했습니다.
+    - Typer CLI와 Streamlit 어댑터에서 extras 미설치 시 ImportError를 잡아 "필요 시 `uv add <extra>`" 메시지를 노출하는 가드가 추가되어 YAGNI 원칙을 위반하지 않습니다.
+
+#### 0.3 분석/파이프라인 경계 문서화 & 템플릿화
+
+- **Goal**: DAG 파이프라인과 분석 모듈의 포트/어댑터 경계를 명문화하여 AI 에이전트가 모듈을 자동 조립할 때 혼선이 없도록 함.
+- **Scope**:
+  - `src/evalvault/domain/services/pipeline_orchestrator.py`
+  - `src/evalvault/adapters/outbound/analysis/*.py`
+  - `docs/ARCHITECTURE.md`, `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`
+- **Plan**:
+  1. `ModuleCatalog`/`AnalysisModulePort` 사용법을 주석과 docstring으로 명시(예: “모든 모듈은 BaseAnalysisModule 상속 + metadata 필수”).
+  2. `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`에 “AI Agent 작업 가이드” 섹션을 추가해 `register_module → build_pipeline → execute` 순서를 다이어그램으로 설명.
+  3. 샘플 스크립트(`scripts/pipeline_template_inspect.py` 등)를 제공해 사람이든 에이전트든 동일한 CLI로 템플릿을 조회할 수 있도록 함.
+- **Validation Checklist**:
+  - 신규 문서를 읽은 다음 `python scripts/pipeline_template_inspect.py --intent ANALYZE_LOW_METRICS` 명령만으로 필요한 모듈 구성이 노출되는지 확인.
+  - 파이프라인 관련 단위 테스트(`tests/unit/test_analysis_modules.py`, `tests/unit/test_intent_classifier.py`)가 구조 변경 후에도 green.
+  - **현황 업데이트 (2026-01-02)**:
+    - `DataLoaderModule`과 `StatisticalAnalyzerModule`이 `BaseAnalysisAdapter.analyze()`에 직접 연결되고, `StatisticalAnalysis` 객체·insights·저성과 케이스를 그대로 다음 노드에 전달합니다. `SummaryReportModule`은 해당 메타데이터를 Markdown 섹션으로 렌더링하고 분석 객체를 파이프라인 출력에 보존하여 downstream 모듈/저장소가 재활용할 수 있도록 했습니다.
+    - CLI `pipeline analyze` 명령은 SQLiteStorageAdapter 인스턴스를 파이프라인에 주입하고, `statistical_analyzer` 노드가 반환한 `StatisticalAnalysis`를 저장한 뒤 성공 메시지를 출력합니다. 루프 변수와 `--output` 옵션 변수를 분리하여 결과를 파일로 저장하지 않을 때도 dict 객체를 `open()`에 넘기는 버그를 제거했습니다.
+    - `scripts/pipeline_template_inspect.py`와 `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`의 설명이 싱크되어 AI/휴먼이 동일한 DAG 템플릿을 확인할 수 있고, `tests/unit/test_analysis_modules.py`/`tests/unit/test_cli.py::TestPipelineCommands::test_pipeline_analyze_saves_statistical_analysis`를 확장해 통계 요약·insights·저성과 섹션이 회귀 시 즉시 감지되도록 했습니다.
+    - **검증 로그 (2026-01-02)**: `uv run pytest tests/unit/test_analysis_modules.py tests/unit/test_pipeline_orchestrator.py tests/unit/test_cli.py tests/unit/test_postgres_storage.py -v` (161 tests, 0 failures)
+
 ### P1: 코드 통합 및 중복 제거
 
 > **Priority**: 🔥 High
@@ -177,6 +237,23 @@ class BaseSQLAdapter(ABC):
 - 스키마 변경 시 수정 범위 축소
 - 새 DB 지원 추가 시간: 4시간 → 1시간
 
+**현황 업데이트 (2026-01-01)**:
+- `src/evalvault/adapters/outbound/storage/base_sql.py`에 `SQLQueries` + `BaseSQLStorageAdapter`를 도입해 저장/조회/리스트/삭제 흐름을 단일 구현으로 통합.
+- SQLite/포스트그레스 어댑터는 각각 `SQLQueries` 파라미터만 주입하면 공통 로직을 재사용하며, dialect 차이는 플레이스홀더(`?` vs `%s`)와 RETURNING 절로만 구분.
+- 테스트 자동화:
+  - `uv run pytest tests/unit/test_sqlite_storage.py tests/unit/test_postgres_storage.py -v` (52케이스)
+  - `tests/integration/test_full_workflow.py` 내 `test_06_storage_operations`가 회귀를 감시.
+
+**다음 단계 (AI/Human 공통 태스크)**:
+1. **PostgreSQL 분석 저장소 확장**
+   - `postgres_schema.sql`에 `analysis_results`/`analysis_reports` 정의 후 `PostgreSQLStorageAdapter`에서 `save_analysis`/`get_analysis`/`save_nlp_analysis` 구현.
+   - 공용 직렬화 유틸이 이미 `BaseSQLStorageAdapter`에 있으므로 SQLite 구현을 그대로 호출하되, schema 차이를 `SQLQueries` 서브클래스로 흡수.
+2. **새 DB 추가 가이드**
+   - `BaseSQLStorageAdapter`를 상속하고 `_get_connection()`/`_fetch_lastrowid()`만 오버라이드.
+   - `tests/unit/test_<db>_storage.py` 스켈레톤을 `tests/unit/test_postgres_storage.py`에서 복사 후 dialect에 맞게 수정.
+3. **운영 모니터링 훅**
+   - 저장소 공통화로 쿼리 스트링이 단일 파일에 집중되었으므로, SQL 변경 시 `scripts/test_full_evaluation.py`를 smoke 테스트로 추가 실행하도록 CI 스텝을 확장.
+
 #### 1.3 Analysis Adapter 통합
 
 **현재 문제**:
@@ -218,6 +295,21 @@ class BaseAnalysisAdapter(ABC):
 **예상 효과**:
 - 코드 중복 제거: ~200 LOC 감소
 - 데이터 처리 로직 일관성 향상
+
+**현황 업데이트 (2026-01-01)**:
+- `src/evalvault/adapters/outbound/analysis/common.py`에 `AnalysisDataProcessor`/`BaseAnalysisAdapter`를 추가해 메트릭 추출, pass rate 계산, 텍스트 수집 등 공통 로직을 단일 구현으로 집중.
+- `StatisticalAnalysisAdapter`, `NLPAnalysisAdapter`, `CausalAnalysisAdapter`가 모두 새 베이스를 상속하며 `analyze()` 표준 진입점을 갖추고 중복 로직(메트릭 추출, 텍스트 수집 등)을 제거.
+- 회귀 테스트:
+  - `uv run pytest tests/unit/test_statistical_adapter.py tests/unit/test_nlp_adapter.py tests/unit/test_causal_adapter.py tests/unit/test_analysis_service.py -v`
+  - 분석 서비스/CLI 통합 경로(`tests/unit/test_analysis_service.py::TestAnalysisServiceIntegration`)까지 green 확인.
+
+**다음 단계 (AI/Human 공용 태스크)**:
+1. **분석 모듈(BaseAnalysisModule)과 공통 어댑터의 계약 연결**
+   - 파이프라인 모듈(`statistical_analyzer_module.py` 등)에서 `BaseAnalysisAdapter.analyze()` 시그니처 사용하도록 리팩토링해 AI 에이전트가 동일한 엔트리포인트를 사용하게 함.
+2. **토픽/키워드 처리 공용화**
+   - `NLPAnalysisAdapter`에서 사용하는 TF-IDF/토픽 클러스터링 헬퍼를 `AnalysisDataProcessor` 하위 클래스로 분리하여 향후 causal/summary 모듈에서 재사용.
+3. **분석 결과 직렬화 정비**
+   - `BaseSQLStorageAdapter` 직렬화 유틸을 활용하도록 `PostgreSQLStorageAdapter`에 분석 저장 메서드 추가 후, 신규 공통 포맷(`AnalysisDataProcessor`)에서 생성되는 통계/텍스트 데이터를 그대로 저장하도록 일원화.
 
 ---
 
@@ -840,3 +932,48 @@ if issues := validator.validate():
 2. P1 코드 통합부터 시작
 3. 주간 리뷰 회의로 진행 상황 점검
 4. 분기별 회고를 통한 계획 조정
+
+---
+
+## 부록: 특화 개선 계획
+
+### A. Knowledge Graph 개선 계획
+
+**목표**: NetworkX 기반 KG 고도화 및 신뢰도 향상
+
+#### A.1 NetworkX 마이그레이션
+- [ ] `NetworkXKnowledgeGraph` 어댑터 구현
+- [ ] 기존 API 호환성 유지
+- [ ] 그래프 알고리즘 활용 (최단 경로, 커뮤니티 탐지)
+
+#### A.2 신뢰도 기반 추출
+- [ ] 엔티티 추출 신뢰도 점수 추가
+- [ ] LLM 기반 관계 증강 (신뢰도 낮을 때만)
+- [ ] 추적 가능한 메타데이터 저장
+
+#### A.3 시나리오 전략 레이어
+- [ ] Single-hop, Multi-hop, Comparison 전략 구현
+- [ ] 전략별 질문 생성
+- [ ] CLI 통합 (`--kg-strategy`)
+
+**예상 기간**: 4-5일
+
+### B. AI 리포트 개선 계획
+
+**목표**: 기존 분석 기능을 활용한 고품질 리포트 생성
+
+#### B.1 테스트 케이스 데이터 통합
+- [ ] 실패 사례 구체적 분석
+- [ ] 패턴 탐지 결과 통합
+- [ ] 통계 분석 결과 포함
+
+#### B.2 동적 시간 추정
+- [ ] 테스트 케이스 수와 메트릭 수 기반 추정
+- [ ] UI에 정확한 예상 시간 표시
+
+#### B.3 개선 가이드 연동
+- [ ] ImprovementGuideService 결과 활용
+- [ ] 우선순위화된 액션 제안
+- [ ] 검증 방법 포함
+
+**예상 기간**: 1주

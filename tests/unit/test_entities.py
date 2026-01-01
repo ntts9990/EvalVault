@@ -188,10 +188,10 @@ class TestEvaluationRun:
             ],
         )
         assert run.total_test_cases == 2
-        assert run.passed_test_cases == 1  # strict: 1개 테스트 케이스만 모든 메트릭 통과
-        assert run.strict_pass_rate == 0.5  # 테스트 케이스 기준 통과율
+        assert run.passed_test_cases == 1  # 1개 테스트 케이스만 모든 메트릭 통과
+        assert run.pass_rate == 0.5  # 테스트 케이스 기준 통과율
         # 메트릭 "f"의 평균: (0.9 + 0.5) / 2 = 0.7 >= 0.7 → 통과
-        assert run.pass_rate == 1.0  # 메트릭 기준 통과율 (1/1 메트릭 통과)
+        assert run.metric_pass_rate == 1.0  # 메트릭 기준 통과율 (1/1 메트릭 통과)
 
     def test_pass_rate_empty(self):
         """결과 없을 때 pass_rate=0."""

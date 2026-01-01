@@ -5,8 +5,9 @@ EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, servic
 
 ## Build, Test, and Development Commands
 - `uv sync --extra dev`: install basic runtime plus dev tooling on Python 3.12.
-- `uv sync --extra dev --extra korean --extra web`: install full development environment (recommended).
-  - `--extra korean`: Korean NLP (kiwipiepy, rank-bm25)
+- `uv sync --extra dev --extra analysis --extra korean --extra web`: install full development environment (recommended).
+  - `--extra korean`: Korean NLP (kiwipiepy, rank-bm25, sentence-transformers)
+  - `--extra analysis`: Statistical/NLP analysis helpers (scikit-learn)
   - `--extra web`: Streamlit Web UI (streamlit, plotly)
   - `--extra postgres`: PostgreSQL storage support
   - `--extra mlflow`: MLflow tracker integration

@@ -102,10 +102,10 @@ class TestDataLoaderModule:
 
         result = module.execute(inputs)
 
-        assert "loaded" in result
         assert result["loaded"] is True
-        assert "query" in result
         assert result["query"] == "테스트 쿼리"
+        assert "metrics" in result
+        assert "faithfulness" in result["metrics"]
 
     def test_execute_with_run_id(self):
         """run_id가 있을 때 결과에 포함."""
@@ -124,6 +124,45 @@ class TestDataLoaderModule:
         result = module.execute(inputs)
 
         assert result["run_id"] == "run-456"
+
+    def test_execute_loads_run_from_storage(self):
+        """StoragePort에서 EvaluationRun 로드."""
+        from evalvault.adapters.outbound.analysis.data_loader_module import (
+            DataLoaderModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.result import MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="run-storage-1",
+            metrics_evaluated=["faithfulness"],
+        )
+        run.results.append(
+            TestCaseResult(
+                test_case_id="tc-1",
+                metrics=[MetricScore(name="faithfulness", score=0.9)],
+            )
+        )
+
+        class DummyStorage:
+            def get_run(self, run_id: str) -> EvaluationRun:
+                assert run_id == "run-storage-1"
+                return run
+
+        module = DataLoaderModule(storage=DummyStorage())
+        inputs = {
+            "__context__": {
+                "query": "분석",
+                "run_id": "run-storage-1",
+            }
+        }
+
+        result = module.execute(inputs)
+
+        assert result["run"] is run
+        assert "summary" in result
+        assert result["summary"]["run_id"] == "run-storage-1"
+        assert result["metrics"]["faithfulness"] == [0.9]
 
 
 # =============================================================================
@@ -186,6 +225,52 @@ class TestStatisticalAnalyzerModule:
         result = module.execute(inputs)
 
         assert result["statistics"]["faithfulness"]["mean"] == 0.8
+
+    def test_execute_with_evaluation_run(self):
+        """EvaluationRun을 사용해 어댑터 분석."""
+        from evalvault.adapters.outbound.analysis.statistical_analyzer_module import (
+            StatisticalAnalyzerModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.analysis import StatisticalAnalysis
+        from evalvault.domain.entities.result import MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="run-001",
+            metrics_evaluated=["faithfulness", "answer_relevancy"],
+        )
+        run.results = [
+            TestCaseResult(
+                test_case_id="tc-1",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.9),
+                    MetricScore(name="answer_relevancy", score=0.85),
+                ],
+            ),
+            TestCaseResult(
+                test_case_id="tc-2",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.4, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.6),
+                ],
+            ),
+        ]
+
+        module = StatisticalAnalyzerModule()
+        result = module.execute(
+            {
+                "__context__": {"query": "분석"},
+                "data_loader": {"run": run},
+            }
+        )
+
+        assert result["summary"]["total_metrics"] == 2
+        assert "faithfulness" in result["statistics"]
+        assert "analysis" in result
+        assert isinstance(result["analysis"], StatisticalAnalysis)
+        assert result["low_performers"], "낮은 성능 케이스 정보가 포함되어야 함"
+        assert result["low_performers"][0]["test_case_id"] == "tc-2"
+        assert result["insights"], "생성된 인사이트가 포함되어야 함"
 
 
 # =============================================================================
@@ -255,6 +340,49 @@ class TestSummaryReportModule:
         result = module.execute(inputs)
 
         assert "faithfulness" in result["report"] or "0.9" in result["report"]
+
+    def test_execute_includes_insights_and_low_performers(self):
+        """인사이트/저성과 케이스 섹션과 analysis 객체 전달 확인."""
+        from evalvault.adapters.outbound.analysis.summary_report_module import (
+            SummaryReportModule,
+        )
+        from evalvault.domain.entities.analysis import StatisticalAnalysis
+
+        analysis = StatisticalAnalysis(run_id="run-456", overall_pass_rate=0.62)
+
+        module = SummaryReportModule()
+        inputs = {
+            "__context__": {"query": "요약해줘"},
+            "statistical_analyzer": {
+                "statistics": {
+                    "faithfulness": {"mean": 0.45, "std": 0.1, "min": 0.2, "max": 0.8},
+                },
+                "summary": {
+                    "total_metrics": 1,
+                    "average_score": 0.45,
+                    "overall_pass_rate": 0.62,
+                },
+                "insights": ["Low pass rate requires attention: 62.0%"],
+                "metric_pass_rates": {"faithfulness": 0.4},
+                "low_performers": [
+                    {
+                        "test_case_id": "tc-low",
+                        "metric_name": "faithfulness",
+                        "score": 0.2,
+                        "threshold": 0.7,
+                    }
+                ],
+                "analysis": analysis,
+            },
+        }
+
+        result = module.execute(inputs)
+
+        assert "주의가 필요한 테스트 케이스" in result["report"]
+        assert "Low pass rate requires attention" in result["report"]
+        assert "tc-low" in result["report"]
+        assert result["low_performers"]
+        assert result["analysis"] is analysis
 
 
 # =============================================================================

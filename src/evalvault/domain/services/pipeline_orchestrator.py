@@ -54,6 +54,12 @@ class PipelineOrchestrator:
 
         Args:
             module: 등록할 분석 모듈
+
+        Note:
+            BaseAnalysisModule 구현체는 module_id, name, metadata를 반드시
+            채워야 하며, metadata는 ModuleCatalog를 통해 템플릿 점검/도구화에
+            활용됩니다. 새 모듈을 추가할 때는 register_module()을 호출하여
+            의존성 그래프에 반영해야 합니다.
         """
         self._modules[module.module_id] = module
         if hasattr(module, "metadata") and module.metadata:
