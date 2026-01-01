@@ -1,6 +1,7 @@
 """Tests for CLI interface."""
 
 import json
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
 
@@ -16,6 +17,13 @@ from evalvault.domain.entities import (
     TestCaseResult,
 )
 from tests.unit.conftest import get_test_model
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text for cross-platform testing."""
+    ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_pattern.sub("", text)
+
 
 runner = CliRunner()
 RUN_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.run"
@@ -1737,7 +1745,7 @@ class TestCLIAnalyzeNLP:
         """analyze 명령 help에 --nlp 옵션 표시."""
         result = runner.invoke(app, ["analyze", "--help"])
         assert result.exit_code == 0
-        assert "--nlp" in result.stdout
+        assert "--nlp" in strip_ansi(result.stdout)
 
     @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     def test_analyze_run_not_found(self, mock_storage_cls, tmp_path):
@@ -2183,8 +2191,9 @@ class TestCLIAnalyzePlaybook:
         """analyze 명령 help에 --playbook 옵션 표시."""
         result = runner.invoke(app, ["analyze", "--help"])
         assert result.exit_code == 0
-        assert "--playbook" in result.stdout
-        assert "--enable-llm" in result.stdout
+        stdout = strip_ansi(result.stdout)
+        assert "--playbook" in stdout
+        assert "--enable-llm" in stdout
 
     @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
