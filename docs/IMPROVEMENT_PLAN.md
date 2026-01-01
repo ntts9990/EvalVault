@@ -383,20 +383,16 @@ CLI 명령어: 15개
 
 #### 1.1 LLM Adapter 통합
 
-**현재 문제**:
-- `OpenAIAdapter`, `AzureOpenAIAdapter`, `AnthropicAdapter`가 유사한 로직 반복
+**Status**: ✅ 완료 (2026-01-01)
+- `BaseLLMAdapter` 추상 클래스 도입
+- 공통 로직 통합: TokenUsage 추적, Ragas LLM/Embeddings 관리, ThinkingConfig
+- `LLMConfigurationError` - 사용자 친화적 에러 메시지
+- `_validate_required_settings()` 헬퍼 - 설정 검증 공통화
+- `create_openai_embeddings_with_legacy()` 팩토리 함수 - Legacy 메서드 호환
+- 4개 어댑터 모두 BaseLLMAdapter 상속: OpenAI, Azure, Anthropic, Ollama
+- 테스트: 32 cases passed
 
-**개선 방안**:
-```python
-class BaseLLMAdapter(ABC):
-    """LLM Adapter 공통 로직"""
-    def __init__(self, config: ModelConfig):
-        self.config = config
-        self._token_tracker = TokenTracker()
-        self._error_handler = LLMErrorHandler()
-```
-
-**예상 효과**: ~300 LOC 감소, 새 LLM 추가 시간 2시간 → 30분
+**효과**: ~200 LOC 감소, 새 LLM 추가 시간 단축
 
 #### 1.2 Storage Adapter 통합
 
@@ -610,6 +606,27 @@ docs/tutorials/
 #### 7.2 Phoenix 기본 통합 (Week 1-2)
 
 **담당**: `observability`
+**Status**: ✅ 완료 (2026-01-01)
+
+**구현 완료 사항**:
+- ✅ `phoenix` extra 추가 (pyproject.toml): arize-phoenix, opentelemetry-sdk, openinference
+- ✅ `PhoenixAdapter` 구현: TrackerPort 인터페이스, OpenTelemetry 기반
+- ✅ `instrumentation.py`: LangChain/OpenAI 자동 계측 설정
+- ✅ Settings에 Phoenix 필드 추가: `phoenix_endpoint`, `phoenix_enabled`, `tracker_provider`
+- ✅ CLI `--tracker` 옵션 추가: `langfuse`, `mlflow`, `phoenix`, `none` 지원
+- ✅ 테스트: 13 cases passed
+
+**사용법**:
+```bash
+# Phoenix 의존성 설치
+uv sync --extra phoenix
+
+# Phoenix 서버 실행 (Docker)
+docker run -p 6006:6006 arizephoenix/phoenix:latest
+
+# 평가 실행 + Phoenix 트레이싱
+evalvault run data.csv --tracker phoenix
+```
 
 ```python
 # src/evalvault/config/instrumentation.py

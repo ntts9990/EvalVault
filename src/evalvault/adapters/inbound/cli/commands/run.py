@@ -6,6 +6,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -15,13 +16,15 @@ from rich.table import Table
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.ports.outbound.tracker_port import TrackerPort
 
 from ..utils.formatters import format_score, format_status
 from ..utils.options import db_option, profile_option
 from ..utils.validators import parse_csv_option, validate_choices
+
+TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
 
 
 def register_run_commands(
@@ -59,11 +62,18 @@ def register_run_commands(
             "-o",
             help="Output file for results (JSON format).",
         ),
+        tracker: str = typer.Option(
+            "none",
+            "--tracker",
+            "-t",
+            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+        ),
         langfuse: bool = typer.Option(
             False,
             "--langfuse",
             "-l",
-            help="Log results to Langfuse.",
+            help="[Deprecated] Use --tracker langfuse instead.",
+            hidden=True,
         ),
         db_path: Path | None = db_option(
             default=None,
@@ -162,8 +172,16 @@ def register_run_commands(
 
         _display_results(result, console, verbose)
 
-        if langfuse:
-            _log_to_langfuse(settings, result, console)
+        # Handle deprecated --langfuse flag
+        effective_tracker = tracker
+        if langfuse and tracker == "none":
+            effective_tracker = "langfuse"
+            console.print(
+                "[yellow]Warning:[/yellow] --langfuse is deprecated. Use --tracker langfuse instead."
+            )
+
+        if effective_tracker != "none":
+            _log_to_tracker(settings, result, console, effective_tracker)
         if db_path:
             _save_to_db(db_path, result, console)
         if output:
@@ -220,25 +238,79 @@ def register_run_commands(
                         f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                     )
 
-    def _log_to_langfuse(settings: Settings, result, console: Console) -> None:
-        """Log evaluation results to Langfuse."""
-        if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-            console.print(
-                "[yellow]Warning:[/yellow] Langfuse credentials not configured. Skipping Langfuse logging."
+    def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> TrackerPort | None:
+        """Get the appropriate tracker adapter based on type."""
+        if tracker_type == "langfuse":
+            if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+                console.print(
+                    "[yellow]Warning:[/yellow] Langfuse credentials not configured. Skipping."
+                )
+                return None
+            from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
+
+            return LangfuseAdapter(
+                public_key=settings.langfuse_public_key,
+                secret_key=settings.langfuse_secret_key,
+                host=settings.langfuse_host,
             )
+
+        elif tracker_type == "mlflow":
+            if not settings.mlflow_tracking_uri:
+                console.print(
+                    "[yellow]Warning:[/yellow] MLflow tracking URI not configured. Skipping."
+                )
+                return None
+            try:
+                from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
+
+                return MLflowAdapter(
+                    tracking_uri=settings.mlflow_tracking_uri,
+                    experiment_name=settings.mlflow_experiment_name,
+                )
+            except ImportError:
+                console.print(
+                    "[yellow]Warning:[/yellow] MLflow not installed. "
+                    "Install with: uv sync --extra mlflow"
+                )
+                return None
+
+        elif tracker_type == "phoenix":
+            try:
+                from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
+
+                return PhoenixAdapter(
+                    endpoint=settings.phoenix_endpoint,
+                    service_name="evalvault",
+                )
+            except ImportError:
+                console.print(
+                    "[yellow]Warning:[/yellow] Phoenix not installed. "
+                    "Install with: uv sync --extra phoenix"
+                )
+                return None
+
+        else:
+            console.print(f"[yellow]Warning:[/yellow] Unknown tracker type: {tracker_type}")
+            return None
+
+    def _log_to_tracker(
+        settings: Settings,
+        result,
+        console: Console,
+        tracker_type: str,
+    ) -> None:
+        """Log evaluation results to the specified tracker."""
+        tracker = _get_tracker(settings, tracker_type, console)
+        if tracker is None:
             return
 
-        with console.status("[bold green]Logging to Langfuse..."):
+        tracker_name = tracker_type.capitalize()
+        with console.status(f"[bold green]Logging to {tracker_name}..."):
             try:
-                tracker = LangfuseAdapter(
-                    public_key=settings.langfuse_public_key,
-                    secret_key=settings.langfuse_secret_key,
-                    host=settings.langfuse_host,
-                )
                 trace_id = tracker.log_evaluation_run(result)
-                console.print(f"[green]Logged to Langfuse[/green] (trace_id: {trace_id})")
+                console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
             except Exception as exc:  # pragma: no cover - telemetry best-effort
-                console.print(f"[yellow]Warning:[/yellow] Failed to log to Langfuse: {exc}")
+                console.print(f"[yellow]Warning:[/yellow] Failed to log to {tracker_name}: {exc}")
 
     def _save_to_db(db_path: Path, result, console: Console) -> None:
         """Persist evaluation run to SQLite database."""

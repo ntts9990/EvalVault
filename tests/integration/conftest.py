@@ -38,6 +38,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "requires_langfuse: marks tests that require Langfuse credentials"
     )
+    config.addinivalue_line(
+        "markers", "requires_phoenix: marks tests that require Phoenix/OpenTelemetry dependencies"
+    )
 
     # Add timestamp suffix to HTML report filename
     if hasattr(config.option, "htmlpath") and config.option.htmlpath:
@@ -94,3 +97,10 @@ def pytest_runtest_setup(item):
         os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")
     ):
         pytest.skip("Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY")
+
+    # Check for requires_phoenix marker
+    if item.get_closest_marker("requires_phoenix"):
+        try:
+            import opentelemetry  # noqa: F401
+        except ImportError:
+            pytest.skip("Requires OpenTelemetry dependencies (uv sync --extra phoenix)")

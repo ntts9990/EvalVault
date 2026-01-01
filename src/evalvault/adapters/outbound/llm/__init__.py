@@ -2,6 +2,7 @@
 
 from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
 from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter
+from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, LLMConfigurationError
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
@@ -49,6 +50,8 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
 
 
 __all__ = [
+    "BaseLLMAdapter",
+    "LLMConfigurationError",
     "OpenAIAdapter",
     "AzureOpenAIAdapter",
     "AnthropicAdapter",

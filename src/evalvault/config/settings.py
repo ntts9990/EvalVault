@@ -91,6 +91,22 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str | None = Field(default=None, description="MLflow tracking server URI")
     mlflow_experiment_name: str = Field(default="evalvault", description="MLflow experiment name")
 
+    # Phoenix Configuration (optional - RAG observability)
+    phoenix_endpoint: str = Field(
+        default="http://localhost:6006/v1/traces",
+        description="Phoenix OTLP endpoint for traces",
+    )
+    phoenix_enabled: bool = Field(
+        default=False,
+        description="Enable Phoenix instrumentation for automatic LLM tracing",
+    )
+
+    # Tracker Provider Selection
+    tracker_provider: str = Field(
+        default="langfuse",
+        description="Tracker provider: 'langfuse', 'mlflow', or 'phoenix'",
+    )
+
     # PostgreSQL Configuration (optional)
     postgres_host: str | None = Field(default=None, description="PostgreSQL server host")
     postgres_port: int = Field(default=5432, description="PostgreSQL server port")

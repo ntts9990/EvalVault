@@ -101,6 +101,8 @@ class AnthropicAdapter(BaseLLMAdapter):
         >>> embeddings = adapter.as_ragas_embeddings()
     """
 
+    provider_name = "anthropic"
+
     def __init__(self, settings: Settings):
         """Initialize Anthropic adapter.
 
@@ -108,7 +110,7 @@ class AnthropicAdapter(BaseLLMAdapter):
             settings: Application settings containing Anthropic configuration
 
         Raises:
-            ValueError: If ANTHROPIC_API_KEY is not provided
+            LLMConfigurationError: If ANTHROPIC_API_KEY is not provided
         """
         self._settings = settings
         self._thinking_budget = settings.anthropic_thinking_budget
@@ -122,9 +124,12 @@ class AnthropicAdapter(BaseLLMAdapter):
             thinking_config=thinking_config,
         )
 
-        # Validate Anthropic settings
-        if not settings.anthropic_api_key:
-            raise ValueError("ANTHROPIC_API_KEY is required for Anthropic")
+        # Validate Anthropic settings using common helper
+        self._validate_required_settings(
+            {
+                "ANTHROPIC_API_KEY": (settings.anthropic_api_key, None),
+            }
+        )
 
         # Create token-tracking Anthropic client with thinking support
         self._client = ThinkingTokenTrackingAsyncAnthropic(
