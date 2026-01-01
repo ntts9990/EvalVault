@@ -28,6 +28,14 @@ from evalvault.domain.entities.improvement import (
     RAGImprovementGuide,
 )
 from evalvault.domain.entities.kg import EntityModel, RelationModel
+from evalvault.domain.entities.rag_trace import (
+    GenerationData,
+    RAGTraceData,
+    RerankMethod,
+    RetrievalData,
+    RetrievalMethod,
+    RetrievedDocument,
+)
 from evalvault.domain.entities.result import (
     EvaluationRun,
     MetricScore,
@@ -68,6 +76,13 @@ __all__ = [
     # KG
     "EntityModel",
     "RelationModel",
+    # RAG Trace
+    "GenerationData",
+    "RAGTraceData",
+    "RerankMethod",
+    "RetrievalData",
+    "RetrievalMethod",
+    "RetrievedDocument",
     # Result
     "EvaluationRun",
     "MetricScore",
