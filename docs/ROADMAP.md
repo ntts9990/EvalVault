@@ -683,6 +683,124 @@ evalvault run data.csv \
 
 ---
 
+## Enterprise Track
+
+> **목표**: 멀티테넌트, 비동기 작업 처리, RBAC 기반 엔터프라이즈 운영 환경 구축
+>
+> **상세 계획**: [enterprise/IMPLEMENTATION_PLAN.md](./enterprise/IMPLEMENTATION_PLAN.md)
+
+### Enterprise Phases
+
+| Phase | 범위 | 설명 | 선행 조건 |
+|-------|------|------|-----------|
+| **E1** | Job + Queue | Job 엔티티, JobQueuePort (Celery+Redis), 비동기 제출/상태 조회 | - |
+| **E2** | Idempotency + Store | JobStorePort, IdempotencyPort, 중복 제출 방지, DLQ | E1 |
+| **E3** | Multi-tenancy | Tenant/Project/User 계층, DB 스키마 확장, Row-Level Security | E2 |
+| **E4** | Auth/RBAC | AuthPort, OIDC/JWT, RBAC 스코프 (admin/write/read) | E3 |
+| **E5** | API Server | FastAPI 서버, REST 엔드포인트, 인증 미들웨어 | E4 |
+| **E6** | Observability | Prometheus 메트릭, Grafana 대시보드, SLO 알럿 | E5 |
+| **E7** | Operations | Alembic 마이그레이션, Helm 차트, Terraform 모듈 | E6 |
+
+### 핵심 아키텍처 결정
+
+#### Job vs EvaluationRun 분리
+
+```
+Job (운영 단위)              EvaluationRun (결과)
+├── job_id                   ├── run_id
+├── tenant_id / project_id   ├── dataset_name
+├── status (QUEUED→RUNNING→…)├── metrics / scores
+├── idempotency_key          └── tracker_metadata
+└── result_ref ──────────────→ (1:1 연결)
+```
+
+- **Job**: 작업 상태 추적, 재시도/취소 관리 (운영 관점)
+- **EvaluationRun**: 평가 결과 저장, 분석 (데이터 관점)
+
+#### 신규 Port 인터페이스
+
+```
+Outbound Ports                 Inbound Ports
+┌─────────────────────┐       ┌─────────────────────┐
+│ JobQueuePort        │       │ AuthPort            │
+│ JobStorePort        │       │ RunSubmissionPort   │
+│ IdempotencyPort     │       │ JobQueryPort        │
+│ AuditPort           │       └─────────────────────┘
+│ RegistryPort        │
+│ ObjectStoragePort   │
+└─────────────────────┘
+```
+
+### 구현 의존성 그래프
+
+```mermaid
+graph TD
+    E1[E1: Job + Queue] --> E2[E2: Idempotency]
+    E2 --> E3[E3: Multi-tenancy]
+    E3 --> E4[E4: Auth/RBAC]
+    E4 --> E5[E5: API Server]
+    E5 --> E6[E6: Observability]
+    E6 --> E7[E7: Operations]
+
+    subgraph 독립 가능
+        P3[P3: 성능 최적화]
+        P5[P5: 테스트 개선]
+    end
+
+    E2 -.-> P3
+    E5 -.-> P5
+```
+
+### Operations Checklist
+
+#### 신뢰성 / 운영
+- [ ] Job retry policy (transient vs deterministic error 구분)
+- [ ] Dead Letter Queue 구현
+- [ ] Graceful shutdown (SIGTERM 처리)
+- [ ] Health check 엔드포인트 (`/health/live`, `/health/ready`)
+
+#### 보안 / 접근 제어
+- [ ] OIDC/JWT 인증 흐름
+- [ ] RBAC 스코프 정의 (`tenant:admin`, `project:write`, `project:read`)
+- [ ] Audit 로그 (누가, 언제, 무엇을)
+- [ ] Secret 관리 (Vault 연동 또는 K8s Secret)
+
+#### 데이터 / 스토리지
+- [ ] Alembic 마이그레이션 스크립트
+- [ ] Row-Level Security (PostgreSQL)
+- [ ] Object Storage 연동 (S3/MinIO)
+- [ ] 데이터 보존 정책
+
+#### Observability
+- [ ] Phoenix: LLM traces (품질 디버깅)
+- [ ] Prometheus: 시스템 메트릭 (SLO 모니터링)
+- [ ] Grafana: 대시보드 템플릿
+- [ ] Alert rules 정의
+
+### CLI 인증 옵션 분리
+
+```bash
+# 모델 프로파일 (기존)
+evalvault run data.csv --profile azure-gpt4
+
+# 인증 프로파일 (신규, E4 이후)
+evalvault run data.csv --auth-profile production
+
+# API 서버 모드 (E5 이후)
+evalvault run data.csv --endpoint https://api.company.com
+```
+
+### Quick Wins (Enterprise 준비)
+
+| 항목 | 설명 | 난이도 |
+|------|------|--------|
+| Job ID 필드 추가 | EvaluationRun에 `job_id: str | None` 추가 | ⭐ |
+| Celery task 스켈레톤 | `tasks/evaluation.py` 빈 구조 생성 | ⭐ |
+| DB 스키마 설계 | `jobs` 테이블 DDL 작성 | ⭐⭐ |
+| RBAC 스코프 enum | `RBACScope` enum 정의 | ⭐ |
+
+---
+
 ## 미래 연구 (2027+)
 
 > **Note**: 아래 기능들은 장기 연구 주제이며, 실제 필요성이 검증된 후 구현합니다.
