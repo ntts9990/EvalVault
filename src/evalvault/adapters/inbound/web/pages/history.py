@@ -37,6 +37,15 @@ def render_history_page(adapter, session):
         model_options = ["All"] + sorted({r.model_name for r in all_runs})
         selected_model = st.selectbox("모델", options=model_options, index=0)
 
+        mode_values = sorted({r.run_mode for r in all_runs if r.run_mode})
+        mode_options = ["All"] + mode_values
+        selected_mode = st.selectbox(
+            "실행 모드",
+            options=mode_options,
+            format_func=lambda x: "전체" if x == "All" else x.capitalize(),
+            index=0,
+        )
+
         # 통과율 필터
         min_pass_rate = st.slider("최소 통과율", 0.0, 1.0, 0.0, 0.1)
 
@@ -51,6 +60,7 @@ def render_history_page(adapter, session):
     run_filter = RunFilter(
         model_name=selected_model if selected_model != "All" else None,
         min_pass_rate=min_pass_rate if min_pass_rate > 0 else None,
+        run_mode=selected_mode if selected_mode != "All" else None,
     )
     runs = run_filter.apply(runs)
 
@@ -100,12 +110,12 @@ def render_history_page(adapter, session):
         show_phoenix_column = any(
             r.phoenix_precision is not None or r.phoenix_drift is not None for r in runs
         )
-        column_config = [3, 2, 2, 1, 1]
+        column_config = [3, 1, 2, 2, 1, 1]
         if show_phoenix_column:
             column_config.append(1)
         column_config.append(1)
 
-        header_labels = ["Dataset", "Model", "Metrics", "Pass Rate", "Date"]
+        header_labels = ["Dataset", "Mode", "Model", "Metrics", "Pass Rate", "Date"]
         if show_phoenix_column:
             header_labels.append("Phoenix")
         header_labels.append("Actions")
@@ -122,6 +132,8 @@ def render_history_page(adapter, session):
             prompt_summary = format_prompt_summary_label(run.phoenix_prompts)
             if prompt_summary:
                 dataset_col.caption(f"Prompt: {prompt_summary}")
+            idx += 1
+            row_cols[idx].text((run.run_mode or "-").capitalize())
             idx += 1
             row_cols[idx].text(run.model_name)
             idx += 1

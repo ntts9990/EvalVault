@@ -119,6 +119,7 @@ class TestRunSummary:
         assert len(summary.metrics_evaluated) == 2
         assert summary.total_tokens == 0
         assert summary.total_cost_usd is None
+        assert summary.run_mode is None
 
     def test_summary_with_cost(self):
         """비용 정보 포함된 요약."""
@@ -134,10 +135,12 @@ class TestRunSummary:
             metrics_evaluated=["faithfulness"],
             total_tokens=5000,
             total_cost_usd=0.15,
+            run_mode="simple",
         )
 
         assert summary.total_tokens == 5000
         assert summary.total_cost_usd == 0.15
+        assert summary.run_mode == "simple"
 
 
 class TestRunFilters:
@@ -153,6 +156,7 @@ class TestRunFilters:
         assert filters.date_to is None
         assert filters.min_pass_rate is None
         assert filters.max_pass_rate is None
+        assert filters.run_mode is None
 
     def test_with_filters(self):
         """필터 조건 설정."""
@@ -161,12 +165,14 @@ class TestRunFilters:
             model_name="gpt-5-nano",
             min_pass_rate=0.7,
             max_pass_rate=1.0,
+            run_mode="simple",
         )
 
         assert filters.dataset_name == "insurance-qa"
         assert filters.model_name == "gpt-5-nano"
         assert filters.min_pass_rate == 0.7
         assert filters.max_pass_rate == 1.0
+        assert filters.run_mode == "simple"
 
 
 class TestWebUIAdapter:
@@ -401,6 +407,7 @@ class TestWebUIAdapterRunEvaluation:
         mock_run.dataset_name = "test-dataset"
         mock_run.model_name = "gpt-5-nano"
         mock_run.thresholds = {"faithfulness": 0.7, "answer_relevancy": 0.7}
+        mock_run.tracker_metadata = {}
 
         # async evaluate 메서드 모킹 - AsyncMock 사용
         evaluator.evaluate = AsyncMock(return_value=mock_run)
@@ -514,6 +521,41 @@ class TestWebUIAdapterRunEvaluation:
         # progress 콜백이 한 번 이상 호출되었는지 확인
         # 구현에 따라 호출될 수도 있고 안 될 수도 있음
         assert isinstance(progress_calls, list)
+
+    def test_run_evaluation_with_dataset_sets_run_mode(
+        self, mock_storage, mock_evaluator, mock_llm
+    ):
+        """run_mode가 tracker_metadata에 기록되는지 확인."""
+        from evalvault.adapters.inbound.web.adapter import WebUIAdapter
+        from evalvault.domain.entities import Dataset, TestCase
+
+        dataset = Dataset(
+            name="web-ui-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="tc-1",
+                    question="Q",
+                    answer="A",
+                    contexts=["ctx"],
+                    ground_truth="A",
+                )
+            ],
+        )
+
+        adapter = WebUIAdapter(
+            storage=mock_storage,
+            evaluator=mock_evaluator,
+            llm_adapter=mock_llm,
+        )
+
+        result = adapter.run_evaluation_with_dataset(
+            dataset=dataset,
+            metrics=["faithfulness"],
+            run_mode="simple",
+        )
+
+        assert result.tracker_metadata["run_mode"] == "simple"
 
     def test_run_evaluation_saves_to_storage(
         self, mock_storage, mock_evaluator, mock_llm, mock_data_loader

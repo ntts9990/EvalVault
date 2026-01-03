@@ -32,6 +32,7 @@ class RunFilter:
     date_from: datetime | None = None
     date_to: datetime | None = None
     metrics: list[str] = field(default_factory=list)
+    run_mode: str | None = None
 
     def apply(self, runs: list[RunSummary]) -> list[RunSummary]:
         """필터 적용.
@@ -64,6 +65,10 @@ class RunFilter:
 
         if self.metrics:
             filtered = [r for r in filtered if any(m in r.metrics_evaluated for m in self.metrics)]
+        if self.run_mode:
+            filtered = [
+                r for r in filtered if r.run_mode and r.run_mode.lower() == self.run_mode.lower()
+            ]
 
         return filtered
 
@@ -82,6 +87,7 @@ class RunFilter:
             max_pass_rate=self.max_pass_rate,
             date_from=self.date_from,
             date_to=self.date_to,
+            run_mode=self.run_mode,
         )
 
     def is_empty(self) -> bool:
@@ -96,6 +102,7 @@ class RunFilter:
                 self.date_from,
                 self.date_to,
                 self.metrics if self.metrics else None,
+                self.run_mode,
             ]
         )
 
@@ -167,6 +174,7 @@ class RunTable:
                 {
                     "run_id": run.run_id,
                     "dataset_name": run.dataset_name,
+                    "run_mode": run.run_mode,
                     "model_name": run.model_name,
                     "pass_rate": run.pass_rate,
                     "total_test_cases": run.total_test_cases,
@@ -289,6 +297,7 @@ class HistoryExporter:
             [
                 "run_id",
                 "dataset_name",
+                "run_mode",
                 "model_name",
                 "pass_rate",
                 "total_test_cases",
@@ -311,6 +320,7 @@ class HistoryExporter:
                 [
                     run.run_id,
                     run.dataset_name,
+                    run.run_mode or "",
                     run.model_name,
                     f"{run.pass_rate:.4f}",
                     run.total_test_cases,
@@ -344,6 +354,7 @@ class HistoryExporter:
                     "run_id": run.run_id,
                     "dataset_name": run.dataset_name,
                     "model_name": run.model_name,
+                    "run_mode": run.run_mode,
                     "pass_rate": run.pass_rate,
                     "total_test_cases": run.total_test_cases,
                     "started_at": run.started_at.isoformat() if run.started_at else None,
@@ -393,4 +404,5 @@ class RunSearch:
             if query_lower in r.dataset_name.lower()
             or query_lower in r.model_name.lower()
             or query_lower in r.run_id.lower()
+            or (r.run_mode and query_lower in r.run_mode.lower())
         ]

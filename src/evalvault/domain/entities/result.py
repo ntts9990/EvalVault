@@ -182,6 +182,9 @@ class EvaluationRun:
             trace_url = phoenix_meta.get("trace_url")
             if trace_url:
                 summary["phoenix_trace_url"] = trace_url
+        run_mode = self.tracker_metadata.get("run_mode")
+        if isinstance(run_mode, str) and run_mode:
+            summary["run_mode"] = run_mode
         # 각 메트릭 평균
         for metric in self.metrics_evaluated:
             avg = self.get_avg_score(metric)

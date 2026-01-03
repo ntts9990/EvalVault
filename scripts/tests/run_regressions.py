@@ -23,8 +23,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG_PATH,
+        default=None,
         help=f"Regression config path (default: {DEFAULT_CONFIG_PATH})",
+    )
+    parser.add_argument(
+        "--profile",
+        default=None,
+        help="Use a regression profile from config/regressions/<profile>.json",
     )
     parser.add_argument(
         "--suite",
@@ -71,7 +76,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    suites = load_regression_config(args.config)
+    config_path = args.config
+    if args.profile:
+        if config_path is not None:
+            parser.error("--profile and --config cannot be used together.")
+        config_path = DEFAULT_CONFIG_PATH.parent / f"{args.profile}.json"
+    if config_path is None:
+        config_path = DEFAULT_CONFIG_PATH
+
+    suites = load_regression_config(config_path)
 
     if args.list:
         parser.exit(

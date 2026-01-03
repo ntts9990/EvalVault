@@ -1,0 +1,29 @@
+{
+  "name": "run-mode-simple-smoke",
+  "version": "1.0.0",
+  "description": "Simple mode smoke dataset for UX regression",
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "simple-001",
+      "question": "What is the death benefit amount for this policy?",
+      "answer": "The policy pays a $100,000 death benefit.",
+      "contexts": [
+        "Policy summary: The death benefit is $100,000 for covered claims during the policy term."
+      ],
+      "ground_truth": "$100,000"
+    },
+    {
+      "id": "simple-002",
+      "question": "How long do I pay premiums?",
+      "answer": "Premiums are paid for 20 years.",
+      "contexts": [
+        "Premium schedule: The premium payment period is 20 years for this product."
+      ],
+      "ground_truth": "20 years"
+    }
+  ]
+}

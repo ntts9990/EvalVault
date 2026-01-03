@@ -252,6 +252,7 @@ class WebUIAdapter:
             summaries = []
             for run in runs:
                 prompt_entries = extract_prompt_entries(getattr(run, "tracker_metadata", None))
+                metadata = getattr(run, "tracker_metadata", {}) or {}
                 summary = RunSummary(
                     run_id=run.run_id,
                     dataset_name=run.dataset_name,
@@ -261,6 +262,7 @@ class WebUIAdapter:
                     started_at=run.started_at,
                     finished_at=run.finished_at,
                     metrics_evaluated=run.metrics_evaluated,
+                    run_mode=metadata.get("run_mode"),
                     total_tokens=run.total_tokens,
                     total_cost_usd=run.total_cost_usd,
                     phoenix_prompts=prompt_entries,
@@ -283,6 +285,10 @@ class WebUIAdapter:
                     if filters.min_pass_rate and summary.pass_rate < filters.min_pass_rate:
                         continue
                     if filters.max_pass_rate and summary.pass_rate > filters.max_pass_rate:
+                        continue
+                    if filters.run_mode and (
+                        not summary.run_mode or summary.run_mode.lower() != filters.run_mode.lower()
+                    ):
                         continue
 
                 summaries.append(summary)
@@ -476,6 +482,7 @@ class WebUIAdapter:
         parallel: bool = True,
         batch_size: int = 5,
         on_progress: Callable[[EvalProgress], None] | None = None,
+        run_mode: str | None = None,
     ) -> EvaluationRun:
         """데이터셋 객체로 직접 평가 실행.
 
@@ -537,6 +544,10 @@ class WebUIAdapter:
                     status="completed",
                 )
             )
+
+        metadata = getattr(result, "tracker_metadata", None) or {}
+        metadata.setdefault("run_mode", (run_mode or "full"))
+        result.tracker_metadata = metadata
 
         # 결과 저장
         if self._storage:
