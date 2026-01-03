@@ -6,9 +6,12 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
+from evalvault.adapters.outbound.llm.base import (
+    BaseLLMAdapter,
+    TokenUsage,
+    create_openai_embeddings_with_legacy,
+)
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
-from evalvault.adapters.outbound.llm.openai_adapter import OpenAIEmbeddingsWithLegacy
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import ThinkingConfig
@@ -125,7 +128,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         # Anthropic doesn't provide embeddings, use OpenAI as fallback
         if settings.openai_api_key:
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-            embeddings = OpenAIEmbeddingsWithLegacy(
+            embeddings = create_openai_embeddings_with_legacy(
                 model=settings.openai_embedding_model,
                 client=openai_client,
             )

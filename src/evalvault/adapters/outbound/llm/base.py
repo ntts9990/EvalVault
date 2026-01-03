@@ -174,3 +174,44 @@ class BaseLLMAdapter(LLMPort):
 
     def reset_token_usage(self) -> None:
         self._token_usage.reset()
+
+
+def create_openai_embeddings_with_legacy(
+    model: str,
+    client: Any,
+) -> Any:
+    """Create OpenAI embeddings with legacy LangChain-style methods.
+
+    Ragas AnswerRelevancy metric expects embed_query/embed_documents methods
+    but the modern RagasOpenAIEmbeddings only has embed_text/embed_texts.
+    This factory creates a wrapper that adds the legacy methods for compatibility.
+
+    Args:
+        model: Embedding model name (e.g., 'text-embedding-3-small')
+        client: AsyncOpenAI client instance
+
+    Returns:
+        OpenAIEmbeddings instance with legacy method compatibility
+    """
+    from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
+
+    class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
+        """OpenAI embeddings with legacy LangChain-style methods."""
+
+        def embed_query(self, text: str) -> list[float]:
+            """Embed a single query text (LangChain-style method)."""
+            return self.embed_text(text)
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            """Embed multiple documents (LangChain-style method)."""
+            return self.embed_texts(texts)
+
+        async def aembed_query(self, text: str) -> list[float]:
+            """Async embed a single query text."""
+            return await self.aembed_text(text)
+
+        async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+            """Async embed multiple documents."""
+            return await self.aembed_texts(texts)
+
+    return OpenAIEmbeddingsWithLegacy(model=model, client=client)
