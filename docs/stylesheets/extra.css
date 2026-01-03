@@ -1,0 +1,107 @@
+/* EvalVault Documentation Custom Styles */
+
+/* Improve code block readability */
+.highlight {
+    border-radius: 4px;
+}
+
+/* Admonition customization */
+.admonition {
+    border-radius: 4px;
+    padding: 1em;
+    margin: 1em 0;
+}
+
+.admonition.note {
+    border-left: 4px solid #448aff;
+}
+
+.admonition.warning {
+    border-left: 4px solid #ff9800;
+}
+
+.admonition.tip {
+    border-left: 4px solid #00c853;
+}
+
+.admonition.danger {
+    border-left: 4px solid #f44336;
+}
+
+/* Table improvements */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+table th {
+    background-color: var(--md-default-fg-color--lightest);
+    font-weight: 600;
+}
+
+table td, table th {
+    padding: 0.75em;
+    border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Code inline */
+code {
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* API documentation improvements */
+.doc-heading {
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Navigation improvements */
+.md-nav__item--active > .md-nav__link {
+    font-weight: 600;
+}
+
+/* Responsive images */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Better spacing for lists */
+.md-typeset ul, .md-typeset ol {
+    margin: 1em 0;
+}
+
+.md-typeset li {
+    margin: 0.5em 0;
+}
+
+/* Highlight important content */
+.md-typeset mark {
+    background-color: #fff59d;
+    padding: 0.1em 0.3em;
+    border-radius: 2px;
+}
+
+/* Footer improvements */
+.md-footer-meta {
+    background-color: var(--md-default-bg-color);
+}
+
+/* Search result improvements */
+.md-search-result__article {
+    padding: 1em;
+}
+
+/* Better keyboard shortcuts display */
+kbd {
+    background-color: var(--md-default-fg-color--lightest);
+    border: 1px solid var(--md-default-fg-color--lighter);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    font-family: monospace;
+    font-size: 0.9em;
+}

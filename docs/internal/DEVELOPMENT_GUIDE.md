@@ -1,6 +1,6 @@
 # EvalVault 개발 가이드
 
-> **Last Updated**: 2026-01-03
+> **Last Updated**: 2026-01-07
 > **Version**: 2.0
 > **Status**: 활성 개발 중
 
@@ -115,14 +115,22 @@ rg "from evalvault.adapters" src/evalvault/domain  # 결과 0이어야 함
 | P1.3 | Analysis Adapter 통합 | ✅ 완료 |
 | P2 | CLI 모듈 분리 (3k LOC → 모듈화) | ✅ 완료 |
 
-### 3.2 진행 중인 작업 (Phase 3-8)
+### 3.2 진행 중인 개선 작업 (P2.2~P6)
 
 | Phase | 작업 | 상태 | 담당 |
 |-------|------|------|------|
-| P3 | 성능 최적화 (캐시, 배치, 스트리밍) | ✅ 완료 | performance |
-| P4 | UX 개선 (CLI 모드, 에러 메시지) | ✅ 완료 | - |
-| P5 | 테스트 커버리지 향상 (89% → 95%) | ✅ 완료 | testing |
-| P6 | 문서화 개선 (7개 튜토리얼) | ✅ 완료 | documentation |
+| P2.2 | Web UI 재구조화 | 🚧 진행 중 | - |
+| P3 | 성능 최적화 (캐시, 배치, 스트리밍) | 🚧 진행 중 | performance |
+| P4.1 | CLI UX 개선 | 🚧 진행 중 | - |
+| P5 | 테스트 커버리지 향상 (89% → 95%) | 🚧 진행 중 | testing |
+| P6 | 문서화 개선 (API/튜토리얼) | 🚧 진행 중 | documentation |
+
+상세 범위와 일정은 `docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
+
+### 3.2.1 완료된 개선 작업
+
+| Phase | 작업 | 상태 | 담당 |
+|-------|------|------|------|
 | P7 | Phoenix Observability | ✅ 완료 | observability |
 | P8 | Domain Memory 활용 | ✅ 완료 | - |
 
@@ -391,8 +399,8 @@ uv run python -c "import evalvault"  # 정상 실행
 
 ### A.3 남은 과제
 
-- [ ] PostgreSQL 어댑터에 `analysis_results` 테이블 추가
-- [ ] CLI 모듈 추가 분리 (필요시)
+- 아키텍처 감사 기준의 미완료 항목 없음
+- 개선 작업은 `docs/internal/PARALLEL_WORK_PLAN.md`와 `docs/ROADMAP.md`에서 관리
 
 ---
 

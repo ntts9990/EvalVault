@@ -1,6 +1,6 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2026-01-03
+> Last Updated: 2026-01-07
 > Current Version: 1.5.0
 > Status: Phase 1-14 Complete ✅ | Focusing on Improvement & Future Features
 
@@ -12,7 +12,8 @@
 2. [완료된 작업 (Phase 1-14)](#완료된-작업-phase-1-14)
 3. [현재 진행 중 (2026 Q1)](#현재-진행-중-2026-q1)
 4. [향후 계획 (2026 Q2-Q4)](#향후-계획-2026-q2-q4)
-5. [미래 연구 (2027+)](#미래-연구-2027)
+5. [Enterprise Track](#enterprise-track)
+6. [미래 연구 (2027+)](#미래-연구-2027)
 
 ---
 
@@ -96,6 +97,18 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 >
 > **개발 자동화**: AI 에이전트 기반 병렬 개발 워크플로우 도입
 
+### 진행 중인 개선 작업 (병렬)
+
+| ID | 작업 | 상태 | 참고 |
+|----|------|------|------|
+| P2.2 | Web UI 재구조화 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P3 | 성능 최적화 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P4.1 | CLI UX 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P5 | 테스트 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P6 | 문서화 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+
+상세 범위와 일정은 `docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
+
 ### 개발 자동화 에이전트 시스템
 
 Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병렬화합니다.
@@ -126,29 +139,29 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **목표**: 코드 중복 30% 감소
 
-#### 1.1 LLM Adapter 통합 ✅ In Progress
-- [ ] `BaseLLMAdapter` 생성
-- [ ] 토큰 추적 공통화
-- [ ] 에러 핸들링 공통화
-- [ ] 기존 어댑터 리팩토링
+#### 1.1 LLM Adapter 통합 ✅ 완료
+- [x] `BaseLLMAdapter` 생성
+- [x] 토큰 추적 공통화
+- [x] 에러 핸들링 공통화
+- [x] 기존 어댑터 리팩토링
 
 **예상 효과**:
 - 코드 중복: -300 LOC
 - 새 LLM 추가 시간: 2시간 → 30분
 
-#### 1.2 Storage Adapter 통합
-- [ ] `SQLQueries` 클래스 생성
-- [ ] `BaseSQLAdapter` 생성
-- [ ] 스키마 관리 통합
+#### 1.2 Storage Adapter 통합 ✅ 완료
+- [x] `SQLQueries` 클래스 생성
+- [x] `BaseSQLAdapter` 생성
+- [x] 스키마 관리 통합
 
 **예상 효과**:
 - 코드 중복: -400 LOC
 - 새 DB 지원: 4시간 → 1시간
 
-#### 1.3 Analysis Adapter 통합
-- [ ] `AnalysisDataProcessor` 생성
-- [ ] `BaseAnalysisAdapter` 생성
-- [ ] 데이터 처리 로직 통합
+#### 1.3 Analysis Adapter 통합 ✅ 완료
+- [x] `AnalysisDataProcessor` 생성
+- [x] `BaseAnalysisAdapter` 생성
+- [x] 데이터 처리 로직 통합
 
 **예상 효과**:
 - 코드 중복: -200 LOC
@@ -159,10 +172,10 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **목표**: 모듈 복잡도 50% 감소
 
-#### 2.1 CLI 모듈 분리 ⚡ Quick Win
-- [ ] CLI 명령어별 파일 분리
-- [ ] 공통 유틸리티 추출
-- [ ] 명령어 라우팅 개선
+#### 2.1 CLI 모듈 분리 ✅ 완료
+- [x] CLI 명령어별 파일 분리
+- [x] 공통 유틸리티 추출
+- [x] 명령어 라우팅 개선
 
 **구조**:
 ```
@@ -302,6 +315,9 @@ class ConfigValidator:
 ## 향후 계획 (2026 Q2-Q4)
 
 ### 2026 Q2 (4-6월): 성능 최적화 및 모듈화
+
+P2.2, P3는 병렬 작업으로 선행 진행 중이며 상세 범위는
+`docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
 
 #### P3: 성능 최적화
 
@@ -664,6 +680,124 @@ evalvault run data.csv \
 - [ ] CLI 통합
 
 **예상 기간**: 4-5주
+
+---
+
+## Enterprise Track
+
+> **목표**: 멀티테넌트, 비동기 작업 처리, RBAC 기반 엔터프라이즈 운영 환경 구축
+>
+> **상세 계획**: [enterprise/IMPLEMENTATION_PLAN.md](./enterprise/IMPLEMENTATION_PLAN.md)
+
+### Enterprise Phases
+
+| Phase | 범위 | 설명 | 선행 조건 |
+|-------|------|------|-----------|
+| **E1** | Job + Queue | Job 엔티티, JobQueuePort (Celery+Redis), 비동기 제출/상태 조회 | - |
+| **E2** | Idempotency + Store | JobStorePort, IdempotencyPort, 중복 제출 방지, DLQ | E1 |
+| **E3** | Multi-tenancy | Tenant/Project/User 계층, DB 스키마 확장, Row-Level Security | E2 |
+| **E4** | Auth/RBAC | AuthPort, OIDC/JWT, RBAC 스코프 (admin/write/read) | E3 |
+| **E5** | API Server | FastAPI 서버, REST 엔드포인트, 인증 미들웨어 | E4 |
+| **E6** | Observability | Prometheus 메트릭, Grafana 대시보드, SLO 알럿 | E5 |
+| **E7** | Operations | Alembic 마이그레이션, Helm 차트, Terraform 모듈 | E6 |
+
+### 핵심 아키텍처 결정
+
+#### Job vs EvaluationRun 분리
+
+```
+Job (운영 단위)              EvaluationRun (결과)
+├── job_id                   ├── run_id
+├── tenant_id / project_id   ├── dataset_name
+├── status (QUEUED→RUNNING→…)├── metrics / scores
+├── idempotency_key          └── tracker_metadata
+└── result_ref ──────────────→ (1:1 연결)
+```
+
+- **Job**: 작업 상태 추적, 재시도/취소 관리 (운영 관점)
+- **EvaluationRun**: 평가 결과 저장, 분석 (데이터 관점)
+
+#### 신규 Port 인터페이스
+
+```
+Outbound Ports                 Inbound Ports
+┌─────────────────────┐       ┌─────────────────────┐
+│ JobQueuePort        │       │ AuthPort            │
+│ JobStorePort        │       │ RunSubmissionPort   │
+│ IdempotencyPort     │       │ JobQueryPort        │
+│ AuditPort           │       └─────────────────────┘
+│ RegistryPort        │
+│ ObjectStoragePort   │
+└─────────────────────┘
+```
+
+### 구현 의존성 그래프
+
+```mermaid
+graph TD
+    E1[E1: Job + Queue] --> E2[E2: Idempotency]
+    E2 --> E3[E3: Multi-tenancy]
+    E3 --> E4[E4: Auth/RBAC]
+    E4 --> E5[E5: API Server]
+    E5 --> E6[E6: Observability]
+    E6 --> E7[E7: Operations]
+
+    subgraph 독립 가능
+        P3[P3: 성능 최적화]
+        P5[P5: 테스트 개선]
+    end
+
+    E2 -.-> P3
+    E5 -.-> P5
+```
+
+### Operations Checklist
+
+#### 신뢰성 / 운영
+- [ ] Job retry policy (transient vs deterministic error 구분)
+- [ ] Dead Letter Queue 구현
+- [ ] Graceful shutdown (SIGTERM 처리)
+- [ ] Health check 엔드포인트 (`/health/live`, `/health/ready`)
+
+#### 보안 / 접근 제어
+- [ ] OIDC/JWT 인증 흐름
+- [ ] RBAC 스코프 정의 (`tenant:admin`, `project:write`, `project:read`)
+- [ ] Audit 로그 (누가, 언제, 무엇을)
+- [ ] Secret 관리 (Vault 연동 또는 K8s Secret)
+
+#### 데이터 / 스토리지
+- [ ] Alembic 마이그레이션 스크립트
+- [ ] Row-Level Security (PostgreSQL)
+- [ ] Object Storage 연동 (S3/MinIO)
+- [ ] 데이터 보존 정책
+
+#### Observability
+- [ ] Phoenix: LLM traces (품질 디버깅)
+- [ ] Prometheus: 시스템 메트릭 (SLO 모니터링)
+- [ ] Grafana: 대시보드 템플릿
+- [ ] Alert rules 정의
+
+### CLI 인증 옵션 분리
+
+```bash
+# 모델 프로파일 (기존)
+evalvault run data.csv --profile azure-gpt4
+
+# 인증 프로파일 (신규, E4 이후)
+evalvault run data.csv --auth-profile production
+
+# API 서버 모드 (E5 이후)
+evalvault run data.csv --endpoint https://api.company.com
+```
+
+### Quick Wins (Enterprise 준비)
+
+| 항목 | 설명 | 난이도 |
+|------|------|--------|
+| Job ID 필드 추가 | EvaluationRun에 `job_id: str | None` 추가 | ⭐ |
+| Celery task 스켈레톤 | `tasks/evaluation.py` 빈 구조 생성 | ⭐ |
+| DB 스키마 설계 | `jobs` 테이블 DDL 작성 | ⭐⭐ |
+| RBAC 스코프 enum | `RBACScope` enum 정의 | ⭐ |
 
 ---
 
