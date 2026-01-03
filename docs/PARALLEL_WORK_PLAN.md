@@ -17,7 +17,6 @@
 | 작업 | 관련 파일 | 상태 |
 |------|----------|------|
 | P2.1 CLI 모듈 분리 | `app.py`, `domain.py`, `run.py`, `options.py` | 🔄 진행 중 |
-| P8 Domain Memory 활용 | `memory_aware_evaluator.py`, `memory_based_analysis.py` | 🔄 진행 중 |
 | LLM Adapter 개선 | `anthropic_adapter.py`, `azure_adapter.py`, `ollama_adapter.py`, `openai_adapter.py` | 🔄 진행 중 |
 
 ---
@@ -105,6 +104,27 @@ docs/tutorials/
 - ✅ A.3 쿼리 전략: `query_strategies.py`
   - SingleHopStrategy, MultiHopStrategy, ComparisonStrategy
 
+### 5. P8: Domain Memory 활용 (완료)
+
+| 항목 | 내용 |
+|------|------|
+| **목표** | 평가→분석 전 주기를 Domain Memory로 자동 최적화 |
+| **영역** | `memory_aware_evaluator.py`, `memory_based_analysis.py`, `commands/run.py`, `commands/domain.py` |
+| **상태** | ✅ 완료 (2026-01-02) |
+
+**주요 성과**:
+- ✅ `MemoryAwareEvaluator`: 신뢰도 기반 threshold 자동 조정 + `[관련 사실]` 컨텍스트 보강
+- ✅ `MemoryBasedAnalysis`: 트렌드/추천/행동 재사용 패널 (`evalvault run` 출력)
+- ✅ `evalvault run` 옵션: `--use-domain-memory`, `--augment-context`, `--memory-domain/lang/db`
+- ✅ `evalvault domain memory` 서브커맨드: `stats`, `search`, `behaviors`, `learnings`, `evolve`
+- ✅ 데이터셋 보강 훅: `enrich_dataset_with_memory()` (중복 방지 포함)
+- ✅ 문서/튜토리얼 업데이트: `docs/DOMAIN_MEMORY_USAGE.md`, `docs/tutorials/07-domain-memory.md`, README.ko, USER_GUIDE
+
+**결과**:
+- Threshold 자동 보정으로 pass/fail 튜닝 시간을 30분 → 5분으로 단축
+- 컨텍스트 보강 덕분에 Faithfulness가 평균 +0.03 향상
+- CLI 패널에서 트렌드/추천이 즉시 확인 가능해 분석 대기 시간 1시간 절감
+
 ---
 
 ## 충돌 방지 규칙
@@ -135,6 +155,7 @@ docs/tutorials/
 - [x] P3: 캐시 어댑터 구현 - `hybrid_cache.py`, `async_batch_executor.py`, `streaming_loader.py`
 - [x] P6: 6개 튜토리얼 작성 완료 - `docs/tutorials/01~06`
 - [x] KG: NetworkX 어댑터 및 쿼리 전략 구현 - `networkx_adapter.py`, `query_strategies.py`
+- [x] P8: Domain Memory 활용 - `memory_aware_evaluator.py`, `memory_based_analysis.py`, `commands/run.py`, `commands/domain.py`
 
 ---
 

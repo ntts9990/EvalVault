@@ -155,6 +155,10 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | `GenerationConfig` | `testset_generator.py` | 생성 설정 | 테스트셋 생성 설정 |
 | `DocumentChunker` | `document_chunker.py` | 문서 청킹 서비스 | 문서를 청크로 분할 |
 | `TestCaseEvalResult` | `evaluator.py` | 테스트 케이스 평가 결과 | 개별 평가 결과 데이터 |
+| `MemoryAwareEvaluator` | `memory_aware_evaluator.py` | 메모리 인식 평가기 | Domain Memory를 활용한 평가 최적화 및 컨텍스트 보강 |
+| `MemoryBasedAnalysis` | `memory_based_analysis.py` | 메모리 기반 분석 | Domain Memory를 활용한 트렌드 분석 및 행동 패턴 재사용 |
+| `AsyncBatchExecutor` | `async_batch_executor.py` | 비동기 배치 실행기 | 적응형 배치 크기 조절, 레이트 리밋 처리, 재시도 메커니즘 |
+| `BatchExecutor` | `batch_executor.py` | 배치 실행기 | 동기 배치 처리 |
 
 ### 2.2 Ports Layer (포트 계층)
 
@@ -501,10 +505,11 @@ DDD는 **Entities**, **Value Objects**, **Aggregates**, **Domain Services**, **R
 도메인 규칙과 비즈니스 로직을 구현하는 서비스입니다.
 
 **카테고리**:
-- **평가 서비스**: `RagasEvaluator`
-- **분석 서비스**: `AnalysisService`, `PipelineOrchestrator`
+- **평가 서비스**: `RagasEvaluator`, `MemoryAwareEvaluator`
+- **분석 서비스**: `AnalysisService`, `PipelineOrchestrator`, `MemoryBasedAnalysis`
 - **개선 서비스**: `ImprovementGuideService`
 - **학습 서비스**: `DomainLearningHook`
+- **성능 최적화**: `AsyncBatchExecutor`, `BatchExecutor`
 
 ### 5.3 인터페이스 (Interfaces)
 
@@ -549,20 +554,32 @@ DDD는 **Entities**, **Value Objects**, **Aggregates**, **Domain Services**, **R
 **역할**: 테스트 케이스를 평가하고 메트릭을 계산
 
 **클래스**:
-- **서비스**: `RagasEvaluator`
-- **포트**: `EvaluatorPort`, `LLMPort`, `EmbeddingPort`
+- **서비스**: `RagasEvaluator`, `MemoryAwareEvaluator`
+- **포트**: `EvaluatorPort`, `LLMPort`, `EmbeddingPort`, `DomainMemoryPort`
 - **어댑터**: `OpenAIAdapter`, `AnthropicAdapter`, `OllamaAdapter` 등
 - **엔티티**: `EvaluationRun`, `TestCaseResult`, `MetricScore`
+
+**메모리 활용 흐름**:
+1. `MemoryAwareEvaluator`가 `DomainMemoryPort`를 통해 과거 신뢰도 점수 조회
+2. 신뢰도 점수에 따라 threshold 자동 조정
+3. `augment_context_with_facts()`로 컨텍스트 보강 (선택적)
+4. `RagasEvaluator`로 실제 평가 실행
 
 ### 6.3 분석 단계 (Analysis Stage)
 
 **역할**: 평가 결과를 분석하여 인사이트 생성
 
 **클래스**:
-- **서비스**: `AnalysisService`, `PipelineOrchestrator`
-- **포트**: `AnalysisPort`, `AnalysisModulePort`, `NLPAnalysisPort`, `CausalAnalysisPort`
+- **서비스**: `AnalysisService`, `PipelineOrchestrator`, `MemoryBasedAnalysis`
+- **포트**: `AnalysisPort`, `AnalysisModulePort`, `NLPAnalysisPort`, `CausalAnalysisPort`, `DomainMemoryPort`
 - **어댑터**: `StatisticalAnalysisAdapter`, `NLPAnalysisAdapter`, `CausalAnalysisAdapter` 등
 - **엔티티**: `AnalysisResult`, `StatisticalAnalysis`, `NLPAnalysis`, `CausalAnalysis`
+
+**메모리 활용 흐름**:
+1. `MemoryBasedAnalysis.generate_insights()`로 과거 학습 메모리와 현재 결과 비교
+2. 트렌드 분석 (baseline 대비 delta 계산)
+3. 관련 사실 검색하여 인사이트 생성
+4. `apply_successful_behaviors()`로 성공한 행동 패턴 재사용
 
 ### 6.4 개선 단계 (Improvement Stage)
 
@@ -658,12 +675,16 @@ DDD는 **Entities**, **Value Objects**, **Aggregates**, **Domain Services**, **R
 | 클래스명 | 패키지 | 책임 | 의존성 |
 |---------|--------|------|--------|
 | `RagasEvaluator` | `domain.services.evaluator` | RAG 평가 실행 | `EvaluatorPort`, `LLMPort`, `EmbeddingPort` |
+| `MemoryAwareEvaluator` | `domain.services.memory_aware_evaluator` | 메모리 인식 평가기 | `RagasEvaluator`, `DomainMemoryPort` |
 | `AnalysisService` | `domain.services.analysis_service` | 분석 서비스 오케스트레이션 | `AnalysisPort`, `NLPAnalysisPort`, `CausalAnalysisPort` |
+| `MemoryBasedAnalysis` | `domain.services.memory_based_analysis` | 메모리 기반 분석 | `DomainMemoryPort` |
 | `ImprovementGuideService` | `domain.services.improvement_guide_service` | 개선 가이드 생성 | `PatternDetectorPort`, `InsightGeneratorPort`, `PlaybookPort` |
 | `DomainLearningHook` | `domain.services.domain_learning_hook` | 도메인 학습 훅 | `DomainMemoryPort` |
 | `PipelineOrchestrator` | `domain.services.pipeline_orchestrator` | 파이프라인 오케스트레이션 | `AnalysisModulePort`, `AnalysisCachePort` |
 | `IntentClassifier` | `domain.services.intent_classifier` | 의도 분류 | `IntentClassifierPort` |
 | `KnowledgeGraphGenerator` | `domain.services.kg_generator` | 지식 그래프 생성 | `LLMPort`, `EntityExtractor` |
+| `AsyncBatchExecutor` | `domain.services.async_batch_executor` | 비동기 배치 실행기 | 없음 (유틸리티) |
+| `BatchExecutor` | `domain.services.batch_executor` | 배치 실행기 | 없음 (유틸리티) |
 
 ### 7.3 Ports (포트)
 

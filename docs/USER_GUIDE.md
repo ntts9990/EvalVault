@@ -743,18 +743,157 @@ evalvault analyze <run_id> --include-nlp --include-causal
 
 ### 도메인 메모리 활용
 
-도메인 메모리는 평가 결과에서 학습한 지식을 축적하여 향후 평가에 활용합니다.
+도메인 메모리는 평가 결과에서 학습한 지식을 축적하여 향후 평가에 활용합니다. 과거 평가에서 학습한 패턴을 활용하여 평가 품질을 향상시키고, 관련 사실을 컨텍스트에 자동으로 추가할 수 있습니다.
+
+#### 기본 사용법
+
+```bash
+# Domain Memory를 활용한 평가 (threshold 자동 조정)
+evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --use-domain-memory \
+  --memory-domain insurance \
+  --memory-language ko
+```
+
+**동작 원리**:
+1. 과거 평가에서 학습한 메트릭별 신뢰도 점수 조회
+2. 신뢰도 점수에 따라 threshold 자동 조정:
+   - 신뢰도 < 0.6: threshold를 0.1 낮춤 (최소 0.5)
+   - 신뢰도 > 0.85: threshold를 0.05 높임 (최대 0.95)
+
+#### 컨텍스트 보강
+
+각 테스트 케이스의 질문과 관련된 사실을 자동으로 컨텍스트에 추가합니다.
+
+```bash
+# 컨텍스트 보강 옵션 사용
+evalvault run dataset.json \
+  --metrics faithfulness \
+  --use-domain-memory \
+  --augment-context \
+  --memory-domain insurance \
+  --memory-language ko
+```
+
+**동작 원리**:
+1. 각 테스트 케이스의 질문으로 관련 사실 검색
+2. 검색된 사실을 컨텍스트에 자동 추가
+3. 형식: `[관련 사실]\n- 주체 관계 객체`
+
+#### 메모리 데이터베이스 경로 지정
+
+```bash
+# 커스텀 메모리 DB 경로 지정
+evalvault run dataset.json \
+  --use-domain-memory \
+  --memory-db /path/to/custom_memory.db \
+  --memory-domain insurance
+```
+
+#### Python 코드를 통한 사용
 
 ```python
-# 평가 후 메모리 형성
+from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+
+# 메모리 어댑터 초기화
+memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+evaluator = RagasEvaluator()
+memory_evaluator = MemoryAwareEvaluator(
+    evaluator=evaluator,
+    memory_port=memory_adapter
+)
+
+# 평가 실행 (threshold 자동 조정)
+run = await memory_evaluator.evaluate_with_memory(
+    dataset=dataset,
+    metrics=["faithfulness", "answer_relevancy"],
+    llm=llm_adapter,
+    domain="insurance",
+    language="ko"
+)
+
+# 컨텍스트 보강
+augmented_context = memory_evaluator.augment_context_with_facts(
+    question="보험료는 얼마인가요?",
+    original_context="기본 컨텍스트...",
+    domain="insurance",
+    language="ko",
+    limit=5
+)
+```
+
+#### 메모리 기반 분석
+
+과거 학습 메모리와 현재 평가 결과를 비교하여 트렌드 분석 및 인사이트를 생성합니다.
+
+```python
+from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
+
+# 메모리 기반 분석 초기화
+analysis = MemoryBasedAnalysis(memory_adapter)
+
+# 인사이트 생성
+insights = analysis.generate_insights(
+    evaluation_run=run,
+    domain="insurance",
+    language="ko",
+    history_limit=10
+)
+# {
+#   "trends": {
+#     "faithfulness": {"current": 0.85, "baseline": 0.82, "delta": 0.03},
+#     ...
+#   },
+#   "related_facts": [...],
+#   "recommendations": ["faithfulness 개선 중: 현재 전략을 유지하거나 확장하세요."]
+# }
+
+# 성공한 행동 패턴 적용
+actions = analysis.apply_successful_behaviors(
+    test_case=test_case,
+    domain="insurance",
+    language="ko",
+    min_success_rate=0.8,
+    limit=5
+)
+```
+
+#### 메모리 형성 (자동)
+
+평가 완료 후 `DomainLearningHook`이 자동으로 메모리를 형성합니다. 별도 설정 없이 평가를 실행하면 메모리가 자동으로 저장됩니다.
+
+```python
+# 평가 후 메모리 형성 (자동)
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 
 hook = DomainLearningHook(memory_adapter)
-hook.on_evaluation_complete(run, domain="insurance", language="ko")
+await hook.on_evaluation_complete(
+    evaluation_run=run,
+    domain="insurance",
+    language="ko"
+)
 
 # 학습된 패턴 조회
-reliability = memory_adapter.get_aggregated_reliability("insurance", "ko")
+reliability = memory_adapter.get_aggregated_reliability(
+    domain="insurance",
+    language="ko"
+)
+# {"faithfulness": 0.85, "answer_relevancy": 0.78, ...}
 ```
+
+#### CLI 옵션 요약
+
+| 옵션 | 설명 | 기본값 |
+|------|------|--------|
+| `--use-domain-memory` | Domain Memory를 활용하여 threshold 자동 조정 | `False` |
+| `--memory-domain` | 도메인 이름 (기본값: dataset metadata에서 추출) | `None` |
+| `--memory-language` | 언어 코드 | `ko` |
+| `--memory-db` | Domain Memory 데이터베이스 경로 | `evalvault_memory.db` |
+| `--augment-context` | 각 테스트 케이스의 컨텍스트에 관련 사실 자동 추가 | `False` |
 
 ### 분석 파이프라인
 

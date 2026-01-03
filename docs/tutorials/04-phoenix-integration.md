@@ -125,8 +125,8 @@ PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
 ### Step 3: 평가 실행
 
 ```bash
-# --phoenix 플래그로 Phoenix 추적 활성화
-uv run evalvault run data.json --metrics faithfulness --phoenix
+# --tracker phoenix로 Phoenix 추적 활성화 (--phoenix-max-traces로 per-case 제한 조정)
+uv run evalvault run data.json --metrics faithfulness --tracker phoenix --phoenix-max-traces 200
 ```
 
 또는 환경 변수로 기본 활성화:
@@ -135,6 +135,22 @@ uv run evalvault run data.json --metrics faithfulness --phoenix
 export PHOENIX_ENABLED=true
 uv run evalvault run data.json --metrics faithfulness
 ```
+
+### Step 4: Dataset/Experiment 동기화
+
+```bash
+uv run evalvault run data.json \
+  --metrics faithfulness,answer_relevancy \
+  --tracker phoenix \
+  --phoenix-dataset insurance-qa-ko \
+  --phoenix-dataset-description "보험 QA v2025.01" \
+  --phoenix-experiment gemma3-ko-baseline \
+  --phoenix-experiment-description "Gemma3 vs OpenAI 비교"
+```
+
+- `--phoenix-dataset`: EvalVault 데이터셋(문제/답변/컨텍스트/threshold/메타데이터)을 Phoenix Dataset으로 업로드합니다. 설명을 생략하면 `"{name} v{version}"` 또는 `metadata.description`이 자동 적용됩니다.
+- `--phoenix-experiment`: 업로드된 Dataset과 연결된 Experiment를 생성하고 EvalVault 점수, Pass Rate, Domain Memory 상태를 Phoenix 메타데이터로 포함합니다.
+- 두 결과 모두 `result.tracker_metadata["phoenix"]`에 dataset/experiment URL을 저장하므로 CLI JSON 출력이나 후속 자동화에서 Phoenix 화면으로 바로 이동할 수 있습니다.
 
 ### 연동 확인
 
@@ -204,6 +220,16 @@ evaluation-run-abc123 (45.2s)
 └── ...
 ```
 
+### 5. Embeddings 분석
+
+Phoenix 12.27.0의 Embeddings 뷰(UMAP + HDBSCAN)는 Dataset/Experiment를 업로드한 즉시 활성화됩니다.
+
+- **Drift/Query Distance 시계열**: 기본(Primary) vs 참조(Reference) 임베딩 사이의 유클리드 거리를 시간 축으로 살펴보고 이상 구간을 클릭해 원인 분석을 시작합니다.
+- **드리프트 순 클러스터 리스트**: HDBSCAN으로 자동 생성된 클러스터를 드리프트가 큰 순서대로 정렬해 저성과/이상치 영역을 빠르게 찾을 수 있습니다.
+- **3D 포인트 클라우드 컬러링**: 정확도, 태그, 세그먼트, Domain Memory 표시 여부 등을 색상으로 지정해 문제 영역을 시각적으로 파악합니다.
+
+Dataset/Experiment 링크는 CLI 출력(`tracker_metadata["phoenix"]`)에 함께 제공되므로 클릭 한 번으로 Embeddings 탭을 열 수 있습니다.
+
 ---
 
 ## 고급 기능
@@ -259,11 +285,45 @@ Phoenix에서 자동으로 계산되는 검색 품질 메트릭:
 
 ### 임베딩 시각화
 
-Phoenix의 UMAP 시각화 기능을 활용합니다.
+Phoenix의 Embeddings Analysis(UMAP + HDBSCAN) 기능을 활용합니다.
 
 1. 대시보드에서 **Embeddings** 탭 클릭
-2. 질문/답변/컨텍스트 임베딩 선택
-3. 클러스터 분석 및 이상치 탐지
+2. 질문/답변/컨텍스트 임베딩을 선택하고 Primary/Reference 그룹을 지정
+3. **Drift** 시계열로 유클리드 거리 변화를 추적하고, 자동 정렬된 클러스터 리스트에서 이상치 구간을 찾습니다.
+4. 포인트 클라우드를 정확도·태그·세그먼트 등으로 컬러링해 실패 패턴을 시각적으로 확인합니다.
+
+### Prompt Playground Loop
+
+Phoenix Prompt Playground에서 튜닝한 프롬프트를 EvalVault 실행에 연결하려면 manifest와 전용 CLI를 사용합니다.
+
+1. Prompt ↔ Phoenix ID 매핑
+
+```bash
+uv run evalvault phoenix prompt-link agent/prompts/baseline.txt \
+  --prompt-id pr-428 \
+  --experiment-id exp-20250115 \
+  --notes "Gemma3 baseline"
+```
+
+2. 릴리즈 전 diff 확인
+
+```bash
+uv run evalvault phoenix prompt-diff \
+  agent/prompts/baseline.txt agent/prompts/system.txt \
+  --manifest agent/prompts/prompt_manifest.json \
+  --format table  # json으로 기계 처리 가능
+```
+
+3. 평가 실행에 Prompt 상태 주입
+
+```bash
+uv run evalvault run data.json --metrics faithfulness \
+  --tracker phoenix \
+  --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
+  --prompt-manifest agent/prompts/prompt_manifest.json
+```
+
+이렇게 실행하면 `result.tracker_metadata["phoenix"]["prompts"]`에 파일별 status/checksum/diff가 저장되어 Release Notes, History CLI, Streamlit UI에서 Prompt 변화와 Phoenix Trace/Dataset/Experiment 링크를 함께 확인할 수 있습니다.
 
 ### 커스텀 속성 추가
 
@@ -360,6 +420,8 @@ services:
 |------|--------|------|
 | `PHOENIX_ENABLED` | `false` | Phoenix 추적 활성화 |
 | `PHOENIX_ENDPOINT` | `http://localhost:6006/v1/traces` | Phoenix OTLP 엔드포인트 |
+| `PHOENIX_SAMPLE_RATE` | `1.0` | Phoenix Trace 샘플링 비율 (0.0~1.0) |
+| `PHOENIX_API_TOKEN` | *(빈값)* | Phoenix Cloud API 토큰 (선택) |
 
 ---
 

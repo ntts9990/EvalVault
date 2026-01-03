@@ -34,9 +34,15 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 
 ### 문서 구조
 
-- **[COMPLETED.md](./COMPLETED.md)**: Phase 1-14 달성 기록 (상세)
-- **[IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)**: 코드 품질 개선 계획
-- **[ROADMAP.md](./ROADMAP.md)** (이 문서): 향후 개발 계획
+| 문서 | 역할 | 설명 |
+|------|------|------|
+| **[ROADMAP.md](./ROADMAP.md)** (이 문서) | 전체 로드맵 | 현재 상태 요약 + 향후 개발 계획 |
+| [COMPLETED.md](./COMPLETED.md) | 완료 기록 | Phase 1-14 달성 기록 (상세) |
+| [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md) | 개선 계획 | 코드 품질 개선 계획 (병렬 AI 에이전트 기반) |
+| [PARALLEL_WORK_PLAN.md](./PARALLEL_WORK_PLAN.md) | 병렬 작업 계획 | 병렬 개발 작업 추적 (임시 문서) |
+| [PARALLEL_STATUS.md](./PARALLEL_STATUS.md) | 병렬 작업 상태 | 병렬 작업 진행 상황 (임시 문서) |
+
+> **참고**: `PARALLEL_WORK_PLAN.md`와 `PARALLEL_STATUS.md`는 병렬 작업 완료 후 정리 또는 삭제 예정입니다.
 
 ---
 

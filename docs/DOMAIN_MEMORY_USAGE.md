@@ -4,6 +4,16 @@
 
 이 문서는 EvalVault의 도메인 메모리 시스템이 현재 어떻게 구현되어 있고, 저장된 메모리를 어떻게 사용할 수 있는지(또는 사용해야 하는지)를 분석합니다.
 
+## 📚 관련 문서
+
+| 문서 | 역할 | 설명 |
+|------|------|------|
+| **[DOMAIN_MEMORY_USAGE.md](./DOMAIN_MEMORY_USAGE.md)** (이 문서) | 현황 리포트 | 구현 상태, 사용법, 향후 개선 항목 정리 |
+| [USER_GUIDE.md](./USER_GUIDE.md#도메인-메모리-활용) | 사용자 가이드 | CLI/Python 관점에서 Domain Memory를 사용하는 절차 |
+| [tutorials/07-domain-memory.md](./tutorials/07-domain-memory.md) | 튜토리얼 | 단계별 실습 및 고급 활용법 |
+| [ARCHITECTURE.md](./ARCHITECTURE.md#46-도메인-메모리-활용-흐름-domain-memory-usage-flow) | 아키텍처 | Domain Memory 형성·활용 플로우 |
+| [CLI_GUIDE.md](./CLI_GUIDE.md#4-domain-memory-서브커맨드) | CLI 참조 | `evalvault domain memory` 하위 명령 모음 |
+
 ---
 
 ## 현재 구현 상태
@@ -102,339 +112,253 @@ result = hook.run_evolution(domain="insurance", language="ko")
 
 ---
 
-## ❌ 미구현된 기능 (사용 부분)
+## ✅ 구현 완료된 기능 (사용 부분)
 
 ### 1. 평가 과정에서 메모리 활용
 
-**현재 상태**: 평가 과정에서 저장된 메모리를 조회하여 활용하는 기능이 **없음**
+**현재 상태**: 평가 과정에서 저장된 메모리를 조회하여 활용하는 기능이 **구현 완료**
 
-**필요한 기능**:
-- 평가 전: 과거 평가 결과에서 학습한 패턴을 조회하여 평가 전략 조정
-- 평가 중: 저장된 사실을 참조하여 컨텍스트 보강
-- 평가 후: 저장된 행동 패턴을 참조하여 응답 생성 최적화
+**구현 위치**:
+- `src/evalvault/domain/services/memory_aware_evaluator.py` - `MemoryAwareEvaluator`
+- `src/evalvault/adapters/inbound/cli/commands/run.py` - CLI 통합
 
-**예상 사용 시나리오**:
-```python
-# 평가 전: 과거 학습 패턴 조회
-learning = memory_adapter.get_aggregated_reliability(
-    domain="insurance",
-    language="ko"
-)
-# {"faithfulness": 0.85, "answer_relevancy": 0.78, ...}
+**구현된 기능**:
+- ✅ 평가 전: 과거 평가 결과에서 학습한 패턴을 조회하여 평가 전략 조정
+- ✅ 평가 중: 저장된 사실을 참조하여 컨텍스트 보강
+- ✅ CLI 통합: `--use-domain-memory`, `--augment-context` 옵션
 
-# 평가 중: 관련 사실 조회하여 컨텍스트 보강
-related_facts = memory_adapter.search_facts(
-    query=test_case.question,
-    domain="insurance",
-    language="ko"
-)
-# 컨텍스트에 관련 사실 추가
+**실제 사용 방법**:
 
-# 평가 후: 성공한 행동 패턴 적용
-behaviors = memory_adapter.search_behaviors(
-    context=test_case.question,
-    domain="insurance",
-    language="ko"
-)
-# 행동 패턴을 다음 평가에 활용
+#### CLI를 통한 사용
+
+```bash
+# Domain Memory를 활용한 평가 (threshold 자동 조정)
+evalvault run dataset.json \
+  --metrics faithfulness,answer_relevancy \
+  --use-domain-memory \
+  --memory-domain insurance \
+  --memory-language ko
+
+# 컨텍스트 보강 옵션 사용
+evalvault run dataset.json \
+  --metrics faithfulness \
+  --augment-context \
+  --memory-domain insurance
 ```
+
+#### Python 코드를 통한 사용
+
+```python
+from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+
+# 메모리 어댑터 초기화
+memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+evaluator = RagasEvaluator()
+memory_evaluator = MemoryAwareEvaluator(
+    evaluator=evaluator,
+    memory_port=memory_adapter
+)
+
+# 평가 전: 과거 학습 패턴 조회 및 threshold 자동 조정
+run = await memory_evaluator.evaluate_with_memory(
+    dataset=dataset,
+    metrics=["faithfulness", "answer_relevancy"],
+    llm=llm_adapter,
+    domain="insurance",
+    language="ko"
+)
+# reliability 점수에 따라 threshold가 자동으로 조정됨
+
+# 컨텍스트 보강
+augmented_context = memory_evaluator.augment_context_with_facts(
+    question="보험료는 얼마인가요?",
+    original_context="기본 컨텍스트...",
+    domain="insurance",
+    language="ko",
+    limit=5
+)
+# 관련 사실이 자동으로 컨텍스트에 추가됨
+```
+
+**동작 원리**:
+1. `evaluate_with_memory()` 호출 시 `get_aggregated_reliability()`로 과거 신뢰도 점수 조회
+2. 신뢰도 점수에 따라 threshold 자동 조정:
+   - 신뢰도 < 0.6: threshold를 0.1 낮춤 (최소 0.5)
+   - 신뢰도 > 0.85: threshold를 0.05 높임 (최대 0.95)
+3. `augment_context_with_facts()` 호출 시 질문과 관련된 사실을 검색하여 컨텍스트에 추가
 
 ### 2. 분석 과정에서 메모리 활용
 
-**현재 상태**: 분석 과정에서 저장된 메모리를 활용하는 기능이 **없음**
+**현재 상태**: 분석 과정에서 저장된 메모리를 활용하는 기능이 **구현 완료**
 
-**필요한 기능**:
-- 분석 전: 과거 분석 결과와 비교
-- 분석 중: 저장된 사실을 기반으로 인사이트 생성
-- 분석 후: 분석 결과를 메모리에 저장
+**구현 위치**:
+- `src/evalvault/domain/services/memory_based_analysis.py` - `MemoryBasedAnalysis`
 
-**예상 사용 시나리오**:
+**구현된 기능**:
+- ✅ 분석 전: 과거 분석 결과와 비교 (트렌드 분석)
+- ✅ 분석 중: 저장된 사실을 기반으로 인사이트 생성
+- ✅ 행동 패턴 재사용: 성공한 행동 패턴 자동 적용
+
+**실제 사용 방법**:
+
 ```python
-# 분석 전: 과거 학습 메모리 조회
-learnings = memory_adapter.list_learnings(
+from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+
+# 메모리 기반 분석 초기화
+memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+analysis = MemoryBasedAnalysis(memory_adapter)
+
+# 인사이트 생성 (과거 학습 메모리와 비교)
+insights = analysis.generate_insights(
+    evaluation_run=run,
     domain="insurance",
     language="ko",
-    limit=10
+    history_limit=10
 )
+# {
+#   "trends": {
+#     "faithfulness": {"current": 0.85, "baseline": 0.82, "delta": 0.03},
+#     ...
+#   },
+#   "related_facts": [...],
+#   "recommendations": ["faithfulness 개선 중: 현재 전략을 유지하거나 확장하세요."]
+# }
 
-# 분석 중: 관련 사실을 기반으로 인사이트 생성
-facts = memory_adapter.search_facts(
-    query=analysis_query,
+# 성공한 행동 패턴 적용
+actions = analysis.apply_successful_behaviors(
+    test_case=test_case,
+    domain="insurance",
+    language="ko",
+    min_success_rate=0.8,
+    limit=5
+)
+# ["retrieve_contexts", "extract_monetary_value", "generate_response"]
+```
+
+**동작 원리**:
+1. `generate_insights()`: 과거 학습 메모리와 현재 메트릭을 비교하여 트렌드 분석
+2. `apply_successful_behaviors()`: 질문 컨텍스트에 맞는 성공한 행동 패턴을 검색하여 재사용 가능한 액션 시퀀스 반환
+
+### 3. CLI 통합
+
+**현재 상태**: CLI에서 메모리를 활용하는 기능이 **구현 완료**
+
+**구현된 CLI 옵션** (`evalvault run`):
+- `--use-domain-memory`: Domain Memory를 활용하여 threshold 자동 조정
+- `--memory-domain`: 도메인 이름 지정 (기본값: dataset metadata에서 추출)
+- `--memory-language`: 언어 코드 지정 (기본값: ko)
+- `--memory-db`: Domain Memory 데이터베이스 경로 (기본값: evalvault_memory.db)
+- `--augment-context`: 각 테스트 케이스의 컨텍스트에 관련 사실 자동 추가
+
+**사용 예제**:
+
+```bash
+# 기본 사용 (threshold 자동 조정)
+evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --use-domain-memory \
+  --memory-domain insurance
+
+# 컨텍스트 보강 포함
+evalvault run dataset.json \
+  --metrics faithfulness \
+  --use-domain-memory \
+  --augment-context \
+  --memory-domain insurance \
+  --memory-language ko
+
+# 커스텀 메모리 DB 경로 지정
+evalvault run dataset.json \
+  --use-domain-memory \
+  --memory-db /path/to/custom_memory.db \
+  --memory-domain insurance
+```
+
+**동작 흐름**:
+1. `--use-domain-memory` 옵션 사용 시 `MemoryAwareEvaluator` 자동 생성
+2. 평가 전: `get_aggregated_reliability()`로 신뢰도 점수 조회 및 표시
+3. 평가 실행: 신뢰도 점수에 따라 threshold 자동 조정
+4. `--augment-context` 옵션 사용 시: 각 테스트 케이스의 질문으로 관련 사실 검색하여 컨텍스트에 추가
+
+### 4. 도메인 메모리 CLI 명령어
+
+**현재 상태**: `evalvault domain memory` 서브커맨드 세트가 **구현 완료**
+
+**구현 위치**:
+- `src/evalvault/adapters/inbound/cli/commands/domain.py`
+
+**지원 명령어**:
+- `stats`: Facts/Learnings/Behaviors/Contexts 개수를 도메인별로 요약
+- `search`: Factual 사실 검색 (`--min-score`, `--limit` 지원)
+- `behaviors`: 행동 패턴 검색 (`--min-success`, `--context` 지원)
+- `learnings`: Experiential 학습 로그 조회
+- `evolve`: consolidation/forgetting/decay 실행 (`--dry-run`, `--yes` 제공)
+
+**예시**:
+
+```bash
+$ evalvault domain memory stats --domain insurance
+$ evalvault domain memory search "청약 철회" --domain insurance --min-score 0.7
+$ evalvault domain memory behaviors --domain insurance --min-success 0.8
+$ evalvault domain memory learnings --domain insurance --limit 10
+$ evalvault domain memory evolve --domain insurance --yes
+```
+
+각 명령은 `--memory-db/-M` 옵션으로 별도 DB를 지정할 수 있으며, Rich 테이블로 결과를 출력합니다.
+
+### 5. 데이터셋 보강 (Dataset Enrichment)
+
+**현재 상태**: 평가 전 데이터셋에 메모리 사실을 추가하는 기능이 **구현 완료**
+
+**구현 위치**:
+- `src/evalvault/adapters/inbound/cli/commands/run.py` - `enrich_dataset_with_memory()`
+
+**기능**:
+- ✅ 평가 전: 각 테스트 케이스의 질문으로 관련 사실 검색
+- ✅ 컨텍스트에 관련 사실 자동 추가
+- ✅ 중복 방지 (이미 컨텍스트에 있는 사실은 추가하지 않음)
+
+**사용 방법**:
+
+```python
+from evalvault.adapters.inbound.cli.commands.run import enrich_dataset_with_memory
+from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+
+# 데이터셋 보강
+enriched_count = enrich_dataset_with_memory(
+    dataset=dataset,
+    memory_evaluator=memory_evaluator,
     domain="insurance",
     language="ko"
 )
-# 인사이트 생성 시 사실 참조
-
-# 분석 후: 분석 결과를 메모리에 저장
-# (이미 DomainLearningHook에서 수행)
-```
-
-### 3. 개선 가이드 생성 시 메모리 활용
-
-**현재 상태**: 개선 가이드 생성 시 저장된 메모리를 활용하는 기능이 **없음**
-
-**필요한 기능**:
-- 과거 성공한 행동 패턴을 개선 가이드에 포함
-- 저장된 사실을 기반으로 개선 제안 생성
-- 학습 메모리의 신뢰도 점수를 기반으로 우선순위 결정
-
-**예상 사용 시나리오**:
-```python
-# 개선 가이드 생성 시
-improvement_service = ImprovementGuideService(...)
-
-# 과거 성공한 행동 패턴 조회
-behaviors = memory_adapter.list_behaviors(
-    domain="insurance",
-    language="ko",
-    min_success_rate=0.8
-)
-
-# 개선 가이드에 성공 패턴 포함
-guide = improvement_service.generate_guide(
-    run=evaluation_run,
-    successful_behaviors=behaviors  # 메모리에서 조회한 패턴
-)
-```
-
-### 4. CLI 명령어에서 메모리 조회
-
-**현재 상태**: CLI에서 메모리를 조회하는 명령어가 **없음**
-
-**현재 CLI 명령어** (`evalvault domain`):
-- `domain init`: 도메인 설정 초기화
-- `domain list`: 도메인 목록 조회
-- `domain show`: 도메인 설정 조회
-- `domain terms`: 용어 사전 조회
-
-**필요한 CLI 명령어**:
-```bash
-# 메모리 통계 조회
-evalvault domain memory stats --domain insurance
-
-# 사실 검색
-evalvault domain memory search "보험료" --domain insurance --limit 10
-
-# 행동 패턴 조회
-evalvault domain memory behaviors --domain insurance --min-success 0.8
-
-# 학습 메모리 조회
-evalvault domain memory learnings --domain insurance --limit 10
-
-# Evolution 실행
-evalvault domain memory evolve --domain insurance
+# 보강된 테스트 케이스 수 반환
 ```
 
 ---
 
-## 메모리 활용 방안
+## 향후 개선 사항
 
-### 1. 평가 최적화 (Evaluation Optimization)
+### 1. 개선 가이드 생성 시 메모리 활용
 
-**목적**: 과거 평가에서 학습한 패턴을 활용하여 평가 품질 향상
+**현재 상태**: 개선 가이드 생성 시 저장된 메모리를 직접 활용하는 기능은 아직 없음
 
-**구현 방안**:
-```python
-class MemoryAwareEvaluator:
-    """메모리를 활용하는 평가기"""
+**향후 개선 방안**:
+- `ImprovementGuideService`와 `DomainMemoryPort`를 연결하여 성공/실패 패턴을 가이드에 반영
+- `MemoryBasedAnalysis.apply_successful_behaviors()` 결과를 개선 시나리오의 Recommended Actions로 노출
+- CLI `gate`/`run` 명령에서 생성한 Improvement Guide 패널에 메모리 출처를 표시
 
-    def __init__(
-        self,
-        evaluator: RagasEvaluator,
-        memory_port: DomainMemoryPort
-    ):
-        self.evaluator = evaluator
-        self.memory_port = memory_port
+### 2. 자동화된 리포트 및 시각화
 
-    async def evaluate_with_memory(
-        self,
-        dataset: Dataset,
-        domain: str,
-        language: str = "ko"
-    ) -> EvaluationRun:
-        # 1. 과거 학습 패턴 조회
-        reliability = self.memory_port.get_aggregated_reliability(
-            domain=domain,
-            language=language
-        )
+**현재 상태**: 메모리 기반 트렌드/사실은 CLI 결과 패널에만 표시되며, Web UI·Langfuse에는 노출되지 않음
 
-        # 2. 평가 전략 조정 (신뢰도 낮은 메트릭에 더 집중)
-        adjusted_metrics = self._adjust_metrics_by_reliability(
-            reliability
-        )
-
-        # 3. 평가 실행
-        run = await self.evaluator.evaluate(
-            dataset=dataset,
-            metrics=adjusted_metrics
-        )
-
-        # 4. 평가 중: 관련 사실 조회하여 컨텍스트 보강
-        for result in run.results:
-            related_facts = self.memory_port.search_facts(
-                query=result.question,
-                domain=domain,
-                language=language,
-                limit=3
-            )
-            # 컨텍스트에 관련 사실 추가
-
-        return run
-```
-
-### 2. 컨텍스트 보강 (Context Augmentation)
-
-**목적**: 저장된 사실을 활용하여 평가 컨텍스트 보강
-
-**구현 방안**:
-```python
-class MemoryAugmentedContext:
-    """메모리로 보강된 컨텍스트"""
-
-    def augment_context(
-        self,
-        original_context: str,
-        question: str,
-        memory_port: DomainMemoryPort,
-        domain: str,
-        language: str
-    ) -> str:
-        # 관련 사실 조회
-        facts = memory_port.search_facts(
-            query=question,
-            domain=domain,
-            language=language,
-            limit=5
-        )
-
-        # 사실을 컨텍스트에 추가
-        fact_texts = [
-            f"{fact.subject} {fact.predicate} {fact.object}"
-            for fact in facts
-        ]
-
-        augmented = original_context
-        if fact_texts:
-            augmented += "\n\n[관련 사실]\n" + "\n".join(fact_texts)
-
-        return augmented
-```
-
-### 3. 행동 패턴 재사용 (Behavior Reuse)
-
-**목적**: 과거 성공한 행동 패턴을 재사용하여 평가 효율 향상
-
-**구현 방안**:
-```python
-class BehaviorReusingEvaluator:
-    """행동 패턴을 재사용하는 평가기"""
-
-    def apply_learned_behaviors(
-        self,
-        test_case: TestCase,
-        memory_port: DomainMemoryPort,
-        domain: str,
-        language: str
-    ) -> list[str]:
-        # 관련 행동 패턴 조회
-        behaviors = memory_port.search_behaviors(
-            context=test_case.question,
-            domain=domain,
-            language=language,
-            limit=3
-        )
-
-        # 성공률 높은 행동 패턴 적용
-        actions = []
-        for behavior in behaviors:
-            if behavior.success_rate >= 0.8:
-                actions.extend(behavior.action_sequence)
-
-        return actions
-```
-
-### 4. 분석 인사이트 생성 (Analysis Insight Generation)
-
-**목적**: 저장된 메모리를 기반으로 분석 인사이트 생성
-
-**구현 방안**:
-```python
-class MemoryBasedAnalysis:
-    """메모리 기반 분석"""
-
-    def generate_insights(
-        self,
-        evaluation_run: EvaluationRun,
-        memory_port: DomainMemoryPort,
-        domain: str,
-        language: str
-    ) -> dict:
-        # 과거 학습 메모리와 비교
-        current_metrics = self._extract_metrics(evaluation_run)
-        historical_learnings = memory_port.list_learnings(
-            domain=domain,
-            language=language,
-            limit=10
-        )
-
-        # 트렌드 분석
-        trends = self._analyze_trends(
-            current=current_metrics,
-            historical=historical_learnings
-        )
-
-        # 관련 사실 기반 인사이트
-        facts = memory_port.search_facts(
-            query=evaluation_run.run_id,
-            domain=domain,
-            language=language
-        )
-
-        insights = {
-            "trends": trends,
-            "related_facts": facts,
-            "recommendations": self._generate_recommendations(
-                trends, facts
-            )
-        }
-
-        return insights
-```
-
----
-
-## 구현 우선순위
-
-### Phase 1: 기본 조회 기능 (High Priority)
-
-1. **CLI 명령어 추가**
-   - `evalvault domain memory stats`: 메모리 통계 조회
-   - `evalvault domain memory search`: 사실 검색
-   - `evalvault domain memory behaviors`: 행동 패턴 조회
-
-2. **평가 과정에서 메모리 조회**
-   - 평가 전: 과거 학습 패턴 조회
-   - 평가 중: 관련 사실 조회 (선택적)
-
-### Phase 2: 활용 기능 (Medium Priority)
-
-3. **컨텍스트 보강**
-   - 평가 중: 저장된 사실로 컨텍스트 보강
-   - 분석 중: 관련 사실 기반 인사이트 생성
-
-4. **행동 패턴 재사용**
-   - 평가 중: 성공한 행동 패턴 자동 적용
-   - 개선 가이드에 행동 패턴 포함
-
-### Phase 3: 고급 활용 (Low Priority)
-
-5. **트렌드 분석**
-   - 과거 학습 메모리와 현재 결과 비교
-   - 시계열 분석
-
-6. **자동 최적화**
-   - 메모리 기반 평가 전략 자동 조정
-   - 메모리 기반 개선 제안 자동 생성
+**향후 개선 방안**:
+- Streamlit Web UI (`uv run evalvault web`)에 Domain Memory Insights 섹션 추가
+- Langfuse/MLflow 트래커에 메모리 기반 지표를 부가 속성으로 기록
+- `evalvault analyze` 명령의 JSON 출력에 메모리 인사이트 필드를 포함하여 자동화 워크플로우에서도 활용 가능하게 확장
 
 ---
 
@@ -451,30 +375,33 @@ class MemoryBasedAnalysis:
 - 행동 검색
 - 하이브리드 검색
 
-❌ **사용 기능**: 거의 없음
-- 평가 과정에서 메모리 활용 없음
-- 분석 과정에서 메모리 활용 없음
-- CLI에서 메모리 조회 명령어 없음
+✅ **사용 기능**: 핵심 기능 구현 완료
+- ✅ 평가 과정에서 메모리 활용 (`MemoryAwareEvaluator`)
+- ✅ 분석 과정에서 메모리 활용 (`MemoryBasedAnalysis`)
+- ✅ CLI 통합 (`run` 명령 + `domain memory` 서브커맨드)
+- ✅ 데이터셋 보강 (`enrich_dataset_with_memory`)
 
-### 권장 사항
+### 구현 완료된 기능 요약
 
-1. **즉시 구현 가능**: CLI 명령어 추가
-   - 메모리 통계, 검색, 조회 명령어
+| 기능 | 구현 상태 | 위치 |
+|------|----------|------|
+| 메모리 저장 | ✅ 완료 | `DomainLearningHook`, `SQLiteDomainMemoryAdapter` |
+| 메모리 검색 | ✅ 완료 | `SQLiteDomainMemoryAdapter` |
+| 평가 최적화 | ✅ 완료 | `MemoryAwareEvaluator.evaluate_with_memory()` |
+| 컨텍스트 보강 | ✅ 완료 | `MemoryAwareEvaluator.augment_context_with_facts()` |
+| 트렌드 분석 | ✅ 완료 | `MemoryBasedAnalysis.generate_insights()` |
+| 행동 패턴 재사용 | ✅ 완료 | `MemoryBasedAnalysis.apply_successful_behaviors()` |
+| CLI 통합 | ✅ 완료 | `run` 명령어 옵션 |
+| 메모리 CLI 명령어 | ✅ 완료 | `domain` 명령의 `memory` 서브커맨드 |
+| 데이터셋 보강 | ✅ 완료 | `enrich_dataset_with_memory()` |
 
-2. **단기 구현**: 평가 과정에서 메모리 활용
-   - 평가 전 학습 패턴 조회
-   - 평가 중 관련 사실 조회
+### 향후 개선 사항
 
-3. **중기 구현**: 컨텍스트 보강 및 행동 패턴 재사용
-   - 메모리 기반 컨텍스트 보강
-   - 성공한 행동 패턴 자동 적용
-
-4. **장기 구현**: 자동 최적화
-   - 메모리 기반 평가 전략 자동 조정
-   - 메모리 기반 개선 제안 자동 생성
+1. **개선 가이드 통합**: `ImprovementGuideService`와 Domain Memory를 연결하여 행동 패턴/사실을 기반으로 한 권고안을 생성
+2. **자동화된 리포트**: Web UI·Langfuse·`evalvault analyze` 출력에 메모리 인사이트를 포함해 시각화/자동화를 지원
 
 ---
 
-**문서 버전**: 1.0
-**최종 업데이트**: 2026년
-**작성 기준**: EvalVault 프로젝트 코드베이스 분석
+**문서 버전**: 2.0
+**최종 업데이트**: 2026-01-02
+**작성 기준**: EvalVault 1.5.0 코드베이스 분석

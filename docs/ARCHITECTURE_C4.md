@@ -10,6 +10,14 @@
 
 이 문서는 EvalVault의 아키텍처를 C4 Model 방법론에 따라 계층적으로 설명합니다.
 
+## 📚 관련 문서
+
+| 문서 | 역할 | 설명 |
+|------|------|------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 메인 아키텍처 가이드 | 상세한 아키텍처 설명, 설계 원칙, 데이터 흐름 |
+| **[ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md)** (이 문서) | C4 다이어그램 | C4 Model 기반 계층적 아키텍처 다이어그램 |
+| [ARCHITECTURE_AUDIT.md](./ARCHITECTURE_AUDIT.md) | 아키텍처 감사 | 아키텍처 감사 결과 및 개선 제안 |
+
 ---
 
 ## 목차

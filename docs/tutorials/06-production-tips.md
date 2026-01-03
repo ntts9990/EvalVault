@@ -98,6 +98,8 @@ OPENAI_API_KEY=sk-...
 | `OLLAMA_BASE_URL` | 조건부 | localhost:11434 | Ollama 사용 시 |
 | `PHOENIX_ENABLED` | 권장 | false | 모니터링 활성화 |
 | `PHOENIX_ENDPOINT` | 조건부 | localhost:6006 | Phoenix 사용 시 |
+| `PHOENIX_SAMPLE_RATE` | 선택 | 1.0 | Phoenix Trace 샘플링 비율 (0.0~1.0) |
+| `PHOENIX_API_TOKEN` | 선택 | *(빈값)* | Phoenix Cloud API 토큰 (선택) |
 
 ---
 
@@ -170,6 +172,21 @@ def evaluate_with_retry(dataset, metrics):
 PHOENIX_ENABLED=true
 PHOENIX_ENDPOINT=http://phoenix:6006/v1/traces
 ```
+
+#### Phoenix Dataset / Experiment 파이프라인
+
+- 프로덕션 데이터셋을 Phoenix에 업로드하여 Embeddings/Cluster 시각화를 유지합니다.
+- Experiment를 생성해 모델/프롬프트 릴리즈마다 비교 가능한 Run을 고정합니다.
+
+```bash
+uv run evalvault run data.json \
+  --metrics faithfulness,answer_relevancy \
+  --tracker phoenix \
+  --phoenix-dataset prod-insurance-qa \
+  --phoenix-experiment release-2025w02
+```
+
+CI에서 JSON 출력의 `tracker_metadata["phoenix"]`를 파싱해 Experiment URL을 릴리즈 노트나 Slack 알림에 포함시키면 운영자가 Phoenix에서 즉시 임베딩 시각화와 Drift 알림을 확인할 수 있습니다.
 
 ### 로깅 설정
 
