@@ -7,6 +7,7 @@ from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncOpenAI
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
 
 
@@ -94,12 +95,21 @@ class OpenAIAdapter(BaseLLMAdapter):
         Returns:
             Generated text string
         """
-        response = await self._client.chat.completions.create(
-            model=self._model_name,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=8192,  # 긴 보고서를 위해 증가
-        )
-        return response.choices[0].message.content or ""
+        attrs = {
+            "llm.provider": "openai",
+            "llm.model": self._model_name,
+            "llm.mode": "async",
+        }
+        with instrumentation_span("llm.generate_text", attrs) as span:
+            response = await self._client.chat.completions.create(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=8192,  # 긴 보고서를 위해 증가
+            )
+            content = response.choices[0].message.content or ""
+            if span:
+                set_span_attributes(span, {"llm.response.length": len(content)})
+        return content
 
     def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
         """Generate text from a prompt (sync).
@@ -135,5 +145,14 @@ class OpenAIAdapter(BaseLLMAdapter):
         if json_mode:
             api_kwargs["response_format"] = {"type": "json_object"}
 
-        response = sync_client.chat.completions.create(**api_kwargs)
-        return response.choices[0].message.content or ""
+        attrs = {
+            "llm.provider": "openai",
+            "llm.model": self._model_name,
+            "llm.mode": "sync",
+        }
+        with instrumentation_span("llm.generate_text", attrs) as span:
+            response = sync_client.chat.completions.create(**api_kwargs)
+            content = response.choices[0].message.content or ""
+            if span:
+                set_span_attributes(span, {"llm.response.length": len(content)})
+        return content

@@ -64,6 +64,7 @@ class OllamaAdapter(BaseLLMAdapter):
         ragas_client = ThinkingTokenTrackingAsyncOpenAI(
             usage_tracker=self._token_usage,
             think_level=self._think_level,
+            provider_name="ollama",
             **chat_kwargs,
         )
 
@@ -223,3 +224,52 @@ class OllamaAdapter(BaseLLMAdapter):
                     return future.result()
         else:
             return asyncio.run(self.embed(texts, model, dimension))
+
+    async def agenerate_text(self, prompt: str) -> str:
+        """Generate text from a prompt (async).
+
+        Uses the Ollama OpenAI-compatible API for simple text generation.
+
+        Args:
+            prompt: The prompt to generate text from
+
+        Returns:
+            Generated text string
+        """
+        response = await self._embedding_client.chat.completions.create(
+            model=self._ollama_model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content or ""
+
+    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+        """Generate text from a prompt (sync).
+
+        Args:
+            prompt: The prompt to generate text from
+            json_mode: If True, force JSON response format (not fully supported by all Ollama models)
+
+        Returns:
+            Generated text string
+        """
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            try:
+                import nest_asyncio
+
+                nest_asyncio.apply()
+                return loop.run_until_complete(self.agenerate_text(prompt))
+            except ImportError:
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.agenerate_text(prompt))
+                    return future.result()
+        else:
+            return asyncio.run(self.agenerate_text(prompt))
