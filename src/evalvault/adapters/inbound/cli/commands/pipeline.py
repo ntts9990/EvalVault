@@ -10,6 +10,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
+from evalvault.config.settings import Settings
 
 from ..utils.options import db_option
 
@@ -49,6 +51,10 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
 
         console.print("\n[bold]Pipeline Analysis[/bold]\n")
         console.print(f"Query: [cyan]{query}[/cyan]")
+
+        settings = Settings()
+        if settings.phoenix_enabled:
+            ensure_phoenix_instrumentation(settings, console=console)
 
         service = AnalysisPipelineService()
         storage = SQLiteStorageAdapter(db_path=db_path)

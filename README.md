@@ -25,11 +25,13 @@ minimal wiring.
 - Batteries-included Typer CLI for running, comparing, and exporting evaluation runs
 - Profile-driven model wiring with OpenAI and Ollama defaults
 - Optional Langfuse integration for trace-level inspection
+- Phoenix observability hooks for OpenTelemetry tracing, dataset sync, embedding drill-down, and prompt manifest tracking
+- Prompt Playground loop that links Phoenix prompt IDs, diffs, and EvalVault runs in one manifest
 - Dataset loaders for JSON, CSV, and Excel sources
 - Cross-platform support (Linux, macOS, Windows)
 - **Web UI**: Streamlit dashboard for evaluation, history, and reports
 - **Korean NLP**: Morphological analysis with Kiwi, BM25/Dense/Hybrid retrieval
-- **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
+- **Domain Memory**: Learn from evaluation results for continuous improvement (auto thresholds, context boosts, trend insights)
 - **NLP Analysis**: Text statistics, question type classification, keyword extraction
 - **Causal Analysis**: Root cause analysis and causal relationship discovery
 - **Knowledge Graph**: Automatic test set generation from documents
@@ -55,11 +57,13 @@ uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 - Standardized scoring with six Ragas v1.0 metrics + domain-specific metrics
 - JSON/CSV/Excel dataset loaders with versioned metadata
 - Automatic result storage in SQLite + PostgreSQL + Langfuse/MLflow
+- Phoenix integration: OpenTelemetry tracing, `--phoenix-max-traces`, dataset/experiment sync, embedding analysis, prompt manifest/diff workflow
+- Prompt manifest + diff commands to stamp Phoenix prompt IDs onto agent files and tracker metadata
 - Air-gapped compatibility through Ollama profiles
 - Cross-platform CLI with thoughtful defaults
 - **Web UI**: Streamlit dashboard with evaluation, history, and report generation
 - **Korean NLP**: Morphological analysis (Kiwi), BM25/Dense/Hybrid retrieval
-- **Domain Memory**: Learn from evaluation results for continuous improvement (feedback loop)
+- **Domain Memory**: Learn from evaluation results for continuous improvement (auto thresholds, context boosts, trend insights)
 - **NLP Analysis**: Text statistics, question type classification, keyword extraction, topic clustering
 - **Causal Analysis**: Root cause analysis, causal relationship discovery, improvement suggestions
 - **Knowledge Graph**: Automatic test set generation from documents
@@ -95,9 +99,146 @@ uv sync --extra dev --extra analysis --extra korean --extra web
 | `web` | streamlit, plotly | Streamlit Web UI Dashboard |
 | `postgres` | psycopg | PostgreSQL storage support |
 | `mlflow` | mlflow | MLflow tracker integration |
+| `phoenix` | arize-phoenix, openinference-instrumentation-langchain, opentelemetry-sdk, opentelemetry-exporter-otlp | Phoenix tracing, dataset sync, embedding analysis |
 | `anthropic` | anthropic | Anthropic LLM adapter |
 
 > **Note**: The `.python-version` file pins Python to 3.12. uv will automatically download and use Python 3.12 if not already installed.
+
+## Phoenix Observability (Tracing + Experiments)
+
+EvalVault ships with optional Phoenix instrumentation tested against `arize-phoenix` 12.27.0. Install the `phoenix` extra (`uv sync --extra phoenix`) to pull the OpenTelemetry exporters and Phoenix client helpers, then set the following in `.env`:
+
+```bash
+PHOENIX_ENABLED=true
+PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
+PHOENIX_API_TOKEN= # Phoenix Cloud only
+PHOENIX_SAMPLE_RATE=1.0
+```
+
+### Tracker & Trace Options
+
+- `--tracker phoenix` enables OpenInference tracing for each test case. Use `--phoenix-max-traces` to cap how many cases are pushed per run.
+- The CLI automatically pushes span metadata such as dataset path, metric names, Domain Memory status, and per-run reliability snapshots so you can slice traces inside Phoenix.
+- JSON output embeds `tracker_metadata["phoenix"]["trace_url"]` whenever Phoenix logging succeeds.
+
+### Dataset / Experiment Sync
+
+Use the new CLI switches to mirror EvalVault datasets and experiments inside Phoenix:
+
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --tracker phoenix \
+  --phoenix-dataset insurance-qa-ko \
+  --phoenix-dataset-description "보험 QA v2025.01" \
+  --phoenix-experiment gemma3-ko-baseline \
+  --phoenix-experiment-description "Gemma3 vs OpenAI 비교"
+```
+
+- `--phoenix-dataset` uploads the active EvalVault dataset with contexts, answers, metadata, and thresholds. Add `--phoenix-dataset-description` or rely on dataset metadata/`{name} v{version}`.
+- `--phoenix-experiment` creates a Phoenix Experiment tied to the uploaded dataset and stores EvalVault metrics, pass rate, and Domain Memory signals. Override the default description via `--phoenix-experiment-description`.
+- Both operations add URLs (dataset + experiment) under `result.tracker_metadata["phoenix"]` so downstream automation can deep-link into Phoenix.
+
+### Embedding Visualization & Analysis
+
+Phoenix 12.27.0 ships an Embeddings Analysis workspace (UMAP + HDBSCAN) that shows:
+
+- **Drift over Time** & Query Distance: Euclidean distance charts highlight when primary vs reference embeddings start diverging.
+- **Clusters Ordered by Drift**: Automatic HDBSCAN clustering surfaces under-performing or anomalous semantic regions first.
+- **3D Point Cloud Coloring**: Color points by correctness, tags, or inference cohorts to debug failure pockets quickly.
+
+Uploading EvalVault datasets unlocks this view immediately—click the dataset or experiment URL from the CLI output/JSON and open the “Embeddings” tab to inspect question/answer/context vectors, overlay Domain Memory tags, and export clusters back into EvalVault.
+
+### Offline Embedding Export
+
+Generate CSV/Parquet snapshots (text + 2D projections + clusters) for Domain Memory cross-analysis:
+
+```bash
+uv run evalvault phoenix export-embeddings \
+  --dataset phoenix-dataset-id \
+  --endpoint http://localhost:6006 \
+  --output tmp/phoenix_embeddings.csv
+```
+
+UMAP/HDBSCAN is used when available; otherwise the command falls back to PCA/DBSCAN so you always have quick-look embeddings.
+
+### Prompt Playground Loop (Phoenix Prompts)
+
+Phoenix’s Prompt Playground lets you pin prompt iterations to experiments. EvalVault mirrors that context with a manifest (`agent/prompts/prompt_manifest.json` by default) plus CLI helpers:
+
+1. **Link prompt files to Phoenix IDs**
+
+```bash
+uv run evalvault phoenix prompt-link agent/prompts/baseline.txt \
+  --prompt-id pr-428 \
+  --experiment-id exp-20250115 \
+  --notes "Gemma3 baseline prompt"
+```
+
+2. **Review drift before shipping**
+
+```bash
+uv run evalvault phoenix prompt-diff \
+  agent/prompts/baseline.txt agent/prompts/system.txt \
+  --manifest agent/prompts/prompt_manifest.json \
+  --format table  # or json
+```
+
+3. **Attach prompt metadata to evaluation runs**
+
+```bash
+uv run evalvault run data.json --metrics faithfulness \
+  --profile prod \
+  --tracker phoenix \
+  --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
+  --prompt-manifest agent/prompts/prompt_manifest.json
+```
+
+> **Prompt loop tip**: Use the `prod` profile (`gpt-oss-safeguard:20b` via OpenAI OSS) whenever you run Phoenix-instrumented prompt loops. This model supports tool-calling, so Phoenix can attach diff metadata without the “does not support tools” error that lightweight Ollama models (e.g., `gemma3:1b`) raise. The run takes longer but keeps prompt regression telemetry intact.
+
+`result.tracker_metadata["phoenix"]["prompts"]` now captures the status for each file (synced/untracked/modified), checksums, and diffs so release notes, history tables, and the Streamlit UI can show prompt drift next to trace/dataset/experiment links.
+
+> Reference: [Phoenix Embeddings Analysis (arize-phoenix-v12.27.0)](https://github.com/Arize-ai/phoenix/blob/arize-phoenix-v12.27.0/docs/phoenix/cookbook/retrieval-and-inferences/embeddings-analysis.mdx). EvalVault aligns with this tag when surfacing embeddings, prompt metadata, and experiment links.
+
+### Phoenix Drift Watcher & Auto Gate
+
+Use `scripts/ops/phoenix_watch.py` to poll Phoenix experiments, push Slack alerts, and trigger `evalvault gate` when embedding drift climbs above an SLA. The watcher:
+
+- Pulls Phoenix datasets via REST, tracking the last seen timestamp to avoid duplicate notifications.
+- Evaluates a configurable metric key (default `embedding_drift_score`) and emits threshold alerts in both the terminal and Slack.
+- Can run any EvalVault Gate command (or custom shell pipeline) once drift is above the threshold, guaranteeing the regression suite runs automatically.
+- When `--run-regressions threshold` or `--run-regressions event` is supplied, automatically invokes `scripts/tests/run_regressions.py` (backed by `config/regressions/default.json`) so smoke/regression pytest suites execute immediately after a Phoenix alert.
+
+```bash
+uv run python scripts/ops/phoenix_watch.py \
+  --endpoint http://localhost:6006 \
+  --dataset-id ds_123 \
+  --drift-key embedding_drift_score \
+  --drift-threshold 0.18 \
+  --slack-webhook https://hooks.slack.com/services/... \
+  --gate-command "uv run evalvault gate tests/fixtures/gates/regression.yaml --profile prod" \
+  --run-regressions threshold \
+  --regression-config config/regressions/default.json
+```
+
+### Release Notes Automation
+
+The `phoenix_trace_url`, dataset, and experiment links are now exposed through a helper (`evalvault.config.phoenix_support.format_phoenix_links`) so downstream surfaces stay in sync. Generate Markdown or Slack-ready release notes straight from the CLI JSON:
+
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --output run.json
+uv run python scripts/reports/generate_release_notes.py \
+  --summary run.json \
+  --style markdown \
+  --out reports/release_notes.md
+```
+
+Passing `--style slack` renders `<>` links that can be posted directly to your on-call channel together with Phoenix trace/dataset/experiment links and the embedding export CLI.
+
+### Phoenix Surfaces in CLI & Web
+
+- `uv run evalvault history` adds `Phoenix P@K` and `Drift` columns whenever the stored run includes Phoenix experiment metadata. The resolver pulls precision@k and drift scores directly from the Phoenix REST API (using `PHOENIX_ENDPOINT`/`PHOENIX_API_TOKEN`) so CLI reviewers can jump straight to anomalous experiments.
+- The Streamlit dashboard, history table, and report selector show the same metrics plus deep links to the Phoenix experiment page, making it easy to pivot from EvalVault stats to the Embeddings/Trace workspace.
 
 ---
 
@@ -330,6 +471,21 @@ uv run evalvault web --port 8501
 uv run evalvault pipeline analyze "요약해줘" --run-id <run_id>
 uv run evalvault pipeline intents     # List analysis intents
 uv run evalvault pipeline templates   # List pipeline templates
+
+# Domain Memory (auto threshold tuning)
+uv run evalvault run data.json --metrics faithfulness \
+  --use-domain-memory --memory-domain insurance --memory-language ko
+
+# Domain Memory + context augmentation
+uv run evalvault run data.json --metrics faithfulness \
+  --use-domain-memory --augment-context --memory-domain insurance
+
+# Ingest Phoenix embedding clusters into Domain Memory
+uv run evalvault domain memory ingest-embeddings phoenix_embeddings.csv \
+  --domain insurance \
+  --language ko \
+  --min-cluster-size 5 \
+  --sample-size 3
 
 # Run benchmarks
 uv run evalvault benchmark run --name korean-rag

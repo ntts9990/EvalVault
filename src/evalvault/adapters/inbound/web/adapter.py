@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from evalvault.config.phoenix_support import PhoenixExperimentResolver
+from evalvault.config.settings import Settings
+from evalvault.domain.services.prompt_status import extract_prompt_entries
 from evalvault.ports.inbound.web_port import (
     EvalProgress,
     EvalRequest,
@@ -72,6 +75,7 @@ class WebUIAdapter:
         report_generator: object | None = None,
         llm_adapter: LLMPort | None = None,
         data_loader: object | None = None,
+        settings: Settings | None = None,
     ):
         """어댑터 초기화.
 
@@ -87,6 +91,63 @@ class WebUIAdapter:
         self._report_generator = report_generator
         self._llm_adapter = llm_adapter
         self._data_loader = data_loader
+        self._settings = settings
+        self._phoenix_resolver: PhoenixExperimentResolver | None = None
+        self._phoenix_resolver_checked = False
+
+    def _get_phoenix_resolver(self) -> PhoenixExperimentResolver | None:
+        """Lazily initialize Phoenix resolver if available."""
+
+        if self._phoenix_resolver_checked:
+            return self._phoenix_resolver
+
+        self._phoenix_resolver_checked = True
+        try:
+            settings = self._settings or Settings()
+        except Exception:
+            self._settings = None
+            self._phoenix_resolver = None
+            return None
+
+        self._settings = settings
+        resolver = PhoenixExperimentResolver(settings)
+        if not resolver.is_available:
+            self._phoenix_resolver = None
+            return None
+
+        self._phoenix_resolver = resolver
+        return resolver
+
+    def _get_llm_for_model(self, model_id: str | None) -> LLMPort | None:
+        """Get LLM adapter for specified model, or default if None.
+
+        Args:
+            model_id: Model ID in format "provider/model_name", or None for default
+
+        Returns:
+            LLMPort instance for the specified model, or default adapter
+        """
+        if model_id is None:
+            return self._llm_adapter
+
+        # Parse model_id: "provider/model_name"
+        if "/" not in model_id:
+            logger.warning(f"Invalid model_id format: {model_id}, using default")
+            return self._llm_adapter
+
+        provider, model_name = model_id.split("/", 1)
+
+        # Get base settings
+        settings = self._settings or Settings()
+
+        # Create adapter for specific model
+        from evalvault.adapters.outbound.llm import create_llm_adapter_for_model
+
+        try:
+            return create_llm_adapter_for_model(provider, model_name, settings)
+        except Exception as e:
+            logger.warning(f"Failed to create LLM adapter for {model_id}: {e}, using default")
+            return self._llm_adapter
 
     def run_evaluation(
         self,
@@ -181,6 +242,8 @@ class WebUIAdapter:
             logger.warning("Storage not configured, returning empty list")
             return []
 
+        resolver = self._get_phoenix_resolver()
+
         try:
             # 저장소에서 평가 목록 조회
             runs = self._storage.list_runs(limit=limit)
@@ -188,6 +251,7 @@ class WebUIAdapter:
             # RunSummary로 변환
             summaries = []
             for run in runs:
+                prompt_entries = extract_prompt_entries(getattr(run, "tracker_metadata", None))
                 summary = RunSummary(
                     run_id=run.run_id,
                     dataset_name=run.dataset_name,
@@ -199,7 +263,16 @@ class WebUIAdapter:
                     metrics_evaluated=run.metrics_evaluated,
                     total_tokens=run.total_tokens,
                     total_cost_usd=run.total_cost_usd,
+                    phoenix_prompts=prompt_entries,
                 )
+
+                if resolver and resolver.can_resolve(getattr(run, "tracker_metadata", None)):
+                    stats = resolver.get_stats(getattr(run, "tracker_metadata", None))
+                    if stats:
+                        summary.phoenix_precision = stats.precision_at_k
+                        summary.phoenix_drift = stats.drift_score
+                        summary.phoenix_experiment_url = stats.experiment_url
+                        summary.phoenix_dataset_url = stats.dataset_url
 
                 # 필터 적용
                 if filters:
@@ -478,6 +551,7 @@ class WebUIAdapter:
         *,
         include_llm: bool = False,
         metrics: list[str] | None = None,
+        model_id: str | None = None,
     ) -> ImprovementReport:
         """개선 가이드 생성.
 
@@ -487,6 +561,7 @@ class WebUIAdapter:
             run_id: 분석할 평가 실행 ID
             include_llm: LLM 기반 분석 포함 여부
             metrics: 분석할 메트릭 (None이면 모두)
+            model_id: 사용할 모델 ID (None이면 기본 모델)
 
         Returns:
             ImprovementReport 개선 가이드 리포트
@@ -534,8 +609,10 @@ class WebUIAdapter:
 
         # 인사이트 생성기 초기화 (LLM 사용 시)
         generator = None
-        if include_llm and self._llm_adapter:
-            generator = InsightGenerator(llm_adapter=self._llm_adapter)
+        if include_llm:
+            llm_adapter = self._get_llm_for_model(model_id)
+            if llm_adapter:
+                generator = InsightGenerator(llm_adapter=llm_adapter)
 
         # 서비스 초기화 및 리포트 생성
         # max_llm_samples=2로 설정하여 LLM 호출 수 감소 (속도 개선)
@@ -616,6 +693,7 @@ class WebUIAdapter:
         *,
         metrics_to_analyze: list[str] | None = None,
         thresholds: dict[str, float] | None = None,
+        model_id: str | None = None,
     ):
         """LLM 기반 지능형 보고서 생성.
 
@@ -626,6 +704,7 @@ class WebUIAdapter:
             run_id: 분석할 평가 실행 ID
             metrics_to_analyze: 분석할 메트릭 (None이면 모두)
             thresholds: 메트릭별 임계값
+            model_id: 사용할 모델 ID (None이면 기본 모델)
 
         Returns:
             LLMReport 인스턴스
@@ -636,7 +715,10 @@ class WebUIAdapter:
         """
         if self._storage is None:
             raise RuntimeError("Storage not configured")
-        if self._llm_adapter is None:
+
+        # Get LLM adapter (default or model-specific)
+        llm_adapter = self._get_llm_for_model(model_id)
+        if llm_adapter is None:
             raise RuntimeError("LLM adapter not configured. .env에 OPENAI_API_KEY를 설정하세요.")
 
         # 평가 결과 조회
@@ -648,7 +730,7 @@ class WebUIAdapter:
         from evalvault.adapters.outbound.report import LLMReportGenerator
 
         generator = LLMReportGenerator(
-            llm_adapter=self._llm_adapter,
+            llm_adapter=llm_adapter,
             include_research_insights=True,
             include_action_items=True,
         )
@@ -693,4 +775,5 @@ def create_adapter() -> WebUIAdapter:
         storage=storage,
         evaluator=evaluator,
         llm_adapter=llm_adapter,
+        settings=settings,
     )

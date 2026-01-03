@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS evaluation_runs (
     metrics_evaluated JSONB,  -- JSON array of metric names
     thresholds JSONB,  -- JSON object of metric thresholds
     langfuse_trace_id VARCHAR(255),
+    metadata JSONB,  -- Tracker metadata (Phoenix, Langfuse, etc.)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

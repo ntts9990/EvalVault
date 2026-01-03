@@ -17,6 +17,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
+
 if TYPE_CHECKING:
     from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
 
@@ -101,32 +103,40 @@ class KoreanBM25Retriever:
         Raises:
             ImportError: rank-bm25가 설치되지 않은 경우
         """
-        try:
-            from rank_bm25 import BM25Okapi
-        except ImportError as e:
-            raise ImportError(
-                "rank-bm25가 설치되지 않았습니다. "
-                "'uv add rank-bm25' 또는 'pip install rank-bm25'로 설치하세요."
-            ) from e
+        span_attrs = {"retriever.documents": len(documents), "retriever.type": "bm25"}
+        with instrumentation_span("retriever.bm25.index", span_attrs) as span:
+            try:
+                from rank_bm25 import BM25Okapi
+            except ImportError as e:
+                raise ImportError(
+                    "rank-bm25가 설치되지 않았습니다. "
+                    "'uv add rank-bm25' 또는 'pip install rank-bm25'로 설치하세요."
+                ) from e
 
-        if not documents:
-            logger.warning("빈 문서 리스트로 인덱싱 시도")
-            return 0
+            if not documents:
+                logger.warning("빈 문서 리스트로 인덱싱 시도")
+                return 0
 
-        self._documents = documents
-        self._tokenized_docs = [self._tokenizer.tokenize(doc) for doc in documents]
+            self._documents = documents
+            self._tokenized_docs = [self._tokenizer.tokenize(doc) for doc in documents]
 
-        # 빈 토큰 리스트 처리
-        self._tokenized_docs = [tokens if tokens else [""] for tokens in self._tokenized_docs]
+            # 빈 토큰 리스트 처리
+            self._tokenized_docs = [tokens if tokens else [""] for tokens in self._tokenized_docs]
 
-        self._bm25 = BM25Okapi(
-            self._tokenized_docs,
-            k1=self._k1,
-            b=self._b,
-        )
+            self._bm25 = BM25Okapi(
+                self._tokenized_docs,
+                k1=self._k1,
+                b=self._b,
+            )
 
-        logger.info(f"BM25 인덱스 구축 완료: {len(documents)}개 문서")
-        return len(documents)
+            if span:
+                set_span_attributes(
+                    span,
+                    {"retriever.tokenizer": self._tokenizer.__class__.__name__},
+                )
+
+            logger.info(f"BM25 인덱스 구축 완료: {len(documents)}개 문서")
+            return len(documents)
 
     def search(
         self,
@@ -147,35 +157,44 @@ class KoreanBM25Retriever:
         Raises:
             ValueError: 인덱스가 구축되지 않은 경우
         """
+        span_attrs = {
+            "retriever.type": "bm25",
+            "retriever.query.length": len(query or ""),
+            "retriever.top_k": top_k,
+        }
         if not self.is_indexed:
             raise ValueError("인덱스가 구축되지 않았습니다. index()를 먼저 호출하세요.")
 
-        # 쿼리 토큰화
-        query_tokens = self._tokenizer.tokenize(query)
-        if not query_tokens:
-            logger.warning(f"쿼리에서 토큰을 추출할 수 없음: {query}")
-            return []
+        with instrumentation_span("retriever.bm25.search", span_attrs) as span:
+            # 쿼리 토큰화
+            query_tokens = self._tokenizer.tokenize(query)
+            if not query_tokens:
+                logger.warning(f"쿼리에서 토큰을 추출할 수 없음: {query}")
+                return []
 
-        # BM25 점수 계산
-        scores = self._bm25.get_scores(query_tokens)
+            # BM25 점수 계산
+            scores = self._bm25.get_scores(query_tokens)
 
-        # 상위 k개 인덱스
-        top_indices = scores.argsort()[::-1][:top_k]
+            # 상위 k개 인덱스
+            top_indices = scores.argsort()[::-1][:top_k]
 
-        results = []
-        for idx in top_indices:
-            idx = int(idx)
-            score = float(scores[idx])
+            results = []
+            for idx in top_indices:
+                idx = int(idx)
+                score = float(scores[idx])
 
-            result = RetrievalResult(
-                document=self._documents[idx],
-                score=score,
-                doc_id=idx,
-                tokens=self._tokenized_docs[idx] if include_tokens else None,
-            )
-            results.append(result)
+                result = RetrievalResult(
+                    document=self._documents[idx],
+                    score=score,
+                    doc_id=idx,
+                    tokens=self._tokenized_docs[idx] if include_tokens else None,
+                )
+                results.append(result)
 
-        return results
+            if span:
+                set_span_attributes(span, {"retriever.result_count": len(results)})
+
+            return results
 
     def search_with_scores(
         self,

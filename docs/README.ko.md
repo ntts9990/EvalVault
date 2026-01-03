@@ -24,11 +24,13 @@ SQLite 또는 Langfuse에 결과를 저장합니다. OpenAI, Ollama, 폐쇄망 �
 - Typer 기반 CLI로 평가·비교·내보내기를 한 번에 수행
 - OpenAI/Ollama 프로필 기반 의존성 주입
 - Langfuse 연동으로 트레이스 단위 분석
+- Phoenix 연동으로 OpenTelemetry 트레이싱·데이터셋/실험 동기화·임베딩 분석·프롬프트 manifest 추적 제공
+- Prompt Playground 루프로 Phoenix Prompt ID/차이를 EvalVault 실행과 동기화
 - JSON/CSV/Excel 데이터 로더
 - Linux·macOS·Windows 호환
 - **Web UI**: Streamlit 대시보드로 평가, 이력, 리포트 관리
 - **Korean NLP**: Kiwi 형태소 분석, BM25/Dense/Hybrid 검색
-- **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (학습 피드백 루프)
+- **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (threshold 자동 조정, 컨텍스트 보강, 트렌드 분석)
 - **NLP Analysis**: 텍스트 통계, 질문 유형 분류, 키워드 추출
 - **Causal Analysis**: 인과 관계 분석 및 근본 원인 파악
 - **Knowledge Graph**: 문서에서 자동으로 테스트셋 생성
@@ -54,11 +56,13 @@ uv run evalvault run tests/fixtures/sample_dataset.json --metrics faithfulness
 - Ragas v1.0 기반 6가지 표준 메트릭 + 도메인 특화 메트릭
 - 버전 메타데이터를 포함한 JSON/CSV/Excel 데이터셋
 - SQLite + PostgreSQL + Langfuse/MLflow 자동 결과 저장
+- Phoenix 통합: OpenTelemetry 트레이싱, `--phoenix-max-traces`, 데이터셋/실험 동기화, 임베딩 분석, Prompt manifest/diff 워크플로
+- Prompt manifest + diff 명령으로 Phoenix Prompt ID를 agent 파일 및 트래커 메타데이터에 기록
 - Ollama 프로필을 통한 폐쇄망/온프레미스 지원
 - 간결한 CLI UX
 - **Web UI**: Streamlit 대시보드로 평가, 이력, 리포트 생성
 - **Korean NLP**: Kiwi 형태소 분석, BM25/Dense/Hybrid 검색
-- **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (학습 피드백 루프)
+- **Domain Memory**: 평가 결과에서 학습하여 지속적 개선 (threshold 자동 조정, 컨텍스트 보강, 트렌드 분석)
 - **NLP Analysis**: 텍스트 통계, 질문 유형 분류, 키워드 추출, 토픽 클러스터링
 - **Causal Analysis**: 인과 관계 분석 및 근본 원인 파악, 개선 제안 생성
 - **Knowledge Graph**: 문서에서 자동으로 테스트셋 생성
@@ -94,9 +98,143 @@ uv sync --extra dev --extra analysis --extra korean --extra web
 | `web` | streamlit, plotly | Streamlit Web UI 대시보드 |
 | `postgres` | psycopg | PostgreSQL 저장소 지원 |
 | `mlflow` | mlflow | MLflow 트래커 연동 |
+| `phoenix` | arize-phoenix, openinference-instrumentation-langchain, opentelemetry-sdk, opentelemetry-exporter-otlp | Phoenix 트레이싱/데이터셋 동기화/임베딩 분석 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
 
 > **참고**: `.python-version` 파일이 Python 3.12를 지정합니다. uv가 Python 3.12를 자동으로 다운로드하여 사용합니다.
+
+## Phoenix 옵저버빌리티 (트레이싱 + 실험)
+
+EvalVault는 `arize-phoenix` 12.27.0 기준으로 검증된 Phoenix 연동 기능을 제공합니다. `uv sync --extra phoenix`로 OpenTelemetry exporter와 Phoenix 클라이언트를 설치한 뒤 `.env`에 다음 값을 설정하세요.
+
+```bash
+PHOENIX_ENABLED=true
+PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
+PHOENIX_API_TOKEN= # Phoenix Cloud 사용 시
+PHOENIX_SAMPLE_RATE=1.0
+```
+
+### 트래커 & 트레이스 옵션
+
+- `--tracker phoenix`로 테스트 케이스별 OpenInference 스팬이 활성화되며, `--phoenix-max-traces`로 전송 케이스 수를 제어할 수 있습니다.
+- CLI는 데이터셋 경로, 메트릭, Domain Memory 상태, 신뢰도 스냅샷을 자동으로 Phoenix 메타데이터에 포함합니다.
+- Phoenix 로깅에 성공하면 JSON 출력의 `tracker_metadata["phoenix"]["trace_url"]` 필드에서 대시보드 링크를 바로 확인할 수 있습니다.
+
+### 데이터셋 / 실험 동기화
+
+새로운 CLI 옵션으로 EvalVault 데이터셋과 실험을 Phoenix와 동기화하세요:
+
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --tracker phoenix \
+  --phoenix-dataset insurance-qa-ko \
+  --phoenix-dataset-description "보험 QA v2025.01" \
+  --phoenix-experiment gemma3-ko-baseline \
+  --phoenix-experiment-description "Gemma3 vs OpenAI 비교"
+```
+
+- `--phoenix-dataset`은 EvalVault 데이터셋(컨텍스트/답변/메타데이터/threshold 포함)을 Phoenix Dataset으로 업로드합니다. 설명은 `--phoenix-dataset-description` 또는 기본 `"{name} v{version}"`을 사용합니다.
+- `--phoenix-experiment`는 업로드된 Dataset과 연결된 Phoenix Experiment를 만들고, EvalVault 점수·Pass Rate·Domain Memory 정보를 포함합니다. `--phoenix-experiment-description`으로 설명을 지정하세요.
+- 두 작업 모두 `result.tracker_metadata["phoenix"]`에 URL을 저장하므로 후속 자동화에서 Phoenix 화면으로 바로 이동할 수 있습니다.
+
+### 임베딩 시각화 & 분석
+
+Phoenix 12.27.0의 Embeddings Analysis 뷰(UMAP + HDBSCAN)는 다음 정보를 제공합니다.
+
+- **시간대별 드리프트/Query Distance**: 기본/비교 임베딩 사이의 유클리드 거리를 시계열로 확인해 이상 구간을 빠르게 찾습니다.
+- **드리프트 우선 클러스터**: HDBSCAN으로 추출된 클러스터를 드리프트 순으로 정렬해 저성과 영역을 먼저 표시합니다.
+- **3D 포인트 클라우드 컬러링**: 정확도, 태그, 세그먼트별로 색상을 지정해 패턴을 시각적으로 탐지할 수 있습니다.
+
+EvalVault가 업로드한 Dataset/Experiment URL을 클릭한 뒤 Phoenix 대시보드의 “Embeddings” 탭을 열면 질문/답변/컨텍스트 벡터를 즉시 탐색하고, Domain Memory 태그를 겹쳐 본 뒤 클러스터를 다시 EvalVault 개선 작업으로 연결할 수 있습니다.
+
+### 오프라인 임베딩 내보내기
+
+Phoenix Dataset을 CSV/Parquet으로 덤프해 Domain Memory 교차 분석에 활용하세요:
+
+```bash
+uv run evalvault phoenix export-embeddings \
+  --dataset phoenix-dataset-id \
+  --endpoint http://localhost:6006 \
+  --output tmp/phoenix_embeddings.csv
+```
+
+UMAP/HDBSCAN 라이브러리가 설치되어 있으면 동일한 알고리즘을 사용하고, 없는 경우 PCA/DBSCAN으로 자동 대체합니다.
+
+### Prompt Playground 루프 (Phoenix 프롬프트)
+
+Phoenix Prompt Playground에서 튜닝한 프롬프트를 EvalVault 실행과 동기화하기 위해 기본 manifest(`agent/prompts/prompt_manifest.json`)와 전용 CLI를 제공합니다.
+
+1. **프롬프트 ↔ Phoenix ID 연결**
+
+```bash
+uv run evalvault phoenix prompt-link agent/prompts/baseline.txt \
+  --prompt-id pr-428 \
+  --experiment-id exp-20250115 \
+  --notes "Gemma3 베이스라인 프롬프트"
+```
+
+2. **릴리즈 전 diff 확인**
+
+```bash
+uv run evalvault phoenix prompt-diff \
+  agent/prompts/baseline.txt agent/prompts/system.txt \
+  --manifest agent/prompts/prompt_manifest.json \
+  --format table  # 또는 json
+```
+
+3. **평가 실행에 Prompt 상태 주입**
+
+```bash
+uv run evalvault run data.json --metrics faithfulness \
+  --profile prod \
+  --tracker phoenix \
+  --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
+  --prompt-manifest agent/prompts/prompt_manifest.json
+```
+
+> 💡 **Prompt Loop 팁**: Phoenix Prompt Playground 연동 시에는 `prod` 프로필(`gpt-oss-safeguard:20b`, OpenAI OSS)을 사용하세요. 이 모델은 Phoenix tool-calling을 지원하므로 `gemma3:1b`에서 발생하던 “does not support tools” 오류 없이 Prompt diff/Trace 메타데이터가 기록됩니다. 실행 시간은 길지만 Prompt 회귀 추적 품질이 크게 향상됩니다.
+
+`result.tracker_metadata["phoenix"]["prompts"]`에 파일별 상태(동기화/수정/미추적), 체크섬, diff가 저장되어 Slack 릴리즈 노트, history 테이블, Streamlit UI에서 Prompt 변화를 Trace/Dataset/Experiment 링크와 함께 확인할 수 있습니다.
+
+> 참고: [Phoenix Embeddings Analysis (arize-phoenix-v12.27.0)](https://github.com/Arize-ai/phoenix/blob/arize-phoenix-v12.27.0/docs/phoenix/cookbook/retrieval-and-inferences/embeddings-analysis.mdx) 문서를 기준으로 임베딩 및 Prompt 메타데이터 동작을 검증했습니다.
+
+### Phoenix Drift Watcher & 자동 Gate
+
+`scripts/ops/phoenix_watch.py`는 Phoenix Dataset/Experiment를 주기적으로 조회하고 Slack 알림을 보내며, 임계값을 초과한 경우 `evalvault gate` 명령을 자동으로 실행합니다.
+
+- REST API로 최신 Experiment를 가져오고 state 파일로 마지막 타임스탬프를 저장합니다.
+- 기본 `embedding_drift_score` 또는 사용자가 지정한 지표 키를 읽어 임계값 이상이면 즉시 경고를 보냅니다.
+- 임계값 초과 시 `--gate-command`에 전달된 EvalVault Gate 명령(또는 쉘 파이프라인)을 실행해 회귀 테스트를 강제합니다.
+
+```bash
+uv run python scripts/ops/phoenix_watch.py \
+  --endpoint http://localhost:6006 \
+  --dataset-id ds_123 \
+  --drift-key embedding_drift_score \
+  --drift-threshold 0.18 \
+  --slack-webhook https://hooks.slack.com/services/... \
+  --gate-command "uv run evalvault gate tests/fixtures/gates/regression.yaml --profile prod"
+```
+
+### 릴리즈 노트 자동화
+
+`evalvault.config.phoenix_support.format_phoenix_links` 헬퍼가 `phoenix_trace_url`·Dataset·Experiment 링크를 표준화하므로 외부 보고서에서도 일관되게 재사용할 수 있습니다. CLI JSON 요약을 Markdown/Slack 형식으로 변환하려면 아래 스크립트를 사용하세요.
+
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --output run.json
+uv run python scripts/reports/generate_release_notes.py \
+  --summary run.json \
+  --style markdown \
+  --out reports/release_notes.md
+```
+
+`--style slack` 옵션을 주면 `<http://...|Phoenix Trace>` 형식으로 렌더링되므로 온콜 채널에 바로 붙여넣을 수 있습니다.
+
+### CLI/웹에서 Phoenix 메트릭 확인
+
+- `uv run evalvault history` 테이블에 `Phoenix P@K`/`Drift` 컬럼이 추가되어 Phoenix Experiment가 연결된 실행의 정밀도/드리프트 값을 즉시 확인할 수 있습니다. `PHOENIX_ENDPOINT`/`PHOENIX_API_TOKEN`이 설정되어 있으면 Phoenix REST API에서 최신 값을 자동으로 가져옵니다.
+- Streamlit 홈/History/Reports 화면에서도 동일한 메트릭과 Experiment 링크가 표시되어 EvalVault 통계에서 Phoenix Embeddings 뷰로 곧바로 이동할 수 있습니다.
 
 ---
 
@@ -329,6 +467,21 @@ uv run evalvault web --port 8501
 uv run evalvault pipeline analyze "요약해줘" --run-id <run_id>
 uv run evalvault pipeline intents     # 분석 의도 목록
 uv run evalvault pipeline templates   # 파이프라인 템플릿 목록
+
+# Domain Memory 활용 (threshold 자동 조정)
+uv run evalvault run data.json --metrics faithfulness \
+  --use-domain-memory --memory-domain insurance --memory-language ko
+
+# Domain Memory + 컨텍스트 보강
+uv run evalvault run data.json --metrics faithfulness \
+  --use-domain-memory --augment-context --memory-domain insurance
+
+# Phoenix 임베딩 클러스터를 Domain Memory로 가져오기
+uv run evalvault domain memory ingest-embeddings phoenix_embeddings.csv \
+  --domain insurance \
+  --language ko \
+  --min-cluster-size 5 \
+  --sample-size 3
 
 # 벤치마크 실행
 uv run evalvault benchmark run --name korean-rag

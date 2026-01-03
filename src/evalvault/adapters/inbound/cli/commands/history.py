@@ -10,6 +10,8 @@ from rich.console import Console
 from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.phoenix_support import PhoenixExperimentResolver
+from evalvault.config.settings import Settings
 
 from ..utils.options import db_option
 
@@ -49,6 +51,19 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             console.print("[yellow]No evaluation runs found.[/yellow]\n")
             return
 
+        resolver: PhoenixExperimentResolver | None = None
+        show_phoenix = False
+        if runs:
+            try:
+                settings = Settings()
+                resolver = PhoenixExperimentResolver(settings)
+            except Exception:
+                resolver = None
+            if resolver and resolver.is_available:
+                show_phoenix = any(
+                    resolver.can_resolve(getattr(run, "tracker_metadata", None)) for run in runs
+                )
+
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("Run ID", style="dim")
         table.add_column("Dataset")
@@ -56,17 +71,33 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         table.add_column("Started At")
         table.add_column("Pass Rate", justify="right")
         table.add_column("Test Cases", justify="right")
+        if show_phoenix:
+            table.add_column("Phoenix P@K", justify="right")
+            table.add_column("Drift", justify="right")
 
         for run in runs:
             pass_rate_color = "green" if run.pass_rate >= 0.7 else "red"
-            table.add_row(
+            row = [
                 run.run_id[:8] + "...",
                 run.dataset_name,
                 run.model_name,
                 run.started_at.strftime("%Y-%m-%d %H:%M"),
                 f"[{pass_rate_color}]{run.pass_rate:.1%}[/{pass_rate_color}]",
                 str(run.total_test_cases),
-            )
+            ]
+
+            if show_phoenix and resolver:
+                stats = resolver.get_stats(getattr(run, "tracker_metadata", None))
+                precision_display = "-"
+                drift_display = "-"
+                if stats:
+                    if stats.precision_at_k is not None:
+                        precision_display = f"{stats.precision_at_k:.2f}"
+                    if stats.drift_score is not None:
+                        drift_display = f"{stats.drift_score:.2f}"
+                row.extend([precision_display, drift_display])
+
+            table.add_row(*row)
 
         console.print(table)
         console.print(f"\n[dim]Showing {len(runs)} of {limit} runs[/dim]\n")

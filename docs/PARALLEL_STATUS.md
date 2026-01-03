@@ -13,6 +13,7 @@
 | P3: Performance optimization | LRU+TTL 하이브리드 캐시, 비동기 배치 실행기, 스트리밍 데이터 로더 구현 | `hybrid_cache.py` (432줄), `async_batch_executor.py`, `streaming_loader.py` |
 | P6: Documentation improvement | 6개 튜토리얼 작성 완료 (Quickstart ~ Production Tips) | `docs/tutorials/01-quickstart.md` ~ `06-production-tips.md` |
 | Knowledge Graph Enhancement | NetworkX 기반 KG 어댑터, 쿼리 전략 (SingleHop/MultiHop/Comparison) 구현 | `networkx_adapter.py` (627줄), `query_strategies.py` |
+| P8: Domain Memory 활용 | MemoryAwareEvaluator, MemoryBasedAnalysis, CLI/튜토리얼 통합 | `memory_aware_evaluator.py`, `memory_based_analysis.py`, `commands/run.py`, `commands/domain.py` |
 
 ---
 
@@ -37,6 +38,12 @@ docs/tutorials/
 #### Knowledge Graph Enhancement
 - **NetworkXKnowledgeGraph**: 엔티티/관계 관리, 그래프 탐색 (BFS), 서브그래프 추출, 통계 정보
 - **QueryStrategies**: SingleHop, MultiHop, Comparison 쿼리 생성 전략
+
+#### P8: Domain Memory 활용
+- **MemoryAwareEvaluator**: reliability 기반 threshold 자동 조정, `[관련 사실]` 컨텍스트 보강
+- **MemoryBasedAnalysis**: 트렌드/추천/행동 재사용 → CLI “Domain Memory Insights” 패널로 출력
+- **CLI 통합**: `evalvault run --use-domain-memory/--augment-context`, `evalvault domain memory stats/search/behaviors/learnings/evolve`
+- **문서화**: README.ko, USER_GUIDE, `docs/DOMAIN_MEMORY_USAGE.md`, `docs/tutorials/07-domain-memory.md` 업데이트
 
 ---
 

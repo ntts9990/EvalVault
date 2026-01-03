@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.phoenix_support import get_phoenix_trace_url
 
 from ..utils.formatters import format_diff, format_score, format_status
 
@@ -123,6 +124,8 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
 
             results.append(metric_result)
 
+        trace_url = get_phoenix_trace_url(getattr(run, "tracker_metadata", None))
+
         if output_format == "json":
             output_data = {
                 "run_id": run_id,
@@ -134,6 +137,8 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
             if baseline:
                 output_data["baseline_id"] = baseline
                 output_data["fail_on_regression"] = fail_on_regression
+            if trace_url:
+                output_data["phoenix_trace_url"] = trace_url
             console.print(json.dumps(output_data, indent=2))
         elif output_format == "github-actions":
             for metric_result in results:
@@ -150,6 +155,8 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
                 f"::set-output name=passed::{str(all_passed and not regression_detected).lower()}"
             )
             console.print(f"::set-output name=pass_rate::{run.pass_rate:.3f}")
+            if trace_url:
+                console.print(f"::notice::Phoenix Trace: {trace_url}")
             if not all_passed:
                 failed_metrics = [r["metric"] for r in results if not r["passed"]]
                 console.print(
@@ -205,6 +212,8 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
                     )
 
             console.print(table)
+            if trace_url:
+                console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
             if all_passed and not regression_detected:
                 console.print("\n[bold green]✅ Quality gate PASSED[/bold green]")
             else:

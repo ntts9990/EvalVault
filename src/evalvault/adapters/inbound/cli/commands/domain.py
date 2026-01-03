@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -18,7 +20,9 @@ from evalvault.config.domain_config import (
     load_domain_config,
     save_domain_config,
 )
+from evalvault.domain.entities.memory import FactType
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+from evalvault.domain.services.embedding_overlay import build_cluster_facts
 
 from ..utils.options import memory_db_option
 from ..utils.validators import parse_csv_option, validate_choices
@@ -129,6 +133,25 @@ def create_domain_app(console: Console) -> typer.Typer:
             display += "..."
         return display
 
+    def _load_embedding_rows(file_path: Path) -> list[dict[str, Any]]:
+        suffix = file_path.suffix.lower()
+        if suffix == ".csv":
+            with file_path.open(encoding="utf-8") as handle:
+                reader = csv.DictReader(handle)
+                return [dict(row) for row in reader]
+        if suffix in {".parquet", ".pq"}:
+            try:
+                import pandas as pd  # type: ignore
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise typer.BadParameter(
+                    "Reading Parquet exports requires pandas. Install via `uv pip install pandas pyarrow`."
+                ) from exc
+            df = pd.read_parquet(file_path)
+            return df.to_dict(orient="records")
+        raise typer.BadParameter(
+            "Unsupported embedding file format. Use CSV or Parquet exported by `evalvault phoenix export-embeddings`."
+        )
+
     @memory_app.command("stats")
     def memory_stats(
         domain: str | None = typer.Option(
@@ -155,6 +178,108 @@ def create_domain_app(console: Console) -> typer.Typer:
         console.print(
             f"[dim]Database:[/dim] {memory_db}  |  [dim]Domain:[/dim] {domain or 'all'}\n"
         )
+
+    @memory_app.command("ingest-embeddings")
+    def memory_ingest_embeddings(  # noqa: PLR0913
+        file: Path = typer.Argument(
+            ..., help="CSV/Parquet exported via `evalvault phoenix export-embeddings`."
+        ),
+        domain: str = typer.Option(
+            "insurance", "--domain", "-d", help="Domain to store the facts."
+        ),
+        language: str = typer.Option(
+            "ko", "--language", "-l", help="Language tag for stored facts."
+        ),
+        min_cluster_size: int = typer.Option(
+            5, "--min-cluster-size", help="Skip clusters smaller than this size."
+        ),
+        sample_size: int = typer.Option(
+            3, "--sample-size", help="Number of representative questions per cluster."
+        ),
+        cluster_key: str = typer.Option(
+            "cluster_id", "--cluster-key", help="Column containing the Phoenix cluster identifier."
+        ),
+        verification_score: float = typer.Option(
+            0.4,
+            "--verification-score",
+            help="Verification score assigned to imported facts (0.0~1.0).",
+        ),
+        fact_type: str = typer.Option(
+            "inferred",
+            "--fact-type",
+            help="Fact type to use when storing clusters (verified, inferred, contradictory).",
+        ),
+        dry_run: bool = typer.Option(
+            False, "--dry-run", help="Print summary without writing to the database."
+        ),
+        memory_db: Path = memory_db_option(),
+    ) -> None:
+        """Convert Phoenix embedding exports into Domain Memory facts."""
+
+        if min_cluster_size < 1:
+            raise typer.BadParameter("--min-cluster-size must be >= 1")
+        if sample_size < 1:
+            raise typer.BadParameter("--sample-size must be >= 1")
+        if not 0.0 < verification_score <= 1.0:
+            raise typer.BadParameter("--verification-score must be between 0 and 1")
+        if not file.exists():
+            console.print(f"[red]Error:[/red] File not found: {file}")
+            raise typer.Exit(1)
+
+        fact_type_value = fact_type.lower().strip()
+        valid_fact_types = {"verified", "inferred", "contradictory"}
+        if fact_type_value not in valid_fact_types:
+            raise typer.BadParameter(
+                f"--fact-type must be one of {', '.join(sorted(valid_fact_types))}"
+            )
+
+        rows = _load_embedding_rows(file)
+        if not rows:
+            console.print(f"[yellow]No rows found in {file}. Nothing to ingest.[/yellow]\n")
+            return
+
+        console.print(f"[dim]Loaded {len(rows)} embedding rows from[/dim] [cyan]{file}[/cyan]")
+
+        fact_type_enum: FactType = fact_type_value  # type: ignore[assignment]
+
+        facts = build_cluster_facts(
+            rows,
+            domain=domain,
+            language=language,
+            cluster_key=cluster_key,
+            min_cluster_size=min_cluster_size,
+            sample_size=sample_size,
+            fact_type=fact_type_enum,
+            verification_score=verification_score,
+        )
+
+        if not facts:
+            console.print(
+                "[yellow]No clusters met the ingestion thresholds. "
+                "Check --cluster-key and --min-cluster-size settings.[/yellow]\n"
+            )
+            return
+
+        if dry_run:
+            console.print(
+                f"[cyan]Dry run:[/cyan] {len(facts)} cluster facts would be saved to domain "
+                f"[bold]{domain}[/bold] ({language})."
+            )
+            preview = facts[: min(3, len(facts))]
+            for fact in preview:
+                console.print(f"  • {fact.subject} → {fact.object[:80]}...")
+            console.print()
+            return
+
+        adapter = _load_memory_adapter(memory_db)
+        for fact in facts:
+            adapter.save_fact(fact)
+
+        console.print(
+            f"[green]Stored {len(facts)} embedding clusters into domain memory[/green] "
+            f"(domain={domain}, language={language})."
+        )
+        console.print(f"[dim]Database:[/dim] {memory_db}\n")
 
     @memory_app.command("search")
     def memory_search(

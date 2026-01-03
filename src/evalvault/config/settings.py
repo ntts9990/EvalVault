@@ -96,9 +96,19 @@ class Settings(BaseSettings):
         default="http://localhost:6006/v1/traces",
         description="Phoenix OTLP endpoint for traces",
     )
+    phoenix_api_token: str | None = Field(
+        default=None,
+        description="Phoenix API token for cloud deployments (optional)",
+    )
     phoenix_enabled: bool = Field(
         default=False,
         description="Enable Phoenix instrumentation for automatic LLM tracing",
+    )
+    phoenix_sample_rate: float = Field(
+        default=1.0,
+        description="Sampling rate for Phoenix traces (0.0~1.0).",
+        ge=0.0,
+        le=1.0,
     )
 
     # Tracker Provider Selection

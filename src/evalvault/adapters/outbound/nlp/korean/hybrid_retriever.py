@@ -25,6 +25,7 @@ from evalvault.adapters.outbound.nlp.korean.bm25_retriever import (
     KoreanBM25Retriever,
     RetrievalResult,
 )
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 
 if TYPE_CHECKING:
     from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
@@ -160,22 +161,34 @@ class KoreanHybridRetriever:
             logger.warning("빈 문서 리스트로 인덱싱 시도")
             return 0
 
-        self._documents = documents
+        span_attrs = {
+            "retriever.type": "hybrid",
+            "retriever.documents": len(documents),
+            "retriever.fusion": self._fusion_method.value,
+        }
+        with instrumentation_span("retriever.hybrid.index", span_attrs) as span:
+            self._documents = documents
 
-        # BM25 인덱스 구축
-        self._bm25_retriever.index(documents)
+            # BM25 인덱스 구축
+            self._bm25_retriever.index(documents)
 
-        # Dense 임베딩 계산
-        if compute_embeddings and self._embedding_func is not None:
-            try:
-                embeddings = self._embedding_func(documents)
-                self._embeddings = np.array(embeddings)
-                logger.info(f"Dense 임베딩 계산 완료: {len(documents)}개 문서")
-            except Exception as e:
-                logger.warning(f"임베딩 계산 실패: {e}")
-                self._embeddings = None
+            # Dense 임베딩 계산
+            if compute_embeddings and self._embedding_func is not None:
+                try:
+                    embeddings = self._embedding_func(documents)
+                    self._embeddings = np.array(embeddings)
+                    logger.info(f"Dense 임베딩 계산 완료: {len(documents)}개 문서")
+                except Exception as e:
+                    logger.warning(f"임베딩 계산 실패: {e}")
+                    self._embeddings = None
 
-        return len(documents)
+            if span and self._embeddings is not None:
+                set_span_attributes(
+                    span,
+                    {"retriever.embedding_dim": int(self._embeddings.shape[1])},
+                )
+
+            return len(documents)
 
     def search(
         self,
@@ -201,25 +214,37 @@ class KoreanHybridRetriever:
         if not self.is_indexed:
             raise ValueError("인덱스가 구축되지 않았습니다. index()를 먼저 호출하세요.")
 
-        # 검색 실행
-        bm25_results: list[RetrievalResult] = []
-        dense_results: list[tuple[int, float]] = []
+        span_attrs = {
+            "retriever.type": "hybrid",
+            "retriever.top_k": top_k,
+            "retriever.use_bm25": use_bm25,
+            "retriever.use_dense": use_dense,
+        }
+        with instrumentation_span("retriever.hybrid.search", span_attrs) as span:
+            # 검색 실행
+            bm25_results: list[RetrievalResult] = []
+            dense_results: list[tuple[int, float]] = []
 
-        if use_bm25:
-            bm25_results = self._bm25_retriever.search(query, top_k=len(self._documents))
+            if use_bm25:
+                bm25_results = self._bm25_retriever.search(query, top_k=len(self._documents))
 
-        if use_dense and self.has_embeddings and self._embedding_func is not None:
-            dense_results = self._search_dense(query)
+            if use_dense and self.has_embeddings and self._embedding_func is not None:
+                dense_results = self._search_dense(query)
 
-        # 결과 융합
-        if use_bm25 and use_dense and bm25_results and dense_results:
-            return self._fuse_results(bm25_results, dense_results, top_k)
-        elif use_bm25 and bm25_results:
-            return self._convert_bm25_results(bm25_results[:top_k])
-        elif use_dense and dense_results:
-            return self._convert_dense_results(dense_results[:top_k])
-        else:
-            return []
+            # 결과 융합
+            if use_bm25 and use_dense and bm25_results and dense_results:
+                fused = self._fuse_results(bm25_results, dense_results, top_k)
+            elif use_bm25 and bm25_results:
+                fused = self._convert_bm25_results(bm25_results[:top_k])
+            elif use_dense and dense_results:
+                fused = self._convert_dense_results(dense_results[:top_k])
+            else:
+                fused = []
+
+            if span:
+                set_span_attributes(span, {"retriever.result_count": len(fused)})
+
+            return fused
 
     def _search_dense(self, query: str) -> list[tuple[int, float]]:
         """Dense 검색을 수행합니다.

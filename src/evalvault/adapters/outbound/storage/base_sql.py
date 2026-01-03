@@ -30,12 +30,13 @@ class SQLQueries:
         return ", ".join([self.placeholder] * count)
 
     def insert_run(self) -> str:
-        values = self._values(12)
+        values = self._values(13)
         return f"""
         INSERT INTO evaluation_runs (
             run_id, dataset_name, dataset_version, model_name,
             started_at, finished_at, total_tokens, total_cost_usd,
-            pass_rate, metrics_evaluated, thresholds, langfuse_trace_id
+            pass_rate, metrics_evaluated, thresholds, langfuse_trace_id,
+            metadata
         ) VALUES ({values})
         """
 
@@ -64,7 +65,8 @@ class SQLQueries:
         return f"""
         SELECT run_id, dataset_name, dataset_version, model_name,
                started_at, finished_at, total_tokens, total_cost_usd,
-               pass_rate, metrics_evaluated, thresholds, langfuse_trace_id
+               pass_rate, metrics_evaluated, thresholds, langfuse_trace_id,
+               metadata
         FROM evaluation_runs
         WHERE run_id = {self.placeholder}
         """
@@ -177,6 +179,7 @@ class BaseSQLStorageAdapter(ABC):
                 metrics_evaluated=self._deserialize_json(run_row["metrics_evaluated"]) or [],
                 thresholds=self._deserialize_json(run_row["thresholds"]) or {},
                 langfuse_trace_id=run_row["langfuse_trace_id"],
+                tracker_metadata=self._deserialize_json(run_row["metadata"]) or {},
             )
 
     def list_runs(
@@ -228,6 +231,7 @@ class BaseSQLStorageAdapter(ABC):
             self._serialize_json(run.metrics_evaluated),
             self._serialize_json(run.thresholds),
             run.langfuse_trace_id,
+            self._serialize_json(run.tracker_metadata),
         )
 
     def _test_case_params(self, run_id: str, result: TestCaseResult) -> Sequence[Any]:

@@ -93,7 +93,23 @@ $ evalvault domain memory search "청약 철회" --domain insurance
 └────────────────────────┴──────────────┴──────────────┴──────────────┴───────┴─────────┘
 ```
 
-[phoenix] `--tracker phoenix` 또는 LangSmith 등에서 Phoenix를 선택하면 CLI가 `log_evaluation_run()`에 더해 개별 테스트 케이스별 RAG trace(`RetrievalData`, `GenerationData`)도 기록해줍니다. 기본 한계치는 20건이며, Langfuse/MLflow는 기존 동작 그대로 유지됩니다.
+[phoenix]
+
+- `--tracker phoenix`: OpenInference 스팬과 Phoenix 트레이스(`RetrievalData`, `GenerationData`)를 전송합니다.
+- `--phoenix-max-traces`: 전송할 테스트 케이스 상한(기본 전체)을 조정합니다.
+- `--phoenix-dataset` / `--phoenix-dataset-description`: EvalVault 데이터셋을 Phoenix Dataset으로 업로드합니다. 설명 미지정 시 `"{name} v{version}"` 또는 데이터셋 메타데이터를 사용합니다.
+- `--phoenix-experiment` / `--phoenix-experiment-description`: 업로드된 Dataset과 연결된 Phoenix Experiment를 생성하고 EvalVault 메트릭/Domain Memory 신호를 메타데이터로 저장합니다. Experiment만 지정하면 Dataset 이름은 `"{dataset}:{version}"`으로 자동 생성됩니다.
+- Phoenix 업로드 결과는 `tracker_metadata["phoenix"]`에 dataset/experiment URL로 저장되며 JSON 출력에서도 확인할 수 있습니다.
+
+예시:
+
+```bash
+uv run evalvault run dataset.json --metrics faithfulness \
+  --tracker phoenix --phoenix-dataset insurance-qa \
+  --phoenix-experiment gemma3-baseline
+```
+
+Langfuse/MLflow 플래그는 기존 동작 그대로 유지되며, Phoenix 전송이 실패해도 평가 실행은 계속됩니다.
 
 ---
 

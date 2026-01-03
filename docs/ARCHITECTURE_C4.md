@@ -10,6 +10,14 @@
 
 이 문서는 EvalVault의 아키텍처를 C4 Model 방법론에 따라 계층적으로 설명합니다.
 
+## 📚 관련 문서
+
+| 문서 | 역할 | 설명 |
+|------|------|------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 메인 아키텍처 가이드 | 상세한 아키텍처 설명, 설계 원칙, 데이터 흐름 |
+| **[ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md)** (이 문서) | C4 다이어그램 | C4 Model 기반 계층적 아키텍처 다이어그램 |
+| [ARCHITECTURE_AUDIT.md](./ARCHITECTURE_AUDIT.md) | 아키텍처 감사 | 아키텍처 감사 결과 및 개선 제안 |
+
 ---
 
 ## 목차
@@ -436,166 +444,542 @@
 
 ## Level 4: Code Structure
 
-**코드 구조**는 주요 컴포넌트의 내부 클래스 및 함수 구조를 보여줍니다.
+**코드 구조**는 EvalVault의 모든 클래스를 계층별로 분류하여 보여줍니다.
 
-### 4.1 RagasEvaluator 구조
+> **총 클래스 수**: 200+ 클래스
+> - Domain Layer: 96 클래스 (Entities 75, Services 20, Metrics 1)
+> - Ports Layer: 40 클래스 (Inbound 8, Outbound 32)
+> - Adapters Layer: 85 클래스 (Inbound 20, Outbound 65)
+> - Config Layer: 14 클래스
+
+---
+
+### 4.1 Domain Layer - Entities (75 클래스)
+
+#### 4.1.1 Core Entities
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `TestCase` | dataset.py | 개별 평가 테스트 케이스 |
+| `Dataset` | dataset.py | 테스트 케이스 컬렉션 |
+| `MetricScore` | result.py | 개별 메트릭 점수 |
+| `TestCaseResult` | result.py | 테스트 케이스 평가 결과 |
+| `EvaluationRun` | result.py | 전체 평가 실행 결과 |
+| `MetricType` | result.py | 메트릭 타입 Enum |
+
+#### 4.1.2 Experiment Entities
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `ExperimentGroup` | experiment.py | 실험 그룹 정의 |
+| `Experiment` | experiment.py | A/B 실험 정의 |
+
+#### 4.1.3 Knowledge Graph Entities
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `EntityModel` | kg.py | 지식 그래프 엔티티 |
+| `RelationModel` | kg.py | 지식 그래프 관계 |
+
+#### 4.1.4 Analysis Pipeline Entities (10 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `AnalysisIntent` | analysis_pipeline.py | 분석 의도 Enum (19개 의도) |
+| `AnalysisIntentCategory` | analysis_pipeline.py | 의도 카테고리 Enum |
+| `NodeExecutionStatus` | analysis_pipeline.py | 노드 실행 상태 |
+| `AnalysisNode` | analysis_pipeline.py | DAG 파이프라인 노드 |
+| `AnalysisContext` | analysis_pipeline.py | 분석 실행 컨텍스트 |
+| `AnalysisPipeline` | analysis_pipeline.py | DAG 파이프라인 정의 |
+| `NodeResult` | analysis_pipeline.py | 노드 실행 결과 |
+| `PipelineResult` | analysis_pipeline.py | 파이프라인 실행 결과 |
+| `ModuleMetadata` | analysis_pipeline.py | 모듈 메타데이터 |
+| `ModuleCatalog` | analysis_pipeline.py | 모듈 카탈로그 |
+
+#### 4.1.5 Domain Memory Entities (5 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `FactualFact` | memory.py | 사실적 기억 (SPO 트리플) |
+| `LearningMemory` | memory.py | 학습 기억 (패턴) |
+| `DomainMemoryContext` | memory.py | 메모리 검색 컨텍스트 |
+| `BehaviorEntry` | memory.py | 행동 기억 엔트리 |
+| `BehaviorHandbook` | memory.py | 행동 핸드북 |
+
+#### 4.1.6 Improvement Entities (11 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RAGComponent` | improvement.py | RAG 컴포넌트 Enum |
+| `ImprovementPriority` | improvement.py | 개선 우선순위 Enum |
+| `PatternType` | improvement.py | 패턴 타입 Enum |
+| `EffortLevel` | improvement.py | 노력 수준 Enum |
+| `EvidenceSource` | improvement.py | 증거 소스 Enum |
+| `FailureSample` | improvement.py | 실패 샘플 |
+| `PatternEvidence` | improvement.py | 패턴 탐지 증거 |
+| `ImprovementEvidence` | improvement.py | 개선 증거 |
+| `ImprovementAction` | improvement.py | 개선 액션 |
+| `RAGImprovementGuide` | improvement.py | RAG 개선 가이드 |
+| `ImprovementReport` | improvement.py | 개선 리포트 |
+
+#### 4.1.7 RAG Trace Entities (6 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RetrievalMethod` | rag_trace.py | 검색 방법 Enum |
+| `RerankMethod` | rag_trace.py | 재순위 방법 Enum |
+| `RetrievedDocument` | rag_trace.py | 검색된 문서 |
+| `RetrievalData` | rag_trace.py | 검색 단계 데이터 |
+| `GenerationData` | rag_trace.py | 생성 단계 데이터 |
+| `RAGTraceData` | rag_trace.py | RAG 파이프라인 추적 데이터 |
+
+#### 4.1.8 Benchmark Entities (8 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `TaskType` | benchmark.py | 벤치마크 태스크 타입 |
+| `MetricType` | benchmark.py | 벤치마크 메트릭 타입 |
+| `RAGTestCase` | benchmark.py | 벤치마크 테스트 케이스 |
+| `RAGTestCaseResult` | benchmark.py | 테스트 케이스 결과 |
+| `SplitScores` | benchmark.py | 분할 점수 |
+| `BenchmarkResult` | benchmark.py | 벤치마크 결과 |
+| `BenchmarkSuite` | benchmark.py | 벤치마크 스위트 |
+| `BenchmarkConfig` | benchmark.py | 벤치마크 설정 |
+
+#### 4.1.9 Statistical Analysis Entities (27 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `AnalysisType` | analysis.py | 분석 타입 Enum |
+| `QuestionType` | analysis.py | 질문 타입 Enum |
+| `EffectSizeLevel` | analysis.py | 효과 크기 수준 |
+| `MetricStats` | analysis.py | 메트릭 통계 |
+| `CorrelationInsight` | analysis.py | 상관관계 인사이트 |
+| `LowPerformerInfo` | analysis.py | 저성과 정보 |
+| `ComparisonResult` | analysis.py | 비교 결과 |
+| `AnalysisResult` | analysis.py | 분석 결과 기본 클래스 |
+| `StatisticalAnalysis` | analysis.py | 통계 분석 결과 |
+| `MetaAnalysisResult` | analysis.py | 메타 분석 결과 |
+| `AnalysisBundle` | analysis.py | 분석 번들 |
+| `TextStats` | analysis.py | 텍스트 통계 |
+| `QuestionTypeStats` | analysis.py | 질문 타입 통계 |
+| `KeywordInfo` | analysis.py | 키워드 정보 |
+| `TopicCluster` | analysis.py | 토픽 클러스터 |
+| `NLPAnalysis` | analysis.py | NLP 분석 결과 |
+| `CausalFactorType` | analysis.py | 인과 요인 타입 |
+| `ImpactDirection` | analysis.py | 영향 방향 |
+| `ImpactStrength` | analysis.py | 영향 강도 |
+| `FactorStats` | analysis.py | 요인 통계 |
+| `StratifiedGroup` | analysis.py | 계층화 그룹 |
+| `FactorImpact` | analysis.py | 요인 영향 |
+| `CausalRelationship` | analysis.py | 인과 관계 |
+| `RootCause` | analysis.py | 근본 원인 |
+| `InterventionSuggestion` | analysis.py | 개입 제안 |
+| `CausalAnalysis` | analysis.py | 인과 분석 결과 |
+
+---
+
+### 4.2 Domain Layer - Services (20 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RagasEvaluator` | evaluator.py | Ragas 기반 평가 서비스 |
+| `TestCaseEvalResult` | evaluator.py | 테스트 케이스 평가 결과 |
+| `ExperimentManager` | experiment_manager.py | 실험 관리 서비스 |
+| `MetricComparison` | experiment_manager.py | 메트릭 비교 결과 |
+| `PipelineOrchestrator` | pipeline_orchestrator.py | 파이프라인 오케스트레이터 |
+| `AnalysisPipelineService` | pipeline_orchestrator.py | 분석 파이프라인 서비스 |
+| `PipelineTemplateRegistry` | pipeline_template_registry.py | 파이프라인 템플릿 레지스트리 |
+| `IntentKeywordRegistry` | intent_classifier.py | 의도 키워드 레지스트리 |
+| `KeywordIntentClassifier` | intent_classifier.py | 키워드 기반 의도 분류기 |
+| `AnalysisService` | analysis_service.py | 통합 분석 서비스 |
+| `DomainLearningHook` | domain_learning_hook.py | 도메인 학습 훅 |
+| `ImprovementGuideService` | improvement_guide_service.py | 개선 가이드 서비스 |
+| `KnowledgeGraph` | kg_generator.py | 지식 그래프 |
+| `KnowledgeGraphGenerator` | kg_generator.py | 지식 그래프 생성기 |
+| `Entity` | entity_extractor.py | 추출된 엔티티 |
+| `Relation` | entity_extractor.py | 추출된 관계 |
+| `EntityExtractor` | entity_extractor.py | 엔티티 추출기 |
+| `GenerationConfig` | testset_generator.py | 테스트셋 생성 설정 |
+| `BasicTestsetGenerator` | testset_generator.py | 기본 테스트셋 생성기 |
+| `DocumentChunker` | document_chunker.py | 문서 청킹 서비스 |
+| `BenchmarkComparison` | benchmark_runner.py | 벤치마크 비교 |
+| `KoreanRAGBenchmarkRunner` | benchmark_runner.py | 한국어 RAG 벤치마크 러너 |
+
+---
+
+### 4.3 Domain Layer - Metrics (1 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `InsuranceTermAccuracy` | insurance.py | 보험 용어 정확도 메트릭 |
+
+---
+
+### 4.4 Ports Layer - Inbound (8 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `EvaluatorPort` | evaluator_port.py | 평가 실행 포트 |
+| `AnalysisPipelinePort` | analysis_pipeline_port.py | 분석 파이프라인 포트 |
+| `DomainLearningHookPort` | learning_hook_port.py | 도메인 학습 훅 포트 |
+| `EvalRequest` | web_port.py | 평가 요청 DTO |
+| `EvalProgress` | web_port.py | 평가 진행률 DTO |
+| `RunSummary` | web_port.py | 실행 요약 DTO |
+| `RunFilters` | web_port.py | 실행 필터 DTO |
+| `WebUIPort` | web_port.py | 웹 UI 포트 |
+
+---
+
+### 4.5 Ports Layer - Outbound (32 클래스)
+
+#### 4.5.1 LLM & Embedding Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `ThinkingConfig` | llm_port.py | Thinking 모드 설정 |
+| `LLMPort` | llm_port.py | LLM 어댑터 인터페이스 |
+| `EmbeddingResult` | embedding_port.py | 임베딩 결과 |
+| `EmbeddingPort` | embedding_port.py | 임베딩 포트 |
+
+#### 4.5.2 Data & Storage Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `DatasetPort` | dataset_port.py | 데이터셋 로더 포트 |
+| `StoragePort` | storage_port.py | 저장소 포트 |
+| `DomainMemoryPort` | domain_memory_port.py | 도메인 메모리 포트 |
+| `AnalysisCachePort` | analysis_cache_port.py | 분석 캐시 포트 |
+
+#### 4.5.3 Analysis Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `AnalysisPort` | analysis_port.py | 통계 분석 포트 |
+| `NLPAnalysisPort` | nlp_analysis_port.py | NLP 분석 포트 |
+| `CausalAnalysisPort` | causal_analysis_port.py | 인과 분석 포트 |
+| `AnalysisModulePort` | analysis_module_port.py | 분석 모듈 포트 |
+| `IntentClassificationResult` | intent_classifier_port.py | 의도 분류 결과 |
+| `IntentClassifierPort` | intent_classifier_port.py | 의도 분류기 포트 |
+
+#### 4.5.4 Tracking & Report Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `TrackerPort` | tracker_port.py | 추적기 포트 |
+| `ReportPort` | report_port.py | 리포트 포트 |
+
+#### 4.5.5 Korean NLP Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `FaithfulnessClaimResultProtocol` | korean_nlp_port.py | 충실도 클레임 결과 |
+| `FaithfulnessResultProtocol` | korean_nlp_port.py | 충실도 결과 |
+| `RetrieverResultProtocol` | korean_nlp_port.py | 검색기 결과 |
+| `RetrieverPort` | korean_nlp_port.py | 검색기 포트 |
+| `KoreanNLPToolkitPort` | korean_nlp_port.py | 한국어 NLP 툴킷 포트 |
+
+#### 4.5.6 Improvement Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `ActionDefinitionProtocol` | improvement_port.py | 액션 정의 프로토콜 |
+| `PatternDefinitionProtocol` | improvement_port.py | 패턴 정의 프로토콜 |
+| `MetricPlaybookProtocol` | improvement_port.py | 메트릭 플레이북 프로토콜 |
+| `PlaybookPort` | improvement_port.py | 플레이북 포트 |
+| `PatternDetectorPort` | improvement_port.py | 패턴 탐지기 포트 |
+| `ClaimImprovementProtocol` | improvement_port.py | 클레임 개선 프로토콜 |
+| `InsightGeneratorPort` | improvement_port.py | 인사이트 생성기 포트 |
+
+#### 4.5.7 Other Ports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RelationAugmenterPort` | relation_augmenter_port.py | 관계 증강기 포트 |
+
+---
+
+### 4.6 Adapters Layer - Inbound (20 클래스)
+
+#### 4.6.1 Web UI Adapters
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `WebUIAdapter` | adapter.py | 웹 UI 어댑터 메인 |
+| `GateResult` | adapter.py | 품질 게이트 결과 |
+| `GateReport` | adapter.py | 품질 게이트 리포트 |
+| `WebSession` | session.py | 웹 세션 관리 |
+
+#### 4.6.2 Web Components - Upload & Cards
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `ValidationResult` | upload.py | 파일 검증 결과 |
+| `FileUploadHandler` | upload.py | 파일 업로드 핸들러 |
+| `MetricSummaryCard` | cards.py | 메트릭 요약 카드 |
+| `StatCard` | cards.py | 통계 카드 |
+
+#### 4.6.3 Web Components - History
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RunFilter` | history.py | 실행 필터 컴포넌트 |
+| `RunTable` | history.py | 실행 테이블 컴포넌트 |
+| `RunDetailPanel` | history.py | 실행 상세 패널 |
+| `HistoryExporter` | history.py | 히스토리 내보내기 |
+| `RunSearch` | history.py | 실행 검색 컴포넌트 |
+
+#### 4.6.4 Web Components - Other
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `RecentRunsList` | lists.py | 최근 실행 목록 |
+| `MetricSelector` | metrics.py | 메트릭 선택기 |
+| `EvaluationProgress` | progress.py | 평가 진행률 표시 |
+| `ProgressStep` | progress.py | 진행 단계 |
+| `DashboardStats` | stats.py | 대시보드 통계 |
+| `EvaluationConfig` | evaluate.py | 평가 설정 |
+| `EvaluationResult` | evaluate.py | 평가 결과 표시 |
+
+#### 4.6.5 Web Components - Reports
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `ReportConfig` | reports.py | 리포트 설정 |
+| `ReportResult` | reports.py | 리포트 결과 |
+| `ReportTemplate` | reports.py | 리포트 템플릿 |
+| `ReportGenerator` | reports.py | 리포트 생성기 |
+| `ReportDownloader` | reports.py | 리포트 다운로더 |
+| `RunSelector` | reports.py | 실행 선택기 |
+| `ReportPreview` | reports.py | 리포트 미리보기 |
+
+---
+
+### 4.7 Adapters Layer - Outbound LLM (10 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `BaseLLMAdapter` | base.py | LLM 어댑터 기본 클래스 |
+| `LLMConfigurationError` | base.py | LLM 설정 오류 |
+| `TokenUsage` | base.py | 토큰 사용량 |
+| `OpenAIAdapter` | openai_adapter.py | OpenAI 어댑터 |
+| `TokenTrackingAsyncOpenAI` | openai_adapter.py | 토큰 추적 AsyncOpenAI |
+| `OpenAIEmbeddingsWithLegacy` | openai_adapter.py | 레거시 임베딩 지원 |
+| `AzureOpenAIAdapter` | azure_adapter.py | Azure OpenAI 어댑터 |
+| `AnthropicAdapter` | anthropic_adapter.py | Anthropic 어댑터 |
+| `ThinkingTokenTrackingAsyncAnthropic` | anthropic_adapter.py | Thinking 토큰 추적 |
+| `OllamaAdapter` | ollama_adapter.py | Ollama 어댑터 |
+| `ThinkingTokenTrackingAsyncOpenAI` | ollama_adapter.py | Thinking 토큰 추적 (Ollama) |
+| `LLMRelationAugmenter` | llm_relation_augmenter.py | LLM 기반 관계 증강 |
+
+---
+
+### 4.8 Adapters Layer - Outbound Storage (4 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `BaseSQLStorageAdapter` | base_sql.py | SQL 저장소 기본 클래스 |
+| `SQLQueries` | base_sql.py | SQL 쿼리 정의 |
+| `SQLiteStorageAdapter` | sqlite_adapter.py | SQLite 저장소 어댑터 |
+| `PostgreSQLStorageAdapter` | postgres_adapter.py | PostgreSQL 저장소 어댑터 |
+
+---
+
+### 4.9 Adapters Layer - Outbound Tracker (3 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `LangfuseAdapter` | langfuse_adapter.py | Langfuse 추적 어댑터 |
+| `MLflowAdapter` | mlflow_adapter.py | MLflow 추적 어댑터 |
+| `PhoenixAdapter` | phoenix_adapter.py | Phoenix/OpenTelemetry 어댑터 |
+
+---
+
+### 4.10 Adapters Layer - Outbound Dataset (4 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `BaseDatasetLoader` | base.py | 데이터셋 로더 기본 클래스 |
+| `CSVDatasetLoader` | csv_loader.py | CSV 로더 |
+| `ExcelDatasetLoader` | excel_loader.py | Excel 로더 |
+| `JSONDatasetLoader` | json_loader.py | JSON 로더 |
+
+---
+
+### 4.11 Adapters Layer - Outbound Korean NLP (18 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `KiwiTokenizer` | kiwi_tokenizer.py | Kiwi 한국어 토크나이저 |
+| `Token` | kiwi_tokenizer.py | 토큰 |
+| `KoreanBM25Retriever` | bm25_retriever.py | BM25 검색기 |
+| `RetrievalResult` | bm25_retriever.py | 검색 결과 |
+| `KoreanDenseRetriever` | dense_retriever.py | Dense 검색기 |
+| `DenseRetrievalResult` | dense_retriever.py | Dense 검색 결과 |
+| `DeviceType` | dense_retriever.py | 디바이스 타입 |
+| `KoreanHybridRetriever` | hybrid_retriever.py | 하이브리드 검색기 |
+| `HybridResult` | hybrid_retriever.py | 하이브리드 검색 결과 |
+| `FusionMethod` | hybrid_retriever.py | 퓨전 방법 |
+| `KoreanDocumentChunker` | document_chunker.py | 문서 청커 |
+| `ParagraphChunker` | document_chunker.py | 단락 청커 |
+| `Chunk` | document_chunker.py | 청크 |
+| `KoreanFaithfulnessChecker` | korean_evaluation.py | 한국어 충실도 검사기 |
+| `KoreanSemanticSimilarity` | korean_evaluation.py | 한국어 의미 유사도 |
+| `FaithfulnessResult` | korean_evaluation.py | 충실도 결과 |
+| `ClaimVerification` | korean_evaluation.py | 클레임 검증 |
+| `NumberWithUnit` | korean_evaluation.py | 단위 숫자 |
+| `SemanticSimilarityResult` | korean_evaluation.py | 의미 유사도 결과 |
+| `KoreanNLPToolkit` | toolkit.py | 한국어 NLP 툴킷 |
+| `_RetrieverWrapper` | toolkit.py | 검색기 래퍼 |
+
+---
+
+### 4.12 Adapters Layer - Outbound Analysis (13 클래스)
+
+#### 4.12.1 Analysis Adapters
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `BaseAnalysisAdapter` | common.py | 분석 어댑터 기본 클래스 |
+| `AnalysisDataProcessor` | common.py | 분석 데이터 처리기 |
+| `StatisticalAnalysisAdapter` | statistical_adapter.py | 통계 분석 어댑터 |
+| `NLPAnalysisAdapter` | nlp_adapter.py | NLP 분석 어댑터 |
+| `CausalAnalysisAdapter` | causal_adapter.py | 인과 분석 어댑터 |
+
+#### 4.12.2 Analysis Modules
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `BaseAnalysisModule` | base_module.py | 분석 모듈 기본 클래스 |
+| `DataLoaderModule` | data_loader_module.py | 데이터 로더 모듈 |
+| `StatisticalAnalyzerModule` | statistical_analyzer_module.py | 통계 분석 모듈 |
+| `NLPAnalyzerModule` | nlp_analyzer_module.py | NLP 분석 모듈 |
+| `CausalAnalyzerModule` | causal_analyzer_module.py | 인과 분석 모듈 |
+| `SummaryReportModule` | summary_report_module.py | 요약 리포트 모듈 |
+| `AnalysisReportModule` | analysis_report_module.py | 분석 리포트 모듈 |
+| `ComparisonReportModule` | comparison_report_module.py | 비교 리포트 모듈 |
+| `VerificationReportModule` | verification_report_module.py | 검증 리포트 모듈 |
+
+---
+
+### 4.13 Adapters Layer - Outbound Improvement (10 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `PatternDetector` | pattern_detector.py | 패턴 탐지기 |
+| `FeatureVector` | pattern_detector.py | 특징 벡터 |
+| `PlaybookLoader` | playbook_loader.py | 플레이북 로더 |
+| `Playbook` | playbook_loader.py | 플레이북 |
+| `MetricPlaybook` | playbook_loader.py | 메트릭 플레이북 |
+| `PatternDefinition` | playbook_loader.py | 패턴 정의 |
+| `ActionDefinition` | playbook_loader.py | 액션 정의 |
+| `DetectionRule` | playbook_loader.py | 탐지 규칙 |
+| `InsightGenerator` | insight_generator.py | 인사이트 생성기 |
+| `LLMInsight` | insight_generator.py | LLM 인사이트 |
+| `BatchPatternInsight` | insight_generator.py | 배치 패턴 인사이트 |
+
+---
+
+### 4.14 Adapters Layer - Outbound Report (4 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `LLMReportGenerator` | llm_report_generator.py | LLM 리포트 생성기 |
+| `LLMReport` | llm_report_generator.py | LLM 리포트 |
+| `LLMReportSection` | llm_report_generator.py | LLM 리포트 섹션 |
+| `MarkdownReportAdapter` | markdown_adapter.py | 마크다운 리포트 어댑터 |
+
+---
+
+### 4.15 Adapters Layer - Outbound Other (2 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `SQLiteDomainMemoryAdapter` | sqlite_adapter.py | SQLite 도메인 메모리 어댑터 |
+| `MemoryCacheAdapter` | memory_cache.py | 메모리 캐시 어댑터 |
+
+---
+
+### 4.16 Config Layer (14 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `Settings` | settings.py | 환경 설정 (pydantic-settings) |
+| `LLMConfig` | model_config.py | LLM 설정 |
+| `EmbeddingConfig` | model_config.py | 임베딩 설정 |
+| `ProfileConfig` | model_config.py | 프로필 설정 |
+| `ModelConfig` | model_config.py | 모델 설정 |
+| `LanguageConfig` | domain_config.py | 언어 설정 |
+| `FactualConfig` | domain_config.py | 사실 기억 설정 |
+| `ExperientialConfig` | domain_config.py | 경험 기억 설정 |
+| `WorkingConfig` | domain_config.py | 작업 기억 설정 |
+| `LearningConfig` | domain_config.py | 학습 설정 |
+| `DomainMetadata` | domain_config.py | 도메인 메타데이터 |
+| `DomainMemoryConfig` | domain_config.py | 도메인 메모리 설정 |
+| `AgentMode` | agent_types.py | 에이전트 모드 Enum |
+| `AgentType` | agent_types.py | 에이전트 타입 Enum |
+| `AgentConfig` | agent_types.py | 에이전트 설정 |
+
+---
+
+### 4.17 주요 서비스 상세 구조
+
+#### RagasEvaluator (domain/services/evaluator.py)
 
 ```python
-# domain/services/evaluator.py
-
 class RagasEvaluator:
     """Ragas 기반 RAG 평가 서비스."""
 
-    # 메트릭 매핑
-    METRIC_MAP: dict[str, type]
-    CUSTOM_METRIC_MAP: dict[str, type]
+    METRIC_MAP: dict[str, type]       # Ragas 메트릭 매핑
+    CUSTOM_METRIC_MAP: dict[str, type] # 커스텀 메트릭 매핑
 
-    async def evaluate(
-        self,
-        dataset: Dataset,
-        metrics: list[str],
-        llm: LLMPort,
-        thresholds: dict[str, float] | None = None,
-    ) -> EvaluationRun:
-        """평가 실행"""
-        # 1. 임계값 해석
-        # 2. Ragas 메트릭 실행
-        # 3. 커스텀 메트릭 실행
-        # 4. 결과 집계
-        ...
+    async def evaluate(dataset, metrics, llm, thresholds) -> EvaluationRun:
+        """평가 실행: 임계값 해석 → Ragas 실행 → 결과 집계"""
 
-    async def _evaluate_with_ragas(
-        self,
-        dataset: Dataset,
-        metrics: list[str],
-        llm: LLMPort,
-    ) -> list[TestCaseEvalResult]:
+    async def _evaluate_with_ragas(...) -> list[TestCaseEvalResult]:
         """Ragas 메트릭 실행"""
-        ...
 
-    def _aggregate_results(
-        self,
-        dataset: Dataset,
-        metrics: list[str],
-        eval_results: list[TestCaseEvalResult],
-        thresholds: dict[str, float],
-    ) -> EvaluationRun:
-        """결과 집계"""
-        ...
+    def _aggregate_results(...) -> EvaluationRun:
+        """결과 집계 및 EvaluationRun 생성"""
 ```
 
-### 4.2 PipelineOrchestrator 구조
+#### PipelineOrchestrator (domain/services/pipeline_orchestrator.py)
 
 ```python
-# domain/services/pipeline_orchestrator.py
-
-@dataclass
 class PipelineOrchestrator:
-    """파이프라인 오케스트레이터."""
+    """DAG 기반 분석 파이프라인 오케스트레이터."""
 
     module_catalog: ModuleCatalog
     template_registry: PipelineTemplateRegistry
     intent_classifier: KeywordIntentClassifier
-    _modules: dict[str, AnalysisModulePort]
 
-    def register_module(self, module: AnalysisModulePort) -> None:
+    def register_module(module: AnalysisModulePort) -> None:
         """모듈 등록"""
-        ...
 
-    def build_pipeline(
-        self,
-        intent: AnalysisIntent,
-        context: AnalysisContext,
-    ) -> AnalysisPipeline:
-        """파이프라인 빌드"""
-        # 1. 템플릿 조회
-        # 2. 컨텍스트 주입
-        # 3. 파이프라인 생성
-        ...
+    def build_pipeline(intent, context) -> AnalysisPipeline:
+        """템플릿 기반 파이프라인 빌드"""
 
-    async def execute_pipeline(
-        self,
-        pipeline: AnalysisPipeline,
-        context: AnalysisContext,
-    ) -> PipelineResult:
-        """파이프라인 실행"""
-        # 1. DAG 토폴로지 정렬
-        # 2. 의존성 순서대로 실행
-        # 3. 결과 집계
-        ...
+    async def execute_pipeline(pipeline, context) -> PipelineResult:
+        """DAG 토폴로지 정렬 → 의존성 순서 실행 → 결과 집계"""
 ```
 
-### 4.3 DomainLearningHook 구조
+#### DomainLearningHook (domain/services/domain_learning_hook.py)
 
 ```python
-# domain/services/domain_learning_hook.py
-
 class DomainLearningHook:
-    """도메인 학습 훅 서비스."""
+    """도메인 학습 훅 - 3계층 메모리 형성."""
 
-    def __init__(self, memory_port: DomainMemoryPort):
-        self.memory_port = memory_port
-
-    async def on_evaluation_complete(
-        self,
-        evaluation_run: EvaluationRun,
-        domain: str,
-        language: str = "ko",
-        auto_save: bool = True,
-    ) -> dict[str, list | LearningMemory]:
-        """평가 완료 후 메모리 형성"""
-        # 1. 사실 추출
-        # 2. 패턴 추출
-        # 3. 행동 추출
-        ...
+    async def on_evaluation_complete(evaluation_run, domain, language) -> dict:
+        """평가 완료 후 Factual/Experiential/Behavior 메모리 형성"""
 
     def extract_and_save_facts(...) -> list[FactualFact]:
-        """사실 추출 및 저장"""
-        ...
+        """SPO 트리플 추출 및 저장"""
 
     def extract_and_save_patterns(...) -> LearningMemory:
-        """패턴 추출 및 저장"""
-        ...
+        """성공/실패 패턴 추출 및 저장"""
 
     def extract_and_save_behaviors(...) -> list[BehaviorEntry]:
-        """행동 추출 및 저장"""
-        ...
-```
-
-### 4.4 포트 인터페이스 구조
-
-```python
-# ports/outbound/llm_port.py
-
-class LLMPort(ABC):
-    """LLM 어댑터 인터페이스."""
-
-    @abstractmethod
-    def get_model_name(self) -> str:
-        """모델 이름 반환"""
-        ...
-
-    @abstractmethod
-    def as_ragas_llm(self):
-        """Ragas 호환 LLM 반환"""
-        ...
-
-# ports/outbound/storage_port.py
-
-class StoragePort(Protocol):
-    """저장소 인터페이스."""
-
-    def save_run(self, run: EvaluationRun) -> str:
-        """평가 실행 저장"""
-        ...
-
-    def get_run(self, run_id: str) -> EvaluationRun:
-        """평가 실행 조회"""
-        ...
-
-    def list_runs(...) -> list[EvaluationRun]:
-        """평가 실행 목록 조회"""
-        ...
+        """재사용 행동 패턴 추출 및 저장"""
 ```
 
 ---
@@ -762,6 +1146,13 @@ Adapters → Ports → Domain
 
 ---
 
-**문서 버전**: 1.0
-**최종 업데이트**: 2026년
+**문서 버전**: 2.0
+**최종 업데이트**: 2026-01-02
 **작성자**: EvalVault Team
+
+### 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+|------|------|-----------|
+| 1.0 | 2026-01 | 초기 C4 문서 작성 |
+| 2.0 | 2026-01-02 | Level 4 클래스 카탈로그 전면 현행화 (200+ 클래스 문서화) |

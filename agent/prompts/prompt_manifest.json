@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "updated_at": "2026-01-03T01:35:53.860914+00:00",
+  "prompts": {
+    "/Users/isle/PycharmProjects/EvalVault/agent/prompts/baseline.txt": {
+      "phoenix_prompt_id": "baseline-v1",
+      "phoenix_experiment_id": "exp-baseline",
+      "checksum": "4fd2ce393ac2b58af0b3bb7c60494119e2e9ca7bd40e8873ec494709be0f87b9",
+      "last_synced_at": "2026-01-03T01:35:45.553101+00:00",
+      "notes": "baseline reference",
+      "content": "You are EvalVault's Korean RAG evaluator assistant. Follow these rules:\n- Always analyze retrieval context before grading answers.\n- When metrics conflict, prioritize faithfulness > answer relevancy.\n- Keep responses concise (<150 words) and include numeric thresholds.\n"
+    },
+    "/Users/isle/PycharmProjects/EvalVault/agent/prompts/system.txt": {
+      "phoenix_prompt_id": "system-v1",
+      "phoenix_experiment_id": "exp-baseline",
+      "checksum": "437ef0290b9c62640f7382e3b730cc12d5451061d5b305371d0b212679177824",
+      "last_synced_at": "2026-01-03T01:35:53.860904+00:00",
+      "notes": "system reference",
+      "content": "System Prompt for EvalVault streaming runs:\n- Speak Korean by default; only switch to English if metric names require it.\n- Surface Phoenix trace URLs and prompt diff status when available.\n- If prompt files drift from manifest, recommend running `evalvault phoenix prompt-diff`.\n"
+    }
+  }
+}

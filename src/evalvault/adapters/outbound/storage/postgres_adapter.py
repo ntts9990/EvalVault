@@ -77,6 +77,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
 
         with psycopg.connect(self._conn_string) as conn:
             conn.execute(schema_sql)
+            self._apply_migrations(conn)
             conn.commit()
 
     def _connect(self) -> psycopg.Connection:
@@ -93,6 +94,19 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
     def _get_connection(self):
         with psycopg.connect(self._conn_string, row_factory=dict_row) as conn:
             yield conn
+
+    def _apply_migrations(self, conn) -> None:
+        """Apply schema migrations for legacy databases."""
+        cursor = conn.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'evaluation_runs'
+              AND column_name = 'metadata'
+            """
+        )
+        if cursor.fetchone() is None:
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata JSONB")
 
     # Experiment 관련 메서드
 

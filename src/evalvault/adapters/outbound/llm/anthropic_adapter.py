@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, TokenUsage
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIEmbeddingsWithLegacy
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import ThinkingConfig
 
@@ -55,15 +56,30 @@ class ThinkingTokenTrackingAsyncAnthropic:
                         "budget_tokens": thinking_budget,
                     }
 
-                response = await inner_self._messages.create(**kwargs)
+                attrs = {
+                    "llm.provider": "anthropic",
+                    "llm.model": kwargs.get("model"),
+                    "llm.thinking.enabled": thinking_budget is not None,
+                }
+                with instrumentation_span("llm.messages", attrs) as span:
+                    response = await inner_self._messages.create(**kwargs)
 
-                if hasattr(response, "usage") and response.usage:
-                    inner_self._tracker.add(
-                        prompt=response.usage.input_tokens or 0,
-                        completion=response.usage.output_tokens or 0,
-                        total=(response.usage.input_tokens or 0)
-                        + (response.usage.output_tokens or 0),
-                    )
+                    if hasattr(response, "usage") and response.usage:
+                        prompt_tokens = response.usage.input_tokens or 0
+                        completion_tokens = response.usage.output_tokens or 0
+                        inner_self._tracker.add(
+                            prompt=prompt_tokens,
+                            completion=completion_tokens,
+                            total=prompt_tokens + completion_tokens,
+                        )
+                        set_span_attributes(
+                            span,
+                            {
+                                "llm.usage.prompt_tokens": prompt_tokens,
+                                "llm.usage.completion_tokens": completion_tokens,
+                                "llm.usage.total_tokens": prompt_tokens + completion_tokens,
+                            },
+                        )
                 return response
 
         return ThinkingTrackingMessages(original_messages, self._usage_tracker)
@@ -95,14 +111,14 @@ class AnthropicAdapter(BaseLLMAdapter):
             }
         )
 
-        anthropic_client = ThinkingTokenTrackingAsyncAnthropic(
+        self._anthropic_client = ThinkingTokenTrackingAsyncAnthropic(
             usage_tracker=self._token_usage,
             thinking_budget=self._thinking_budget,
             api_key=settings.anthropic_api_key,
         )
 
         ragas_llm = create_instructor_llm(
-            "anthropic", settings.anthropic_model, anthropic_client._client
+            "anthropic", settings.anthropic_model, self._anthropic_client._client
         )
         self._set_ragas_llm(ragas_llm)
 
@@ -127,3 +143,58 @@ class AnthropicAdapter(BaseLLMAdapter):
     def get_thinking_budget(self) -> int | None:
         """Get the extended thinking token budget."""
         return self._thinking_budget
+
+    async def agenerate_text(self, prompt: str) -> str:
+        """Generate text from a prompt (async).
+
+        Uses the Anthropic messages API for simple text generation.
+
+        Args:
+            prompt: The prompt to generate text from
+
+        Returns:
+            Generated text string
+        """
+        response = await self._anthropic_client.messages.create(
+            model=self._model_name,
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # Extract text from response content blocks
+        text_parts = []
+        for block in response.content:
+            if hasattr(block, "text"):
+                text_parts.append(block.text)
+        return "".join(text_parts)
+
+    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+        """Generate text from a prompt (sync).
+
+        Args:
+            prompt: The prompt to generate text from
+            json_mode: If True, force JSON response format
+
+        Returns:
+            Generated text string
+        """
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            try:
+                import nest_asyncio
+
+                nest_asyncio.apply()
+                return loop.run_until_complete(self.agenerate_text(prompt))
+            except ImportError:
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.agenerate_text(prompt))
+                    return future.result()
+        else:
+            return asyncio.run(self.agenerate_text(prompt))
