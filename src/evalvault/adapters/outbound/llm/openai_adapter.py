@@ -2,38 +2,14 @@
 
 from typing import Any
 
-from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
-
-from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
+from evalvault.adapters.outbound.llm.base import (
+    BaseLLMAdapter,
+    create_openai_embeddings_with_legacy,
+)
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncOpenAI
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
-
-
-class OpenAIEmbeddingsWithLegacy(RagasOpenAIEmbeddings):
-    """OpenAI embeddings with legacy LangChain-style methods.
-
-    Ragas AnswerRelevancy metric expects embed_query/embed_documents methods
-    but the modern RagasOpenAIEmbeddings only has embed_text/embed_texts.
-    This wrapper adds the legacy methods for compatibility.
-    """
-
-    def embed_query(self, text: str) -> list[float]:
-        """Embed a single query text (LangChain-style method)."""
-        return self.embed_text(text)
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Embed multiple documents (LangChain-style method)."""
-        return self.embed_texts(texts)
-
-    async def aembed_query(self, text: str) -> list[float]:
-        """Async embed a single query text."""
-        return await self.aembed_text(text)
-
-    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Async embed multiple documents."""
-        return await self.aembed_texts(texts)
 
 
 class OpenAIAdapter(BaseLLMAdapter):
@@ -70,7 +46,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         ragas_llm = create_instructor_llm("openai", self._model_name, self._client)
         self._set_ragas_llm(ragas_llm)
 
-        embeddings = OpenAIEmbeddingsWithLegacy(
+        embeddings = create_openai_embeddings_with_legacy(
             model=self._embedding_model_name,
             client=self._client,
         )

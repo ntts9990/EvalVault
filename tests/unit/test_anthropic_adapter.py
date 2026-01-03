@@ -96,7 +96,7 @@ class TestAnthropicAdapter:
                 "evalvault.adapters.outbound.llm.anthropic_adapter.create_instructor_llm"
             ) as mock_llm_factory,
             patch(
-                "evalvault.adapters.outbound.llm.anthropic_adapter.OpenAIEmbeddingsWithLegacy"
+                "evalvault.adapters.outbound.llm.anthropic_adapter.create_openai_embeddings_with_legacy"
             ) as mock_embeddings,
             patch("evalvault.adapters.outbound.llm.anthropic_adapter.AsyncOpenAI") as mock_openai,
         ):

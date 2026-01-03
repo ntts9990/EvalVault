@@ -2,7 +2,11 @@
 
 from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
 from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter
-from evalvault.adapters.outbound.llm.base import BaseLLMAdapter, LLMConfigurationError
+from evalvault.adapters.outbound.llm.base import (
+    BaseLLMAdapter,
+    LLMConfigurationError,
+    create_openai_embeddings_with_legacy,
+)
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
@@ -103,6 +107,7 @@ def create_llm_adapter_for_model(
 __all__ = [
     "BaseLLMAdapter",
     "LLMConfigurationError",
+    "create_openai_embeddings_with_legacy",
     "OpenAIAdapter",
     "AzureOpenAIAdapter",
     "AnthropicAdapter",

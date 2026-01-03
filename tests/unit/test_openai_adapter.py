@@ -23,7 +23,7 @@ class TestOpenAIAdapter:
                 "evalvault.adapters.outbound.llm.openai_adapter.create_instructor_llm"
             ) as mock_llm,
             patch(
-                "evalvault.adapters.outbound.llm.openai_adapter.OpenAIEmbeddingsWithLegacy"
+                "evalvault.adapters.outbound.llm.openai_adapter.create_openai_embeddings_with_legacy"
             ) as mock_embed,
         ):
             mock_client.return_value = MagicMock()

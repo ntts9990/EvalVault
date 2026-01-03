@@ -127,7 +127,7 @@ class TestGetLLMAdapter:
 
     @patch("evalvault.adapters.outbound.llm.openai_adapter.TokenTrackingAsyncOpenAI")
     @patch("evalvault.adapters.outbound.llm.openai_adapter.create_instructor_llm")
-    @patch("evalvault.adapters.outbound.llm.openai_adapter.OpenAIEmbeddingsWithLegacy")
+    @patch("evalvault.adapters.outbound.llm.openai_adapter.create_openai_embeddings_with_legacy")
     def test_openai_provider(self, mock_embeddings, mock_llm_factory, mock_client):
         settings = Settings()
         settings.llm_provider = "openai"
