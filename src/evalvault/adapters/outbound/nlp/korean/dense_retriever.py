@@ -34,6 +34,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
+
 if TYPE_CHECKING:
     pass
 
@@ -470,11 +472,25 @@ class KoreanDenseRetriever:
             logger.warning("빈 문서 리스트로 인덱싱 시도")
             return 0
 
-        self._documents = documents
-        self._embeddings = self.encode(documents, show_progress=True)
+        span_attrs = {
+            "retriever.type": "dense",
+            "retriever.documents": len(documents),
+            "retriever.model": self._model_name,
+        }
+        with instrumentation_span("retriever.dense.index", span_attrs) as span:
+            self._documents = documents
+            self._embeddings = self.encode(documents, show_progress=True)
+            if span and self._embeddings is not None:
+                set_span_attributes(
+                    span,
+                    {
+                        "retriever.embedding_dim": int(self._embeddings.shape[1]),
+                        "retriever.device": self._device.value,
+                    },
+                )
 
-        logger.info(f"Dense 인덱스 구축 완료: {len(documents)}개 문서")
-        return len(documents)
+            logger.info(f"Dense 인덱스 구축 완료: {len(documents)}개 문서")
+            return len(documents)
 
     def search(
         self,
@@ -500,29 +516,38 @@ class KoreanDenseRetriever:
         if not self.is_indexed:
             raise ValueError("인덱스가 구축되지 않았습니다. index()를 먼저 호출하세요.")
 
-        # 쿼리 임베딩
-        query_embedding = self.encode([query])[0]
+        span_attrs = {
+            "retriever.type": "dense",
+            "retriever.top_k": top_k,
+            "retriever.model": self._model_name,
+        }
+        with instrumentation_span("retriever.dense.search", span_attrs) as span:
+            # 쿼리 임베딩
+            query_embedding = self.encode([query])[0]
 
-        # 코사인 유사도 계산
-        scores = self._cosine_similarity(query_embedding, self._embeddings)
+            # 코사인 유사도 계산
+            scores = self._cosine_similarity(query_embedding, self._embeddings)
 
-        # 상위 k개 인덱스
-        top_indices = scores.argsort()[::-1][:top_k]
+            # 상위 k개 인덱스
+            top_indices = scores.argsort()[::-1][:top_k]
 
-        results = []
-        for idx in top_indices:
-            idx = int(idx)
-            score = float(scores[idx])
+            results = []
+            for idx in top_indices:
+                idx = int(idx)
+                score = float(scores[idx])
 
-            result = DenseRetrievalResult(
-                document=self._documents[idx],
-                score=score,
-                doc_id=idx,
-                embedding=self._embeddings[idx].tolist() if include_embeddings else None,
-            )
-            results.append(result)
+                result = DenseRetrievalResult(
+                    document=self._documents[idx],
+                    score=score,
+                    doc_id=idx,
+                    embedding=self._embeddings[idx].tolist() if include_embeddings else None,
+                )
+                results.append(result)
 
-        return results
+            if span:
+                set_span_attributes(span, {"retriever.result_count": len(results)})
+
+            return results
 
     def _cosine_similarity(
         self,
