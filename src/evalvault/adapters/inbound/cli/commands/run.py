@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+import click
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -54,11 +56,44 @@ from evalvault.domain.services.prompt_manifest import (
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
+from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
 from ..utils.formatters import format_score, format_status
 from ..utils.options import db_option, memory_db_option, profile_option
 from ..utils.validators import parse_csv_option, validate_choices
 
 TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
+DEFAULT_RUN_MODE = "full"
+
+
+@dataclass(frozen=True)
+class RunModePreset:
+    """심플/전체 실행 모드를 정의한다."""
+
+    name: str
+    label: str
+    description: str
+    default_metrics: tuple[str, ...] | None = None
+    default_tracker: TrackerType | None = None
+    allow_domain_memory: bool = True
+    allow_prompt_metadata: bool = True
+
+
+RUN_MODE_PRESETS: dict[str, RunModePreset] = {
+    "simple": RunModePreset(
+        name="simple",
+        label="Simple",
+        description="기본 메트릭 2종과 Phoenix 추적만 활성화된 간편 실행 모드.",
+        default_metrics=("faithfulness", "answer_relevancy"),
+        default_tracker="phoenix",
+        allow_domain_memory=False,
+        allow_prompt_metadata=False,
+    ),
+    "full": RunModePreset(
+        name="full",
+        label="Full",
+        description="모든 CLI 옵션과 Domain Memory, Prompt manifest를 활용하는 전체 모드.",
+    ),
+}
 
 
 def register_run_commands(
@@ -70,6 +105,671 @@ def register_run_commands(
 
     @app.command()
     def run(  # noqa: PLR0913 - CLI arguments intentionally flat
+        dataset: Path = typer.Argument(
+            ...,
+            help="Path to dataset file (CSV, Excel, or JSON).",
+            exists=True,
+            readable=True,
+        ),
+        metrics: str = typer.Option(
+            "faithfulness,answer_relevancy",
+            "--metrics",
+            "-m",
+            help="Comma-separated list of metrics to evaluate.",
+            rich_help_panel="Simple mode preset",
+        ),
+        profile: str | None = profile_option(
+            help_text="Model profile (dev, prod, openai). Overrides .env setting.",
+        ),
+        model: str | None = typer.Option(
+            None,
+            "--model",
+            help="Model to use for evaluation (overrides profile).",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output file for results (JSON format).",
+        ),
+        tracker: str = typer.Option(
+            "none",
+            "--tracker",
+            "-t",
+            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+            rich_help_panel="Simple mode preset",
+        ),
+        langfuse: bool = typer.Option(
+            False,
+            "--langfuse",
+            "-l",
+            help="[Deprecated] Use --tracker langfuse instead.",
+            hidden=True,
+        ),
+        phoenix_max_traces: int | None = typer.Option(
+            None,
+            "--phoenix-max-traces",
+            help="Max per-test-case traces to send to Phoenix (default: send all).",
+            rich_help_panel="Full mode options",
+        ),
+        phoenix_dataset: str | None = typer.Option(
+            None,
+            "--phoenix-dataset",
+            help="Upload the dataset/test cases to Phoenix under this name.",
+            rich_help_panel="Full mode options",
+        ),
+        phoenix_dataset_description: str | None = typer.Option(
+            None,
+            "--phoenix-dataset-description",
+            help="Description stored on the Phoenix dataset (default: dataset metadata).",
+            rich_help_panel="Full mode options",
+        ),
+        phoenix_experiment: str | None = typer.Option(
+            None,
+            "--phoenix-experiment",
+            help="Create a Phoenix experiment record for this run (requires dataset upload).",
+            rich_help_panel="Full mode options",
+        ),
+        phoenix_experiment_description: str | None = typer.Option(
+            None,
+            "--phoenix-experiment-description",
+            help="Description stored on the Phoenix experiment.",
+            rich_help_panel="Full mode options",
+        ),
+        prompt_manifest: Path | None = typer.Option(
+            Path("agent/prompts/prompt_manifest.json"),
+            "--prompt-manifest",
+            help="Path to Phoenix prompt manifest JSON.",
+            rich_help_panel="Full mode options",
+        ),
+        prompt_files: str | None = typer.Option(
+            None,
+            "--prompt-files",
+            help="Comma-separated prompt files to capture in Phoenix metadata.",
+            rich_help_panel="Full mode options",
+        ),
+        mode: str = typer.Option(
+            DEFAULT_RUN_MODE,
+            "--mode",
+            help="실행 모드 선택: 'simple'은 간편 실행, 'full'은 모든 옵션 노출.",
+            rich_help_panel="Run modes",
+        ),
+        db_path: Path | None = db_option(
+            default=None,
+            help_text="Path to SQLite database file for storing results.",
+        ),
+        use_domain_memory: bool = typer.Option(
+            False,
+            "--use-domain-memory",
+            help="Leverage Domain Memory for threshold adjustment and insights.",
+            rich_help_panel="Domain Memory (full mode)",
+        ),
+        memory_domain: str | None = typer.Option(
+            None,
+            "--memory-domain",
+            help="Domain name for Domain Memory (defaults to dataset metadata).",
+            rich_help_panel="Domain Memory (full mode)",
+        ),
+        memory_language: str = typer.Option(
+            "ko",
+            "--memory-language",
+            help="Language code for Domain Memory lookups (default: ko).",
+            rich_help_panel="Domain Memory (full mode)",
+        ),
+        memory_db: Path = memory_db_option(
+            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+        ),
+        memory_augment_context: bool = typer.Option(
+            False,
+            "--augment-context",
+            help="Append retrieved factual memories to each test case context.",
+            rich_help_panel="Domain Memory (full mode)",
+        ),
+        verbose: bool = typer.Option(
+            False,
+            "--verbose",
+            help="Show detailed output.",
+        ),
+        parallel: bool = typer.Option(
+            False,
+            "--parallel",
+            help="Enable parallel evaluation for faster processing.",
+        ),
+        batch_size: int = typer.Option(
+            5,
+            "--batch-size",
+            help="Batch size for parallel evaluation (default: 5).",
+        ),
+        stream: bool = typer.Option(
+            False,
+            "--stream",
+            help="Enable streaming evaluation for large datasets (process file in chunks).",
+        ),
+        stream_chunk_size: int = typer.Option(
+            200,
+            "--stream-chunk-size",
+            help="Chunk size when streaming evaluation is enabled (default: 200).",
+        ),
+    ) -> None:
+        """Run RAG evaluation on a dataset.
+
+        Run Modes:
+          • Simple — 안전한 기본값(2개 메트릭 + Phoenix 트래커 + Domain Memory 비활성)을 강제합니다.
+          • Full — 모든 프롬프트/Domain Memory/스트리밍 옵션을 그대로 노출합니다.
+
+        예시:
+          uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json
+          uv run evalvault run-simple tests/fixtures/e2e/insurance_qa_korean.json
+        """
+        try:
+            ctx = click.get_current_context()
+        except RuntimeError:
+            ctx = None
+        alias_invoked = ctx.meta.get("run_mode_alias") if ctx else None
+        run_mode_value = (mode or DEFAULT_RUN_MODE).lower()
+        preset = RUN_MODE_PRESETS.get(run_mode_value)
+        if not preset:
+            print_cli_error(
+                console,
+                "--mode 값이 올바르지 않습니다.",
+                fixes=[f"사용 가능: {', '.join(sorted(RUN_MODE_PRESETS))}"],
+            )
+            raise typer.Exit(2)
+
+        if (
+            preset.name == "simple"
+            or _option_was_provided(ctx, "mode")
+            or alias_invoked is not None
+        ):
+            _print_run_mode_banner(console, preset)
+
+        metric_list = parse_csv_option(metrics)
+        metrics_override = _option_was_provided(ctx, "metrics")
+        if preset.default_metrics:
+            preset_metrics = list(preset.default_metrics)
+            if metrics_override and set(metric_list) != set(preset_metrics):
+                print_cli_warning(
+                    console,
+                    "Simple 모드는 faithfulness/answer_relevancy를 강제합니다.",
+                    tips=["고급 메트릭 구성이 필요하면 --mode full로 실행하세요."],
+                )
+            metric_list = preset_metrics
+        validate_choices(metric_list, available_metrics, console, value_label="metric")
+
+        tracker_override = _option_was_provided(ctx, "tracker") or langfuse
+        selected_tracker = tracker
+        if preset.default_tracker:
+            if tracker_override and tracker != preset.default_tracker:
+                print_cli_warning(
+                    console,
+                    f"Simple 모드는 tracker={preset.default_tracker}로 고정됩니다.",
+                    tips=["다른 Tracker를 사용하려면 --mode full을 사용하세요."],
+                )
+            selected_tracker = preset.default_tracker
+        tracker = selected_tracker
+
+        prompt_manifest_value = prompt_manifest
+        prompt_files_value = prompt_files
+        if not preset.allow_prompt_metadata:
+            if prompt_files or _option_was_provided(ctx, "prompt_manifest"):
+                print_cli_warning(
+                    console,
+                    "Simple 모드에서는 Prompt manifest/diff 기능이 비활성화됩니다.",
+                    tips=["프롬프트 추적이 필요하면 --mode full을 사용하세요."],
+                )
+            prompt_manifest_value = None
+            prompt_files_value = None
+
+        prompt_manifest_path = prompt_manifest_value.expanduser() if prompt_manifest_value else None
+        prompt_file_list = [
+            Path(item).expanduser() for item in parse_csv_option(prompt_files_value)
+        ]
+        prompt_metadata_entries: list[dict[str, Any]] = []
+        if prompt_file_list:
+            prompt_metadata_entries = _collect_prompt_metadata(
+                manifest_path=prompt_manifest_path,
+                prompt_files=prompt_file_list,
+                console=console,
+            )
+            if prompt_metadata_entries:
+                console.print(
+                    f"[dim]Collected Phoenix prompt metadata for {len(prompt_metadata_entries)} file(s).[/dim]"
+                )
+                unsynced = [
+                    entry for entry in prompt_metadata_entries if entry.get("status") != "synced"
+                ]
+                if unsynced:
+                    print_cli_warning(
+                        console,
+                        "Prompt 파일이 manifest와 다릅니다.",
+                        tips=["`uv run evalvault phoenix prompt-diff`로 변경 사항을 확인하세요."],
+                    )
+
+        if stream_chunk_size <= 0:
+            print_cli_error(
+                console,
+                "--stream-chunk-size 값은 1 이상이어야 합니다.",
+                fixes=["예: --stream-chunk-size 200"],
+            )
+            raise typer.Exit(1)
+
+        domain_memory_requested = (
+            use_domain_memory or memory_domain is not None or memory_augment_context
+        )
+        if not preset.allow_domain_memory and domain_memory_requested:
+            print_cli_warning(
+                console,
+                "Simple 모드에서는 Domain Memory를 사용할 수 없습니다.",
+                tips=["--mode full로 전환해 Domain Memory 및 컨텍스트 증강을 활성화하세요."],
+            )
+            use_domain_memory = False
+            memory_domain = None
+            memory_augment_context = False
+            domain_memory_requested = False
+
+        if stream and domain_memory_requested:
+            print_cli_error(
+                console,
+                "Streaming 모드에서는 Domain Memory 옵션을 사용할 수 없습니다.",
+                fixes=["스트리밍을 끄거나 --mode full에서 Domain Memory를 비활성화하세요."],
+            )
+            raise typer.Exit(1)
+        if stream and (phoenix_dataset or phoenix_experiment):
+            print_cli_error(
+                console,
+                "Streaming 모드에서는 Phoenix Dataset/Experiment 업로드가 지원되지 않습니다.",
+                fixes=["스트리밍 없이 업로드하거나 Phoenix 업로드 옵션을 제거하세요."],
+            )
+            raise typer.Exit(1)
+
+        settings = Settings()
+
+        # Apply profile (CLI > .env > default)
+        profile_name = profile or settings.evalvault_profile
+        if profile_name:
+            settings = apply_profile(settings, profile_name)
+
+        # Override model if specified
+        if model:
+            if _is_oss_open_model(model):
+                settings.llm_provider = "ollama"
+                settings.ollama_model = model
+                console.print(
+                    "[dim]OSS model detected. Routing request through Ollama backend.[/dim]"
+                )
+            elif settings.llm_provider == "ollama":
+                settings.ollama_model = model
+            else:
+                settings.openai_model = model
+
+        if settings.llm_provider == "openai" and not settings.openai_api_key:
+            print_cli_error(
+                console,
+                "OPENAI_API_KEY가 설정되지 않았습니다.",
+                fixes=[
+                    ".env 파일 또는 환경 변수에 OPENAI_API_KEY=... 값을 추가하세요.",
+                    "--profile dev 같이 Ollama 기반 프로필을 사용해 로컬 모델을 실행하세요.",
+                ],
+            )
+            raise typer.Exit(1)
+
+        display_model = (
+            f"ollama/{settings.ollama_model}"
+            if settings.llm_provider == "ollama"
+            else settings.openai_model
+        )
+
+        console.print("\n[bold]EvalVault[/bold] - RAG Evaluation")
+        console.print(f"Dataset: [cyan]{dataset}[/cyan]")
+        console.print(f"Metrics: [cyan]{', '.join(metric_list)}[/cyan]")
+        console.print(f"Provider: [cyan]{settings.llm_provider}[/cyan]")
+        console.print(f"Model: [cyan]{display_model}[/cyan]")
+        if profile_name:
+            console.print(f"Profile: [cyan]{profile_name}[/cyan]")
+        console.print()
+
+        phoenix_trace_metadata: dict[str, Any] = {
+            "dataset.path": str(dataset),
+            "metrics": metric_list,
+            "run_mode": preset.name,
+        }
+
+        # Load dataset or configure streaming metadata
+        if stream:
+            ds = _build_streaming_dataset_template(dataset)
+            console.print(
+                f"[dim]Streaming evaluation enabled (chunk size={stream_chunk_size}).[/dim]"
+            )
+            phoenix_trace_metadata["dataset.stream"] = True
+            phoenix_trace_metadata["dataset.template_version"] = ds.version
+        else:
+            with progress_spinner(console, "📂 데이터셋 로딩 중...") as update_progress:
+                try:
+                    loader = get_loader(dataset)
+                    ds = loader.load(dataset)
+                    update_progress(f"✅ {len(ds)}개 테스트 케이스 로드 완료")
+                    phoenix_trace_metadata["dataset.test_cases"] = len(ds)
+                    if ds.metadata:
+                        for key, value in ds.metadata.items():
+                            phoenix_trace_metadata[f"dataset.meta.{key}"] = str(value)
+                except Exception as exc:  # pragma: no cover - user feedback path
+                    print_cli_error(
+                        console,
+                        "데이터셋을 불러오지 못했습니다.",
+                        details=str(exc),
+                        fixes=[
+                            "파일 경로와 확장자(csv/json/xlsx)를 확인하세요.",
+                            "데이터셋 스키마가 문서와 동일한지 검증하세요.",
+                        ],
+                    )
+                    raise typer.Exit(1) from exc
+
+        resolved_thresholds = _resolve_thresholds(metric_list, ds)
+
+        phoenix_dataset_name = phoenix_dataset
+        if phoenix_experiment and not phoenix_dataset_name:
+            phoenix_dataset_name = f"{ds.name}:{ds.version}"
+
+        phoenix_dataset_description_value = phoenix_dataset_description
+        if phoenix_dataset_name and not phoenix_dataset_description_value:
+            desc_source = ds.metadata.get("description") if isinstance(ds.metadata, dict) else None
+            phoenix_dataset_description_value = desc_source or f"{ds.name} v{ds.version}"
+
+        phoenix_sync_service: PhoenixSyncService | None = None
+        phoenix_dataset_result: dict[str, Any] | None = None
+        phoenix_experiment_result: dict[str, Any] | None = None
+
+        if phoenix_dataset_name or phoenix_experiment:
+            try:
+                phoenix_sync_service = PhoenixSyncService(
+                    endpoint=settings.phoenix_endpoint,
+                    api_token=getattr(settings, "phoenix_api_token", None),
+                )
+            except PhoenixSyncError as exc:
+                print_cli_warning(
+                    console,
+                    "Phoenix Sync 서비스를 초기화할 수 없습니다.",
+                    tips=[str(exc)],
+                )
+                phoenix_sync_service = None
+
+        effective_tracker = tracker
+        if langfuse and tracker == "none" and not preset.default_tracker:
+            effective_tracker = "langfuse"
+            print_cli_warning(
+                console,
+                "--langfuse 플래그는 곧 제거됩니다.",
+                tips=["대신 --tracker langfuse를 사용하세요."],
+            )
+
+        config_wants_phoenix = getattr(settings, "phoenix_enabled", False)
+        if not isinstance(config_wants_phoenix, bool):
+            config_wants_phoenix = False
+        should_enable_phoenix = effective_tracker == "phoenix" or config_wants_phoenix
+        if should_enable_phoenix:
+            ensure_phoenix_instrumentation(settings, console=console, force=True)
+
+        evaluator = RagasEvaluator()
+        llm_adapter = get_llm_adapter(settings)
+
+        memory_adapter: SQLiteDomainMemoryAdapter | None = None
+        memory_evaluator: MemoryAwareEvaluator | None = None
+        memory_domain_name = memory_domain or ds.metadata.get("domain") or "default"
+        memory_required = domain_memory_requested
+        reliability_snapshot: dict[str, float] | None = None
+
+        if memory_required:
+            phoenix_trace_metadata["domain_memory.enabled"] = True
+            phoenix_trace_metadata["domain_memory.domain"] = memory_domain_name
+            phoenix_trace_metadata["domain_memory.language"] = memory_language
+            phoenix_trace_metadata["domain_memory.augment_context"] = memory_augment_context
+        else:
+            phoenix_trace_metadata["domain_memory.enabled"] = False
+
+        if memory_required:
+            try:
+                memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
+                memory_evaluator = MemoryAwareEvaluator(
+                    evaluator=evaluator, memory_port=memory_adapter
+                )
+                console.print(
+                    f"[dim]Domain Memory enabled for '{memory_domain_name}' ({memory_language}).[/dim]"
+                )
+                if memory_adapter:
+                    reliability = memory_adapter.get_aggregated_reliability(
+                        domain=memory_domain_name,
+                        language=memory_language,
+                    )
+                    reliability_snapshot = reliability
+                    if reliability:
+                        console.print(
+                            "[dim]Reliability snapshot:[/dim] "
+                            + ", ".join(f"{k}={v:.2f}" for k, v in reliability.items())
+                        )
+                        phoenix_trace_metadata["domain_memory.reliability"] = reliability
+            except Exception as exc:  # pragma: no cover - best-effort memory hookup
+                print_cli_warning(
+                    console,
+                    "Domain Memory 초기화에 실패했습니다.",
+                    tips=[str(exc)],
+                )
+                memory_evaluator = None
+                memory_adapter = None
+
+        if memory_evaluator and memory_augment_context:
+            enriched = enrich_dataset_with_memory(
+                dataset=ds,
+                memory_evaluator=memory_evaluator,
+                domain=memory_domain_name,
+                language=memory_language,
+            )
+            if enriched:
+                console.print(
+                    f"[dim]Appended Domain Memory facts to {enriched} test case(s).[/dim]"
+                )
+
+        if ds.thresholds:
+            console.print("[dim]Thresholds from dataset:[/dim]")
+            for metric, threshold in ds.thresholds.items():
+                console.print(f"  [dim]{metric}: {threshold}[/dim]")
+            console.print()
+        elif resolved_thresholds:
+            console.print("[dim]Thresholds in use:[/dim]")
+            for metric, threshold in resolved_thresholds.items():
+                console.print(f"  [dim]{metric}: {threshold}[/dim]")
+            console.print()
+
+        if stream:
+            status_msg = f"📡 Streaming evaluation (chunk_size={stream_chunk_size})"
+        elif parallel:
+            status_msg = f"⚡ Parallel evaluation (batch_size={batch_size})"
+        else:
+            status_msg = "🤖 Evaluation in progress"
+        with progress_spinner(console, status_msg) as update_progress:
+            try:
+                if stream:
+                    result = asyncio.run(
+                        _evaluate_streaming_run(
+                            dataset_path=dataset,
+                            dataset_template=ds,
+                            metrics=metric_list,
+                            thresholds=resolved_thresholds,
+                            evaluator=evaluator,
+                            llm=llm_adapter,
+                            chunk_size=stream_chunk_size,
+                            parallel=parallel,
+                            batch_size=batch_size,
+                        )
+                    )
+                elif memory_evaluator and use_domain_memory:
+                    update_progress("🔁 Domain Memory와 병렬로 실행 중...")
+                    result = asyncio.run(
+                        memory_evaluator.evaluate_with_memory(
+                            dataset=ds,
+                            metrics=metric_list,
+                            llm=llm_adapter,
+                            thresholds=resolved_thresholds,
+                            parallel=parallel,
+                            batch_size=batch_size,
+                            domain=memory_domain_name,
+                            language=memory_language,
+                        )
+                    )
+                else:
+                    result = asyncio.run(
+                        evaluator.evaluate(
+                            dataset=ds,
+                            metrics=metric_list,
+                            llm=llm_adapter,
+                            thresholds=resolved_thresholds,
+                            parallel=parallel,
+                            batch_size=batch_size,
+                        )
+                    )
+                update_progress("📊 결과 집계 중...")
+            except Exception as exc:  # pragma: no cover - surfaced to CLI
+                print_cli_error(
+                    console,
+                    "평가 실행 중 오류가 발생했습니다.",
+                    details=str(exc),
+                    fixes=[
+                        "LLM API 키/쿼터 상태와 dataset 스키마를 확인하세요.",
+                        "추가 로그는 --verbose 옵션으로 확인할 수 있습니다.",
+                    ],
+                )
+                raise typer.Exit(1) from exc
+
+        phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
+
+        result.tracker_metadata.setdefault("run_mode", preset.name)
+
+        _display_results(result, console, verbose)
+
+        if memory_adapter and memory_required:
+            analyzer = MemoryBasedAnalysis(memory_port=memory_adapter)
+            insights = analyzer.generate_insights(
+                evaluation_run=result,
+                domain=memory_domain_name,
+                language=memory_language,
+            )
+            _display_memory_insights(insights, console)
+
+        if phoenix_sync_service:
+            phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+            phoenix_meta.setdefault("schema_version", 2)
+            if phoenix_dataset_name:
+                try:
+                    dataset_info = phoenix_sync_service.upload_dataset(
+                        dataset=ds,
+                        dataset_name=phoenix_dataset_name,
+                        description=phoenix_dataset_description_value,
+                    )
+                    phoenix_dataset_result = dataset_info.to_dict()
+                    phoenix_meta["dataset"] = phoenix_dataset_result
+                    phoenix_trace_metadata["phoenix.dataset_id"] = dataset_info.dataset_id
+                    phoenix_meta["embedding_export"] = {
+                        "dataset_id": dataset_info.dataset_id,
+                        "cli": (
+                            "uv run evalvault phoenix export-embeddings "
+                            f"--dataset {dataset_info.dataset_id}"
+                        ),
+                        "endpoint": getattr(settings, "phoenix_endpoint", None),
+                    }
+                    console.print(
+                        "[green]Uploaded dataset to Phoenix:[/green] "
+                        f"{dataset_info.dataset_name} ({dataset_info.dataset_id})"
+                    )
+                    console.print(f"[dim]View datasets: {dataset_info.url}[/dim]")
+                except PhoenixSyncError as exc:
+                    print_cli_warning(
+                        console,
+                        "Phoenix Dataset 업로드에 실패했습니다.",
+                        tips=[str(exc)],
+                    )
+            if phoenix_experiment:
+                if not phoenix_dataset_result:
+                    print_cli_warning(
+                        console,
+                        "Dataset 업로드에 실패해 Phoenix Experiment 생성을 건너뜁니다.",
+                        tips=["`--phoenix-dataset` 업로드가 성공한 뒤 실험을 생성하세요."],
+                    )
+                else:
+                    experiment_name = (
+                        phoenix_experiment or f"{result.model_name}-{result.run_id[:8]}"
+                    )
+                    experiment_description = (
+                        phoenix_experiment_description
+                        or f"EvalVault run {result.run_id} ({result.model_name})"
+                    )
+                    extra_meta = {
+                        "domain_memory": {
+                            "enabled": memory_required,
+                            "domain": memory_domain_name,
+                            "language": memory_language,
+                        }
+                    }
+                    experiment_metadata = build_experiment_metadata(
+                        run=result,
+                        dataset=ds,
+                        reliability_snapshot=reliability_snapshot,
+                        extra=extra_meta,
+                    )
+                    try:
+                        dataset_info_obj = PhoenixDatasetInfo(
+                            dataset_id=phoenix_dataset_result["dataset_id"],
+                            dataset_name=phoenix_dataset_result["dataset_name"],
+                            dataset_version_id=phoenix_dataset_result["dataset_version_id"],
+                            url=phoenix_dataset_result["url"],
+                        )
+                        exp_info = phoenix_sync_service.create_experiment_record(
+                            dataset_info=dataset_info_obj,
+                            experiment_name=experiment_name,
+                            description=experiment_description,
+                            metadata=experiment_metadata,
+                        )
+                        phoenix_experiment_result = exp_info.to_dict()
+                        phoenix_meta["experiment"] = phoenix_experiment_result
+                        console.print(
+                            "[green]Created Phoenix experiment:[/green] "
+                            f"{experiment_name} ({exp_info.experiment_id})"
+                        )
+                        console.print(f"[dim]View experiment: {exp_info.url}[/dim]")
+                    except PhoenixSyncError as exc:
+                        print_cli_warning(
+                            console,
+                            "Phoenix Experiment 생성에 실패했습니다.",
+                            tips=[str(exc)],
+                        )
+
+        if prompt_metadata_entries:
+            phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+            phoenix_meta.setdefault("schema_version", 2)
+            phoenix_meta["prompts"] = prompt_metadata_entries
+
+        if effective_tracker != "none":
+            phoenix_opts = None
+            if effective_tracker == "phoenix":
+                phoenix_opts = {
+                    "max_traces": phoenix_max_traces,
+                    "metadata": phoenix_trace_metadata or None,
+                }
+            _log_to_tracker(
+                settings,
+                result,
+                console,
+                effective_tracker,
+                phoenix_options=phoenix_opts,
+            )
+        if db_path:
+            _save_to_db(db_path, result, console)
+        if output:
+            _save_results(output, result, console)
+
+    @app.command(
+        name="run-simple",
+        help="Shortcut for 초보자용 간편 모드. `evalvault run --mode simple`과 동일합니다.",
+    )
+    def run_simple(  # noqa: PLR0913 - CLI arguments intentionally flat
         dataset: Path = typer.Argument(
             ...,
             help="Path to dataset file (CSV, Excel, or JSON).",
@@ -197,395 +897,217 @@ def register_run_commands(
             help="Chunk size when streaming evaluation is enabled (default: 200).",
         ),
     ) -> None:
-        """Run RAG evaluation on a dataset."""
-        metric_list = parse_csv_option(metrics)
-        validate_choices(metric_list, available_metrics, console, value_label="metric")
-
-        prompt_manifest_path = prompt_manifest.expanduser() if prompt_manifest else None
-        prompt_file_list = [Path(item).expanduser() for item in parse_csv_option(prompt_files)]
-        prompt_metadata_entries: list[dict[str, Any]] = []
-        if prompt_file_list:
-            prompt_metadata_entries = _collect_prompt_metadata(
-                manifest_path=prompt_manifest_path,
-                prompt_files=prompt_file_list,
-                console=console,
+        """Alias for simple mode presets."""
+        try:
+            ctx = click.get_current_context()
+        except RuntimeError:
+            ctx = None
+        if ctx:
+            ctx.meta["run_mode_alias"] = "run-simple"
+        try:
+            run(
+                dataset=dataset,
+                metrics=metrics,
+                profile=profile,
+                model=model,
+                output=output,
+                tracker=tracker,
+                langfuse=langfuse,
+                phoenix_max_traces=phoenix_max_traces,
+                phoenix_dataset=phoenix_dataset,
+                phoenix_dataset_description=phoenix_dataset_description,
+                phoenix_experiment=phoenix_experiment,
+                phoenix_experiment_description=phoenix_experiment_description,
+                prompt_manifest=prompt_manifest,
+                prompt_files=prompt_files,
+                db_path=db_path,
+                use_domain_memory=use_domain_memory,
+                memory_domain=memory_domain,
+                memory_language=memory_language,
+                memory_db=memory_db,
+                memory_augment_context=memory_augment_context,
+                verbose=verbose,
+                parallel=parallel,
+                batch_size=batch_size,
+                stream=stream,
+                stream_chunk_size=stream_chunk_size,
+                mode="simple",
             )
-            if prompt_metadata_entries:
-                console.print(
-                    f"[dim]Collected Phoenix prompt metadata for {len(prompt_metadata_entries)} file(s).[/dim]"
-                )
-                unsynced = [
-                    entry for entry in prompt_metadata_entries if entry.get("status") != "synced"
-                ]
-                if unsynced:
-                    console.print(
-                        "[yellow]Warning:[/yellow] Prompt files differ from manifest. "
-                        "Run `evalvault phoenix prompt-diff` to review changes."
-                    )
+        finally:
+            if ctx:
+                ctx.meta.pop("run_mode_alias", None)
 
-        if stream_chunk_size <= 0:
-            console.print("[red]Error:[/red] --stream-chunk-size must be greater than 0.")
-            raise typer.Exit(1)
-
-        domain_memory_requested = (
-            use_domain_memory or memory_domain is not None or memory_augment_context
-        )
-
-        if stream and domain_memory_requested:
-            console.print(
-                "[red]Error:[/red] --stream mode does not support Domain Memory options yet."
+    @app.command(
+        name="run-full",
+        help="전문가용 전체 모드를 바로 실행합니다. `evalvault run --mode full` 별칭.",
+    )
+    def run_full(  # noqa: PLR0913 - CLI arguments intentionally flat
+        dataset: Path = typer.Argument(
+            ...,
+            help="Path to dataset file (CSV, Excel, or JSON).",
+            exists=True,
+            readable=True,
+        ),
+        metrics: str = typer.Option(
+            "faithfulness,answer_relevancy",
+            "--metrics",
+            "-m",
+            help="Comma-separated list of metrics to evaluate.",
+        ),
+        profile: str | None = profile_option(
+            help_text="Model profile (dev, prod, openai). Overrides .env setting.",
+        ),
+        model: str | None = typer.Option(
+            None,
+            "--model",
+            help="Model to use for evaluation (overrides profile).",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output file for results (JSON format).",
+        ),
+        tracker: str = typer.Option(
+            "none",
+            "--tracker",
+            "-t",
+            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+        ),
+        langfuse: bool = typer.Option(
+            False,
+            "--langfuse",
+            "-l",
+            help="[Deprecated] Use --tracker langfuse instead.",
+            hidden=True,
+        ),
+        phoenix_max_traces: int | None = typer.Option(
+            None,
+            "--phoenix-max-traces",
+            help="Max per-test-case traces to send to Phoenix (default: send all).",
+        ),
+        phoenix_dataset: str | None = typer.Option(
+            None,
+            "--phoenix-dataset",
+            help="Upload the dataset/test cases to Phoenix under this name.",
+        ),
+        phoenix_dataset_description: str | None = typer.Option(
+            None,
+            "--phoenix-dataset-description",
+            help="Description stored on the Phoenix dataset (default: dataset metadata).",
+        ),
+        phoenix_experiment: str | None = typer.Option(
+            None,
+            "--phoenix-experiment",
+            help="Create a Phoenix experiment record for this run (requires dataset upload).",
+        ),
+        phoenix_experiment_description: str | None = typer.Option(
+            None,
+            "--phoenix-experiment-description",
+            help="Description stored on the Phoenix experiment.",
+        ),
+        prompt_manifest: Path | None = typer.Option(
+            Path("agent/prompts/prompt_manifest.json"),
+            "--prompt-manifest",
+            help="Path to Phoenix prompt manifest JSON.",
+        ),
+        prompt_files: str | None = typer.Option(
+            None,
+            "--prompt-files",
+            help="Comma-separated prompt files to capture in Phoenix metadata.",
+        ),
+        db_path: Path | None = db_option(
+            default=None,
+            help_text="Path to SQLite database file for storing results.",
+        ),
+        use_domain_memory: bool = typer.Option(
+            False,
+            "--use-domain-memory",
+            help="Leverage Domain Memory for threshold adjustment and insights.",
+        ),
+        memory_domain: str | None = typer.Option(
+            None,
+            "--memory-domain",
+            help="Domain name for Domain Memory (defaults to dataset metadata).",
+        ),
+        memory_language: str = typer.Option(
+            "ko",
+            "--memory-language",
+            help="Language code for Domain Memory lookups (default: ko).",
+        ),
+        memory_db: Path = memory_db_option(
+            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+        ),
+        memory_augment_context: bool = typer.Option(
+            False,
+            "--augment-context",
+            help="Append retrieved factual memories to each test case context.",
+        ),
+        verbose: bool = typer.Option(
+            False,
+            "--verbose",
+            help="Show detailed output.",
+        ),
+        parallel: bool = typer.Option(
+            False,
+            "--parallel",
+            help="Enable parallel evaluation for faster processing.",
+        ),
+        batch_size: int = typer.Option(
+            5,
+            "--batch-size",
+            help="Batch size for parallel evaluation (default: 5).",
+        ),
+        stream: bool = typer.Option(
+            False,
+            "--stream",
+            help="Enable streaming evaluation for large datasets (process file in chunks).",
+        ),
+        stream_chunk_size: int = typer.Option(
+            200,
+            "--stream-chunk-size",
+            help="Chunk size when streaming evaluation is enabled (default: 200).",
+        ),
+    ) -> None:
+        """Alias for full mode presets."""
+        try:
+            ctx = click.get_current_context()
+        except RuntimeError:
+            ctx = None
+        if ctx:
+            ctx.meta["run_mode_alias"] = "run-full"
+        try:
+            run(
+                dataset=dataset,
+                metrics=metrics,
+                profile=profile,
+                model=model,
+                output=output,
+                tracker=tracker,
+                langfuse=langfuse,
+                phoenix_max_traces=phoenix_max_traces,
+                phoenix_dataset=phoenix_dataset,
+                phoenix_dataset_description=phoenix_dataset_description,
+                phoenix_experiment=phoenix_experiment,
+                phoenix_experiment_description=phoenix_experiment_description,
+                prompt_manifest=prompt_manifest,
+                prompt_files=prompt_files,
+                db_path=db_path,
+                use_domain_memory=use_domain_memory,
+                memory_domain=memory_domain,
+                memory_language=memory_language,
+                memory_db=memory_db,
+                memory_augment_context=memory_augment_context,
+                verbose=verbose,
+                parallel=parallel,
+                batch_size=batch_size,
+                stream=stream,
+                stream_chunk_size=stream_chunk_size,
+                mode="full",
             )
-            raise typer.Exit(1)
-        if stream and (phoenix_dataset or phoenix_experiment):
-            console.print(
-                "[red]Error:[/red] Streaming mode cannot upload Phoenix datasets/experiments."
-            )
-            raise typer.Exit(1)
-
-        settings = Settings()
-
-        # Apply profile (CLI > .env > default)
-        profile_name = profile or settings.evalvault_profile
-        if profile_name:
-            settings = apply_profile(settings, profile_name)
-
-        # Override model if specified
-        if model:
-            if _is_oss_open_model(model):
-                settings.llm_provider = "ollama"
-                settings.ollama_model = model
-                console.print(
-                    "[dim]OSS model detected. Routing request through Ollama backend.[/dim]"
-                )
-            elif settings.llm_provider == "ollama":
-                settings.ollama_model = model
-            else:
-                settings.openai_model = model
-
-        if settings.llm_provider == "openai" and not settings.openai_api_key:
-            console.print("[red]Error:[/red] OPENAI_API_KEY not set.")
-            console.print("Set it in your .env file or use --profile dev for Ollama.")
-            raise typer.Exit(1)
-
-        display_model = (
-            f"ollama/{settings.ollama_model}"
-            if settings.llm_provider == "ollama"
-            else settings.openai_model
-        )
-
-        console.print("\n[bold]EvalVault[/bold] - RAG Evaluation")
-        console.print(f"Dataset: [cyan]{dataset}[/cyan]")
-        console.print(f"Metrics: [cyan]{', '.join(metric_list)}[/cyan]")
-        console.print(f"Provider: [cyan]{settings.llm_provider}[/cyan]")
-        console.print(f"Model: [cyan]{display_model}[/cyan]")
-        if profile_name:
-            console.print(f"Profile: [cyan]{profile_name}[/cyan]")
-        console.print()
-
-        phoenix_trace_metadata: dict[str, Any] = {
-            "dataset.path": str(dataset),
-            "metrics": metric_list,
-        }
-
-        # Load dataset or configure streaming metadata
-        if stream:
-            ds = _build_streaming_dataset_template(dataset)
-            console.print(
-                f"[dim]Streaming evaluation enabled (chunk size={stream_chunk_size}).[/dim]"
-            )
-            phoenix_trace_metadata["dataset.stream"] = True
-            phoenix_trace_metadata["dataset.template_version"] = ds.version
-        else:
-            with console.status("[bold green]Loading dataset..."):
-                try:
-                    loader = get_loader(dataset)
-                    ds = loader.load(dataset)
-                    console.print(f"[green]Loaded {len(ds)} test cases[/green]")
-                    phoenix_trace_metadata["dataset.test_cases"] = len(ds)
-                    if ds.metadata:
-                        for key, value in ds.metadata.items():
-                            phoenix_trace_metadata[f"dataset.meta.{key}"] = str(value)
-                except Exception as exc:  # pragma: no cover - user feedback path
-                    console.print(f"[red]Error loading dataset:[/red] {exc}")
-                    raise typer.Exit(1) from exc
-
-        resolved_thresholds = _resolve_thresholds(metric_list, ds)
-
-        phoenix_dataset_name = phoenix_dataset
-        if phoenix_experiment and not phoenix_dataset_name:
-            phoenix_dataset_name = f"{ds.name}:{ds.version}"
-
-        phoenix_dataset_description_value = phoenix_dataset_description
-        if phoenix_dataset_name and not phoenix_dataset_description_value:
-            desc_source = ds.metadata.get("description") if isinstance(ds.metadata, dict) else None
-            phoenix_dataset_description_value = desc_source or f"{ds.name} v{ds.version}"
-
-        phoenix_sync_service: PhoenixSyncService | None = None
-        phoenix_dataset_result: dict[str, Any] | None = None
-        phoenix_experiment_result: dict[str, Any] | None = None
-
-        if phoenix_dataset_name or phoenix_experiment:
-            try:
-                phoenix_sync_service = PhoenixSyncService(
-                    endpoint=settings.phoenix_endpoint,
-                    api_token=getattr(settings, "phoenix_api_token", None),
-                )
-            except PhoenixSyncError as exc:
-                console.print(f"[yellow]Warning:[/yellow] {exc}")
-                phoenix_sync_service = None
-
-        effective_tracker = tracker
-        if langfuse and tracker == "none":
-            effective_tracker = "langfuse"
-            console.print(
-                "[yellow]Warning:[/yellow] --langfuse is deprecated. Use --tracker langfuse instead."
-            )
-
-        config_wants_phoenix = getattr(settings, "phoenix_enabled", False)
-        if not isinstance(config_wants_phoenix, bool):
-            config_wants_phoenix = False
-        should_enable_phoenix = effective_tracker == "phoenix" or config_wants_phoenix
-        if should_enable_phoenix:
-            ensure_phoenix_instrumentation(settings, console=console, force=True)
-
-        evaluator = RagasEvaluator()
-        llm_adapter = get_llm_adapter(settings)
-
-        memory_adapter: SQLiteDomainMemoryAdapter | None = None
-        memory_evaluator: MemoryAwareEvaluator | None = None
-        memory_domain_name = memory_domain or ds.metadata.get("domain") or "default"
-        memory_required = domain_memory_requested
-        reliability_snapshot: dict[str, float] | None = None
-
-        if memory_required:
-            phoenix_trace_metadata["domain_memory.enabled"] = True
-            phoenix_trace_metadata["domain_memory.domain"] = memory_domain_name
-            phoenix_trace_metadata["domain_memory.language"] = memory_language
-            phoenix_trace_metadata["domain_memory.augment_context"] = memory_augment_context
-        else:
-            phoenix_trace_metadata["domain_memory.enabled"] = False
-
-        if memory_required:
-            try:
-                memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
-                memory_evaluator = MemoryAwareEvaluator(
-                    evaluator=evaluator, memory_port=memory_adapter
-                )
-                console.print(
-                    f"[dim]Domain Memory enabled for '{memory_domain_name}' ({memory_language}).[/dim]"
-                )
-                if memory_adapter:
-                    reliability = memory_adapter.get_aggregated_reliability(
-                        domain=memory_domain_name,
-                        language=memory_language,
-                    )
-                    reliability_snapshot = reliability
-                    if reliability:
-                        console.print(
-                            "[dim]Reliability snapshot:[/dim] "
-                            + ", ".join(f"{k}={v:.2f}" for k, v in reliability.items())
-                        )
-                        phoenix_trace_metadata["domain_memory.reliability"] = reliability
-            except Exception as exc:  # pragma: no cover - best-effort memory hookup
-                console.print(
-                    f"[yellow]Warning:[/yellow] Domain Memory initialization failed: {exc}"
-                )
-                memory_evaluator = None
-                memory_adapter = None
-
-        if memory_evaluator and memory_augment_context:
-            enriched = enrich_dataset_with_memory(
-                dataset=ds,
-                memory_evaluator=memory_evaluator,
-                domain=memory_domain_name,
-                language=memory_language,
-            )
-            if enriched:
-                console.print(
-                    f"[dim]Appended Domain Memory facts to {enriched} test case(s).[/dim]"
-                )
-
-        if ds.thresholds:
-            console.print("[dim]Thresholds from dataset:[/dim]")
-            for metric, threshold in ds.thresholds.items():
-                console.print(f"  [dim]{metric}: {threshold}[/dim]")
-            console.print()
-        elif resolved_thresholds:
-            console.print("[dim]Thresholds in use:[/dim]")
-            for metric, threshold in resolved_thresholds.items():
-                console.print(f"  [dim]{metric}: {threshold}[/dim]")
-            console.print()
-
-        if stream:
-            status_msg = (
-                f"[bold green]Running streaming evaluation (chunk_size={stream_chunk_size})..."
-            )
-        elif parallel:
-            status_msg = f"[bold green]Running parallel evaluation (batch_size={batch_size})..."
-        else:
-            status_msg = "[bold green]Running evaluation..."
-        with console.status(status_msg):
-            try:
-                if stream:
-                    result = asyncio.run(
-                        _evaluate_streaming_run(
-                            dataset_path=dataset,
-                            dataset_template=ds,
-                            metrics=metric_list,
-                            thresholds=resolved_thresholds,
-                            evaluator=evaluator,
-                            llm=llm_adapter,
-                            chunk_size=stream_chunk_size,
-                            parallel=parallel,
-                            batch_size=batch_size,
-                        )
-                    )
-                elif memory_evaluator and use_domain_memory:
-                    result = asyncio.run(
-                        memory_evaluator.evaluate_with_memory(
-                            dataset=ds,
-                            metrics=metric_list,
-                            llm=llm_adapter,
-                            thresholds=resolved_thresholds,
-                            parallel=parallel,
-                            batch_size=batch_size,
-                            domain=memory_domain_name,
-                            language=memory_language,
-                        )
-                    )
-                else:
-                    result = asyncio.run(
-                        evaluator.evaluate(
-                            dataset=ds,
-                            metrics=metric_list,
-                            llm=llm_adapter,
-                            thresholds=resolved_thresholds,
-                            parallel=parallel,
-                            batch_size=batch_size,
-                        )
-                    )
-            except Exception as exc:  # pragma: no cover - surfaced to CLI
-                console.print(f"[red]Error during evaluation:[/red] {exc}")
-                raise typer.Exit(1) from exc
-
-        phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
-
-        _display_results(result, console, verbose)
-
-        if memory_adapter and memory_required:
-            analyzer = MemoryBasedAnalysis(memory_port=memory_adapter)
-            insights = analyzer.generate_insights(
-                evaluation_run=result,
-                domain=memory_domain_name,
-                language=memory_language,
-            )
-            _display_memory_insights(insights, console)
-
-        if phoenix_sync_service:
-            phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-            phoenix_meta.setdefault("schema_version", 2)
-            if phoenix_dataset_name:
-                try:
-                    dataset_info = phoenix_sync_service.upload_dataset(
-                        dataset=ds,
-                        dataset_name=phoenix_dataset_name,
-                        description=phoenix_dataset_description_value,
-                    )
-                    phoenix_dataset_result = dataset_info.to_dict()
-                    phoenix_meta["dataset"] = phoenix_dataset_result
-                    phoenix_trace_metadata["phoenix.dataset_id"] = dataset_info.dataset_id
-                    phoenix_meta["embedding_export"] = {
-                        "dataset_id": dataset_info.dataset_id,
-                        "cli": (
-                            "uv run evalvault phoenix export-embeddings "
-                            f"--dataset {dataset_info.dataset_id}"
-                        ),
-                        "endpoint": getattr(settings, "phoenix_endpoint", None),
-                    }
-                    console.print(
-                        "[green]Uploaded dataset to Phoenix:[/green] "
-                        f"{dataset_info.dataset_name} ({dataset_info.dataset_id})"
-                    )
-                    console.print(f"[dim]View datasets: {dataset_info.url}[/dim]")
-                except PhoenixSyncError as exc:
-                    console.print(
-                        f"[yellow]Warning:[/yellow] Failed to upload dataset to Phoenix: {exc}"
-                    )
-            if phoenix_experiment:
-                if not phoenix_dataset_result:
-                    console.print(
-                        "[yellow]Warning:[/yellow] Skipping Phoenix experiment creation "
-                        "because the dataset was not uploaded."
-                    )
-                else:
-                    experiment_name = (
-                        phoenix_experiment or f"{result.model_name}-{result.run_id[:8]}"
-                    )
-                    experiment_description = (
-                        phoenix_experiment_description
-                        or f"EvalVault run {result.run_id} ({result.model_name})"
-                    )
-                    extra_meta = {
-                        "domain_memory": {
-                            "enabled": memory_required,
-                            "domain": memory_domain_name,
-                            "language": memory_language,
-                        }
-                    }
-                    experiment_metadata = build_experiment_metadata(
-                        run=result,
-                        dataset=ds,
-                        reliability_snapshot=reliability_snapshot,
-                        extra=extra_meta,
-                    )
-                    try:
-                        dataset_info_obj = PhoenixDatasetInfo(
-                            dataset_id=phoenix_dataset_result["dataset_id"],
-                            dataset_name=phoenix_dataset_result["dataset_name"],
-                            dataset_version_id=phoenix_dataset_result["dataset_version_id"],
-                            url=phoenix_dataset_result["url"],
-                        )
-                        exp_info = phoenix_sync_service.create_experiment_record(
-                            dataset_info=dataset_info_obj,
-                            experiment_name=experiment_name,
-                            description=experiment_description,
-                            metadata=experiment_metadata,
-                        )
-                        phoenix_experiment_result = exp_info.to_dict()
-                        phoenix_meta["experiment"] = phoenix_experiment_result
-                        console.print(
-                            "[green]Created Phoenix experiment:[/green] "
-                            f"{experiment_name} ({exp_info.experiment_id})"
-                        )
-                        console.print(f"[dim]View experiment: {exp_info.url}[/dim]")
-                    except PhoenixSyncError as exc:
-                        console.print(
-                            f"[yellow]Warning:[/yellow] Failed to create Phoenix experiment: {exc}"
-                        )
-
-        if prompt_metadata_entries:
-            phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-            phoenix_meta.setdefault("schema_version", 2)
-            phoenix_meta["prompts"] = prompt_metadata_entries
-
-        if effective_tracker != "none":
-            phoenix_opts = None
-            if effective_tracker == "phoenix":
-                phoenix_opts = {
-                    "max_traces": phoenix_max_traces,
-                    "metadata": phoenix_trace_metadata or None,
-                }
-            _log_to_tracker(
-                settings,
-                result,
-                console,
-                effective_tracker,
-                phoenix_options=phoenix_opts,
-            )
-        if db_path:
-            _save_to_db(db_path, result, console)
-        if output:
-            _save_results(output, result, console)
+        finally:
+            if ctx:
+                ctx.meta.pop("run_mode_alias", None)
 
     def _display_results(result, console: Console, verbose: bool = False) -> None:
         """Display evaluation results in a formatted table."""
@@ -676,8 +1198,10 @@ def register_run_commands(
         """Get the appropriate tracker adapter based on type."""
         if tracker_type == "langfuse":
             if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-                console.print(
-                    "[yellow]Warning:[/yellow] Langfuse credentials not configured. Skipping."
+                print_cli_warning(
+                    console,
+                    "Langfuse 자격 증명이 설정되지 않아 로깅을 건너뜁니다.",
+                    tips=["LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY를 .env에 추가하세요."],
                 )
                 return None
             from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
@@ -690,8 +1214,10 @@ def register_run_commands(
 
         elif tracker_type == "mlflow":
             if not settings.mlflow_tracking_uri:
-                console.print(
-                    "[yellow]Warning:[/yellow] MLflow tracking URI not configured. Skipping."
+                print_cli_warning(
+                    console,
+                    "MLflow tracking URI가 설정되지 않아 로깅을 건너뜁니다.",
+                    tips=["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."],
                 )
                 return None
             try:
@@ -702,9 +1228,10 @@ def register_run_commands(
                     experiment_name=settings.mlflow_experiment_name,
                 )
             except ImportError:
-                console.print(
-                    "[yellow]Warning:[/yellow] MLflow not installed. "
-                    "Install with: uv sync --extra mlflow"
+                print_cli_warning(
+                    console,
+                    "MLflow extra가 설치되지 않았습니다.",
+                    tips=["uv sync --extra mlflow 명령으로 구성요소를 설치하세요."],
                 )
                 return None
 
@@ -717,14 +1244,19 @@ def register_run_commands(
                     service_name="evalvault",
                 )
             except ImportError:
-                console.print(
-                    "[yellow]Warning:[/yellow] Phoenix not installed. "
-                    "Install with: uv sync --extra phoenix"
+                print_cli_warning(
+                    console,
+                    "Phoenix extra가 설치되지 않았습니다.",
+                    tips=["uv sync --extra phoenix 명령으로 의존성을 추가하세요."],
                 )
                 return None
 
         else:
-            console.print(f"[yellow]Warning:[/yellow] Unknown tracker type: {tracker_type}")
+            print_cli_warning(
+                console,
+                f"알 수 없는 tracker 타입입니다: {tracker_type}",
+                tips=["langfuse/mlflow/phoenix/none 중 하나를 지정하세요."],
+            )
             return None
 
     def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
@@ -774,7 +1306,11 @@ def register_run_commands(
                     if trace_url:
                         console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
             except Exception as exc:  # pragma: no cover - telemetry best-effort
-                console.print(f"[yellow]Warning:[/yellow] Failed to log to {tracker_name}: {exc}")
+                print_cli_warning(
+                    console,
+                    f"{tracker_name} 로깅에 실패했습니다.",
+                    tips=[str(exc)],
+                )
                 return
 
         if tracker_type == "phoenix":
@@ -799,7 +1335,12 @@ def register_run_commands(
                 console.print(f"[green]Results saved to database: {db_path}[/green]")
                 console.print(f"[dim]Run ID: {result.run_id}[/dim]")
             except Exception as exc:  # pragma: no cover - persistence errors
-                console.print(f"[red]Error saving to database:[/red] {exc}")
+                print_cli_error(
+                    console,
+                    "데이터베이스에 저장하지 못했습니다.",
+                    details=str(exc),
+                    fixes=["경로 권한과 DB 파일 잠금 상태를 확인하세요."],
+                )
 
     def _save_results(output: Path, result, console: Console) -> None:
         """Write evaluation summary to disk."""
@@ -828,7 +1369,12 @@ def register_run_commands(
 
                 console.print(f"[green]Results saved to {output}[/green]")
             except Exception as exc:  # pragma: no cover - filesystem errors
-                console.print(f"[red]Error saving results:[/red] {exc}")
+                print_cli_error(
+                    console,
+                    "결과 파일 저장에 실패했습니다.",
+                    details=str(exc),
+                    fixes=["출력 경로 쓰기 권한을 확인하고 재시도하세요."],
+                )
 
 
 def enrich_dataset_with_memory(
@@ -1147,8 +1693,10 @@ def _collect_prompt_metadata(
             manifest_data = load_prompt_manifest(manifest_path)
         except Exception as exc:  # pragma: no cover - guardrail
             if console:
-                console.print(
-                    f"[yellow]Warning:[/yellow] Failed to load prompt manifest {manifest_path}: {exc}"
+                print_cli_warning(
+                    console,
+                    f"Prompt manifest를 불러오지 못했습니다: {manifest_path}",
+                    tips=[str(exc)],
                 )
             manifest_data = None
 
@@ -1169,7 +1717,11 @@ def _collect_prompt_metadata(
             )
             summaries.append(asdict(summary))
             if console:
-                console.print(f"[yellow]Warning:[/yellow] Prompt file not found: {target}")
+                print_cli_warning(
+                    console,
+                    f"프롬프트 파일을 찾을 수 없습니다: {target}",
+                    tips=["경로/파일명을 확인하고 다시 시도하세요."],
+                )
             continue
 
         summary = summarize_prompt_entry(
@@ -1193,6 +1745,40 @@ def _build_content_preview(content: str, *, max_chars: int = 4000) -> str:
         return normalized
     remaining = len(normalized) - max_chars
     return normalized[:max_chars].rstrip() + f"\n... (+{remaining} chars)"
+
+
+def _option_was_provided(ctx: typer.Context, param_name: str) -> bool:
+    """Check whether a CLI option was explicitly provided."""
+
+    if ctx is None:
+        return False
+    try:
+        source = ctx.get_parameter_source(param_name)
+    except (AttributeError, KeyError):
+        return False
+    return source == ParameterSource.COMMANDLINE
+
+
+def _print_run_mode_banner(console: Console, preset: RunModePreset) -> None:
+    """Render a short banner describing the selected run mode."""
+
+    bullet_lines: list[str] = []
+    if preset.default_metrics:
+        bullet_lines.append(f"- Metrics: {', '.join(preset.default_metrics)} (locked)")
+    if preset.default_tracker:
+        bullet_lines.append(f"- Tracker: {preset.default_tracker}")
+    bullet_lines.append(
+        "- Domain Memory: enabled" if preset.allow_domain_memory else "- Domain Memory: disabled"
+    )
+    if not preset.allow_prompt_metadata:
+        bullet_lines.append("- Prompt manifest capture: disabled")
+
+    body = preset.description
+    if bullet_lines:
+        body = f"{preset.description}\n\n" + "\n".join(bullet_lines)
+
+    border_style = "cyan" if preset.name == "simple" else "blue"
+    console.print(Panel(body, title=f"Run Mode: {preset.label}", border_style=border_style))
 
 
 __all__ = ["register_run_commands", "enrich_dataset_with_memory", "log_phoenix_traces"]

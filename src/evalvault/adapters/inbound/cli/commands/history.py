@@ -15,6 +15,8 @@ from evalvault.config.settings import Settings
 
 from ..utils.options import db_option
 
+RUN_MODE_CHOICES = ("simple", "full")
+
 
 def register_history_commands(app: typer.Typer, console: Console) -> None:
     """Attach history/compare/export commands to the root Typer app."""
@@ -39,13 +41,31 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             "-m",
             help="Filter by model name.",
         ),
+        mode: str | None = typer.Option(
+            None,
+            "--mode",
+            help="Filter by run mode (simple/full).",
+        ),
         db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Show evaluation run history."""
         console.print("\n[bold]Evaluation History[/bold]\n")
-
+        normalized_mode: str | None = None
+        if mode:
+            normalized_mode = mode.lower()
+            if normalized_mode not in RUN_MODE_CHOICES:
+                console.print(
+                    "[red]Error:[/red] --mode must be one of: " + ", ".join(RUN_MODE_CHOICES)
+                )
+                raise typer.Exit(2)
         storage = SQLiteStorageAdapter(db_path=db_path)
         runs = storage.list_runs(limit=limit, dataset_name=dataset, model_name=model)
+        if normalized_mode:
+            runs = [
+                run
+                for run in runs
+                if (getattr(run, "tracker_metadata", {}) or {}).get("run_mode") == normalized_mode
+            ]
 
         if not runs:
             console.print("[yellow]No evaluation runs found.[/yellow]\n")
@@ -67,6 +87,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("Run ID", style="dim")
         table.add_column("Dataset")
+        table.add_column("Mode")
         table.add_column("Model")
         table.add_column("Started At")
         table.add_column("Pass Rate", justify="right")
@@ -77,9 +98,13 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
 
         for run in runs:
             pass_rate_color = "green" if run.pass_rate >= 0.7 else "red"
+            metadata = getattr(run, "tracker_metadata", {}) or {}
+            run_mode_value = metadata.get("run_mode")
+            mode_display = run_mode_value.capitalize() if run_mode_value else "-"
             row = [
                 run.run_id[:8] + "...",
                 run.dataset_name,
+                mode_display,
                 run.model_name,
                 run.started_at.strftime("%Y-%m-%d %H:%M"),
                 f"[{pass_rate_color}]{run.pass_rate:.1%}[/{pass_rate_color}]",

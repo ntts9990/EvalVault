@@ -1,0 +1,28 @@
+{
+  "suites": [
+    {
+      "name": "ux-run-mode-fixtures",
+      "description": "Validate simple/full mode fixture datasets",
+      "command": ["pytest", "tests/unit/test_run_mode_fixtures.py", "-q"],
+      "timeout": 300
+    },
+    {
+      "name": "ux-cli-run-modes",
+      "description": "CLI run-mode presets and aliases",
+      "command": ["pytest", "tests/unit/test_cli.py", "-k", "RunModes", "-q"],
+      "timeout": 600
+    },
+    {
+      "name": "ux-web-run-mode-metadata",
+      "description": "Web UI run_mode metadata propagation",
+      "command": [
+        "pytest",
+        "tests/unit/test_web_ui.py",
+        "-k",
+        "run_evaluation_with_dataset_sets_run_mode",
+        "-q"
+      ],
+      "timeout": 300
+    }
+  ]
+}

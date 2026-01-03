@@ -94,6 +94,27 @@ def render_reports_page(adapter, session):
         st.info("보고서를 생성할 평가 결과가 없습니다.")
         return
 
+    mode_options = ["All", "simple", "full"]
+    mode_labels = {"All": "전체", "simple": "Simple", "full": "Full"}
+    current_filter = (
+        session.report_mode_filter if session.report_mode_filter in mode_options else "All"
+    )
+    st.caption("모드별로 보고서 대상을 빠르게 필터링하세요.")
+    selected_mode = st.radio(
+        "실행 모드",
+        options=mode_options,
+        index=mode_options.index(current_filter),
+        format_func=lambda x: mode_labels.get(x, x),
+        horizontal=True,
+        key="reports_mode_filter",
+    )
+    session.report_mode_filter = selected_mode
+    if selected_mode != "All":
+        runs = [run for run in runs if (run.run_mode or "full").lower() == selected_mode]
+        if not runs:
+            st.info("선택한 모드에 해당하는 평가가 없습니다.")
+            return
+
     # 실행 선택 섹션
     st.subheader("1. 평가 선택")
     selector = RunSelector(runs=runs)
@@ -112,14 +133,16 @@ def render_reports_page(adapter, session):
 
     if selected_run:
         # 선택된 평가 정보 표시
-        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
-        with info_col1:
+        info_cols = st.columns(5)
+        with info_cols[0]:
             st.metric("Dataset", selected_run.dataset_name)
-        with info_col2:
+        with info_cols[1]:
             st.metric("Model", selected_run.model_name)
-        with info_col3:
+        with info_cols[2]:
+            st.metric("Mode", (selected_run.run_mode or "-").capitalize())
+        with info_cols[3]:
             st.metric("Pass Rate", f"{selected_run.pass_rate:.1%}")
-        with info_col4:
+        with info_cols[4]:
             st.metric("Test Cases", selected_run.total_test_cases)
         phoenix_bits = []
         if selected_run.phoenix_precision is not None:
@@ -182,12 +205,12 @@ def render_reports_page(adapter, session):
                     f"{selected_run.dataset_name} ({selected_run.run_id[:8]}...)",
                 )
 
-        # LLM 보고서 미리보기
+        # LLM 보고서 표시
         if hasattr(session, "llm_report") and session.llm_report:
             llm_report = session.llm_report
 
             st.divider()
-            st.subheader("4. AI 분석 보고서 미리보기")
+            st.subheader("4. AI 분석 보고서")
 
             # 보고서 내용 마크다운으로 표시
             report_content = llm_report.to_markdown()

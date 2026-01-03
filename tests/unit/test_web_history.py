@@ -28,6 +28,7 @@ def create_sample_run(
     pass_rate: float = 0.85,
     days_ago: int = 0,
     prompts: list[dict[str, str]] | None = None,
+    run_mode: str | None = None,
 ) -> RunSummary:
     """테스트용 RunSummary 생성."""
     started_at = datetime.now() - timedelta(days=days_ago)
@@ -40,6 +41,7 @@ def create_sample_run(
         started_at=started_at,
         finished_at=started_at + timedelta(minutes=5),
         metrics_evaluated=["faithfulness", "answer_relevancy"],
+        run_mode=run_mode,
         total_tokens=1000,
         total_cost_usd=0.10,
         phoenix_prompts=prompts or [],
@@ -155,6 +157,21 @@ class TestRunFilter:
         assert len(filtered) == 1
         assert filtered[0].run_id == "1"
 
+    def test_apply_run_mode_filter(self):
+        """실행 모드 필터 적용."""
+        from evalvault.adapters.inbound.web.components.history import RunFilter
+
+        runs = [
+            create_sample_run(run_id="1", run_mode="simple"),
+            create_sample_run(run_id="2", run_mode="full"),
+            create_sample_run(run_id="3", run_mode="simple"),
+        ]
+        filter_component = RunFilter(run_mode="simple")
+        filtered = filter_component.apply(runs)
+
+        assert len(filtered) == 2
+        assert all(r.run_mode == "simple" for r in filtered)
+
     def test_to_run_filters(self):
         """RunFilters로 변환."""
         from evalvault.adapters.inbound.web.components.history import RunFilter
@@ -163,6 +180,7 @@ class TestRunFilter:
             dataset_name="test",
             model_name="gpt-4",
             min_pass_rate=0.7,
+            run_mode="simple",
         )
 
         run_filters = filter_component.to_run_filters()
@@ -171,6 +189,7 @@ class TestRunFilter:
         assert run_filters.dataset_name == "test"
         assert run_filters.model_name == "gpt-4"
         assert run_filters.min_pass_rate == 0.7
+        assert run_filters.run_mode == "simple"
 
 
 class TestRunTable:
@@ -351,8 +370,8 @@ class TestHistoryExport:
         from evalvault.adapters.inbound.web.components.history import HistoryExporter
 
         runs = [
-            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE),
-            create_sample_run(run_id="run-1"),
+            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE, run_mode="simple"),
+            create_sample_run(run_id="run-1", run_mode="full"),
             create_sample_run(run_id="run-2"),
         ]
         exporter = HistoryExporter(runs=runs)
@@ -362,6 +381,8 @@ class TestHistoryExport:
         assert "run_id" in csv_content
         assert "dataset_name" in csv_content
         assert "phoenix_precision" in csv_content
+        assert "run_mode" in csv_content
+        assert "simple" in csv_content
         assert "phoenix_prompt_summary" in csv_content
         assert "1 drift" in csv_content
         assert "system.txt" in csv_content
@@ -374,8 +395,8 @@ class TestHistoryExport:
         from evalvault.adapters.inbound.web.components.history import HistoryExporter
 
         runs = [
-            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE),
-            create_sample_run(run_id="run-1"),
+            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE, run_mode="simple"),
+            create_sample_run(run_id="run-1", run_mode="full"),
             create_sample_run(run_id="run-2"),
         ]
         exporter = HistoryExporter(runs=runs)
@@ -389,6 +410,7 @@ class TestHistoryExport:
         assert "phoenix_precision" in data[0]
         assert data[0]["phoenix_prompts"]
         assert data[0]["phoenix_prompt_summary"] is not None
+        assert data[0]["run_mode"] == "simple"
 
 
 class TestSearchComponent:

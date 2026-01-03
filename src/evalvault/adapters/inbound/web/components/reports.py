@@ -461,6 +461,7 @@ class RunSelector:
         """
         pass_rate_pct = int(run.pass_rate * 100)
         date_str = run.started_at.strftime("%Y-%m-%d") if run.started_at else "N/A"
+        mode_tag = run.run_mode.upper() if run.run_mode else "AUTO"
         phoenix_bits = []
         if run.phoenix_precision is not None:
             phoenix_bits.append(f"P@K {run.phoenix_precision:.2f}")
@@ -470,7 +471,7 @@ class RunSelector:
         prompt_summary = format_prompt_summary_label(run.phoenix_prompts)
         prompt_suffix = f" | Prompt {prompt_summary}" if prompt_summary else ""
         return (
-            f"{run.run_id} | {run.dataset_name} | {pass_rate_pct}% | {date_str}"
+            f"{run.run_id} | [{mode_tag}] {run.dataset_name} | {pass_rate_pct}% | {date_str}"
             f"{phoenix_suffix}{prompt_suffix}"
         )
 

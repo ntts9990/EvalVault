@@ -27,6 +27,7 @@ class WebSession:
     selected_dataset: str | None = None
     selected_model: str | None = None
     selected_metrics: list[str] = field(default_factory=list)
+    selected_run_mode: str = "simple"
 
     # 평가 옵션
     langfuse_enabled: bool = False
@@ -42,6 +43,7 @@ class WebSession:
     report_format: str = "Markdown"
     include_nlp: bool = True
     include_causal: bool = True
+    report_mode_filter: str = "All"
 
     # 캐시
     runs_cache: list[RunSummary] | None = None

@@ -1,0 +1,37 @@
+{
+  "name": "run-mode-full-domain-memory",
+  "version": "1.0.0",
+  "description": "Full mode dataset with domain metadata for UX regression",
+  "metadata": {
+    "domain": "insurance",
+    "language": "en",
+    "source": "ux-regression"
+  },
+  "thresholds": {
+    "faithfulness": 0.75,
+    "answer_relevancy": 0.7,
+    "context_precision": 0.6
+  },
+  "test_cases": [
+    {
+      "id": "full-001",
+      "question": "When does coverage start after purchase?",
+      "answer": "Coverage starts 30 days after the policy is issued.",
+      "contexts": [
+        "Coverage effective date: benefits begin 30 days after the policy issue date.",
+        "Waiting periods may apply for specific riders."
+      ],
+      "ground_truth": "30 days after issue"
+    },
+    {
+      "id": "full-002",
+      "question": "Is the deductible waived for preventive care visits?",
+      "answer": "Yes, preventive care visits have no deductible.",
+      "contexts": [
+        "Preventive care visits are covered at 100% with no deductible.",
+        "Other outpatient services are subject to a standard deductible."
+      ],
+      "ground_truth": "Yes, no deductible"
+    }
+  ]
+}

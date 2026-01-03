@@ -46,6 +46,7 @@ class RunSummary:
     started_at: datetime
     finished_at: datetime | None
     metrics_evaluated: list[str]
+    run_mode: str | None = None
     total_tokens: int = 0
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None
@@ -65,6 +66,7 @@ class RunFilters:
     date_to: datetime | None = None
     min_pass_rate: float | None = None
     max_pass_rate: float | None = None
+    run_mode: str | None = None
 
 
 class WebUIPort(Protocol):

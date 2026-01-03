@@ -297,6 +297,45 @@ def render_evaluate_page(adapter, session):
 
     st.header("📊 Evaluate")
     st.markdown("데이터셋을 업로드하고 RAG 평가를 실행합니다.")
+    st.markdown(
+        """
+        <style>
+        .mode-pill {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+        }
+        .mode-pill.simple { background: #0ea5e9; }
+        .mode-pill.full { background: #7c3aed; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("0. 실행 모드 선택")
+    mode_label = st.radio(
+        "모드",
+        options=["Simple", "Full"],
+        horizontal=True,
+        index=0 if session.selected_run_mode == "simple" else 1,
+        help="Simple은 기본 메트릭/트래커를 고정하고 Full은 모든 고급 옵션을 노출합니다.",
+    )
+    session.selected_run_mode = "simple" if mode_label == "Simple" else "full"
+    simple_mode_active = session.selected_run_mode == "simple"
+    pill_class = "simple" if simple_mode_active else "full"
+    st.markdown(
+        f"<span class='mode-pill {pill_class}'>Mode · {mode_label}</span>",
+        unsafe_allow_html=True,
+    )
+    if simple_mode_active:
+        st.info("심플 모드는 faithfulness/answer_relevancy + Phoenix tracker를 고정합니다.")
+    else:
+        st.caption(
+            "전체 모드: Domain Memory·Prompt·Phoenix dataset/experiment 옵션을 사용할 수 있습니다."
+        )
 
     # 초기화
     upload_handler = FileUploadHandler()
@@ -352,13 +391,20 @@ def render_evaluate_page(adapter, session):
                 with cols[i % 2]:
                     icon = metric_selector.get_icon(metric)
                     desc = metric_selector.get_description(metric)
-                    if st.checkbox(
+                    default_selected = metric in metric_selector.get_default_metrics()
+                    checkbox_disabled = simple_mode_active
+                    checked = st.checkbox(
                         f"{icon} {metric}",
-                        value=metric in metric_selector.get_default_metrics(),
+                        value=default_selected,
                         help=desc,
+                        disabled=checkbox_disabled,
                         key=f"metric_{metric}",
-                    ):
+                    )
+                    if checked:
                         selected_metrics.append(metric)
+
+    if simple_mode_active:
+        selected_metrics = metric_selector.get_default_metrics()
 
     session.selected_metrics = selected_metrics
 
@@ -449,6 +495,7 @@ def render_evaluate_page(adapter, session):
                             thresholds=thresholds,
                             parallel=parallel_mode,
                             batch_size=5,
+                            run_mode=session.selected_run_mode,
                         )
                         elapsed = time.time() - start_time
 
@@ -494,7 +541,10 @@ def render_evaluate_page(adapter, session):
                     session.current_run_id = result.run_id
 
                     # History 페이지 이동 안내
-                    st.info("📋 History 페이지에서 상세 결과를 확인할 수 있습니다.")
+                    st.info(
+                        f"📋 History 페이지에서 상세 결과를 확인할 수 있습니다. "
+                        f"(Mode: {session.selected_run_mode.capitalize()})"
+                    )
 
                 except Exception as e:
                     st.error(f"❌ 평가 실패: {e}")

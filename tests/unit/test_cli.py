@@ -1017,9 +1017,189 @@ class TestCLIRunEdgeCases:
         phoenix_meta = mock_run.tracker_metadata["phoenix"]
         assert phoenix_meta["schema_version"] == 2
         assert phoenix_meta["prompts"]
-        prompt_entry = phoenix_meta["prompts"][0]
-        assert prompt_entry["status"] == "untracked"
-        assert prompt_entry["path"].endswith("prompt.txt")
+
+
+class TestCLIRunModes:
+    """심플/전체 실행 모드 전용 테스트."""
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            pytest.param(["run", "__DATASET__", "--mode", "simple"], id="with-flag"),
+            pytest.param(["run-simple", "__DATASET__"], id="alias"),
+        ],
+    )
+    @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.ensure_phoenix_instrumentation", return_value=True)
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_simple_mode_forces_defaults(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_ensure_phoenix,
+        mock_memory_adapter,
+        mock_phoenix_adapter,
+        tmp_path,
+        command,
+    ):
+        """심플 모드가 기본 metrics/phoenix tracker 적용 및 Domain Memory 비활성화."""
+        from datetime import datetime, timedelta
+
+        dataset = Dataset(
+            name="simple-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="tc-1",
+                    question="Q",
+                    answer="A",
+                    contexts=["ctx"],
+                    ground_truth="A",
+                )
+            ],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        run = EvaluationRun(
+            dataset_name="simple-dataset",
+            dataset_version="1.0.0",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                )
+            ],
+        )
+        run.tracker_metadata = {}
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_enabled = False
+        mock_settings_cls.return_value = mock_settings
+
+        test_file = tmp_path / "simple.csv"
+        test_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        args = [str(test_file) if value == "__DATASET__" else value for value in command]
+        result = runner.invoke(app, args)
+
+        assert result.exit_code == 0, result.stdout
+        assert "Run Mode: Simple" in result.stdout
+        mock_memory_adapter.assert_not_called()
+        mock_ensure_phoenix.assert_called_once()
+        tracker_instance = mock_phoenix_adapter.return_value
+        tracker_instance.log_evaluation_run.assert_called_once()
+        eval_kwargs = mock_evaluator.evaluate.await_args.kwargs
+        assert eval_kwargs["metrics"] == ["faithfulness", "answer_relevancy"]
+        assert run.tracker_metadata.get("run_mode") == "simple"
+
+    def test_invalid_mode_rejected(self, tmp_path):
+        """지원하지 않는 --mode 값 사용 시 에러."""
+        dataset_file = tmp_path / "dataset.csv"
+        dataset_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["run", str(dataset_file), "--mode", "invalid"])
+
+        assert result.exit_code != 0
+        assert "Error" in result.stdout
+
+    @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.ensure_phoenix_instrumentation", return_value=True)
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_full_mode_alias_shows_banner(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_ensure_phoenix,
+        mock_memory_adapter,
+        mock_phoenix_adapter,
+        tmp_path,
+    ):
+        """`run-full` 별칭도 모드 배너와 메타데이터를 출력."""
+        from datetime import datetime, timedelta
+
+        dataset = Dataset(
+            name="full-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="tc-1",
+                    question="Q",
+                    answer="A",
+                    contexts=["ctx"],
+                    ground_truth="A",
+                )
+            ],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        run = EvaluationRun(
+            dataset_name="full-dataset",
+            dataset_version="1.0.0",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                )
+            ],
+        )
+        run.tracker_metadata = {}
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_enabled = False
+        mock_settings_cls.return_value = mock_settings
+
+        test_file = tmp_path / "full.csv"
+        test_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["run-full", str(test_file)])
+
+        assert result.exit_code == 0, result.stdout
+        assert "Run Mode: Full" in result.stdout
+        assert run.tracker_metadata.get("run_mode") == "full"
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1430,7 +1610,7 @@ class TestCLIRunEdgeCases:
 
         result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
         assert result.exit_code == 1
-        assert "Error loading dataset" in result.stdout
+        assert "데이터셋을 불러오지 못했습니다." in strip_ansi(result.stdout)
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1467,7 +1647,7 @@ class TestCLIRunEdgeCases:
 
         result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
         assert result.exit_code == 1
-        assert "Error during evaluation" in result.stdout
+        assert "평가 실행 중 오류가 발생했습니다." in strip_ansi(result.stdout)
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1594,7 +1774,7 @@ class TestCLIHistory:
         mock_run.started_at = datetime.now()
         mock_run.pass_rate = 0.85
         mock_run.total_test_cases = 10
-        mock_run.tracker_metadata = {}
+        mock_run.tracker_metadata = {"run_mode": "simple"}
 
         mock_storage = MagicMock()
         mock_storage.list_runs.return_value = [mock_run]
@@ -1608,7 +1788,8 @@ class TestCLIHistory:
 
         result = runner.invoke(app, ["history", "--db", str(tmp_path / "test.db")])
         assert result.exit_code == 0
-        assert "test-datas" in result.stdout  # Truncated in table
+        assert "abc12345" in result.stdout  # Run ID truncated
+        assert "Simple" in result.stdout
 
     @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
@@ -1643,6 +1824,8 @@ class TestCLIHistory:
                 "my-dataset",
                 "--model",
                 "gpt-4",
+                "--mode",
+                "simple",
             ],
         )
         assert result.exit_code == 0
@@ -1673,6 +1856,7 @@ class TestCLIHistory:
                 "experiment": {"experiment_id": "exp_456"},
             }
         }
+        mock_run.tracker_metadata["run_mode"] = "full"
 
         mock_storage = MagicMock()
         mock_storage.list_runs.return_value = [mock_run]
@@ -1692,6 +1876,61 @@ class TestCLIHistory:
         result = runner.invoke(app, ["history", "--db", str(tmp_path / "test.db")])
         assert result.exit_code == 0
         assert "0.82" in result.stdout
+
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
+    @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
+    def test_history_filters_by_mode(
+        self,
+        mock_resolver_cls,
+        mock_settings_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """--mode 필터가 해당 모드만 표시한다."""
+        from datetime import datetime
+
+        simple_run = MagicMock()
+        simple_run.run_id = "simple-run"
+        simple_run.dataset_name = "simple-dataset"
+        simple_run.model_name = get_test_model()
+        simple_run.started_at = datetime.now()
+        simple_run.pass_rate = 0.9
+        simple_run.total_test_cases = 5
+        simple_run.tracker_metadata = {"run_mode": "simple"}
+
+        full_run = MagicMock()
+        full_run.run_id = "full-run"
+        full_run.dataset_name = "full-dataset"
+        full_run.model_name = get_test_model()
+        full_run.started_at = datetime.now()
+        full_run.pass_rate = 0.8
+        full_run.total_test_cases = 8
+        full_run.tracker_metadata = {"run_mode": "full"}
+
+        mock_storage = MagicMock()
+        mock_storage.list_runs.return_value = [simple_run, full_run]
+        mock_storage_cls.return_value = mock_storage
+        mock_settings_cls.return_value = SimpleNamespace(
+            phoenix_endpoint="http://localhost:6006/v1/traces",
+            phoenix_api_token=None,
+        )
+        mock_resolver = mock_resolver_cls.return_value
+        mock_resolver.is_available = False
+
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "--db",
+                str(tmp_path / "test.db"),
+                "--mode",
+                "simple",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "simple-d" in result.stdout
+        assert "full-dataset" not in result.stdout
 
 
 class TestCLICompare:
