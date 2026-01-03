@@ -19,6 +19,7 @@ from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.phoenix_support import get_phoenix_trace_url
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.analysis_service import AnalysisService
 
@@ -68,6 +69,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         if not run.results:
             _console.print("[yellow]Warning: No test case results to analyze.[/yellow]")
             raise typer.Exit(0)
+        trace_url = get_phoenix_trace_url(getattr(run, "tracker_metadata", None))
 
         analysis_adapter = StatisticalAnalysisAdapter()
         cache_adapter = MemoryCacheAdapter()
@@ -97,7 +99,10 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             cache_adapter=cache_adapter,
         )
 
-        _console.print(f"\n[bold]Analyzing run: {run_id}[/bold]\n")
+        _console.print(f"\n[bold]Analyzing run: {run_id}[/bold]")
+        if trace_url:
+            _console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
+        _console.print()
         bundle = service.analyze_run(run, include_nlp=nlp, include_causal=causal)
 
         if not bundle.statistical:
@@ -163,9 +168,16 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         analysis_adapter = StatisticalAnalysisAdapter()
         service = AnalysisService(analysis_adapter)
 
+        trace_a = get_phoenix_trace_url(getattr(run_a, "tracker_metadata", None))
+        trace_b = get_phoenix_trace_url(getattr(run_b, "tracker_metadata", None))
+
         _console.print("\n[bold]Comparing runs:[/bold]")
         _console.print(f"  Run A: {run_id1}")
+        if trace_a:
+            _console.print(f"    Phoenix Trace: {trace_a}")
         _console.print(f"  Run B: {run_id2}")
+        if trace_b:
+            _console.print(f"    Phoenix Trace: {trace_b}")
         _console.print(f"  Test: {test}\n")
 
         comparisons = service.compare_runs(run_a, run_b, metrics=metric_list, test_type=test)

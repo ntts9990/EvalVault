@@ -20,6 +20,7 @@ from .generate import register_generate_commands
 from .history import register_history_commands
 from .kg import create_kg_app
 from .langfuse import register_langfuse_commands
+from .phoenix import create_phoenix_app
 from .pipeline import register_pipeline_commands
 from .run import register_run_commands
 from .web import register_web_command
@@ -68,6 +69,7 @@ SUB_APPLICATIONS: tuple[SubAppModule, ...] = (
     SubAppModule("kg", create_kg_app),
     SubAppModule("domain", create_domain_app),
     SubAppModule("benchmark", create_benchmark_app),
+    SubAppModule("phoenix", create_phoenix_app),
 )
 
 
