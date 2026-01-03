@@ -12,7 +12,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider
@@ -28,6 +28,8 @@ def setup_phoenix_instrumentation(
     service_name: str = "evalvault",
     enable_langchain: bool = True,
     enable_openai: bool = True,
+    sample_rate: float = 1.0,
+    headers: dict[str, str] | None = None,
 ) -> TracerProvider | None:
     """Setup Phoenix instrumentation for automatic LLM tracing.
 
@@ -64,6 +66,7 @@ def setup_phoenix_instrumentation(
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
     except ImportError as e:
         logger.warning("OpenTelemetry SDK not installed. Install with: uv sync --extra phoenix")
         logger.debug(f"Import error: {e}")
@@ -77,11 +80,17 @@ def setup_phoenix_instrumentation(
         }
     )
 
+    # Clamp sample rate between 0 and 1
+    ratio = max(0.0, min(sample_rate, 1.0))
+
     # Create tracer provider
-    tracer_provider = TracerProvider(resource=resource)
+    tracer_provider = TracerProvider(resource=resource, sampler=TraceIdRatioBased(ratio))
 
     # Add OTLP exporter for Phoenix
-    otlp_exporter = OTLPSpanExporter(endpoint=endpoint)
+    exporter_kwargs: dict[str, Any] = {"endpoint": endpoint}
+    if headers:
+        exporter_kwargs["headers"] = headers
+    otlp_exporter = OTLPSpanExporter(**exporter_kwargs)
     span_processor = BatchSpanProcessor(otlp_exporter)
     tracer_provider.add_span_processor(span_processor)
 
