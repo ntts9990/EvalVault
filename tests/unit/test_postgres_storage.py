@@ -15,6 +15,16 @@ sys.modules["psycopg"] = MagicMock()
 sys.modules["psycopg.rows"] = MagicMock()
 
 
+@pytest.fixture(autouse=True)
+def patch_pg_migrations():
+    """Skip actual schema migrations during tests."""
+    with patch(
+        "evalvault.adapters.outbound.storage.postgres_adapter.PostgreSQLStorageAdapter._apply_migrations",
+        autospec=True,
+    ) as mocked:
+        yield mocked
+
+
 @pytest.fixture
 def sample_run():
     """Create a sample EvaluationRun for testing."""
@@ -30,6 +40,16 @@ def sample_run():
         total_tokens=1000,
         total_cost_usd=0.05,
         langfuse_trace_id="trace-123",
+        tracker_metadata={
+            "phoenix": {
+                "prompts": [
+                    {
+                        "path": "agent/prompts/baseline.txt",
+                        "status": "missing_file",
+                    }
+                ]
+            }
+        },
         results=[
             TestCaseResult(
                 test_case_id="tc-001",
@@ -295,6 +315,7 @@ class TestPostgreSQLStorageAdapter:
                 "metrics_evaluated": '["faithfulness"]',
                 "thresholds": '{"faithfulness": 0.7}',
                 "langfuse_trace_id": "trace-123",
+                "metadata": '{"phoenix":{"prompts":[{"path":"agent/prompts/baseline.txt","status":"missing_file"}]}}',
             },
             None,  # End of test_case_results
         ]
@@ -352,6 +373,7 @@ class TestPostgreSQLStorageAdapter:
             "metrics_evaluated": '["faithfulness"]',
             "thresholds": '{"faithfulness": 0.7}',
             "langfuse_trace_id": "trace-123",
+            "metadata": None,
         }
 
         # Mock test case results and metrics

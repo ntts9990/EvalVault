@@ -49,6 +49,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")  # Enable foreign key constraints
         conn.executescript(schema_sql)
+        self._apply_migrations(conn)
         conn.commit()
         conn.close()
 
@@ -58,6 +59,13 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
+    def _apply_migrations(self, conn: sqlite3.Connection) -> None:
+        """Apply schema migrations for legacy databases."""
+        cursor = conn.execute("PRAGMA table_info(evaluation_runs)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "metadata" not in columns:
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata TEXT")
 
     # Experiment 관련 메서드
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from langfuse import Langfuse
 
+from evalvault.config.phoenix_support import extract_phoenix_links
 from evalvault.domain.entities import EvaluationRun
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
@@ -279,6 +280,11 @@ class LangfuseAdapter(TrackerPort):
             "event_type": "ragas_evaluation",
         }
 
+        phoenix_links = extract_phoenix_links(getattr(run, "tracker_metadata", None))
+        if phoenix_links:
+            metadata["phoenix_links"] = phoenix_links
+            trace_output["phoenix_links"] = phoenix_links
+
         if run.finished_at:
             metadata["finished_at"] = run.finished_at.isoformat()
             metadata["duration_seconds"] = run.duration_seconds
@@ -332,6 +338,7 @@ class LangfuseAdapter(TrackerPort):
             "evaluation_config": trace_input["evaluation_config"],
             "summary": trace_output["summary"],
             "metrics": metric_summary,
+            "phoenix_links": phoenix_links or {},
             "test_cases": [
                 {
                     "test_case_id": result.test_case_id,

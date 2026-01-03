@@ -1,5 +1,6 @@
 """Unit tests for SQLite storage adapter."""
 
+import json
 import sqlite3
 import tempfile
 from datetime import datetime
@@ -46,6 +47,16 @@ def sample_run():
         total_tokens=1000,
         total_cost_usd=0.05,
         langfuse_trace_id="trace-123",
+        tracker_metadata={
+            "phoenix": {
+                "prompts": [
+                    {
+                        "path": "agent/prompts/baseline.txt",
+                        "status": "missing_file",
+                    }
+                ]
+            }
+        },
         results=[
             TestCaseResult(
                 test_case_id="tc-001",
@@ -141,6 +152,23 @@ class TestSQLiteStorageAdapter:
         assert row[6] == 1000  # total_tokens
         assert row[7] == 0.05  # total_cost_usd
 
+    def test_save_run_stores_tracker_metadata(self, storage_adapter, sample_run, temp_db):
+        """Ensure tracker metadata is persisted for prompt diff rendering."""
+        storage_adapter.save_run(sample_run)
+
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT metadata FROM evaluation_runs WHERE run_id = ?",
+            ("test-run-001",),
+        )
+        raw_metadata = cursor.fetchone()[0]
+        conn.close()
+
+        assert raw_metadata is not None
+        metadata = json.loads(raw_metadata)
+        assert metadata["phoenix"]["prompts"][0]["status"] == "missing_file"
+
     def test_save_run_stores_test_case_results(self, storage_adapter, sample_run, temp_db):
         """Test that save_run stores test case results."""
         storage_adapter.save_run(sample_run)
@@ -186,6 +214,7 @@ class TestSQLiteStorageAdapter:
         assert retrieved_run.model_name == sample_run.model_name
         assert retrieved_run.total_tokens == sample_run.total_tokens
         assert len(retrieved_run.results) == 2
+        assert retrieved_run.tracker_metadata == sample_run.tracker_metadata
 
     def test_get_run_raises_key_error_for_nonexistent_run(self, storage_adapter):
         """Test that get_run raises KeyError for non-existent run_id."""
