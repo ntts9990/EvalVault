@@ -1,0 +1,20 @@
+{
+  "suites": [
+    {
+      "name": "unit-cli-gate",
+      "description": "Quality gate related CLI behavior",
+      "command": ["pytest", "tests/unit/test_cli.py", "-k", "gate", "-q"],
+      "timeout": 600
+    },
+    {
+      "name": "integration-english-smoke",
+      "description": "English dataset end-to-end regression smoke test",
+      "command": [
+        "pytest",
+        "tests/integration/test_e2e_scenarios.py::TestRealEvaluationE2E::test_real_evaluation_english_dataset",
+        "-vv"
+      ],
+      "timeout": 900
+    }
+  ]
+}
