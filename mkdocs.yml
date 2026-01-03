@@ -1,0 +1,142 @@
+site_name: EvalVault
+site_description: RAG evaluation system using Ragas with Phoenix/Langfuse tracing
+site_author: EvalVault Contributors
+site_url: https://github.com/ntts9990/EvalVault
+
+repo_name: ntts9990/EvalVault
+repo_url: https://github.com/ntts9990/EvalVault
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search:
+      lang:
+        - en
+        - ko
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            docstring_style: google
+            docstring_section_style: table
+            merge_init_into_class: true
+            show_if_no_docstring: true
+            members_order: source
+            group_by_category: true
+            show_signature_annotations: true
+            separate_signature: true
+            line_length: 80
+            filters:
+              - "!^_"  # Exclude private members
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - footnotes
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+nav:
+  - Home: INDEX.md
+  - Getting Started:
+    - Installation: README.md
+    - Quickstart: tutorials/01-quickstart.md
+    - Development Guide: DEV_GUIDE.md
+  - Tutorials:
+    - Basic Evaluation: tutorials/02-basic-evaluation.md
+    - Custom Metrics: tutorials/03-custom-metrics.md
+    - Phoenix Integration: tutorials/04-phoenix-integration.md
+    - Korean RAG: tutorials/05-korean-rag.md
+    - Production Tips: tutorials/06-production-tips.md
+    - Domain Memory: tutorials/07-domain-memory.md
+  - User Guide:
+    - Overview: USER_GUIDE.md
+    - CLI Guide: CLI_GUIDE.md
+  - Architecture:
+    - Overview: ARCHITECTURE.md
+    - C4 Model: internal/ARCHITECTURE_C4.md
+    - Class Catalog: internal/CLASS_CATALOG.md
+    - Feature Specs: internal/FEATURE_SPECS.md
+  - API Reference:
+    - Domain:
+      - Entities: api/domain/entities.md
+      - Services: api/domain/services.md
+      - Metrics: api/domain/metrics.md
+    - Ports:
+      - Inbound: api/ports/inbound.md
+      - Outbound: api/ports/outbound.md
+    - Adapters:
+      - Inbound: api/adapters/inbound.md
+      - Outbound: api/adapters/outbound.md
+    - Configuration: api/config.md
+  - Development:
+    - Roadmap: ROADMAP.md
+    - Status: STATUS.md
+    - Observability Playbook: OBSERVABILITY_PLAYBOOK.md
+  - Internal:
+    - Query Analysis: internal/QUERY_BASED_ANALYSIS_PIPELINE.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ntts9990/EvalVault
+  version:
+    provider: mike
+
+extra_css:
+  - stylesheets/extra.css

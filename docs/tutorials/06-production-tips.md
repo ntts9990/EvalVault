@@ -69,14 +69,16 @@ OPENAI_API_KEY=sk-...
    ```
 
 2. **시크릿 관리 서비스 사용**:
-   ```python
-   # AWS Secrets Manager
-   import boto3
 
-   client = boto3.client('secretsmanager')
-   secret = client.get_secret_value(SecretId='evalvault/openai')
-   os.environ['OPENAI_API_KEY'] = secret['SecretString']
-   ```
+```python
+# AWS Secrets Manager
+import boto3
+import os
+
+client = boto3.client('secretsmanager')
+secret = client.get_secret_value(SecretId='evalvault/openai')
+os.environ['OPENAI_API_KEY'] = secret['SecretString']
+```
 
 3. **Kubernetes Secrets**:
    ```yaml

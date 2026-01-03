@@ -104,14 +104,20 @@ print(tokens)  # ['보험료', '얼마']
 
 보험, 의료 등 도메인 특화 용어를 추가할 수 있습니다.
 
-```python
-# 사용자 사전 파일: user_dict.txt
+먼저 사용자 사전 파일을 생성합니다 (`user_dict.txt`):
+
+```text
 # 형식: 단어 \t 품사 \t 점수
 보장금액	NNG	10
 실손보험	NNG	10
 해지환급금	NNG	10
+```
 
-# 토크나이저에 사전 적용
+토크나이저에 사전을 적용합니다:
+
+```python
+from evalvault.domain.services.korean import KiwiTokenizer
+
 tokenizer = KiwiTokenizer(user_dict_path="user_dict.txt")
 ```
 

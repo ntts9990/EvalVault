@@ -1,6 +1,6 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2026-01-03
+> Last Updated: 2026-01-07
 > Current Version: 1.5.0
 > Status: Phase 1-14 Complete ✅ | Focusing on Improvement & Future Features
 
@@ -12,7 +12,8 @@
 2. [완료된 작업 (Phase 1-14)](#완료된-작업-phase-1-14)
 3. [현재 진행 중 (2026 Q1)](#현재-진행-중-2026-q1)
 4. [향후 계획 (2026 Q2-Q4)](#향후-계획-2026-q2-q4)
-5. [미래 연구 (2027+)](#미래-연구-2027)
+5. [Enterprise Track](#enterprise-track)
+6. [미래 연구 (2027+)](#미래-연구-2027)
 
 ---
 
@@ -96,6 +97,18 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 >
 > **개발 자동화**: AI 에이전트 기반 병렬 개발 워크플로우 도입
 
+### 진행 중인 개선 작업 (병렬)
+
+| ID | 작업 | 상태 | 참고 |
+|----|------|------|------|
+| P2.2 | Web UI 재구조화 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P3 | 성능 최적화 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P4.1 | CLI UX 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P5 | 테스트 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+| P6 | 문서화 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
+
+상세 범위와 일정은 `docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
+
 ### 개발 자동화 에이전트 시스템
 
 Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병렬화합니다.
@@ -126,29 +139,29 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **목표**: 코드 중복 30% 감소
 
-#### 1.1 LLM Adapter 통합 ✅ In Progress
-- [ ] `BaseLLMAdapter` 생성
-- [ ] 토큰 추적 공통화
-- [ ] 에러 핸들링 공통화
-- [ ] 기존 어댑터 리팩토링
+#### 1.1 LLM Adapter 통합 ✅ 완료
+- [x] `BaseLLMAdapter` 생성
+- [x] 토큰 추적 공통화
+- [x] 에러 핸들링 공통화
+- [x] 기존 어댑터 리팩토링
 
 **예상 효과**:
 - 코드 중복: -300 LOC
 - 새 LLM 추가 시간: 2시간 → 30분
 
-#### 1.2 Storage Adapter 통합
-- [ ] `SQLQueries` 클래스 생성
-- [ ] `BaseSQLAdapter` 생성
-- [ ] 스키마 관리 통합
+#### 1.2 Storage Adapter 통합 ✅ 완료
+- [x] `SQLQueries` 클래스 생성
+- [x] `BaseSQLAdapter` 생성
+- [x] 스키마 관리 통합
 
 **예상 효과**:
 - 코드 중복: -400 LOC
 - 새 DB 지원: 4시간 → 1시간
 
-#### 1.3 Analysis Adapter 통합
-- [ ] `AnalysisDataProcessor` 생성
-- [ ] `BaseAnalysisAdapter` 생성
-- [ ] 데이터 처리 로직 통합
+#### 1.3 Analysis Adapter 통합 ✅ 완료
+- [x] `AnalysisDataProcessor` 생성
+- [x] `BaseAnalysisAdapter` 생성
+- [x] 데이터 처리 로직 통합
 
 **예상 효과**:
 - 코드 중복: -200 LOC
@@ -159,10 +172,10 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **목표**: 모듈 복잡도 50% 감소
 
-#### 2.1 CLI 모듈 분리 ⚡ Quick Win
-- [ ] CLI 명령어별 파일 분리
-- [ ] 공통 유틸리티 추출
-- [ ] 명령어 라우팅 개선
+#### 2.1 CLI 모듈 분리 ✅ 완료
+- [x] CLI 명령어별 파일 분리
+- [x] 공통 유틸리티 추출
+- [x] 명령어 라우팅 개선
 
 **구조**:
 ```
@@ -302,6 +315,9 @@ class ConfigValidator:
 ## 향후 계획 (2026 Q2-Q4)
 
 ### 2026 Q2 (4-6월): 성능 최적화 및 모듈화
+
+P2.2, P3는 병렬 작업으로 선행 진행 중이며 상세 범위는
+`docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
 
 #### P3: 성능 최적화
 

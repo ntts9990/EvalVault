@@ -16,5 +16,6 @@ repos:
       - id: check-added-large-files
       - id: check-ast
       - id: check-yaml
+        args: ["--unsafe"]
       - id: end-of-file-fixer
       - id: trailing-whitespace
