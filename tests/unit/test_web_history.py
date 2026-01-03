@@ -11,12 +11,23 @@ if TYPE_CHECKING:
     pass
 
 
+PROMPT_SAMPLE = [
+    {
+        "path": "/tmp/system.txt",
+        "status": "modified",
+        "phoenix_prompt_id": "pr-1",
+        "diff": "- hi\n+ hello",
+    }
+]
+
+
 def create_sample_run(
     run_id: str = "run-1",
     dataset_name: str = "test-dataset",
     model_name: str = "gpt-5-nano",
     pass_rate: float = 0.85,
     days_ago: int = 0,
+    prompts: list[dict[str, str]] | None = None,
 ) -> RunSummary:
     """테스트용 RunSummary 생성."""
     started_at = datetime.now() - timedelta(days=days_ago)
@@ -31,6 +42,7 @@ def create_sample_run(
         metrics_evaluated=["faithfulness", "answer_relevancy"],
         total_tokens=1000,
         total_cost_usd=0.10,
+        phoenix_prompts=prompts or [],
     )
 
 
@@ -312,6 +324,18 @@ class TestRunDetailPanel:
 
         assert "m" in duration or "s" in duration  # 분 또는 초 포함
 
+    def test_get_prompt_entries(self):
+        """Prompt 메타데이터 조회."""
+        from evalvault.adapters.inbound.web.components.history import RunDetailPanel
+
+        run = create_sample_run(prompts=PROMPT_SAMPLE)
+        panel = RunDetailPanel(run=run)
+
+        entries = panel.get_prompt_entries()
+
+        assert len(entries) == 1
+        assert entries[0]["status"] == "modified"
+
 
 class TestHistoryExport:
     """History 내보내기 테스트."""
@@ -326,13 +350,21 @@ class TestHistoryExport:
         """CSV 내보내기."""
         from evalvault.adapters.inbound.web.components.history import HistoryExporter
 
-        runs = [create_sample_run(run_id=f"run-{i}") for i in range(3)]
+        runs = [
+            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE),
+            create_sample_run(run_id="run-1"),
+            create_sample_run(run_id="run-2"),
+        ]
         exporter = HistoryExporter(runs=runs)
 
         csv_content = exporter.to_csv()
 
         assert "run_id" in csv_content
         assert "dataset_name" in csv_content
+        assert "phoenix_precision" in csv_content
+        assert "phoenix_prompt_summary" in csv_content
+        assert "1 drift" in csv_content
+        assert "system.txt" in csv_content
         assert "run-0" in csv_content
 
     def test_export_to_json(self):
@@ -341,7 +373,11 @@ class TestHistoryExport:
 
         from evalvault.adapters.inbound.web.components.history import HistoryExporter
 
-        runs = [create_sample_run(run_id=f"run-{i}") for i in range(3)]
+        runs = [
+            create_sample_run(run_id="run-0", prompts=PROMPT_SAMPLE),
+            create_sample_run(run_id="run-1"),
+            create_sample_run(run_id="run-2"),
+        ]
         exporter = HistoryExporter(runs=runs)
 
         json_content = exporter.to_json()
@@ -350,6 +386,9 @@ class TestHistoryExport:
         assert isinstance(data, list)
         assert len(data) == 3
         assert data[0]["run_id"] == "run-0"
+        assert "phoenix_precision" in data[0]
+        assert data[0]["phoenix_prompts"]
+        assert data[0]["phoenix_prompt_summary"] is not None
 
 
 class TestSearchComponent:

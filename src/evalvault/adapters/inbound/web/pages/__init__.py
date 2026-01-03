@@ -1,6 +1,9 @@
-"""Web UI pages."""
+"""Streamlit page renderers used by EvalVault Web UI."""
 
-# Pages will be imported dynamically by Streamlit
-# or explicitly when needed
+from .history import render_history_page
+from .reports import render_reports_page
 
-__all__: list[str] = []
+__all__ = [
+    "render_history_page",
+    "render_reports_page",
+]

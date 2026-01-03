@@ -8,12 +8,14 @@ import json
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pandas as pd
 
     from evalvault.ports.inbound.web_port import RunFilters, RunSummary
+
+from evalvault.domain.services.prompt_status import format_prompt_summary_label
 
 
 @dataclass
@@ -172,6 +174,13 @@ class RunTable:
                     "metrics": ", ".join(run.metrics_evaluated),
                     "tokens": run.total_tokens,
                     "cost": run.total_cost_usd,
+                    "phoenix_precision": run.phoenix_precision,
+                    "phoenix_drift": run.phoenix_drift,
+                    "phoenix_experiment_url": run.phoenix_experiment_url,
+                    "phoenix_prompt_summary": format_prompt_summary_label(run.phoenix_prompts)
+                    if run.phoenix_prompts
+                    else None,
+                    "phoenix_prompts": run.phoenix_prompts,
                 }
             )
 
@@ -218,6 +227,10 @@ class RunDetailPanel:
             # 저장된 점수가 있으면 사용, 없으면 None
             breakdown[metric] = self.metric_scores.get(metric)
         return breakdown
+
+    def get_prompt_entries(self) -> list[dict[str, Any]]:
+        """Prompt manifest 상태."""
+        return list(getattr(self.run, "phoenix_prompts", []) or [])
 
     def format_duration(self) -> str:
         """소요 시간 포맷.
@@ -284,6 +297,11 @@ class HistoryExporter:
                 "metrics",
                 "tokens",
                 "cost_usd",
+                "phoenix_precision",
+                "phoenix_drift",
+                "phoenix_experiment_url",
+                "phoenix_prompt_summary",
+                "phoenix_prompts",
             ]
         )
 
@@ -301,6 +319,13 @@ class HistoryExporter:
                     ",".join(run.metrics_evaluated),
                     run.total_tokens,
                     f"{run.total_cost_usd:.4f}" if run.total_cost_usd else "",
+                    f"{run.phoenix_precision:.4f}" if run.phoenix_precision is not None else "",
+                    f"{run.phoenix_drift:.4f}" if run.phoenix_drift is not None else "",
+                    run.phoenix_experiment_url or "",
+                    format_prompt_summary_label(run.phoenix_prompts) or "",
+                    json.dumps(run.phoenix_prompts, ensure_ascii=False)
+                    if run.phoenix_prompts
+                    else "",
                 ]
             )
 
@@ -326,6 +351,13 @@ class HistoryExporter:
                     "metrics_evaluated": run.metrics_evaluated,
                     "total_tokens": run.total_tokens,
                     "total_cost_usd": run.total_cost_usd,
+                    "phoenix_precision": run.phoenix_precision,
+                    "phoenix_drift": run.phoenix_drift,
+                    "phoenix_experiment_url": run.phoenix_experiment_url,
+                    "phoenix_prompt_summary": format_prompt_summary_label(run.phoenix_prompts)
+                    if run.phoenix_prompts
+                    else None,
+                    "phoenix_prompts": run.phoenix_prompts,
                 }
             )
 

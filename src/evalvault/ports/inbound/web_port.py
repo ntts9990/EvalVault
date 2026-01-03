@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun
@@ -48,6 +48,11 @@ class RunSummary:
     metrics_evaluated: list[str]
     total_tokens: int = 0
     total_cost_usd: float | None = None
+    phoenix_precision: float | None = None
+    phoenix_drift: float | None = None
+    phoenix_experiment_url: str | None = None
+    phoenix_dataset_url: str | None = None
+    phoenix_prompts: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

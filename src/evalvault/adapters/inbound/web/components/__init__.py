@@ -19,6 +19,12 @@ from evalvault.adapters.inbound.web.components.history import (
 )
 from evalvault.adapters.inbound.web.components.lists import RecentRunsList
 from evalvault.adapters.inbound.web.components.metrics import MetricSelector
+from evalvault.adapters.inbound.web.components.model_selector import (
+    ModelOption,
+    get_available_models,
+    get_model_by_id,
+    render_model_selector,
+)
 from evalvault.adapters.inbound.web.components.progress import (
     EvaluationProgress,
     ProgressStep,
@@ -75,4 +81,9 @@ __all__ = [
     "ReportDownloader",
     "ReportPreview",
     "RunSelector",
+    # Model Selector
+    "ModelOption",
+    "get_available_models",
+    "get_model_by_id",
+    "render_model_selector",
 ]

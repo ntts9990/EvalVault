@@ -6,6 +6,15 @@ from datetime import datetime, timedelta
 
 from evalvault.ports.inbound.web_port import RunSummary
 
+PROMPT_SAMPLE = [
+    {
+        "path": "/tmp/system.txt",
+        "status": "modified",
+        "phoenix_prompt_id": "pr-9",
+        "diff": "- old\n+ new",
+    }
+]
+
 
 def create_sample_run(
     run_id: str = "run-1",
@@ -13,6 +22,7 @@ def create_sample_run(
     model_name: str = "gpt-5-nano",
     pass_rate: float = 0.85,
     days_ago: int = 0,
+    prompts: list[dict[str, str]] | None = None,
 ) -> RunSummary:
     """테스트용 RunSummary 생성."""
     started_at = datetime.now() - timedelta(days=days_ago)
@@ -27,6 +37,7 @@ def create_sample_run(
         metrics_evaluated=["faithfulness", "answer_relevancy"],
         total_tokens=1000,
         total_cost_usd=0.10,
+        phoenix_prompts=prompts or [],
     )
 
 
@@ -121,7 +132,7 @@ class TestReportTemplate:
         """기본 템플릿 렌더링."""
         from evalvault.adapters.inbound.web.components.reports import ReportTemplate
 
-        run = create_sample_run()
+        run = create_sample_run(prompts=PROMPT_SAMPLE)
         metrics = {"faithfulness": 0.85, "answer_relevancy": 0.90}
 
         template = ReportTemplate(name="basic")
@@ -129,12 +140,13 @@ class TestReportTemplate:
 
         assert run.dataset_name in content
         assert "faithfulness" in content.lower()
+        assert "Prompt 상태" in content
 
     def test_render_detailed_template(self):
         """상세 템플릿 렌더링."""
         from evalvault.adapters.inbound.web.components.reports import ReportTemplate
 
-        run = create_sample_run()
+        run = create_sample_run(prompts=PROMPT_SAMPLE)
         metrics = {"faithfulness": 0.85, "answer_relevancy": 0.90}
 
         template = ReportTemplate(name="detailed")
@@ -142,6 +154,7 @@ class TestReportTemplate:
 
         assert run.dataset_name in content
         assert run.model_name in content
+        assert "Prompt 상태" in content
 
 
 class TestReportGenerator:

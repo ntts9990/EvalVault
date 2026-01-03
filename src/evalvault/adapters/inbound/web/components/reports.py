@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from evalvault.ports.inbound.web_port import RunSummary
 
+from evalvault.domain.services.prompt_status import (
+    format_prompt_section,
+    format_prompt_summary_label,
+)
 
 VALID_FORMATS = {"markdown", "html"}
 
@@ -201,6 +205,17 @@ class ReportTemplate:
         else:
             lines.append("✅ 모든 메트릭이 임계값을 충족합니다!")
 
+        prompt_section = format_prompt_section(run.phoenix_prompts, style="markdown")
+        if prompt_section:
+            lines.extend(
+                [
+                    "",
+                    "## Prompt 상태",
+                    "",
+                    prompt_section,
+                ]
+            )
+
         lines.append("")
         lines.append("---")
         lines.append(f"*생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
@@ -269,6 +284,19 @@ class ReportTemplate:
                 lines.append(f"- **{metric}**: 관련 로직 검토 필요")
         else:
             lines.append("모든 메트릭이 기준치를 충족합니다.")
+
+        lines.extend(
+            [
+                "",
+                "## 5. Prompt 상태",
+                "",
+            ]
+        )
+        prompt_section = format_prompt_section(run.phoenix_prompts, style="markdown")
+        if prompt_section:
+            lines.append(prompt_section)
+        else:
+            lines.append("등록된 Prompt 메타데이터가 없습니다.")
 
         lines.extend(
             [
@@ -433,7 +461,18 @@ class RunSelector:
         """
         pass_rate_pct = int(run.pass_rate * 100)
         date_str = run.started_at.strftime("%Y-%m-%d") if run.started_at else "N/A"
-        return f"{run.run_id} | {run.dataset_name} | {pass_rate_pct}% | {date_str}"
+        phoenix_bits = []
+        if run.phoenix_precision is not None:
+            phoenix_bits.append(f"P@K {run.phoenix_precision:.2f}")
+        if run.phoenix_drift is not None:
+            phoenix_bits.append(f"Drift {run.phoenix_drift:.2f}")
+        phoenix_suffix = f" | {' | '.join(phoenix_bits)}" if phoenix_bits else ""
+        prompt_summary = format_prompt_summary_label(run.phoenix_prompts)
+        prompt_suffix = f" | Prompt {prompt_summary}" if prompt_summary else ""
+        return (
+            f"{run.run_id} | {run.dataset_name} | {pass_rate_pct}% | {date_str}"
+            f"{phoenix_suffix}{prompt_suffix}"
+        )
 
     def get_by_id(self, run_id: str) -> RunSummary | None:
         """ID로 실행 조회.
