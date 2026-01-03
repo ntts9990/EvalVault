@@ -1,7 +1,7 @@
 # EvalVault 개선 계획서
 
-> Last Updated: 2026-01-01
-> Version: 3.2
+> Last Updated: 2026-01-07
+> Version: 3.6
 > Focus: 병렬 AI 에이전트 기반 코드 품질 개선, RAG Observability 통합, Domain Memory 활용, 성능 최적화
 
 ---
@@ -326,11 +326,11 @@ class CoordinationProtocol:
 
 | 영역 | 설명 |
 |------|------|
-| **아키텍처** | Hexagonal Architecture로 잘 구조화됨 |
-| **테스트** | 1352개 테스트, 89% 커버리지 |
+| **아키텍처** | Hexagonal Architecture로 잘 구조화됨 (235+ 클래스, C4 모델 문서화) |
+| **테스트** | 1,648개 테스트, 89% 커버리지 |
 | **기능 완성도** | Phase 1-14 완료, 핵심 기능 모두 구현 |
 | **확장성** | Port/Adapter 패턴으로 쉬운 확장 |
-| **문서화** | 상세한 ROADMAP, USER_GUIDE 제공 |
+| **문서화** | 상세한 ROADMAP, USER_GUIDE, ARCHITECTURE_C4, 튜토리얼 7종 제공 |
 
 ### 개선 필요 영역
 
@@ -346,11 +346,13 @@ class CoordinationProtocol:
 ### 코드베이스 통계
 
 ```
-총 코드 라인: 59,073 LOC
-테스트 수: 1,352개
+소스 코드: 43,074 LOC
+테스트 코드: 32,362 LOC
+총 코드 라인: 75,436 LOC
+테스트 수: 1,648개 (Unit: 1,565 / Integration: 83)
 커버리지: 89%
-모듈 수: ~200개
-CLI 명령어: 15개
+클래스 수: 235+ 클래스
+CLI 명령어: 17개
 ```
 
 ---
@@ -425,7 +427,7 @@ CLI 명령어: 15개
 
 #### 2.1 CLI 모듈 분리
 
-**Status**: 🔄 진행 중 (2026-01-03)
+**Status**: ✅ 완료 (2026-01-03)
 - ✅ `commands/run.py`: `evalvault run` 전용 모듈
 - ✅ `commands/history.py`: `history/compare/export` 모듈
 - ✅ `commands/pipeline.py`: `pipeline analyze/intents/templates` 모듈
@@ -470,11 +472,22 @@ src/evalvault/adapters/inbound/cli/
 
 #### 2.3 Domain Services 분리
 
-**ExperimentManager → 분리**:
-- `ExperimentRepository`: CRUD
-- `ExperimentComparator`: 비교
-- `ExperimentStatisticsCalculator`: 통계
-- `ExperimentReportGenerator`: 보고서
+**Status**: ✅ 완료 (2026-01-03)
+
+**ExperimentManager → 분리 완료**:
+- ✅ `ExperimentRepository` (experiment_repository.py): CRUD
+- ✅ `ExperimentComparator` (experiment_comparator.py): 비교
+- ✅ `ExperimentStatisticsCalculator` (experiment_statistics.py): 통계
+- ✅ `ExperimentReportGenerator` (experiment_reporter.py): 보고서
+
+```
+src/evalvault/domain/services/
+├── experiment_manager.py          # ExperimentManager (통합 진입점)
+├── experiment_repository.py       # ✅ ExperimentRepository (CRUD)
+├── experiment_comparator.py       # ✅ ExperimentComparator (비교 로직)
+├── experiment_statistics.py       # ✅ ExperimentStatisticsCalculator (통계)
+└── experiment_reporter.py         # ✅ ExperimentReportGenerator (보고서)
+```
 
 ---
 
@@ -516,6 +529,8 @@ async def evaluate_batch(test_cases: list, batch_size: int = 10):
 
 #### 4.1 CLI 명령어 개선
 
+**Status**: ⏳ 계획 중 (2026-01-07)
+
 ```bash
 # 개선된 사용법
 evalvault run data.csv \
@@ -525,6 +540,8 @@ evalvault run data.csv \
 ```
 
 #### 4.2 에러 메시지 개선
+
+**Status**: ✅ 완료 (2026-01-07)
 
 ```
 ❌ Error: OpenAI API key not found
@@ -538,6 +555,8 @@ evalvault run data.csv \
 
 #### 4.3 Progress Indicator 개선
 
+**Status**: ✅ 완료 (2026-01-07)
+
 - Rich 라이브러리 통합
 - ETA 표시 추가
 
@@ -548,10 +567,15 @@ evalvault run data.csv \
 | 단계 | 설명 | 산출물 | 담당 |
 |------|------|--------|------|
 | **Step 0: 선행 조건 정리** | P2.1 잔여 과제(공통 옵션 팩토리, Typer 서브커맨드 등록 자동화, CLI 가이드 초안)를 완료해 모든 명령이 동일한 옵션 세트를 재사용하도록 만든다. | `cli/utils/options.py` 보강, `docs/CLI_GUIDE.md` 초안 | `architecture`, `documentation` |
-| **Step 1: 모드 스펙 정의** | 심플/전체 모드가 각각 포함할 플래그, 기본값, Tracker/Domain Memory 연계 범위를 문서화한다. 심플 모드는 `evalvault run simple` 형태로 미리 정의된 파이프라인(기본 metrics, Phoenix 추적, Domain Memory 미활성)을 제공하고, 전체 모드는 기존 `evalvault run` 옵션을 모두 허용하되 `--profile full` 혹은 `evalvault run full` 서브커맨드로 호출한다. | `docs/IMPROVEMENT_PLAN.md`(본 섹션), `docs/CLI_GUIDE.md` 모드 테이블 | `architecture`, `documentation` |
-| **Step 2: CLI 구현** | Typer 앱에 `run simple`, `run full` 혹은 `run --mode simple/full` 프리셋을 추가한다. 심플 모드는 내부적으로 `SimpleRunProfile`(metrics, tracker, 출력 형식)을 적용하고, 전체 모드는 고급 옵션 group(Tracker/Phoenix, Prompt manifest, Domain Memory, Langfuse)을 한 번에 노출한다. | `commands/run.py`, `cli/utils/options.py`, 테스트(`tests/unit/test_cli.py::TestCLIRunModes`) | `architecture` |
-| **Step 3: UX 개선과 연동** | P4.1~P4.3에서 정의한 명령어 개선·에러 메시지·Progress Indicator를 심플/전체 모드 모두에서 일관되게 적용한다. 심플 모드에는 친절한 Quick Fix 메시지를 기본 포함하고, 전체 모드에는 상세 Trace/링크 등을 확장 출력한다. | 에러 템플릿, Progress 컴포넌트, 공통 로거 | `documentation`, `architecture` |
-| **Step 4: 검증 & 문서화** | `uv run pytest tests/unit/test_cli.py -k "run and mode"`로 회귀를 추가하고, README/README.ko/튜토리얼에 모드 사용법과 예제를 추가한다. Streamlit/Web UI에서도 모드별 실행 이력을 구분해 표기한다. | 테스트 케이스, README 업데이트, 튜토리얼, History UI 태그 | `testing`, `documentation` |
+| **Step 1: 모드 스펙 정의** | 심플/전체 모드가 각각 포함할 플래그, 기본값, Tracker/Domain Memory 연계 범위를 문서화한다. 심플 모드는 `evalvault run --mode simple` (또는 별칭 커맨드) 형태로 기본 metrics·Phoenix 추적·Domain Memory 비활성 프리셋을 제공하고, 전체 모드는 `evalvault run --mode full` 로 호출하며 기존 고급 옵션을 한 번에 노출한다. | `docs/IMPROVEMENT_PLAN.md`(본 섹션), `docs/CLI_GUIDE.md` 모드 테이블 | `architecture`, `documentation` |
+| **Step 2: CLI 구현** | ✅ (2026-01-07) Typer `run --mode` 프리셋, Phoenix/Domain Memory 옵션 자동화, 경고 배너 제공. | `commands/run.py`, `cli/utils/options.py`, 테스트(`tests/unit/test_cli.py::TestCLIRunModes`) | `architecture` |
+| **Step 3: UX 개선과 연동** | ✅ (2026-01-07) 심플 모드 전용 메시지/경고, Tracker·Prompt 메타데이터 제약, `history` 명령 & Streamlit History/Reports에 “Mode” 컬럼 노출. | `commands/history.py`, `adapters/inbound/web/**` | `documentation`, `architecture` |
+| **Step 4: 검증 & 문서화** | ✅ (2026-01-07) `tests/unit/test_cli.py -k history`, `tests/unit/test_web_history.py`, `tests/unit/test_web_ui.py` 회귀 추가. README/CLI 가이드 TODO(별도 PR)이나 UI/CLI 출력은 이미 모드 정보를 포함. | 테스트 케이스, History UI, CSV/JSON Export | `testing`, `documentation` |
+
+> **2026-01-07 업데이트**
+> - `evalvault run --mode simple/full`이 기본 제공되며, 심플 모드는 Metrics/Tracker/Domain Memory 옵션을 강제하고 Quick Fix 메시지를 출력합니다.
+> - `evalvault history --mode`와 Streamlit History/Reports가 `tracker_metadata.run_mode`를 표시·필터링하고 CSV/JSON 내보내기에도 포함합니다.
+> - `tests/unit/test_cli.py::TestCLIHistory`, `test_web_history.py`, `test_web_ui.py`가 모드 필터/표시를 회귀 테스트합니다.
 
 **심플 모드 제안 기본값**
 
@@ -575,6 +599,25 @@ evalvault run data.csv \
 4. Streamlit History/Reports, `evalvault history` 출력이 모드(meta: `run_mode`)를 저장해 향후 분석/필터링에서 활용 가능하다.
 
 > 💡 **향후 확장**: 모드별 설정은 `config/run_modes.yaml`(예: simple/default/full/custom)로 분리해 팀별 프리셋을 관리할 수 있으며, Langfuse profile이나 Phoenix Dataset 연동도 모드 정의에 선언적으로 추가할 수 있다.
+
+#### 4.5 UX Fast Follow 작업계획 (신규)
+
+**목표**: 심플/전체 모드 도입 직후에 필요한 문서·UX 후속 작업을 빠르게 정리하고, P4.1~P4.3과 연결되는 구체적인 개발 범위를 고정한다.
+
+| ID | 범주 | 해야 할 일 | 산출물 | 담당 | 상태 |
+|----|------|-----------|--------|------|------|
+| UX-1 | CLI 문서 | `README.md`, `README.ko.md`, `docs/CLI_GUIDE.md`에 `--mode`, `history --mode`, Streamlit Mode 표시 캡처를 추가하고, 심플/전체 모드 비교표와 FAQ를 배치한다. | 갱신된 문서 + 캡처 3종 | `documentation` | ✅ (2026-01-07) |
+| UX-2 | Typer UX | `evalvault run` 도움말을 `Simple mode / Full mode` 섹션으로 그룹화하고, `evalvault run simple/full` 별칭을 `app.py`에 추가해 초보자 온보딩 명령을 단축한다. | Typer 도움말, `--help` 스냅샷, `tests/unit/test_cli.py::TestCLIRunModes` 보강 | `architecture` | ✅ (2026-01-07) |
+| UX-3 | 에러/Progress | P4.2~P4.3 요구사항을 기반으로 `src/evalvault/adapters/inbound/cli/console.py`(예시) 에 공통 경고/에러 템플릿 + Rich Progress를 이식하고, 모드별 메시지 샘플을 정의한다. | 공통 템플릿 모듈, CLI 캡처, 회귀 테스트 | `architecture`, `documentation` | ✅ (2026-01-07) |
+| UX-4 | Web UI 연동 | Streamlit Run/Reports 페이지에 `mode` 선택 토글 + 서머리 Pill을 추가하고, 세션 상태에 모드를 저장해 향후 재실행/서버 랭킹에 활용한다. | `web/components/run.py`, `web/pages/history.py` 업데이트, `tests/unit/test_web_ui.py` 추가 케이스 | `web`, `architecture` | ✅ (2026-01-07) |
+| UX-5 | 회귀 자동화 | 심플 모드 기본 시나리오(2 metrics)와 전체 모드 고급 시나리오(Tracker+Domain Memory)용 샘플 데이터를 `tests/fixtures/e2e/`에 추가하고, `scripts/tests/run_regressions.py --profile ux` 프리셋으로 묶는다. | 신규 fixture 2종, regression script 옵션, CI matrix 플래그 | `testing` | ⏳ |
+
+**우선순위 가이드**:
+1. UX-1과 UX-2를 먼저 완료해 신규 사용자 온보딩 흐름이 모드 개념과 일치하도록 만든다.
+2. UX-3 진행 시 P4.2/4.3의 에러/Progress 개선 요구사항을 그대로 반영하고, 심플 모드에서는 Quick Fix, 전체 모드에서는 상세 Trace 링크를 표준화한다.
+3. UX-4~UX-5는 Streamlit/Web 사용자와 회귀 파이프라인 사용자가 같은 `run_mode` 메타데이터를 소비하도록 만들어 P4 이후 P5~P6에서 재사용한다.
+
+> 2026-01-07: README/CLI 가이드에 모드 비교표 추가, `evalvault run-simple/run-full` 별칭과 Typer 도움말 섹션을 배포했고 Streamlit Evaluate/Reports 페이지가 동일한 모드 토글·필터를 노출합니다. CLI 전반에 공통 Error/Warning 패널 + Rich Progress spinner를 적용해 P4.2~P4.3 요구사항을 충족했습니다.
 
 ---
 
@@ -1426,6 +1469,6 @@ def run(
 
 ---
 
-**Last Updated**: 2026-01-01
-**Version**: 3.2
+**Last Updated**: 2026-01-07
+**Version**: 3.6
 **Maintainer**: Coordinator Agent

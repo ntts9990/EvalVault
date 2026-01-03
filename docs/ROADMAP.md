@@ -1,6 +1,6 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2026-01-01
+> Last Updated: 2026-01-03
 > Current Version: 1.5.0
 > Status: Phase 1-14 Complete ✅ | Focusing on Improvement & Future Features
 
@@ -25,7 +25,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | 지표 | 값 |
 |------|-----|
 | Version | 1.5.0 |
-| Tests | 1,352 passing |
+| Tests | 1,671 tests collected (`pytest --collect-only`) |
 | Coverage | 89% |
 | LOC | ~59,000 |
 | Phases Completed | 14/14 (100%) |
@@ -37,18 +37,17 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | 문서 | 역할 | 설명 |
 |------|------|------|
 | **[ROADMAP.md](./ROADMAP.md)** (이 문서) | 전체 로드맵 | 현재 상태 요약 + 향후 개발 계획 |
-| [COMPLETED.md](./COMPLETED.md) | 완료 기록 | Phase 1-14 달성 기록 (상세) |
-| [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md) | 개선 계획 | 코드 품질 개선 계획 (병렬 AI 에이전트 기반) |
-| [PARALLEL_WORK_PLAN.md](./PARALLEL_WORK_PLAN.md) | 병렬 작업 계획 | 병렬 개발 작업 추적 (임시 문서) |
-| [PARALLEL_STATUS.md](./PARALLEL_STATUS.md) | 병렬 작업 상태 | 병렬 작업 진행 상황 (임시 문서) |
+| [STATUS.md](./STATUS.md) | 현재 상태 | 버전, 테스트 수, 완료 항목 요약 |
+| [README.md](./README.md) | 문서 인덱스 | 전체 문서 구조 및 탐색 가이드 |
+| [internal/DEVELOPMENT_GUIDE.md](./internal/DEVELOPMENT_GUIDE.md) | 개발 가이드 | 개발 환경, 코드 품질, 에이전트 시스템 |
 
-> **참고**: `PARALLEL_WORK_PLAN.md`와 `PARALLEL_STATUS.md`는 병렬 작업 완료 후 정리 또는 삭제 예정입니다.
+> **참고**: 완료된 작업 추적 문서들은 `internal/archive/`로 이동되었습니다.
 
 ---
 
 ## 완료된 작업 (Phase 1-14)
 
-> 상세 내용은 [COMPLETED.md](./COMPLETED.md) 참조
+> 상세 내용은 [internal/archive/COMPLETED.md](./internal/archive/COMPLETED.md) 참조
 
 ### 완료 현황
 
@@ -65,7 +64,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | Phase 9 | Korean RAG Optimization | ✅ Complete | +24 |
 | Phase 10-13 | Streamlit Web UI | ✅ Complete | +138 |
 | Phase 14 | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
-| **Total** | | **✅ 100%** | **1,352** |
+| **Total** | | **✅ 100%** | **1,671** |
 
 ### 주요 달성 사항
 
@@ -84,7 +83,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 - ✅ DAG Analysis Pipeline
 
 #### 개발 인프라
-- ✅ 1,352 tests (89% coverage)
+- ✅ 1,671 tests collected (89% coverage)
 - ✅ CI/CD (Ubuntu, macOS, Windows)
 - ✅ PyPI 자동 배포
 - ✅ Semantic Versioning
@@ -119,7 +118,7 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **메모리 시스템**: `agent/memory/`에 에이전트별 세션 로그, 공유 결정사항, 의존성 추적
 
-**참조**: [agent/README.md](../agent/README.md), [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)
+**참조**: [agent/README.md](../agent/README.md), [internal/DEVELOPMENT_GUIDE.md](./internal/DEVELOPMENT_GUIDE.md)
 
 ---
 
@@ -783,10 +782,11 @@ evalvault profile <dataset_path> \
 
 ## 참고 문서
 
-- [COMPLETED.md](./COMPLETED.md): Phase 1-14 달성 기록
-- [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 코드 품질 개선 계획 (병렬 에이전트 워크플로우 포함)
+- [README.md](./README.md): 전체 문서 인덱스
+- [STATUS.md](./STATUS.md): 현재 상태 요약
 - [USER_GUIDE.md](./USER_GUIDE.md): 사용자 가이드
 - [ARCHITECTURE.md](./ARCHITECTURE.md): 아키텍처 문서
+- [internal/DEVELOPMENT_GUIDE.md](./internal/DEVELOPMENT_GUIDE.md): 개발 가이드 (에이전트 워크플로우 포함)
 - [agent/README.md](../agent/README.md): 자율 에이전트 시스템 사용 가이드
 
 ---
@@ -807,8 +807,8 @@ EvalVault는 오픈소스 프로젝트입니다. 기여를 환영합니다!
 
 ## 라이선스
 
-MIT License
+EvalVault는 [Apache 2.0](../LICENSE.md) 라이선스를 따릅니다.
 
 ---
 
-**Last Updated**: 2026-01-01
+**Last Updated**: 2026-01-03

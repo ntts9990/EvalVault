@@ -16,7 +16,7 @@
 |------|------|------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 메인 아키텍처 가이드 | 상세한 아키텍처 설명, 설계 원칙, 데이터 흐름 |
 | **[ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md)** (이 문서) | C4 다이어그램 | C4 Model 기반 계층적 아키텍처 다이어그램 |
-| [ARCHITECTURE_AUDIT.md](./ARCHITECTURE_AUDIT.md) | 아키텍처 감사 | 아키텍처 감사 결과 및 개선 제안 |
+| [archive/ARCHITECTURE_AUDIT.md](./archive/ARCHITECTURE_AUDIT.md) | 아키텍처 감사 | 아키텍처 감사 결과 및 개선 제안 (아카이브) |
 
 ---
 
@@ -233,6 +233,16 @@
    - **책임**: 도메인 메모리 (Factual/Experiential/Behavior) 저장
    - **포트**: SQLite (파일)
 
+6. **Observability Stack**
+   - **기술**: Langfuse, MLflow, Phoenix(OpenInference)
+   - **책임**: 트레이스·점수·리포트 추적, Phoenix dataset/experiment 싱크
+   - **특징**: `config/phoenix_support.ensure_phoenix_instrumentation()`이 OpenTelemetry를 초기화하고 tracker 어댑터가 Trace를 전송
+
+7. **Automation & Agents**
+   - **기술**: `agent/` (claude-agent-sdk), Python scripts (`scripts/regression_runner.py`)
+   - **책임**: 개발/운영 에이전트 실행, 회귀 시나리오 자동화
+   - **통합**: CLI `evalvault agent …`, JSON 기반 RegressionSuite
+
 ### 컨테이너 간 통신
 
 - **CLI/Web UI → Core**: 함수 호출 (동기)
@@ -294,6 +304,11 @@
 │              │  │  - Ollama       │  │             │
 └──────────────┘  └────────────────┘  └─────────────┘
 ```
+
+**Memory-aware 확장**
+- `MemoryAwareEvaluator`는 위 다이어그램의 RagasEvaluator 앞단에서 DomainMemoryPort를 조회하여 metric별 임계값을 조정하고, `augment_context_with_facts()`로 Retrieved context에 factual knowledge를 주입합니다.
+- `MemoryBasedAnalysis`는 EvaluationRun이 저장된 후 DomainMemory의 Learning 집계와 비교하여 트렌드/추천을 계산합니다.
+- `AsyncBatchExecutor`는 다수의 테스트 케이스를 처리할 때 LLM rate-limit을 고려해 배치 크기와 재시도를 자동으로 조정합니다.
 
 ### 3.2 분석 파이프라인 컴포넌트
 
@@ -389,6 +404,9 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+- SQLite 어댑터는 FTS5 인덱스를 자동 재생성하며, `instrumentation_span`으로 Fact 검색/저장을 Phoenix trace에 기록합니다.
+- Domain Memory는 `MemoryAwareEvaluator`, `MemoryBasedAnalysis`, `DomainLearningHook`에서 각각 Retrieval, Insight, Formation 용도로 사용됩니다.
+
 ### 3.4 개선 가이드 컴포넌트
 
 ```
@@ -424,6 +442,14 @@
 │           └───────────────────────────────────┘                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 3.5 관측성 · 자동화 컴포넌트
+
+- **Tracker Adapters** (`langfuse_adapter.py`, `mlflow_adapter.py`, `phoenix_adapter.py`): `TrackerPort` 구현으로 Langfuse/MLflow/Phoenix에 trace/span/score를 기록하고 Phoenix 링크를 metadata에 저장합니다.
+- **Phoenix Instrumentation & Sync** (`config/phoenix_support.py`, `config/instrumentation.py`, `adapters/outbound/phoenix/sync_service.py`): OpenTelemetry tracer 초기화, prompt manifest diff·experiment metadata 추출, dataset/experiment 업로드를 담당합니다.
+- **Prompt Manifest Utilities** (`prompt_manifest.py`): `PromptDiffSummary`로 프롬프트 버전 차이를 계산해 Phoenix/Tracker와 동기화합니다.
+- **reports/release_notes.py**: 최신 EvaluationRun과 AnalysisBundle을 Markdown/Slack-friendly 텍스트로 요약합니다.
+- **Agent & Regression Automation** (`agent/*.py`, `scripts/regression_runner.py`): `AgentConfig`로 정의된 개발/운영 에이전트를 실행하고, JSON 정의 기반 회귀 시나리오(`RegressionSuite`)를 반복 실행합니다.
 
 ### 주요 컴포넌트 요약
 
@@ -584,27 +610,30 @@
 | 클래스 | 파일 | 설명 |
 |--------|------|------|
 | `RagasEvaluator` | evaluator.py | Ragas 기반 평가 서비스 |
-| `TestCaseEvalResult` | evaluator.py | 테스트 케이스 평가 결과 |
-| `ExperimentManager` | experiment_manager.py | 실험 관리 서비스 |
-| `MetricComparison` | experiment_manager.py | 메트릭 비교 결과 |
-| `PipelineOrchestrator` | pipeline_orchestrator.py | 파이프라인 오케스트레이터 |
-| `AnalysisPipelineService` | pipeline_orchestrator.py | 분석 파이프라인 서비스 |
-| `PipelineTemplateRegistry` | pipeline_template_registry.py | 파이프라인 템플릿 레지스트리 |
-| `IntentKeywordRegistry` | intent_classifier.py | 의도 키워드 레지스트리 |
+| `MemoryAwareEvaluator` | memory_aware_evaluator.py | Domain Memory 신뢰도로 threshold 조정 및 컨텍스트 확장 |
+| `MemoryBasedAnalysis` | memory_based_analysis.py | 과거 학습과 현재 결과를 비교하여 트렌드·추천 생성 |
+| `AsyncBatchExecutor` | async_batch_executor.py | 적응형 비동기 배치 실행기 |
+| `BatchExecutor` | batch_executor.py | 동기 배치 실행기 |
+| `AnalysisService` | analysis_service.py | 통계/NLP/인과 분석 통합 서비스 |
+| `PipelineOrchestrator` | pipeline_orchestrator.py | DAG 기반 분석 파이프라인 빌더/실행기 |
+| `PipelineTemplateRegistry` | pipeline_template_registry.py | 템플릿 카탈로그 및 검증기 |
+| `IntentKeywordRegistry` | intent_classifier.py | 의도별 키워드 매핑 |
 | `KeywordIntentClassifier` | intent_classifier.py | 키워드 기반 의도 분류기 |
-| `AnalysisService` | analysis_service.py | 통합 분석 서비스 |
-| `DomainLearningHook` | domain_learning_hook.py | 도메인 학습 훅 |
-| `ImprovementGuideService` | improvement_guide_service.py | 개선 가이드 서비스 |
-| `KnowledgeGraph` | kg_generator.py | 지식 그래프 |
-| `KnowledgeGraphGenerator` | kg_generator.py | 지식 그래프 생성기 |
-| `Entity` | entity_extractor.py | 추출된 엔티티 |
-| `Relation` | entity_extractor.py | 추출된 관계 |
-| `EntityExtractor` | entity_extractor.py | 엔티티 추출기 |
-| `GenerationConfig` | testset_generator.py | 테스트셋 생성 설정 |
-| `BasicTestsetGenerator` | testset_generator.py | 기본 테스트셋 생성기 |
+| `DomainLearningHook` | domain_learning_hook.py | 평가 결과에서 Fact/Learning/Behavior 추출 |
+| `ImprovementGuideService` | improvement_guide_service.py | 규칙/LLM 결합 개선 리포트 생성 |
+| `ExperimentManager` | experiment_manager.py | 실험 생성/비교/결론 기록 |
+| `ExperimentRepository` | experiment_repository.py | StoragePort 기반 실험 CRUD |
+| `ExperimentComparator` | experiment_comparator.py | 그룹간 메트릭 비교 |
+| `ExperimentStatisticsCalculator` | experiment_statistics.py | 실험 통계 요약 |
+| `ExperimentReportGenerator` | experiment_reporter.py | 실험 보고서 생성 |
+| `BenchmarkRunner` | benchmark_runner.py | 한국어 RAG 벤치마크 실행 |
+| `BenchmarkComparison` | benchmark_runner.py | 벤치마크 비교 결과 |
 | `DocumentChunker` | document_chunker.py | 문서 청킹 서비스 |
-| `BenchmarkComparison` | benchmark_runner.py | 벤치마크 비교 |
-| `KoreanRAGBenchmarkRunner` | benchmark_runner.py | 한국어 RAG 벤치마크 러너 |
+| `EntityExtractor` | entity_extractor.py | 엔티티/관계 추출 |
+| `KnowledgeGraphGenerator` | kg_generator.py | 지식 그래프 생성 서비스 |
+| `BasicTestsetGenerator` | testset_generator.py | 기본 테스트셋 생성기 |
+| `KnowledgeGraphTestsetGenerator` | testset_generator.py | 그래프 기반 테스트셋 생성기 |
+| `EmbeddingOverlay` | embedding_overlay.py | Phoenix 임베딩 클러스터 → Domain Memory fact 변환 |
 
 ---
 
@@ -803,6 +832,11 @@
 | `CSVDatasetLoader` | csv_loader.py | CSV 로더 |
 | `ExcelDatasetLoader` | excel_loader.py | Excel 로더 |
 | `JSONDatasetLoader` | json_loader.py | JSON 로더 |
+| `StreamingConfig` | streaming_loader.py | 스트리밍 로더 설정 |
+| `StreamingStats` | streaming_loader.py | 스트리밍 진행 통계 |
+| `StreamingTestCaseIterator` | streaming_loader.py | 청크 기반 TestCase 이터레이터 |
+| `StreamingDatasetLoader` | streaming_loader.py | 스트리밍 로더 진입점 |
+| `StreamingCSVLoader` | streaming_loader.py | CSV 스트리밍 로더 |
 
 ---
 
@@ -896,7 +930,12 @@
 | 클래스 | 파일 | 설명 |
 |--------|------|------|
 | `SQLiteDomainMemoryAdapter` | sqlite_adapter.py | SQLite 도메인 메모리 어댑터 |
-| `MemoryCacheAdapter` | memory_cache.py | 메모리 캐시 어댑터 |
+| `MemoryCacheAdapter` | memory_cache.py | 단순 LRU 캐시 |
+| `HybridCache` | hybrid_cache.py | Hot/Cold 2-tier 캐시 + Prefetch |
+
+**Observability Helpers**
+- `PhoenixSyncService`, `PhoenixDatasetInfo`, `PhoenixExperimentInfo` (`adapters/outbound/phoenix/sync_service.py`)는 Phoenix dataset/experiment API를 감싸고 CLI `--phoenix-*` 옵션과 함께 사용됩니다.
+- `reports/release_notes.py`는 CLI/PR/README용 요약 리포트를 생성합니다.
 
 ---
 
@@ -919,6 +958,8 @@
 | `AgentMode` | agent_types.py | 에이전트 모드 Enum |
 | `AgentType` | agent_types.py | 에이전트 타입 Enum |
 | `AgentConfig` | agent_types.py | 에이전트 설정 |
+
+- **Automation Support**: `scripts/regression_runner.py`의 `RegressionSuite`/`RegressionResult`와 `agent/` 폴더의 `AgentState`/`AgentMemory` 구조는 CLI `evalvault agent …` 및 CI 회귀 파이프라인에서 재사용됩니다.
 
 ---
 
@@ -1085,6 +1126,40 @@ class DomainLearningHook:
 
 5. 리포트 반환
    └─> 사용자에게 개선 가이드 제공
+```
+
+### 시나리오 5: 관측성 & Phoenix 트레이싱
+
+```
+1. CLI에서 --phoenix-enabled / --tracker phoenix 옵션 지정
+   └─> config/phoenix_support.ensure_phoenix_instrumentation() 호출
+
+2. OpenTelemetry TracerProvider 초기화
+   └─> LangChain/OpenAI 자동 계측, instrumentation_span 사용 가능
+
+3. Evaluation 실행 중 MemoryAwareEvaluator/DatasetLoader/PhoenixSyncService가 instrumentation_span으로 세부 span 기록
+   └─> domain/entities/rag_trace.RAGTraceData 가 span attributes 생성
+
+4. TrackerPort(PhoenixAdapter)가 EvaluationRun/TestCaseResult를 span/score로 변환해 Phoenix에 업로드
+   └─> prompt manifest diff, Phoenix dataset/experiment 링크가 metadata에 저장
+
+5. reports/release_notes.py가 Phoenix 링크와 메트릭 요약을 Markdown으로 생성
+   └─> README/Slack/PR에 첨부
+```
+
+### 시나리오 6: 에이전트 · 회귀 자동화
+
+```
+1. 개발자가 evalvault agent run architecture --project-dir .. 실행
+   └─> agent/config.py, agent_types.AgentConfig 로 agent/ 폴더 초기화
+
+2. agent/main.py 가 claude-agent-sdk 세션을 열고 agent/memory/ 하위에 로그/결정 기록
+   └─> AgentMemory/AgentState 가 공유 컨텍스트 제공
+
+3. scripts/regression_runner.run_regression_suites() 가 config/regressions/*.json 로 정의된 RegressionSuite 를 실행
+   └─> subprocess 로 CLI 명령/pytest/ruff 등을 실행하고 RegressionResult 로 stdout/stderr 캡처
+
+4. 회귀 실패 시 halt_on_failure 플래그에 따라 즉시 중단하고 결과를 agent/ 또는 CI 로 전달
 ```
 
 ---

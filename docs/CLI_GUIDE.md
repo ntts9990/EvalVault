@@ -42,6 +42,18 @@ evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --tracker phoenix \
   --profile dev
 ```
+- `run-simple` / `run-full` 별칭: `evalvault run --mode simple/full`과 동일하며 초보자가 dataset + profile만으로 실행할 수 있도록 안내용 도움말을 별도 섹션으로 분리했습니다.
+
+#### Run Modes
+
+| 모드 | 명령 | 동작 |
+|------|------|------|
+| Simple | `evalvault run --mode simple DATASET.json`<br>`evalvault run-simple DATASET.json` | `faithfulness,answer_relevancy` 메트릭, Phoenix tracker, Domain Memory/Prompt OFF, Quick Fix 메시지를 자동 출력 |
+| Full | `evalvault run --mode full DATASET.json`<br>`evalvault run-full DATASET.json` | 모든 Typer 옵션(프로파일, Prompt manifest, Phoenix dataset/experiment, Domain Memory, streaming)을 노출 |
+
+- `evalvault history --mode simple/full`로 CLI 결과를 필터링할 수 있습니다.
+- Streamlit Evaluate/Reports 페이지 역시 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
+
 - `--thresholds`, `--db`, `--profile`, `--tracker`를 조합해 CI나 실험용 러너를 구성합니다.
 - Domain Memory 연동:
   - `--use-domain-memory`: 학습된 신뢰도로 임계값을 자동 보정합니다.

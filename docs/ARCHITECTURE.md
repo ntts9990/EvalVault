@@ -9,9 +9,10 @@
 | 문서 | 역할 | 설명 |
 |------|------|------|
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** (이 문서) | 메인 아키텍처 가이드 | 상세한 아키텍처 설명, 설계 원칙, 데이터 흐름 |
-| [ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md) | C4 다이어그램 | C4 Model 기반 계층적 아키텍처 다이어그램 |
-| [ARCHITECTURE_AUDIT.md](./ARCHITECTURE_AUDIT.md) | 아키텍처 감사 | 아키텍처 감사 결과 및 개선 제안 |
-| [CLASS_CATALOG.md](./CLASS_CATALOG.md) | 클래스 카탈로그 | 모든 클래스의 역할별/프로세스별 분류 |
+| [internal/ARCHITECTURE_C4.md](./internal/ARCHITECTURE_C4.md) | C4 다이어그램 | C4 Model 기반 계층적 아키텍처 다이어그램 |
+| [internal/CLASS_CATALOG.md](./internal/CLASS_CATALOG.md) | 클래스 카탈로그 | 모든 클래스의 역할별/프로세스별 분류 |
+| [internal/DEVELOPMENT_GUIDE.md](./internal/DEVELOPMENT_GUIDE.md) | 개발 가이드 | 개발 환경, 코드 품질, 에이전트 시스템 |
+| [internal/FEATURE_SPECS.md](./internal/FEATURE_SPECS.md) | 기능 스펙 | 한국어 RAG, Phoenix, Domain Memory 등 상세 |
 
 ---
 
@@ -293,6 +294,11 @@
 │  │   │       - 지식 그래프 구조                                                     │
 │  │   │       - 엔티티 및 관계 표현                                                   │
 │  │   │                                                                              │
+│  │   ├── rag_trace.py                   ─ RAG Trace 엔티티                           │
+│  │   │   └── RetrievalData, GenerationData, RAGTraceData                            │
+│  │   │       - Phoenix/OpenTelemetry span 속성 매핑                                 │
+│  │   │       - 검색/생성 단계 레이턴시 및 토큰 사용 분석                            │
+│  │   │                                                                              │
 │  │   └── memory.py                      ─ Domain Memory 엔티티                       │
 │  │       └── FactualFact, LearningMemory, BehaviorEntry                             │
 │  │           - 도메인 메모리 (Factual/Experiential/Behavior)                        │
@@ -385,6 +391,36 @@
 │          └── BenchmarkRunner                                                       │
 │              - 한국어 RAG 벤치마크 실행                                             │
 │              - 메트릭 비교 및 리더보드 생성                                         │
+│                                                                                     │
+│      ├── memory_aware_evaluator.py     ─ 도메인 메모리 기반 평가                    │
+│      │   └── MemoryAwareEvaluator                                                   │
+│      │       - DomainMemoryPort 신뢰도로 threshold 자동 조정                        │
+│      │       - Phoenix span으로 검색/컨텍스트 보강                                    │
+│      │                                                                              │
+│      ├── memory_based_analysis.py      ─ 메모리 기반 분석                           │
+│      │   └── MemoryBasedAnalysis                                                   │
+│      │       - 과거 LearningMemory와 현재 EvaluationRun 비교                        │
+│      │       - 행동 패턴 재사용, 추천문 생성                                        │
+│      │                                                                              │
+│      ├── domain_learning_hook.py       ─ Formation dynamics 엔트리                  │
+│      │   └── DomainLearningHook                                                    │
+│      │       - 평가 종료 후 Facts/Learnings/Behaviors 추출 및 저장                  │
+│      │       - 중복 fact 갱신·망각 정책 적용                                       │
+│      │                                                                              │
+│      ├── async_batch_executor.py / batch_executor.py ─ 배치 실행기                   │
+│      │       - 적응형 배치 크기, 재시도, 진행 콜백                                  │
+│      │       - Ragas 평가 및 대량 API 호출의 신뢰성 향상                            │
+│      │                                                                              │
+│      ├── embedding_overlay.py          ─ Phoenix 임베딩 → Domain Memory             │
+│      │       - Phoenix 클러스터 export를 Fact triple로 변환                         │
+│      │                                                                              │
+│      ├── prompt_manifest.py            ─ 프롬프트 거버넌스                          │
+│      │       - PromptDiffSummary, manifest I/O                                      │
+│      │       - Langfuse/Phoenix prompt 메타데이터 추적                              │
+│      │                                                                              │
+│      └── experiment_*.*                ─ 실험 저장/통계/리포팅 서비스               │
+│              - ExperimentRepository, ExperimentComparator, ExperimentReportGenerator │
+│              - MetricComparison, 히스토리 요약                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -417,7 +453,31 @@
 └───────────────────────────────────┘
 ```
 
+- `domain_config.py`: 도메인 메모리 학습/언어 리소스 경로를 정의하는 Pydantic 모델 (`domains/<name>/memory.yaml` 로딩).
+- `agent_types.py`: CLI와 개발용 `agent/` 폴더가 공유하는 `AgentType`, `AgentConfig`, 운영/개발 모드 정의.
+- `phoenix_support.py` & `instrumentation.py`: Phoenix/OpenTelemetry 설정, CLI에서 `instrumentation_span` 컨텍스트, 링크 포맷터(`extract_phoenix_links`) 제공.
+- `playbooks/`: 개선 패턴 탐지 규칙 템플릿 (`improvement/playbook_loader.py`가 로딩).
+
 ---
+
+### 1.2 전체 코드 맵 (디렉터리 → 책임)
+
+| 경로 | 역할 | 주요 구성요소 |
+|------|------|---------------|
+| `src/evalvault/domain` | 핵심 도메인 엔티티·서비스 | Dataset/Result/Analysis/Memory/Improvement 엔티티, `RagasEvaluator`, `MemoryAwareEvaluator`, `MemoryBasedAnalysis`, `DomainLearningHook`, `PipelineOrchestrator`, `ImprovementGuideService`, `ExperimentManager`, `BenchmarkRunner`, `PromptManifest` 등 |
+| `src/evalvault/ports` | 도메인이 외부와 통신하기 위해 정의한 계약 | Inbound 포트(평가, 파이프라인, 웹), Outbound 포트(LLM, Dataset, Storage, Tracker, DomainMemory, Analysis*, Embedding, Korean NLP, Report, Relation Augmenter 등) |
+| `src/evalvault/adapters/inbound` | 사용자 인터페이스 계층 | Typer CLI(`commands/run.py`, `commands/gate.py`, `commands/pipeline.py`, `commands/agent.py` 등)와 Streamlit Web UI(`app.py`, `components/`, `pages/`, `session.py`) |
+| `src/evalvault/adapters/outbound` | 외부 시스템 구현체 | Dataset 로더(정적+스트리밍), LLM/Token-aware Chat, Storage(SQLite/Postgres), Domain Memory(SQLite+FTS5), Tracker(Langfuse/MLflow/Phoenix), Analysis 모듈, Korean NLP, Cache, KG, Report, Improvement, Phoenix Sync |
+| `src/evalvault/config` | 실행 설정/계측/에이전트 정의 | `settings.py`, `model_config.py`, `domain_config.py`, `agent_types.py`, `phoenix_support.py`, `instrumentation.py`, `playbooks/` |
+| `src/evalvault/reports` | CLI/PR 보고서 템플릿 | `release_notes.py` |
+| `src/evalvault/scripts` | 자동화 도구 | `regression_runner.py` (회귀 시나리오 오케스트레이션) |
+| `agent/` | 개발자용 하이브리드 에이전트 | `main.py`, `agent.py`, `config.py`, `prompts/`, `memory/`, `security.py` 등 – `evalvault agent …` CLI와 연동 |
+| `config/` | 모델/도메인 프로필 | `.env`, `models.yaml`, `domains/<name>/memory.yaml`, `playbooks/*.yaml` |
+| `data/`, `tests/fixtures/` | 샘플/고정 데이터셋 | e2e JSON, fixture |
+| `tests/` | 단위/통합/e2e 테스트 | `tests/unit`, `tests/integration`, `tests/e2e_data` |
+| `docs/` | 설계/운영 문서 | ARCHITECTURE, C4, IMPROVEMENT_PLAN 등 |
+
+이 표는 Hexagonal 아키텍처의 각 면이 실제 어디에 놓여 있는지 빠르게 파악할 수 있도록 돕습니다. 아래 섹션에서 세부 내용을 다시 설명합니다.
 
 ## 2. 방법론 기반: Hexagonal Architecture
 
@@ -555,6 +615,32 @@ class EvaluationRun:
 - 평가 결과의 집계 및 통계 계산
 - 통과/실패 판정 로직
 - 도메인 이벤트 발생 가능 (향후 확장)
+
+**RAGTraceData 엔티티 (`domain/entities/rag_trace.py`)**
+
+```python
+@dataclass
+class RAGTraceData:
+    trace_id: str = ""
+    query: str = ""
+    retrieval: RetrievalData | None = None
+    generation: GenerationData | None = None
+    final_answer: str = ""
+    total_time_ms: float = 0.0
+
+    def to_span_attributes(self) -> dict[str, Any]:
+        attrs = {"rag.total_time_ms": self.total_time_ms}
+        if self.retrieval:
+            attrs.update(self.retrieval.to_span_attributes())
+        if self.generation:
+            attrs.update(self.generation.to_span_attributes())
+        return attrs
+```
+
+**책임:**
+- Phoenix/OpenTelemetry span 속성으로 직렬화하여 검색·생성 단계의 병목을 드러냅니다.
+- `RetrievalData`는 Precision@K, 점수 분포, 리랭킹 정보를, `GenerationData`는 토큰/비용, 프롬프트 템플릿, stop reason 등을 추적합니다.
+- `config/phoenix_support.instrumentation_span` 또는 tracker 어댑터가 `RAGTraceData`를 이용해 Langfuse/Phoenix에 공통 메타데이터를 남깁니다.
 
 #### 3.1.2 Services (도메인 서비스)
 
@@ -765,6 +851,64 @@ class ExperimentManager:
 **의존성:**
 - `StoragePort` (포트 인터페이스) - 구체적인 저장소에 의존하지 않음
 
+**MemoryAwareEvaluator & MemoryBasedAnalysis**
+
+```python
+class MemoryAwareEvaluator:
+    async def evaluate_with_memory(...):
+        reliability = self._memory_port.get_aggregated_reliability(domain=domain, language=language)
+        base_thresholds = dict(dataset.thresholds)
+        if thresholds:
+            base_thresholds.update(thresholds)
+        adjusted = self._adjust_by_reliability(metrics, base_thresholds, reliability)
+        return await self._evaluator.evaluate(
+            dataset=dataset,
+            metrics=metrics,
+            llm=llm,
+            thresholds=adjusted,
+            parallel=parallel,
+            batch_size=batch_size,
+        )
+```
+
+- DomainMemory의 신뢰도를 이용해 SLA 임계값을 상향/하향 조정하고, `augment_context_with_facts()`로 질문별 factual context를 주입합니다.
+- Phoenix instrumentation(`instrumentation_span`)을 통해 도메인 메모리 검색 비용/레이턴시를 추적합니다.
+
+```python
+class MemoryBasedAnalysis:
+    def generate_insights(...):
+        historical = self.memory_port.list_learnings(...)
+        current_metrics = self._extract_metrics(evaluation_run)
+        trends = self._analyze_trends(current_metrics, historical)
+        related = self.memory_port.hybrid_search(...)
+        recommendations = self._generate_recommendations(trends, related.get("facts", []))
+        return {"trends": trends, "related_facts": related.get("facts", []), "recommendations": recommendations}
+```
+
+- 평가 결과를 메모리 학습치와 비교하여 delta, 추천 작업, 재사용 가능한 행동(Action sequence)을 산출합니다.
+
+**DomainLearningHook**
+- Formation 단계에서 Facts/Learnings/Behaviors를 추출하여 중복 제거·망각 지표·신뢰도 갱신 정책을 적용합니다.
+- DomainMemoryPort를 통해 저장소를 추상화하므로 SQLite 외 다른 구현으로 쉽게 확장할 수 있습니다.
+
+**AsyncBatchExecutor / BatchExecutor**
+- `AsyncBatchExecutor`는 적응형 배치 크기, Rate-limit 대응, 진행 콜백을 제공하여 Ragas 평가, Phoenix 데이터 동기화 등 대규모 API 호출을 안정화합니다.
+- Sync 버전(`BatchExecutor`)은 CLI가 멀티스레드 없이 사용할 때 동일한 정책을 제공합니다.
+
+**PromptManifest 유틸리티**
+
+```python
+def summarize_prompt_entry(...):
+    record = manifest.get("prompts", {}).get(normalized_path)
+    current_checksum = _checksum(content)
+    if record is None:
+        return PromptDiffSummary(path=normalized_path, status="untracked", current_checksum=current_checksum)
+    ...
+```
+
+- Phoenix prompt manifest를 로딩하고 프롬프트 파일의 변경 사항, Langfuse/실험 ID, 체크섬을 기록합니다.
+- CLI `run` 명령은 prompt metadata를 Phoenix/Tracker에 첨부하기 전에 이 유틸리티로 변화 내역을 요약합니다.
+
 #### 3.1.3 Metrics (메트릭)
 
 도메인 특화 메트릭을 정의합니다.
@@ -943,6 +1087,19 @@ class DomainMemoryPort(Protocol):
 - Formation/Evolution/Retrieval dynamics 지원
 - Knowledge Graph 통합 (Phase 5)
 
+**추가 Outbound 포트 요약**
+
+| 포트 | 역할 | 대표 구현 |
+|------|------|-----------|
+| `AnalysisModulePort` | DAG 노드에 주입되는 분석 모듈 계약 (입력 검증 + sync/async 실행) | `adapters/outbound/analysis/*_module.py` |
+| `AnalysisCachePort` | 분석 결과 캐싱 (LRU/TTL, 통계 제공) | `cache/memory_cache.py`, `cache/hybrid_cache.py` |
+| `NLPAnalysisPort` / `CausalAnalysisPort` / `AnalysisPort` | 통계·언어·인과 분석 엔진 추상화 | `analysis/statistical_adapter.py`, `analysis/nlp_adapter.py`, `analysis/causal_adapter.py` |
+| `KoreanNLPPort` | 한국어 토크나이저/검색기/평가기를 주입 | `nlp/korean/*.py` |
+| `EmbeddingPort` | Dense 임베딩 생성 (encode/encode_query) | SentenceTransformers/BGE 어댑터 (향후) |
+| `RelationAugmenterPort` | 컨텍스트 내 엔티티 관계 보강 | `llm/llm_relation_augmenter.py` |
+| `ReportPort` | Markdown/LLM 기반 리포트 생성 | `report/markdown_adapter.py`, `report/llm_report_generator.py` |
+| `IntentClassifierPort` | 분석 의도 분류기 (Keyword, LLM 등) | `domain/services/intent_classifier.KeywordIntentClassifier` |
+
 **ImprovementPort (패턴 탐지 및 인사이트 생성)**
 
 ```python
@@ -1018,6 +1175,15 @@ def run(
 - `EvaluatorPort` (포트 인터페이스)
 - `DatasetPort`, `LLMPort` (포트 인터페이스)
 
+**확장 CLI 명령**
+- `commands/run.py`: `RunModePreset(simple/full)`과 Domain Memory/Prompt Manifest/Phoenix dataset sync 옵션을 노출, `StreamingDatasetLoader`를 통한 대규모 데이터셋 처리, Tracker 선택(`langfuse`, `mlflow`, `phoenix`), Phoenix experiment metadata (`build_experiment_metadata`) 삽입.
+- `commands/gate.py`, `agent.py`, `domain.py`, `benchmark.py`, `kg.py`, `pipeline.py`, `analyze.py`, `config.py`, `langfuse.py`, `phoenix.py`, `web.py`: 각각 게이트 테스트, 운영/개발 에이전트, 도메인 메모리 bootstrap, Langfuse/phoenix 설정 확인, Streamlit 부트스트랩 등을 담당합니다.
+- `commands/history.py`, `experiment.py`: StoragePort를 조회하여 run/실험 히스토리를 표 형태로 노출합니다.
+
+**Web UI Adapter**
+- `app.py`는 Streamlit multipage 앱을 구성하고, `components/` 모듈이 카드/차트/업로드/히스토리/평가 뷰를 렌더링합니다.
+- `session.py`는 CLI와 동일한 설정(`Settings`, `ModelConfig`)을 주입하여 UI와 CLI 사이의 경험을 통일합니다.
+
 #### 3.3.2 Outbound Adapters (출력 어댑터)
 
 **Dataset Loaders (CSV, Excel, JSON)**
@@ -1055,6 +1221,10 @@ class CSVDatasetLoader(BaseDatasetLoader):
 - Dataset 엔티티로 변환
 - 파일 형식 지원 여부 확인
 
+**StreamingDatasetLoader**
+
+대용량 CSV/JSON/Excel 파일은 `StreamingDatasetLoader`(+`StreamingConfig`)와 `StreamingTestCaseIterator`를 통해 청크 단위로 처리합니다. Iterator는 청크 진행 상황을 외부 콜백으로 내보내고, CLI는 메모리 사용량을 10분의 1 수준으로 유지할 수 있습니다.
+
 **LLM Adapters**
 
 ```python
@@ -1082,6 +1252,11 @@ class OpenAIAdapter(LLMPort):
 - Ragas 호환 형식으로 변환
 - 토큰 사용량 추적
 
+추가 구현체:
+- `token_aware_chat.py`: 토큰 사용량을 기반으로 동적으로 max_tokens를 조절하는 래퍼.
+- `instructor_factory.py`: Instructor(OpenAI function calling 호환) 프롬프트를 생성.
+- `llm_relation_augmenter.py`: LLM을 이용해 Retrieved context에 관계 설명을 삽입해 Domain Memory와의 결합도를 높입니다.
+
 **Storage Adapters**
 
 ```python
@@ -1104,6 +1279,8 @@ class SQLiteStorageAdapter(StoragePort):
 **책임:**
 - 데이터베이스 쿼리 실행
 - 도메인 엔티티 ↔ DB 스키마 변환
+
+`postgres_adapter.py`는 동일한 `BaseSQLStorageAdapter` 추상화를 공유하며 `postgres_schema.sql`을 로드하여 다중 실행 환경(CI)에서도 동일한 스키마를 유지합니다.
 
 **Tracker Adapters**
 
@@ -1142,6 +1319,8 @@ class LangfuseAdapter(TrackerPort):
 **책임:**
 - 추적 시스템 API 호출
 - 도메인 엔티티 → 추적 형식 변환
+
+Langfuse 외에 `mlflow_adapter.py`(실험/파라미터 기록), `phoenix_adapter.py`(OpenInference 이벤트 전송)도 동일한 `TrackerPort`를 구현하여 CLI 옵션 하나로 추적 대상을 교체할 수 있습니다.
 
 **Web Adapter (Streamlit)**
 
@@ -1240,6 +1419,21 @@ class InsightGenerator(InsightGeneratorPort):
 - 플레이북 기반 패턴 탐지
 - LLM 기반 인사이트 생성
 - 개선 액션 제안
+
+**Analysis Modules & Cache**
+- `adapters/outbound/analysis/*_module.py`는 `AnalysisModulePort`를 구현하여 PipelineOrchestrator가 동적으로 DAG를 구성할 수 있게 합니다. `statistical_analyzer_module.py`, `nlp_analyzer_module.py`, `causal_analyzer_module.py`, `analysis_report_module.py`, `summary_report_module.py`, `comparison_report_module.py`, `verification_report_module.py`, `data_loader_module.py` 등이 존재하며 메타데이터는 `ModuleCatalog`에 등록됩니다.
+- `cache/memory_cache.py`는 단순 LRU, `cache/hybrid_cache.py`는 Hot/Cold 2-tier 캐시, Prefetch, TTL 확장, 통계 수집을 제공하여 `AnalysisCachePort` 구현으로 사용됩니다.
+
+**NLP · Retrieval · KG 어댑터**
+- `nlp/korean`은 kiwipiepy 기반 토크나이저, BM25/Dense/Hybrid retriever, 평가 툴킷(`korean_evaluation.py`), Document chunker를 제공하며 `KoreanNLPPort`와 `DocumentChunker` 서비스가 사용하는 자원입니다.
+- `adapters/outbound/kg`는 `networkx_adapter.py`, `query_strategies.py`로 지식 그래프 생성·탐색을 지원합니다.
+
+**Domain Memory Adapter 심화**
+- `domain_memory/sqlite_adapter.py`는 FTS5 인덱스 동기화(`_rebuild_fts_indexes`)와 abstraction level, KG binding, behavior 검색, formation/evolution util을 구현합니다. `DomainLearningHook`과 CLI history 명령이 이 기능을 활용합니다.
+
+**Report & Phoenix**
+- `report/llm_report_generator.py`는 메트릭별 전문가 프롬프트 템플릿, 토큰 비용 계산, 비동기 LLM 호출을 제공하여 `ReportPort` 구현체로 사용됩니다. `markdown_adapter.py`는 CLI/README용 요약 텍스트를 생성합니다.
+- `adapters/outbound/phoenix/sync_service.py`는 Phoenix dataset/experiment API를 감싸고, CLI `--phoenix-dataset/--phoenix-experiment` 옵션과 `config/phoenix_support.py`가 이 클래스를 호출합니다.
 
 ---
 
@@ -1664,12 +1858,69 @@ class InsightGenerator(InsightGeneratorPort):
     │  evaluator = RagasEvaluator()
     │  llm = get_llm_adapter(settings)  # LLMPort 구현
     │
-    └─> [4] 도메인 서비스에 포트 전달
+└─> [4] 도메인 서비스에 포트 전달
             evaluator.evaluate(
                 dataset=ds,
                 metrics=metric_list,
                 llm=llm,  # 의존성 주입
             )
+```
+
+### 4.10 관측성 · 추적 흐름 (Observability & Tracing Flow)
+
+```
+[1] CLI --phoenix-enabled / --tracker 옵션
+    │
+    ▼
+[2] config/phoenix_support.ensure_phoenix_instrumentation()
+    │  - OpenTelemetry TracerProvider 구성
+    │  - LangChain/OpenAI 자동 계측
+    │
+    └─> instrumentation_span() 컨텍스트 매니저
+            │
+            ├─> MemoryAwareEvaluator / DatasetLoader / PhoenixSyncService
+            │       - Domain Memory 검색, 스트리밍 로딩, Phoenix 업로드에 span 부여
+            │
+            └─> domain/entities/rag_trace.py
+                    - RetrievalData, GenerationData, RAGTraceData 작성
+
+[3] TrackerPort 구현체 (Langfuse / MLflow / Phoenix)
+    │  - run 결과를 trace/span/score로 기록
+    │  - Prompt manifest diff 정보를 metadata에 포함
+    │
+    └─> config/phoenix_support.extract_phoenix_links()
+            - CLI/Web UI 출력에 Phoenix Trace/Experiment URL 삽입
+
+[4] PhoenixSyncService (옵션)
+    │  - Dataset/Experiment 업로드
+    │  - Prompt manifest + Phoenix metadata 연동
+    │
+    └─> Phoenix UI에서 트레이스/실험/데이터셋을 한 번에 탐색
+
+[5] reports/release_notes.py
+    │  - 최근 run/분석 요약을 Markdown으로 생성
+    │
+    └─> README/PR/Slack에 붙일 수 있는 자동 보고서 제공
+```
+
+### 4.11 자동화 · 에이전트 흐름 (Automation & Agent Flow)
+
+```
+[1] evalvault agent list/info/run
+    │
+    ▼
+[2] config/agent_types.py
+    │  - AgentType, AgentConfig, 운영/개발 프로필
+    │
+    └─> agent/main.py
+            │  - claude-agent-sdk 기반 개발용 에이전트 실행
+            │  - agent/prompts/*, agent/memory/* 관리
+
+[3] scripts/regression_runner.py
+    │  - config/regressions/*.json 로드
+    │  - RegressionSuite 정의, subprocess 실행, httpx 호출
+    │
+    └─> CI/에이전트가 회귀 시나리오를 자동으로 반복
 ```
 
 ---
