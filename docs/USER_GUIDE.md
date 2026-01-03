@@ -1,282 +1,107 @@
 # EvalVault 사용자 가이드
 
-> RAG 시스템 성능을 측정하고 분석하는 평가 전문 도구
+> RAG 시스템 품질 평가 · 분석 · 추적을 위한 종합 워크플로 가이드
+
+이 문서는 README에서 다룬 간단한 소개를 넘어, 설치부터 Phoenix 연동·Domain Memory·자동화까지 모든 기능을 심층적으로 설명합니다.
 
 ---
 
 ## 목차
 
-1. [EvalVault란?](#evalvault란)
-2. [5분 만에 시작하기](#5분-만에-시작하기)
-3. [설치 가이드](#설치-가이드)
-4. [환경 설정](#환경-설정)
-5. [모델 프로필 설정](#모델-프로필-설정)
-6. [CLI 사용법](#cli-사용법)
-7. [평가 메트릭 이해하기](#평가-메트릭-이해하기)
-8. [데이터셋 준비](#데이터셋-준비)
-9. [결과 저장 및 추적](#결과-저장-및-추적)
-10. [고급 기능](#고급-기능)
-11. [문제 해결](#문제-해결)
+1. [시작하기](#시작하기)
+   - [시스템 요구 사항](#시스템-요구-사항)
+   - [설치 옵션](#설치-옵션)
+2. [환경 구성](#환경-구성)
+   - [.env 작성](#env-작성)
+   - [모델 프로필 관리](#모델-프로필-관리)
+   - [데이터셋 준비](#데이터셋-준비)
+3. [핵심 워크플로](#핵심-워크플로)
+   - [CLI 실행](#cli-실행)
+   - [히스토리/비교/내보내기](#히스토리비교내보내기)
+   - [Web UI](#web-ui)
+4. [저장·추적](#저장추적)
+   - [SQLite/PostgreSQL](#sqlitepostgresql)
+   - [Langfuse](#langfuse)
+5. [관측성 & Phoenix](#관측성--phoenix)
+   - [트레이싱 활성화](#트레이싱-활성화)
+   - [Dataset/Experiment 동기화](#datasetexperiment-동기화)
+   - [임베딩 분석 & 내보내기](#임베딩-분석--내보내기)
+   - [Prompt Manifest 루프](#prompt-manifest-루프)
+   - [드리프트 감시 & 릴리스 노트](#드리프트-감시--릴리스-노트)
+6. [Domain Memory & 분석 기능](#domain-memory--분석-기능)
+7. [한국어 NLP & 데이터 스트리밍](#한국어-nlp--데이터-스트리밍)
+8. [자동화 & 에이전트](#자동화--에이전트)
+9. [문제 해결](#문제-해결)
+10. [참고 자료](#참고-자료)
 
 ---
 
-## EvalVault란?
+## 시작하기
 
-EvalVault는 **RAG(Retrieval-Augmented Generation) 시스템의 품질을 객관적으로 측정**하는 평가 도구입니다.
+### 시스템 요구 사항
 
-### 왜 EvalVault인가?
+| 항목 | 권장 버전 | 비고 |
+|------|-----------|------|
+| Python | 3.12.x | `uv`가 자동 설치 (macOS/Linux/Windows 지원) |
+| uv | 최신 | [설치 가이드](https://docs.astral.sh/uv/getting-started/installation/) |
+| Docker (선택) | 최신 | Langfuse/Phoenix 로컬 배포 시 |
+| Ollama (선택) | 최신 | 폐쇄망/로컬 모델 사용 시 |
 
-| 문제 | EvalVault 솔루션 |
-|------|------------------|
-| "우리 RAG가 잘 작동하는지 어떻게 알지?" | 6가지 표준화된 메트릭으로 객관적 측정 |
-| "평가 결과를 어디에 저장하지?" | SQLite + Langfuse 자동 저장 |
-| "한국어 데이터도 평가 가능?" | 한국어/영어/일본어/중국어 지원 |
-| "팀원들과 결과를 공유하고 싶어" | Langfuse 대시보드로 시각화 |
+### 설치 옵션
 
-### 핵심 기능
-
-```
-📊 6가지 평가 메트릭 (Ragas 기반)
-📁 다양한 데이터 포맷 지원 (JSON, CSV, Excel)
-💾 자동 결과 저장 (SQLite, PostgreSQL)
-📈 실시간 추적 (Langfuse, MLflow)
-🔌 확장 가능한 아키텍처 (Hexagonal Architecture)
-```
-
----
-
-## 5분 만에 시작하기
-
-### 전제 조건
-
-- Python 3.12+
-- OpenAI API 키
-
-### Step 1: 설치
-
+#### PyPI
 ```bash
-# 저장소 클론
+uv pip install evalvault
+```
+
+#### 소스 (권장)
+```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
-
-# 의존성 설치 (uv 권장)
-uv sync --extra dev
-
-# 또는 pip 사용
-pip install -e ".[dev]"
+uv sync --extra dev        # 기본 개발 환경
+uv sync --extra dev --extra analysis --extra korean --extra web   # 전체 기능
 ```
 
-### Step 2: 환경 설정
-
-```bash
-# .env 파일 생성
-cp .env.example .env
-
-# 필수: OpenAI API 키 설정
-echo "OPENAI_API_KEY=sk-your-api-key" >> .env
-```
-
-### Step 3: 첫 평가 실행
-
-```bash
-# 샘플 데이터셋으로 평가 실행
-evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
-```
-
-### Step 4: 결과 확인
-
-```bash
-# 평가 히스토리 조회
-evalvault history
-
-# 상세 결과 확인
-evalvault export <run_id> -o result.json
-```
-
-**축하합니다! 첫 RAG 평가를 완료했습니다.**
+Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12를 고정하므로 추가 설치가 필요 없습니다.
 
 ---
 
-## 설치 가이드
+## 환경 구성
 
-### 방법 1: uv 사용 (권장)
-
-[uv](https://github.com/astral-sh/uv)는 빠른 Python 패키지 관리자입니다.
-
-```bash
-# uv 설치 (macOS/Linux)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 프로젝트 설치
-cd EvalVault
-uv sync --extra dev
-```
-
-### 방법 2: pip 사용
+### .env 작성
+`cp .env.example .env` 후 아래 값을 채웁니다.
 
 ```bash
-# 가상환경 생성
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# 공통
+EVALVAULT_PROFILE=dev              # config/models.yaml에 정의된 프로필
+OPENAI_API_KEY=sk-...
 
-# 설치
-pip install -e ".[dev]"
-```
-
-### 방법 3: Docker
-
-```bash
-# Docker Compose로 전체 스택 실행 (PostgreSQL + EvalVault)
-docker compose up -d
-
-# EvalVault CLI 실행
-docker compose run evalvault run data.json --metrics faithfulness
-
-# 또는 직접 빌드
-docker build -t evalvault .
-docker run -it evalvault --help
-```
-
-### 설치 확인
-
-```bash
-# CLI 버전 확인
-evalvault --help
-
-# 사용 가능한 메트릭 확인
-evalvault metrics
-```
-
----
-
-## 환경 설정
-
-### 필수 설정
-
-`.env` 파일에 다음을 설정합니다:
-
-```bash
-# OpenAI API (필수)
-OPENAI_API_KEY=sk-your-openai-api-key
-OPENAI_MODEL=gpt-5-nano           # 기본 모델
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-### 선택적 설정
-
-```bash
-# Langfuse 연동 (평가 결과 추적)
+# Langfuse (선택)
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com  # 또는 self-hosted URL
+LANGFUSE_HOST=http://localhost:3000
+
+# Phoenix/OpenTelemetry (선택)
+PHOENIX_ENABLED=true
+PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
+PHOENIX_SAMPLE_RATE=1.0
 ```
 
-> **Note**: 메트릭 임계값(thresholds)은 환경변수가 아닌 **데이터셋 JSON 파일**에 정의합니다. [데이터셋 준비](#데이터셋-준비) 섹션을 참조하세요.
+Ollama를 사용할 경우 `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT`을 추가하고, 평가 전에 `ollama pull`로 모델을 내려받습니다.
 
-### 설정 확인
-
-```bash
-# 현재 설정 상태 확인
-evalvault config
-```
-
-출력 예시:
-```
-EvalVault Configuration
-========================
-OpenAI Model: gpt-5-nano
-Embedding Model: text-embedding-3-small
-Langfuse: Configured ✓
-```
-
----
-
-## 모델 프로필 설정
-
-EvalVault는 **프로필 기반 모델 설정**을 지원합니다. 개발/운영 환경별로 다른 모델을 사용하거나, 폐쇄망에서 로컬 Ollama 모델을 사용할 수 있습니다.
-
-### 설정 파일 역할 분리
-
-| 파일 | 역할 | Git 관리 |
-|------|------|----------|
-| `config/models.yaml` | 모델 프로필 정의 (모델명, provider) | ✅ Yes |
-| `.env` | 시크릿/인프라 설정 (API 키, 서버 URL) | ❌ No |
-
-### 사용 가능한 프로필
-
-| 프로필 | LLM | Embedding | 용도 |
-|--------|-----|-----------|------|
-| `dev` | gemma3:1b (Ollama) | qwen3-embedding:0.6b | 개발/테스트 |
-| `prod` | gpt-oss-safeguard:20b (Ollama) | qwen3-embedding:8b | 운영 환경 |
-| `openai` | gpt-5-nano (OpenAI) | text-embedding-3-small | 외부망 |
-
-### 프로필 사용 방법
-
-#### 방법 1: .env 파일에서 설정
-
-```bash
-# .env
-EVALVAULT_PROFILE=dev
-```
-
-```bash
-# 프로필 자동 적용
-evalvault run data.json --metrics faithfulness
-```
-
-#### 방법 2: CLI 옵션으로 오버라이드
-
-```bash
-# --profile 옵션으로 프로필 선택
-evalvault run data.json --profile prod --metrics faithfulness
-
-# 단축 옵션
-evalvault run data.json -p openai --metrics faithfulness
-```
-
-### 폐쇄망(Air-gapped) 환경 설정
-
-외부 인터넷 접근이 불가능한 환경에서는 Ollama를 사용합니다.
-
-```bash
-# .env 설정
-EVALVAULT_PROFILE=dev              # 또는 prod
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_TIMEOUT=120
-```
-
-```bash
-# Ollama 모델 설치 (사전 준비)
-ollama pull gemma3:1b
-ollama pull qwen3-embedding:0.6b
-```
-
-### 프로필 설정 파일 (config/models.yaml)
+### 모델 프로필 관리
+`config/models.yaml`은 프로필별 LLM/임베딩 구성을 정의합니다.
 
 ```yaml
 profiles:
   dev:
-    description: "개발/테스트용 경량 모델"
     llm:
       provider: ollama
       model: gemma3:1b
     embedding:
       provider: ollama
       model: qwen3-embedding:0.6b
-
-  prod:
-    description: "운영용 고성능 모델"
-    llm:
-      provider: ollama
-      model: gpt-oss-safeguard:20b
-      options:
-        think_level: medium
-    embedding:
-      provider: ollama
-      model: qwen3-embedding:8b
-
   openai:
-    description: "OpenAI API 사용 (외부망)"
     llm:
       provider: openai
       model: gpt-5-nano
@@ -285,732 +110,217 @@ profiles:
       model: text-embedding-3-small
 ```
 
----
+사용법:
+- 환경 변수 `EVALVAULT_PROFILE` 설정
+- 또는 CLI `--profile openai` / `-p openai`
 
-## CLI 사용법
-
-### 기본 명령어
-
-| 명령어 | 설명 | 예시 |
-|--------|------|------|
-| `run` | 평가 실행 | `evalvault run data.json --metrics faithfulness` |
-| `run --parallel` | 병렬 평가 (대규모 데이터셋) | `evalvault run data.json --metrics faithfulness --parallel` |
-| `metrics` | 사용 가능한 메트릭 목록 | `evalvault metrics` |
-| `config` | 현재 설정 확인 | `evalvault config` |
-| `history` | 평가 히스토리 조회 | `evalvault history --limit 10` |
-| `compare` | 두 평가 결과 비교 | `evalvault compare <id1> <id2>` |
-| `export` | 결과 내보내기 | `evalvault export <id> -o result.json` |
-
-### 평가 실행 (`run`)
-
-```bash
-# 기본 사용
-evalvault run <dataset_path> --metrics <metric1,metric2,...>
-
-# 예시: 단일 메트릭
-evalvault run data.json --metrics faithfulness
-
-# 예시: 여러 메트릭
-evalvault run data.json --metrics faithfulness,answer_relevancy,context_precision
-
-# 예시: 모든 메트릭
-evalvault run data.json --metrics faithfulness,answer_relevancy,context_precision,context_recall,factual_correctness,semantic_similarity
-
-# 예시: 병렬 평가 (대규모 데이터셋에서 빠른 처리)
-evalvault run data.json --metrics faithfulness --parallel
-
-# 예시: 병렬 평가 + 배치 크기 지정
-evalvault run data.json --metrics faithfulness --parallel --batch-size 10
-
-# 예시: 프로필 지정 (Ollama dev 환경)
-evalvault run data.json --profile dev --metrics faithfulness
-
-# 예시: 프로필 지정 (OpenAI)
-evalvault run data.json -p openai --metrics faithfulness
-
-# 예시: Langfuse 연동
-evalvault run data.json --metrics faithfulness --langfuse
-```
-
-### 히스토리 조회 (`history`)
-
-```bash
-# 최근 10개 결과
-evalvault history --limit 10
-
-# 특정 데이터셋 필터링
-evalvault history --dataset insurance-qa
-
-# 특정 모델 필터링
-evalvault history --model gpt-5-nano
-```
-
-### 결과 비교 (`compare`)
-
-```bash
-# 두 평가 결과 비교
-evalvault compare abc123 def456
-```
-
-출력 예시:
-```
-Comparison: abc123 vs def456
-============================
-                    Run 1      Run 2      Diff
-faithfulness        0.85       0.92       +0.07
-answer_relevancy    0.78       0.81       +0.03
-context_precision   0.90       0.88       -0.02
-```
-
----
-
-## 평가 메트릭 이해하기
-
-EvalVault는 [Ragas](https://docs.ragas.io/) 프레임워크 기반의 6가지 메트릭을 제공합니다.
-
-### 메트릭 한눈에 보기
-
-| 메트릭 | 측정 대상 | Ground Truth 필요 | 임베딩 필요 |
-|--------|-----------|-------------------|-------------|
-| Faithfulness | 답변이 컨텍스트에 충실한지 | ❌ | ❌ |
-| Answer Relevancy | 답변이 질문과 관련있는지 | ❌ | ✅ |
-| Context Precision | 검색된 컨텍스트의 정밀도 | ✅ | ❌ |
-| Context Recall | 필요한 정보가 검색되었는지 | ✅ | ❌ |
-| Factual Correctness | 답변이 정답과 일치하는지 | ✅ | ❌ |
-| Semantic Similarity | 답변과 정답의 의미적 유사도 | ✅ | ✅ |
-
-### 상세 설명
-
-#### 1. Faithfulness (충실도)
-
-**"답변이 검색된 컨텍스트에서 벗어나지 않았는가?"**
-
-```
-점수 1.0: 답변의 모든 주장이 컨텍스트에서 지원됨
-점수 0.0: 답변이 컨텍스트에 없는 내용을 포함 (환각)
-```
-
-사용 사례:
-- 환각(Hallucination) 감지
-- RAG 시스템의 신뢰성 평가
-
-#### 2. Answer Relevancy (답변 관련성)
-
-**"답변이 질문에 적절히 대응하는가?"**
-
-```
-점수 1.0: 답변이 질문과 완벽하게 관련됨
-점수 0.0: 답변이 질문과 무관함
-```
-
-사용 사례:
-- 답변 품질 평가
-- 주제 이탈 감지
-
-#### 3. Context Precision (컨텍스트 정밀도)
-
-**"검색된 컨텍스트 중 실제로 유용한 것의 비율은?"**
-
-```
-점수 1.0: 모든 검색 결과가 유용함
-점수 0.0: 검색 결과가 모두 노이즈
-```
-
-사용 사례:
-- Retriever 품질 평가
-- 검색 정밀도 개선
-
-#### 4. Context Recall (컨텍스트 재현율)
-
-**"정답을 도출하는데 필요한 정보가 모두 검색되었는가?"**
-
-```
-점수 1.0: 필요한 모든 정보가 검색됨
-점수 0.0: 필요한 정보가 누락됨
-```
-
-사용 사례:
-- Retriever 커버리지 평가
-- 검색 누락 감지
-
-#### 5. Factual Correctness (사실적 정확성)
-
-**"답변의 사실적 주장이 정답과 일치하는가?"**
-
-```
-점수 1.0: 모든 사실이 정확함
-점수 0.0: 사실적 오류 포함
-```
-
-사용 사례:
-- 사실 검증
-- 오답 감지
-
-#### 6. Semantic Similarity (의미적 유사도)
-
-**"답변과 정답이 의미적으로 얼마나 유사한가?"**
-
-```
-점수 1.0: 의미가 동일함
-점수 0.0: 의미가 완전히 다름
-```
-
-사용 사례:
-- 답변 품질 종합 평가
-- 다양한 표현 허용
-
-### 메트릭 선택 가이드
-
-```
-🎯 빠른 평가가 필요할 때:
-   → faithfulness (환각 감지)
-
-🎯 Retriever 성능 평가:
-   → context_precision + context_recall
-
-🎯 답변 품질 종합 평가:
-   → answer_relevancy + semantic_similarity
-
-🎯 정확도 중심 평가:
-   → factual_correctness
-
-🎯 전체 파이프라인 평가:
-   → 모든 메트릭 사용
-```
-
----
-
-## 데이터셋 준비
-
-### 지원 형식
-
-| 형식 | 확장자 | 특징 |
-|------|--------|------|
-| JSON | `.json` | 구조화된 데이터, 메타데이터 포함 가능 |
-| CSV | `.csv` | 스프레드시트 호환, 간단한 편집 |
-| Excel | `.xlsx` | 엑셀에서 직접 편집 가능 |
-
-### JSON 형식 (권장)
+### 데이터셋 준비
+EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습니다.
 
 ```json
 {
-  "name": "insurance-qa-dataset",
+  "name": "insurance_qa_korean",
   "version": "1.0.0",
-  "thresholds": {
-    "faithfulness": 0.8,
-    "answer_relevancy": 0.7,
-    "context_precision": 0.7,
-    "context_recall": 0.7
-  },
+  "thresholds": {"faithfulness": 0.8},
   "test_cases": [
     {
       "id": "tc-001",
-      "question": "이 보험의 보장금액은 얼마인가요?",
-      "answer": "보장금액은 1억원입니다.",
-      "contexts": [
-        "해당 보험의 사망 보장금액은 1억원입니다.",
-        "보험료 납입기간은 20년입니다."
-      ],
-      "ground_truth": "1억원"
+      "question": "보험 해지 환급금은 어떻게 계산하나요?",
+      "answer": "...",
+      "contexts": ["..."],
+      "ground_truth": "..."
     }
   ]
 }
 ```
 
-> **thresholds**: 메트릭별 통과 기준 (0.0~1.0). 미지정 시 기본값 0.7 적용.
-> 데이터셋에 포함하여 버전 관리가 가능하고, 팀 간 일관된 SLA 적용이 가능합니다.
-
-### CSV 형식
-
-```csv
-id,question,answer,contexts,ground_truth
-tc-001,"보장금액은?","1억원입니다.","[""사망 보장금액은 1억원""]","1억원"
-```
-
-> **주의**: CSV에서 contexts는 JSON 배열 문자열로 작성합니다.
-
-### Excel 형식
-
-| id | question | answer | contexts | ground_truth |
-|----|----------|--------|----------|--------------|
-| tc-001 | 보장금액은? | 1억원입니다. | ["사망 보장금액은 1억원"] | 1억원 |
-
-### 필드 설명
-
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| `id` | ✅ | 테스트케이스 고유 ID |
-| `question` | ✅ | 사용자 질문 |
-| `answer` | ✅ | RAG 시스템의 답변 |
-| `contexts` | ✅ | 검색된 컨텍스트 (배열) |
-| `ground_truth` | ⚠️ | 정답 (일부 메트릭에 필요) |
-
-> ⚠️ `ground_truth`는 context_precision, context_recall, factual_correctness, semantic_similarity 메트릭에 필요합니다.
-
-### 샘플 데이터셋
-
-프로젝트에 포함된 샘플 데이터셋:
-
-```
-tests/fixtures/e2e/
-├── insurance_qa_korean.json    # 한국어 보험 QA (5개 케이스)
-├── insurance_qa_english.json   # 영어 보험 QA (5개 케이스)
-└── edge_cases.json             # 엣지 케이스 테스트
-```
+CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고 `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
 
 ---
 
-## 결과 저장 및 추적
+## 핵심 워크플로
 
-### 자동 저장 (SQLite)
-
-평가 결과는 자동으로 로컬 SQLite 데이터베이스에 저장됩니다.
-
+### CLI 실행
 ```bash
-# 기본 저장 위치
-data/evaluations.db
-
-# 저장된 결과 조회
-evalvault history
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy \
+  --profile dev \
+  --tracker langfuse \
+  --db evalvault.db
 ```
 
-### Langfuse 연동
+옵션 요약:
+- `--metrics` : 쉼표로 구분된 메트릭 목록
+- `--parallel / --batch-size` : 대량 데이터 병렬 평가
+- `--tracker {none,langfuse,phoenix,mlflow}` : 추적기 선택
+- `--db path/to.sqlite` : SQLite 저장소 지정
+- `--use-domain-memory` : Domain Memory 기반 threshold/컨텍스트 보강 활성화
 
-[Langfuse](https://langfuse.com/)는 LLM 애플리케이션 추적 플랫폼입니다.
-
-#### 설정 방법
-
+### 히스토리/비교/내보내기
 ```bash
-# .env 파일에 추가
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com  # 또는 self-hosted
+uv run evalvault history --limit 20 --db evalvault.db
+uv run evalvault compare <run_a> <run_b>
+uv run evalvault export <run_id> -o run.json
 ```
 
-#### 사용 방법
-
+### Web UI
 ```bash
-# --langfuse 플래그 추가
-evalvault run data.json --metrics faithfulness --langfuse
+uv run evalvault web --browser
 ```
-
-#### Langfuse 대시보드에서 확인 가능한 정보
-
-- 평가 실행별 Trace
-- 메트릭 점수 시계열
-- 테스트케이스별 상세 결과
-- 토큰 사용량 및 비용
-
-### 결과 내보내기
-
-```bash
-# JSON으로 내보내기
-evalvault export <run_id> -o results.json
-
-# 출력 예시
-{
-  "run_id": "abc123...",
-  "dataset_name": "insurance-qa",
-  "pass_rate": 0.8,
-  "metrics": {
-    "faithfulness": 0.9,
-    "answer_relevancy": 0.85
-  },
-  "results": [...]
-}
-```
+Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
 
 ---
 
-## 고급 기능
+## 저장·추적
 
-### 테스트셋 자동 생성
+### SQLite/PostgreSQL
+- 기본값은 `evalvault.db` (SQLite)
+- PostgreSQL 사용 시 `.env`에 `DATABASE_URL=postgresql+psycopg://...` 를 설정하고 `uv sync --extra postgres` 를 실행합니다.
 
-문서에서 자동으로 테스트셋을 생성합니다.
+### Langfuse
+1. `docker compose -f docker-compose.langfuse.yml up -d`
+2. http://localhost:3000 접속 후 프로젝트를 만들고 API 키를 발급
+3. `.env` 에 키/호스트를 설정 후 `--tracker langfuse` 옵션 사용
 
+Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며, Streamlit/CLI 히스토리에도 trace URL이 나타납니다.
+
+---
+
+## 관측성 & Phoenix
+
+### 트레이싱 활성화
+1. `uv sync --extra phoenix`
+2. `.env` 에 `PHOENIX_ENABLED=true`, `PHOENIX_ENDPOINT`, `PHOENIX_SAMPLE_RATE`, `PHOENIX_API_TOKEN(선택)` 설정
+3. CLI 실행 시 `--tracker phoenix` 또는 `--phoenix-max-traces` 사용
+
+Phoenix 트레이스는 OpenTelemetry 스팬으로 생성되며 `tracker_metadata["phoenix"]["trace_url"]` 에 링크가 저장됩니다.
+
+### Dataset/Experiment 동기화
 ```bash
-evalvault generate documents/ -n 10 -o testset.json
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --tracker phoenix \
+  --phoenix-dataset insurance-qa-ko \
+  --phoenix-dataset-description "보험 QA v2025.01" \
+  --phoenix-experiment gemma3-ko-baseline \
+  --phoenix-experiment-description "Gemma3 vs OpenAI 비교"
 ```
+- `--phoenix-dataset` : EvalVault Dataset을 Phoenix Dataset으로 업로드
+- `--phoenix-experiment` : Phoenix Experiment 생성 및 메트릭/Pass Rate/Domain Memory 메타데이터 포함
+- 생성된 URL은 JSON 출력과 Web UI 히스토리에서 확인할 수 있습니다.
 
-### 다중 LLM 지원
+### 임베딩 분석 & 내보내기
+Phoenix 12.27.0의 Embeddings Analysis 뷰는 드리프트/클러스터/3D 시각화를 제공합니다. 업로드된 Dataset/Experiment 화면에서 “Embeddings” 탭을 열면 EvalVault 질문/답변 벡터 및 Domain Memory 태그를 확인할 수 있습니다.
 
+오프라인 분석이 필요하면 CLI로 내보내세요.
 ```bash
-# Azure OpenAI
-AZURE_OPENAI_API_KEY=...
-AZURE_OPENAI_ENDPOINT=...
-
-# Anthropic Claude
-ANTHROPIC_API_KEY=...
+uv run evalvault phoenix export-embeddings \
+  --dataset phoenix-dataset-id \
+  --endpoint http://localhost:6006 \
+  --output tmp/phoenix_embeddings.csv
 ```
+UMAP/HDBSCAN 라이브러리가 없는 경우 자동으로 PCA/DBSCAN으로 대체합니다.
 
-### 커스텀 메트릭
+### Prompt Manifest 루프
+Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/prompt_manifest.json`과 전용 명령을 사용합니다.
 
-보험 도메인 특화 메트릭 예시:
+1. **프롬프트 ↔ Phoenix ID 연결**
+   ```bash
+   uv run evalvault phoenix prompt-link agent/prompts/baseline.txt \
+     --prompt-id pr-428 \
+     --experiment-id exp-20250115 \
+     --notes "Gemma3 베이스라인"
+   ```
+2. **Diff 확인**
+   ```bash
+   uv run evalvault phoenix prompt-diff \
+     agent/prompts/baseline.txt agent/prompts/system.txt \
+     --manifest agent/prompts/prompt_manifest.json --format table
+   ```
+3. **평가 실행에 Prompt 정보 주입**
+   ```bash
+   uv run evalvault run data.json --metrics faithfulness \
+     --profile prod \
+     --tracker phoenix \
+     --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
+     --prompt-manifest agent/prompts/prompt_manifest.json
+   ```
 
-```python
-from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
+`tracker_metadata["phoenix"]["prompts"]` 에 파일 상태/체크섬/diff가 기록되어 Slack 릴리즈 노트, 히스토리, Web UI에 그대로 노출됩니다.
 
-# 보험 용어 정확도 평가
-metric = InsuranceTermAccuracy(terms_dictionary="terms.json")
-```
+> **Tip**: Prompt Playground 연동 시에는 Phoenix tool-calling을 지원하는 `prod` 프로필(`gpt-oss-safeguard:20b`)을 사용하면 "does not support tools" 오류 없이 메타데이터가 기록됩니다.
+
+### 드리프트 감시 & 릴리스 노트
+- `scripts/ops/phoenix_watch.py` : Phoenix Dataset을 주기적으로 조회하여 `embedding_drift_score` 초과 시 Slack 알림 또는 `evalvault gate`/회귀 테스트 실행
+  ```bash
+  uv run python scripts/ops/phoenix_watch.py \
+    --endpoint http://localhost:6006 \
+    --dataset-id ds_123 \
+    --drift-key embedding_drift_score \
+    --drift-threshold 0.18 \
+    --slack-webhook https://hooks.slack.com/services/... \
+    --gate-command "uv run evalvault gate configs/gate.yaml" \
+    --run-regressions threshold \
+    --regression-config config/regressions/default.json
+  ```
+- `scripts/reports/generate_release_notes.py` : `evalvault run --output run.json` 결과를 Markdown/Slack 형식 릴리스 노트로 변환하고 Phoenix 링크를 삽입합니다.
+
+---
+
+## Domain Memory & 분석 기능
+- `--use-domain-memory` : 평가 전 Domain Memory의 신뢰도로 메트릭 임계값을 자동 조정하고 관련 사실을 컨텍스트에 보강합니다.
+- `MemoryBasedAnalysis` : `evalvault analyze` 또는 Web UI 리포트에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다.
+- `ImprovementGuideService` : 규칙 기반 패턴 탐지 + LLM 인사이트를 결합해 우선순위가 매겨진 개선 액션을 제공합니다.
+- `Analysis Pipeline` : `evalvault pipeline run --query "요약해줘"` 형태로 12가지 의도를 분류하고 DAG 모듈을 실행합니다.
+
+---
+
+## 한국어 NLP & 데이터 스트리밍
+- `uv sync --extra korean` 설치 시 Kiwi 기반 형태소 분석, BM25/Dense/Hybrid 검색기, 한국어 Faithfulness/Factual 검증기가 활성화됩니다.
+- 대용량 CSV/JSON/Excel은 `StreamingDatasetLoader`가 청크 단위로 처리하여 메모리 사용량을 줄이고 진행률 콜백을 제공합니다 (`StreamingConfig.chunk_size`, `max_rows` 등 조정 가능).
+
+---
+
+## 자동화 & 에이전트
+- `scripts/regression_runner.py` : JSON (`config/regressions/*.json`) 으로 정의된 회귀 스위트를 순차 실행하고 stdout/stderr를 캡처합니다.
+- `evalvault agent ...` : `agent/` 폴더의 claude-agent-sdk 기반 개발/운영 에이전트를 실행하여 아키텍처/관측성/테스트/문서 등을 자동 개선합니다. 에이전트 상태와 로그는 `agent/memory/` 하위에 저장되며, `AgentConfig` 는 `src/evalvault/config/agent_types.py` 에 정의되어 있습니다.
 
 ---
 
 ## 문제 해결
 
-### 자주 발생하는 문제
+| 증상 | 해결 방법 |
+|------|------------|
+| `Command 'evalvault' not found` | `uv run evalvault ...` 또는 PATH에 `.venv/bin` 추가 |
+| OpenAI 401 에러 | `.env` 의 `OPENAI_API_KEY` 확인, 프로필이 OpenAI인지 확인 |
+| Ollama connection refused | `ollama serve` 실행 여부, `OLLAMA_BASE_URL` 확인 |
+| Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 |
+| Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
+| Streamlit ImportError | `uv sync --extra web` 실행 |
 
-#### 1. OpenAI API 키 오류
-
-```
-Error: OPENAI_API_KEY not set
-```
-
-**해결**: `.env` 파일에 API 키가 올바르게 설정되었는지 확인
-
-```bash
-cat .env | grep OPENAI_API_KEY
-```
-
-#### 2. 메트릭 점수가 모두 0
-
-**원인**: `ground_truth` 필드 누락
-
-**해결**: 데이터셋에 `ground_truth` 필드 추가
-
-#### 3. 평가 시간이 너무 오래 걸림
-
-**해결 방법**:
-1. 병렬 평가 활성화: `--parallel --batch-size 10`
-2. 메트릭 수 줄이기: `--metrics faithfulness`
-3. 테스트케이스 수 줄이기
-4. 더 빠른 모델 사용: `OPENAI_MODEL=gpt-5-nano`
-
-#### 4. Langfuse 연결 실패
-
-```
-Error: Failed to connect to Langfuse
-```
-
-**해결**:
-1. 자격 증명 확인: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
-2. 호스트 URL 확인: `LANGFUSE_HOST`
-3. 네트워크 연결 확인
-
-### 로그 확인
-
-```bash
-# 상세 로그 출력
-evalvault run data.json --metrics faithfulness --verbose
-```
-
-### 지원 요청
-
-- GitHub Issues: https://github.com/ntts9990/EvalVault/issues
-- 버그 리포트 시 포함할 정보:
-  - Python 버전: `python --version`
-  - EvalVault 버전: `evalvault --version`
-  - 에러 메시지 전체
-  - 재현 단계
+추가 이슈는 GitHub Issues 또는 `evalvault config` 출력을 참고하세요.
 
 ---
 
-## 고급 기능 및 조합
-
-### 고급 분석 기능
-
-#### NLP 분석
-```bash
-# NLP 분석 포함 평가
-evalvault run data.json --metrics faithfulness --analyze-nlp
-
-# 질문 유형, 키워드, 토픽 클러스터 분석
-```
-
-#### 인과 분석
-```bash
-# 인과 분석 포함 평가
-evalvault run data.json --metrics faithfulness --analyze-causal
-
-# 근본 원인 분석 및 개선 제안
-```
-
-#### 통합 분석
-```bash
-# 모든 분석 포함
-evalvault analyze <run_id> --include-nlp --include-causal
-```
-
-### 도메인 메모리 활용
-
-도메인 메모리는 평가 결과에서 학습한 지식을 축적하여 향후 평가에 활용합니다. 과거 평가에서 학습한 패턴을 활용하여 평가 품질을 향상시키고, 관련 사실을 컨텍스트에 자동으로 추가할 수 있습니다.
-
-#### 기본 사용법
-
-```bash
-# Domain Memory를 활용한 평가 (threshold 자동 조정)
-evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
-  --metrics faithfulness,answer_relevancy \
-  --use-domain-memory \
-  --memory-domain insurance \
-  --memory-language ko
-```
-
-**동작 원리**:
-1. 과거 평가에서 학습한 메트릭별 신뢰도 점수 조회
-2. 신뢰도 점수에 따라 threshold 자동 조정:
-   - 신뢰도 < 0.6: threshold를 0.1 낮춤 (최소 0.5)
-   - 신뢰도 > 0.85: threshold를 0.05 높임 (최대 0.95)
-
-#### 컨텍스트 보강
-
-각 테스트 케이스의 질문과 관련된 사실을 자동으로 컨텍스트에 추가합니다.
-
-```bash
-# 컨텍스트 보강 옵션 사용
-evalvault run dataset.json \
-  --metrics faithfulness \
-  --use-domain-memory \
-  --augment-context \
-  --memory-domain insurance \
-  --memory-language ko
-```
-
-**동작 원리**:
-1. 각 테스트 케이스의 질문으로 관련 사실 검색
-2. 검색된 사실을 컨텍스트에 자동 추가
-3. 형식: `[관련 사실]\n- 주체 관계 객체`
-
-#### 메모리 데이터베이스 경로 지정
-
-```bash
-# 커스텀 메모리 DB 경로 지정
-evalvault run dataset.json \
-  --use-domain-memory \
-  --memory-db /path/to/custom_memory.db \
-  --memory-domain insurance
-```
-
-#### Python 코드를 통한 사용
-
-```python
-from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
-from evalvault.domain.services.evaluator import RagasEvaluator
-from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
-from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
-
-# 메모리 어댑터 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
-evaluator = RagasEvaluator()
-memory_evaluator = MemoryAwareEvaluator(
-    evaluator=evaluator,
-    memory_port=memory_adapter
-)
-
-# 평가 실행 (threshold 자동 조정)
-run = await memory_evaluator.evaluate_with_memory(
-    dataset=dataset,
-    metrics=["faithfulness", "answer_relevancy"],
-    llm=llm_adapter,
-    domain="insurance",
-    language="ko"
-)
-
-# 컨텍스트 보강
-augmented_context = memory_evaluator.augment_context_with_facts(
-    question="보험료는 얼마인가요?",
-    original_context="기본 컨텍스트...",
-    domain="insurance",
-    language="ko",
-    limit=5
-)
-```
-
-#### 메모리 기반 분석
-
-과거 학습 메모리와 현재 평가 결과를 비교하여 트렌드 분석 및 인사이트를 생성합니다.
-
-```python
-from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
-
-# 메모리 기반 분석 초기화
-analysis = MemoryBasedAnalysis(memory_adapter)
-
-# 인사이트 생성
-insights = analysis.generate_insights(
-    evaluation_run=run,
-    domain="insurance",
-    language="ko",
-    history_limit=10
-)
-# {
-#   "trends": {
-#     "faithfulness": {"current": 0.85, "baseline": 0.82, "delta": 0.03},
-#     ...
-#   },
-#   "related_facts": [...],
-#   "recommendations": ["faithfulness 개선 중: 현재 전략을 유지하거나 확장하세요."]
-# }
-
-# 성공한 행동 패턴 적용
-actions = analysis.apply_successful_behaviors(
-    test_case=test_case,
-    domain="insurance",
-    language="ko",
-    min_success_rate=0.8,
-    limit=5
-)
-```
-
-#### 메모리 형성 (자동)
-
-평가 완료 후 `DomainLearningHook`이 자동으로 메모리를 형성합니다. 별도 설정 없이 평가를 실행하면 메모리가 자동으로 저장됩니다.
-
-```python
-# 평가 후 메모리 형성 (자동)
-from evalvault.domain.services.domain_learning_hook import DomainLearningHook
-
-hook = DomainLearningHook(memory_adapter)
-await hook.on_evaluation_complete(
-    evaluation_run=run,
-    domain="insurance",
-    language="ko"
-)
-
-# 학습된 패턴 조회
-reliability = memory_adapter.get_aggregated_reliability(
-    domain="insurance",
-    language="ko"
-)
-# {"faithfulness": 0.85, "answer_relevancy": 0.78, ...}
-```
-
-#### CLI 옵션 요약
-
-| 옵션 | 설명 | 기본값 |
-|------|------|--------|
-| `--use-domain-memory` | Domain Memory를 활용하여 threshold 자동 조정 | `False` |
-| `--memory-domain` | 도메인 이름 (기본값: dataset metadata에서 추출) | `None` |
-| `--memory-language` | 언어 코드 | `ko` |
-| `--memory-db` | Domain Memory 데이터베이스 경로 | `evalvault_memory.db` |
-| `--augment-context` | 각 테스트 케이스의 컨텍스트에 관련 사실 자동 추가 | `False` |
-
-### 분석 파이프라인
-
-쿼리 기반 DAG 분석 파이프라인을 사용하여 복잡한 분석을 자동화합니다.
-
-```bash
-# 의도 분류 기반 분석
-evalvault pipeline analyze "요약해줘" --run-id <run_id>
-
-# 사용 가능한 의도 목록
-evalvault pipeline intents
-
-# 파이프라인 템플릿 목록
-evalvault pipeline templates
-```
-
-### 개선 가이드 생성
-
-평가 결과를 분석하여 구체적인 개선 제안을 생성합니다.
-
-```bash
-# 개선 가이드 생성
-evalvault improve <run_id> --output improvement.md
-```
-
-### Knowledge Graph 기반 테스트셋 생성
-
-문서에서 지식 그래프를 생성하고 이를 기반으로 테스트셋을 생성합니다.
-
-```bash
-# KG 생성
-evalvault kg build documents.md -o knowledge_graph.json
-
-# KG 기반 테스트셋 생성
-evalvault generate documents.md --method knowledge_graph -n 50
-```
-
----
-
-## 부록
-
-### A. 환경 변수 전체 목록
-
-#### 프로필 설정
-
-| 변수 | 필수 | 기본값 | 설명 |
-|------|------|--------|------|
-| `EVALVAULT_PROFILE` | ❌ | - | 모델 프로필 (dev, prod, openai) |
-| `LLM_PROVIDER` | ❌ | openai | LLM 제공자 (openai, ollama) |
-
-#### OpenAI 설정 (외부망)
-
-| 변수 | 필수 | 기본값 | 설명 |
-|------|------|--------|------|
-| `OPENAI_API_KEY` | ⚠️ | - | OpenAI API 키 (openai 사용 시 필수) |
-| `OPENAI_MODEL` | ❌ | gpt-5-nano | 평가에 사용할 모델 |
-| `OPENAI_EMBEDDING_MODEL` | ❌ | text-embedding-3-small | 임베딩 모델 |
-| `OPENAI_BASE_URL` | ❌ | - | 커스텀 API 엔드포인트 |
-
-#### Ollama 설정 (폐쇄망)
-
-| 변수 | 필수 | 기본값 | 설명 |
-|------|------|--------|------|
-| `OLLAMA_BASE_URL` | ❌ | http://localhost:11434 | Ollama 서버 URL |
-| `OLLAMA_MODEL` | ❌ | gemma3:1b | Ollama LLM 모델 |
-| `OLLAMA_EMBEDDING_MODEL` | ❌ | qwen3-embedding:0.6b | Ollama 임베딩 모델 |
-| `OLLAMA_TIMEOUT` | ❌ | 120 | 요청 타임아웃 (초) |
-
-#### 추적/모니터링 설정
-
-| 변수 | 필수 | 기본값 | 설명 |
-|------|------|--------|------|
-| `LANGFUSE_PUBLIC_KEY` | ❌ | - | Langfuse 공개 키 |
-| `LANGFUSE_SECRET_KEY` | ❌ | - | Langfuse 비밀 키 |
-| `LANGFUSE_HOST` | ❌ | cloud.langfuse.com | Langfuse 호스트 |
-
-> **Note**: 메트릭 임계값은 데이터셋 JSON의 `thresholds` 필드에 정의합니다.
-> 모델 프로필은 `config/models.yaml`에서 관리하며 Git으로 버전 관리됩니다.
-
-### B. 프로젝트 구조
-
-```
-EvalVault/
-├── config/
-│   └── models.yaml       # 모델 프로필 설정 (Git 관리)
-├── src/evalvault/
-│   ├── domain/           # 비즈니스 로직
-│   │   ├── entities/     # 도메인 엔티티
-│   │   ├── services/     # 평가 서비스
-│   │   └── metrics/      # 커스텀 메트릭
-│   ├── ports/            # 인터페이스 정의
-│   ├── adapters/         # 구현체
-│   │   ├── inbound/      # CLI
-│   │   └── outbound/     # 외부 서비스 연동 (OpenAI, Ollama, ...)
-│   └── config/           # Settings, ModelConfig
-├── tests/                # 테스트
-├── docs/                 # 문서
-├── .env                  # 시크릿/인프라 설정 (gitignore)
-└── data/                 # 데이터 (gitignore)
-```
-
-### C. 버전 히스토리
-
-| 버전 | 날짜 | 주요 변경 |
-|------|------|-----------|
-| 1.0.0 | 2025-12-28 | OSS Release - PyPI 배포, CI/CD 자동화, 병렬 평가, Docker 지원 |
-| 0.4.0 | 2025-12-25 | Ollama 지원 (폐쇄망), 프로필 기반 모델 설정, --profile CLI 옵션 |
-| 0.3.0 | 2025-12-24 | Phase 6 완료, 6개 메트릭 지원, Ragas v1.0 호환 |
-| 0.2.0 | 2024-12-24 | SQLite 저장, CLI 히스토리 기능 |
-| 0.1.0 | 2024-12-24 | 초기 릴리스, 4개 기본 메트릭 |
-
----
-
-<div align="center">
-
-**EvalVault** - RAG 평가의 새로운 기준
-
-[GitHub](https://github.com/ntts9990/EvalVault) · [Issues](https://github.com/ntts9990/EvalVault/issues) · [Langfuse](https://langfuse.com/)
-
-</div>
+## 참고 자료
+
+### EvalVault 문서
+- [README.md](../README.md) / [README.ko.md](README.ko.md) - 프로젝트 개요
+- [README.md](README.md) - 전체 문서 인덱스
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 아키텍처 가이드
+- [CLI_GUIDE.md](CLI_GUIDE.md) - CLI 참조
+- [ROADMAP.md](ROADMAP.md) - 개발 로드맵
+- [CHANGELOG.md](../CHANGELOG.md) - 변경 이력
+
+### 튜토리얼
+- [tutorials/01-quickstart.md](tutorials/01-quickstart.md) - 5분 빠른 시작
+- [tutorials/04-phoenix-integration.md](tutorials/04-phoenix-integration.md) - Phoenix 통합
+- [tutorials/05-korean-rag.md](tutorials/05-korean-rag.md) - 한국어 RAG
+- [tutorials/07-domain-memory.md](tutorials/07-domain-memory.md) - Domain Memory
+
+### 외부 리소스
+- [Phoenix 공식 문서](https://docs.arize.com/phoenix)
+- [Langfuse 공식 문서](https://langfuse.com/docs)
+- [Ragas 공식 문서](https://docs.ragas.io/)
+
+필요 시 `uv run evalvault --help`로 명령 전체 목록을 확인하세요.

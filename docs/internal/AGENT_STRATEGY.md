@@ -835,7 +835,7 @@ uv run python main.py --project-dir .. --agent-type coordinator
 
 ## 참고
 
-- [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 개발 자동화 계획
+- [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md): 개발 가이드 (자동화 계획 포함)
 - [agent/README.md](../agent/README.md): 에이전트 시스템 가이드
-- [COMPLETED.md](./COMPLETED.md): Phase 1-14 완료 내역
+- [archive/COMPLETED.md](./archive/COMPLETED.md): Phase 1-14 완료 내역 (아카이브)
 - [ROADMAP.md](./ROADMAP.md): 2026-2027 개발 로드맵
