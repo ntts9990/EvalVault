@@ -145,6 +145,35 @@ class TestRagasEvaluator:
             assert result.total_tokens == 180
 
     @pytest.mark.asyncio
+    async def test_parallel_evaluation_tracks_latency(self, sample_dataset, mock_llm):
+        """병렬 평가에서도 개별 테스트 케이스의 타이밍이 기록된다."""
+        evaluator = RagasEvaluator()
+        ragas_metrics = [MagicMock()]
+        ragas_metrics[0].name = "faithfulness"
+
+        async def fake_score(*_args, **_kwargs):
+            await asyncio.sleep(0)
+            return {"faithfulness": 0.9}
+
+        with patch.object(evaluator, "_score_single_sample", side_effect=fake_score):
+            mock_llm.reset_token_usage = MagicMock()
+            mock_llm.get_and_reset_token_usage = MagicMock(return_value=(0, 0, 0))
+            results = await evaluator._evaluate_parallel(
+                dataset=sample_dataset,
+                ragas_samples=["sample-1", "sample-2"],
+                ragas_metrics=ragas_metrics,
+                llm=mock_llm,
+                batch_size=2,
+            )
+
+        assert len(results) == 2
+        for res in results.values():
+            assert res.started_at is not None
+            assert res.finished_at is not None
+            assert res.finished_at >= res.started_at
+            assert res.latency_ms >= 0
+
+    @pytest.mark.asyncio
     async def test_evaluate_sets_timestamps(self, sample_dataset, mock_llm, thresholds):
         """평가 시작/종료 시간이 올바르게 설정되는지 테스트."""
         evaluator = RagasEvaluator()

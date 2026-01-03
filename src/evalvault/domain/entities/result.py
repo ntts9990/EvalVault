@@ -93,6 +93,7 @@ class EvaluationRun:
 
     # Langfuse 연동
     langfuse_trace_id: str | None = None
+    tracker_metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def total_test_cases(self) -> int:
@@ -174,7 +175,13 @@ class EvaluationRun:
             "total_tokens": self.total_tokens,
             "total_cost_usd": self.total_cost_usd,
             "duration_seconds": self.duration_seconds,
+            "tracker_metadata": self.tracker_metadata,
         }
+        phoenix_meta = self.tracker_metadata.get("phoenix")
+        if isinstance(phoenix_meta, dict):
+            trace_url = phoenix_meta.get("trace_url")
+            if trace_url:
+                summary["phoenix_trace_url"] = trace_url
         # 각 메트릭 평균
         for metric in self.metrics_evaluated:
             avg = self.get_avg_score(metric)

@@ -7,10 +7,99 @@ import pytest
 
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.services.experiment_comparator import ExperimentComparator
 from evalvault.domain.services.experiment_manager import (
     ExperimentManager,
     MetricComparison,
 )
+from evalvault.domain.services.experiment_reporter import ExperimentReportGenerator
+from evalvault.domain.services.experiment_repository import ExperimentRepository
+from evalvault.domain.services.experiment_statistics import ExperimentStatisticsCalculator
+
+
+@pytest.fixture
+def mock_storage():
+    """Mock StoragePort 구현."""
+    storage = Mock()
+    experiments: dict[str, Experiment] = {}
+
+    def save_experiment(exp):
+        experiments[exp.experiment_id] = exp
+        return exp.experiment_id
+
+    def get_experiment(exp_id):
+        if exp_id not in experiments:
+            raise KeyError(f"Experiment not found: {exp_id}")
+        return experiments[exp_id]
+
+    def list_experiments(status=None, limit=100):
+        exps = list(experiments.values())
+        if status:
+            exps = [e for e in exps if e.status == status]
+        return exps[:limit]
+
+    def update_experiment(exp):
+        experiments[exp.experiment_id] = exp
+
+    storage.save_experiment.side_effect = save_experiment
+    storage.get_experiment.side_effect = get_experiment
+    storage.list_experiments.side_effect = list_experiments
+    storage.update_experiment.side_effect = update_experiment
+    storage.get_run = Mock()
+
+    return storage
+
+
+@pytest.fixture
+def sample_runs():
+    """샘플 EvaluationRun 데이터."""
+    run1 = EvaluationRun(
+        run_id="run-control-1",
+        dataset_name="test-dataset",
+        model_name="gpt-4o",
+        metrics_evaluated=["faithfulness", "answer_relevancy"],
+        results=[
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.8, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.75, threshold=0.7),
+                ],
+            ),
+            TestCaseResult(
+                test_case_id="tc-002",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.7, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.7, threshold=0.7),
+                ],
+            ),
+        ],
+    )
+
+    run2 = EvaluationRun(
+        run_id="run-variant-a-1",
+        dataset_name="test-dataset",
+        model_name="gpt-5-nano",
+        metrics_evaluated=["faithfulness", "answer_relevancy"],
+        results=[
+            TestCaseResult(
+                test_case_id="tc-001",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.9, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.85, threshold=0.7),
+                ],
+            ),
+            TestCaseResult(
+                test_case_id="tc-002",
+                metrics=[
+                    MetricScore(name="faithfulness", score=0.85, threshold=0.7),
+                    MetricScore(name="answer_relevancy", score=0.8, threshold=0.7),
+                ],
+            ),
+        ],
+    )
+
+    return {"control": run1, "variant_a": run2}
 
 
 class TestExperimentGroup:
@@ -140,93 +229,128 @@ class TestMetricComparison:
         assert comparison.improvement == pytest.approx(13.33)
 
 
+class TestExperimentRepository:
+    """ExperimentRepository 동작 테스트."""
+
+    def test_create_and_get_experiment(self, mock_storage):
+        repo = ExperimentRepository(mock_storage)
+        exp = repo.create(
+            name="Repo Test",
+            description="desc",
+            hypothesis="hypo",
+            metrics=["faithfulness"],
+        )
+
+        loaded = repo.get(exp.experiment_id)
+        assert loaded.name == "Repo Test"
+        assert loaded.description == "desc"
+        assert loaded.metrics_to_compare == ["faithfulness"]
+
+    def test_add_group_and_run(self, mock_storage):
+        repo = ExperimentRepository(mock_storage)
+        exp = repo.create(name="Attach")
+
+        repo.add_group(exp.experiment_id, "control", "baseline")
+        repo.add_run(exp.experiment_id, "control", "run-1")
+
+        stored = repo.get(exp.experiment_id)
+        assert stored.groups[0].name == "control"
+        assert stored.groups[0].run_ids == ["run-1"]
+
+    def test_conclude_and_list(self, mock_storage):
+        repo = ExperimentRepository(mock_storage)
+        draft = repo.create(name="Draft Only")
+        running = repo.create(name="Running")
+        running.status = "running"
+        repo.save(running)
+
+        repo.conclude(draft.experiment_id, "done")
+        completed = repo.list(status="completed")
+
+        assert len(completed) == 1
+        assert completed[0].name == "Draft Only"
+        assert repo.get(draft.experiment_id).conclusion == "done"
+
+
+class TestExperimentComparator:
+    """ExperimentComparator 테스트."""
+
+    def test_compare_returns_metric_scores(self, mock_storage, sample_runs):
+        comparator = ExperimentComparator(mock_storage)
+        experiment = Experiment(
+            name="Comparator",
+            metrics_to_compare=["faithfulness", "answer_relevancy"],
+        )
+        experiment.add_group("control")
+        experiment.add_group("variant_a")
+        experiment.add_run_to_group("control", "run-control-1")
+        experiment.add_run_to_group("variant_a", "run-variant-a-1")
+
+        mock_storage.get_run.side_effect = lambda run_id: sample_runs[
+            "control" if "control" in run_id else "variant_a"
+        ]
+
+        comparisons = comparator.compare(experiment)
+
+        assert len(comparisons) == 2
+        metrics = {c.metric_name for c in comparisons}
+        assert "faithfulness" in metrics
+        assert "answer_relevancy" in metrics
+
+    def test_compare_handles_empty_groups(self, mock_storage):
+        comparator = ExperimentComparator(mock_storage)
+        experiment = Experiment(name="Empty")
+        experiment.add_group("control")
+
+        assert comparator.compare(experiment) == []
+
+
+class TestExperimentStatisticsCalculator:
+    """ExperimentStatisticsCalculator 테스트."""
+
+    def test_build_summary(self):
+        experiment = Experiment(
+            name="Summary",
+            description="desc",
+            hypothesis="hypo",
+        )
+        experiment.add_group("control", "baseline")
+        experiment.add_run_to_group("control", "run-123")
+
+        calculator = ExperimentStatisticsCalculator()
+        summary = calculator.build_summary(experiment)
+
+        assert summary["name"] == "Summary"
+        assert summary["groups"]["control"]["num_runs"] == 1
+        assert summary["groups"]["control"]["description"] == "baseline"
+
+
+class TestExperimentReportGenerator:
+    """ExperimentReportGenerator 테스트."""
+
+    def test_generate_report_combines_sections(self):
+        experiment = Experiment(name="Report")
+        comparator = Mock(spec=ExperimentComparator)
+        comparator.compare.return_value = [
+            MetricComparison(
+                metric_name="faithfulness",
+                group_scores={"control": 0.8},
+                best_group="control",
+                improvement=0.0,
+            )
+        ]
+        stats = ExperimentStatisticsCalculator()
+        reporter = ExperimentReportGenerator(comparator=comparator, statistics_calculator=stats)
+
+        report = reporter.generate(experiment)
+
+        assert report["experiment"]["name"] == "Report"
+        assert report["comparisons"][0]["metric_name"] == "faithfulness"
+        comparator.compare.assert_called_once_with(experiment)
+
+
 class TestExperimentManager:
     """ExperimentManager 서비스 테스트."""
-
-    @pytest.fixture
-    def mock_storage(self):
-        """Mock StoragePort 픽스처."""
-        storage = Mock()
-        # Experiment storage 관련 모킹
-        experiments: dict[str, Experiment] = {}
-
-        def save_experiment(exp):
-            experiments[exp.experiment_id] = exp
-            return exp.experiment_id
-
-        def get_experiment(exp_id):
-            if exp_id not in experiments:
-                raise KeyError(f"Experiment not found: {exp_id}")
-            return experiments[exp_id]
-
-        def list_experiments(status=None, limit=100):
-            exps = list(experiments.values())
-            if status:
-                exps = [e for e in exps if e.status == status]
-            return exps[:limit]
-
-        def update_experiment(exp):
-            experiments[exp.experiment_id] = exp
-
-        storage.save_experiment.side_effect = save_experiment
-        storage.get_experiment.side_effect = get_experiment
-        storage.list_experiments.side_effect = list_experiments
-        storage.update_experiment.side_effect = update_experiment
-
-        return storage
-
-    @pytest.fixture
-    def sample_runs(self):
-        """샘플 EvaluationRun 데이터."""
-        # Control group run
-        run1 = EvaluationRun(
-            run_id="run-control-1",
-            dataset_name="test-dataset",
-            model_name="gpt-4o",
-            metrics_evaluated=["faithfulness", "answer_relevancy"],
-            results=[
-                TestCaseResult(
-                    test_case_id="tc-001",
-                    metrics=[
-                        MetricScore(name="faithfulness", score=0.8, threshold=0.7),
-                        MetricScore(name="answer_relevancy", score=0.75, threshold=0.7),
-                    ],
-                ),
-                TestCaseResult(
-                    test_case_id="tc-002",
-                    metrics=[
-                        MetricScore(name="faithfulness", score=0.7, threshold=0.7),
-                        MetricScore(name="answer_relevancy", score=0.7, threshold=0.7),
-                    ],
-                ),
-            ],
-        )
-
-        # Variant A run
-        run2 = EvaluationRun(
-            run_id="run-variant-a-1",
-            dataset_name="test-dataset",
-            model_name="gpt-5-nano",
-            metrics_evaluated=["faithfulness", "answer_relevancy"],
-            results=[
-                TestCaseResult(
-                    test_case_id="tc-001",
-                    metrics=[
-                        MetricScore(name="faithfulness", score=0.9, threshold=0.7),
-                        MetricScore(name="answer_relevancy", score=0.85, threshold=0.7),
-                    ],
-                ),
-                TestCaseResult(
-                    test_case_id="tc-002",
-                    metrics=[
-                        MetricScore(name="faithfulness", score=0.85, threshold=0.7),
-                        MetricScore(name="answer_relevancy", score=0.8, threshold=0.7),
-                    ],
-                ),
-            ],
-        )
-
-        return {"control": run1, "variant_a": run2}
 
     def test_create_experiment(self, mock_storage):
         """실험 생성 테스트."""

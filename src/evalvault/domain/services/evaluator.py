@@ -1,7 +1,11 @@
 """Ragas evaluation service."""
 
+from __future__ import annotations
+
+import logging
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from ragas import SingleTurnSample
 
@@ -24,15 +28,12 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
         SemanticSimilarity,
     )
 
-from evalvault.domain.entities import (
-    Dataset,
-    EvaluationRun,
-    MetricScore,
-    TestCaseResult,
-)
+from evalvault.domain.entities import Dataset, EvaluationRun, MetricScore, TestCase, TestCaseResult
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.ports.outbound.llm_port import LLMPort
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,6 +50,17 @@ class TestCaseEvalResult:
     started_at: datetime | None = None
     finished_at: datetime | None = None
     latency_ms: int = 0
+
+
+@dataclass
+class ParallelSampleOutcome:
+    """Container for per-sample metadata collected during parallel evaluation."""
+
+    scores: dict[str, float]
+    started_at: datetime
+    finished_at: datetime
+    latency_ms: int
+    error: Exception | None = None
 
 
 class RagasEvaluator:
@@ -358,39 +370,63 @@ class RagasEvaluator:
             테스트 케이스별 평가 결과
         """
         results: dict[str, TestCaseEvalResult] = {}
-        total_samples = len(ragas_samples)
+        sample_pairs = list(zip(dataset.test_cases, ragas_samples, strict=True))
+        total_samples = len(sample_pairs)
 
-        # 토큰 추적 리셋 (전체 배치 시작 전)
-        if hasattr(llm, "reset_token_usage"):
-            llm.reset_token_usage()
+        async def worker(pair: tuple[TestCase, Any]):
+            test_case, sample = pair
+            started_at = datetime.now()
+            error: Exception | None = None
+            try:
+                scores = await self._score_single_sample(sample, ragas_metrics)
+            except Exception as exc:  # pragma: no cover - safe fallback
+                logger.warning(
+                    "Failed to evaluate test case '%s' in parallel mode: %s",
+                    test_case.id,
+                    exc,
+                )
+                scores = {metric.name: 0.0 for metric in ragas_metrics}
+                error = exc
+            finished_at = datetime.now()
+            latency_ms = int((finished_at - started_at).total_seconds() * 1000)
+            return (
+                test_case.id,
+                ParallelSampleOutcome(
+                    scores=scores,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    latency_ms=latency_ms,
+                    error=error,
+                ),
+            )
 
-        batch_start_time = datetime.now()
-
-        async def worker(sample):
-            return await self._score_single_sample(sample, ragas_metrics)
-
-        batched_scores = await run_in_batches(
-            ragas_samples,
+        batched_outcomes = await run_in_batches(
+            sample_pairs,
             worker=worker,
             batch_size=batch_size,
             return_exceptions=True,
         )
 
-        for test_case, scores_or_error in zip(dataset.test_cases, batched_scores, strict=True):
-            if isinstance(scores_or_error, Exception):
-                scores = {m.name: 0.0 for m in ragas_metrics}
-            else:
-                scores = scores_or_error
-
-            results[test_case.id] = TestCaseEvalResult(
-                scores=scores,
+        for outcome in batched_outcomes:
+            if isinstance(outcome, Exception):  # pragma: no cover - defensive
+                logger.error("Parallel evaluation batch failed: %s", outcome)
+                continue
+            test_case_id, sample_outcome = outcome
+            if sample_outcome.error:
+                logger.debug(
+                    "Parallel evaluation error for '%s': %s",
+                    test_case_id,
+                    sample_outcome.error,
+                )
+            results[test_case_id] = TestCaseEvalResult(
+                scores=sample_outcome.scores,
                 tokens_used=0,
                 prompt_tokens=0,
                 completion_tokens=0,
                 cost_usd=0.0,
-                started_at=batch_start_time,
-                finished_at=datetime.now(),
-                latency_ms=0,
+                started_at=sample_outcome.started_at,
+                finished_at=sample_outcome.finished_at,
+                latency_ms=sample_outcome.latency_ms,
             )
 
         # 전체 토큰 사용량 가져와서 테스트 케이스별로 평균 분배
@@ -405,13 +441,6 @@ class RagasEvaluator:
                     results[test_case_id].tokens_used = avg_tokens
                     results[test_case_id].prompt_tokens = avg_prompt
                     results[test_case_id].completion_tokens = avg_completion
-
-        # 레이턴시 계산 (전체 시간 / 테스트 케이스 수)
-        total_elapsed = (datetime.now() - batch_start_time).total_seconds() * 1000
-        if total_samples > 0:
-            avg_latency = int(total_elapsed / total_samples)
-            for test_case_id in results:
-                results[test_case_id].latency_ms = avg_latency
 
         return results
 

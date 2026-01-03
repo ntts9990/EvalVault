@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.domain.entities import Dataset, EvaluationRun
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
@@ -65,20 +66,34 @@ class MemoryAwareEvaluator:
     ) -> str:
         """Augment an existing context block with retrieved factual memories."""
 
-        facts = self._memory_port.search_facts(
-            query=question,
-            domain=domain,
-            language=language,
-            limit=limit,
-        )
+        with instrumentation_span(
+            "domain_memory.augment_context",
+            {
+                "domain_memory.domain": domain,
+                "domain_memory.language": language,
+                "domain_memory.limit": limit,
+            },
+        ) as span:
+            facts = self._memory_port.search_facts(
+                query=question,
+                domain=domain,
+                language=language,
+                limit=limit,
+            )
+            if span:
+                set_span_attributes(
+                    span,
+                    {
+                        "question.length": len(question or ""),
+                        "domain_memory.fact_count": len(facts),
+                    },
+                )
         if not facts:
             return original_context
 
         fact_rows = [f"- {fact.subject} {fact.predicate} {fact.object}" for fact in facts]
         header = "[관련 사실]\n" + "\n".join(fact_rows)
-        if not original_context:
-            return header
-        return f"{original_context}\n\n{header}"
+        return header if not original_context else f"{original_context}\n\n{header}"
 
     def _adjust_by_reliability(
         self,
