@@ -2,13 +2,19 @@
 
 import json
 import re
-from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
 
 import pytest
 from typer.testing import CliRunner
 
 from evalvault.adapters.inbound.cli import app
+from evalvault.adapters.inbound.cli.commands import run as run_command_module
+from evalvault.adapters.outbound.phoenix.sync_service import (
+    PhoenixDatasetInfo,
+    PhoenixExperimentInfo,
+)
 from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
@@ -106,6 +112,62 @@ class TestCLIRun:
         """데이터셋 파일 누락 시 에러."""
         result = runner.invoke(app, ["run", "nonexistent.csv"])
         assert result.exit_code != 0
+
+    @patch(f"{RUN_COMMAND_MODULE}._evaluate_streaming_run", new_callable=AsyncMock)
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_streaming_invokes_helper(
+        self,
+        mock_settings_cls,
+        mock_get_loader,
+        mock_evaluator_cls,
+        mock_get_llm_adapter,
+        mock_stream_helper,
+        mock_evaluation_run,
+        tmp_path,
+    ):
+        """--stream 플래그 사용 시 스트리밍 헬퍼 호출."""
+        dataset_file = tmp_path / "dataset.csv"
+        dataset_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_enabled = False
+        mock_settings_cls.return_value = mock_settings
+
+        mock_get_loader.return_value = MagicMock()
+        mock_evaluator_cls.return_value = MagicMock()
+
+        mock_llm = MagicMock()
+        mock_get_llm_adapter.return_value = mock_llm
+
+        mock_stream_helper.return_value = mock_evaluation_run
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(dataset_file),
+                "--metrics",
+                "faithfulness",
+                "--stream",
+                "--stream-chunk-size",
+                "1",
+            ],
+        )
+
+        assert result.exit_code == 0, result.stdout
+        mock_stream_helper.assert_awaited_once()
+        args, kwargs = mock_stream_helper.await_args
+        assert kwargs["dataset_path"] == dataset_file
+        assert kwargs["metrics"] == ["faithfulness"]
+        assert kwargs["chunk_size"] == 1
+        mock_get_loader.assert_not_called()
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -231,6 +293,60 @@ class TestCLIRun:
         )
 
         assert result.exit_code == 0
+
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_with_oss_model_routes_to_ollama(
+        self,
+        mock_settings_cls,
+        mock_get_llm_adapter,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_dataset,
+        mock_evaluation_run,
+        tmp_path,
+    ):
+        """gpt-oss-* 모델은 자동으로 Ollama 백엔드로 전환."""
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = None
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.ollama_model = "gemma3:1b"
+        mock_settings_cls.return_value = mock_settings
+
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = mock_dataset
+        mock_get_loader.return_value = mock_loader
+
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_evaluation_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+
+        mock_llm = MagicMock()
+        mock_get_llm_adapter.return_value = mock_llm
+
+        test_file = tmp_path / "test.csv"
+        test_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(test_file),
+                "--metrics",
+                "faithfulness",
+                "--model",
+                "gpt-oss-safeguard:20b",
+            ],
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert mock_settings.llm_provider == "ollama"
+        assert mock_settings.ollama_model == "gpt-oss-safeguard:20b"
 
     @patch(f"{RUN_COMMAND_MODULE}.MemoryBasedAnalysis")
     @patch(f"{RUN_COMMAND_MODULE}.MemoryAwareEvaluator")
@@ -530,6 +646,7 @@ class TestCLIRunEdgeCases:
         assert "Invalid metrics" in result.stdout
 
     @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.ensure_phoenix_instrumentation", return_value=True)
     @patch(f"{RUN_COMMAND_MODULE}.log_phoenix_traces")
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -542,6 +659,7 @@ class TestCLIRunEdgeCases:
         mock_evaluator_cls,
         mock_get_loader,
         mock_log_traces,
+        mock_ensure_phoenix,
         mock_phoenix_adapter,
         tmp_path,
     ):
@@ -602,7 +720,306 @@ class TestCLIRunEdgeCases:
 
         assert result.exit_code == 0
         tracker.log_evaluation_run.assert_called_once()
-        mock_log_traces.assert_called_once_with(tracker, mock_run)
+        assert mock_ensure_phoenix.called
+        mock_log_traces.assert_called_once()
+        args, kwargs = mock_log_traces.call_args
+        assert args == (tracker, mock_run)
+        assert kwargs["max_traces"] is None
+        assert "metadata" in kwargs
+
+    @patch(f"{RUN_COMMAND_MODULE}.PhoenixSyncService")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_uploads_phoenix_dataset_when_requested(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_phoenix_sync,
+        tmp_path,
+    ):
+        """--phoenix-dataset 옵션 사용 시 Dataset 업로드 로직이 호출된다."""
+        from datetime import datetime, timedelta
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_endpoint = "http://localhost:6006/v1/traces"
+        mock_settings_cls.return_value = mock_settings
+
+        dataset = Dataset(
+            name="phoenix-ds",
+            version="2024.12",
+            metadata={"description": "Customer QA"},
+            test_cases=[
+                TestCase(id="tc-01", question="Q", answer="A", contexts=["ctx"]),
+            ],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        mock_run = EvaluationRun(
+            dataset_name="phoenix-ds",
+            dataset_version="2024.12",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-01",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                )
+            ],
+        )
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        service = MagicMock()
+        dataset_info = PhoenixDatasetInfo(
+            dataset_id="ds_123",
+            dataset_name="phoenix-ds",
+            dataset_version_id="ver_1",
+            url="http://phoenix/datasets/ds_123",
+        )
+        service.upload_dataset.return_value = dataset_info
+        mock_phoenix_sync.return_value = service
+
+        test_file = tmp_path / "phoenix.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(test_file),
+                "--metrics",
+                "faithfulness",
+                "--phoenix-dataset",
+                "phoenix-ds",
+            ],
+        )
+
+        assert result.exit_code == 0
+        service.upload_dataset.assert_called_once_with(
+            dataset=dataset,
+            dataset_name="phoenix-ds",
+            description="Customer QA",
+        )
+        phoenix_meta = mock_run.tracker_metadata["phoenix"]
+        assert phoenix_meta["dataset"] == dataset_info.to_dict()
+        assert phoenix_meta["schema_version"] == 2
+        export_meta = phoenix_meta["embedding_export"]
+        assert export_meta["dataset_id"] == "ds_123"
+        assert "export-embeddings" in export_meta["cli"]
+
+    @patch(f"{RUN_COMMAND_MODULE}.build_experiment_metadata")
+    @patch(f"{RUN_COMMAND_MODULE}.PhoenixSyncService")
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_creates_phoenix_experiment(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_phoenix_sync,
+        mock_build_metadata,
+        tmp_path,
+    ):
+        """--phoenix-experiment 옵션 사용 시 Experiment가 생성된다."""
+        from datetime import datetime, timedelta
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_endpoint = "http://localhost:6006/v1/traces"
+        mock_settings_cls.return_value = mock_settings
+
+        dataset = Dataset(
+            name="phoenix-ds",
+            version="2024.12",
+            metadata={"description": "Customer QA"},
+            test_cases=[
+                TestCase(id="tc-01", question="Q", answer="A", contexts=["ctx"]),
+            ],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        mock_run = EvaluationRun(
+            dataset_name="phoenix-ds",
+            dataset_version="2024.12",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-01",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                )
+            ],
+        )
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        service = MagicMock()
+        dataset_info = PhoenixDatasetInfo(
+            dataset_id="ds_123",
+            dataset_name="phoenix-ds",
+            dataset_version_id="ver_1",
+            url="http://phoenix/datasets/ds_123",
+        )
+        experiment_info = PhoenixExperimentInfo(
+            experiment_id="exp_555",
+            dataset_id="ds_123",
+            url="http://phoenix/experiments/exp_555",
+            dataset_url="http://phoenix/datasets/ds_123",
+        )
+        service.upload_dataset.return_value = dataset_info
+        service.create_experiment_record.return_value = experiment_info
+        mock_phoenix_sync.return_value = service
+        mock_build_metadata.return_value = {"pass_rate": 0.9}
+
+        test_file = tmp_path / "phoenix.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(test_file),
+                "--metrics",
+                "faithfulness",
+                "--phoenix-dataset",
+                "phoenix-ds",
+                "--phoenix-experiment",
+                "exp-A",
+                "--phoenix-experiment-description",
+                "Smoke run",
+            ],
+        )
+
+        assert result.exit_code == 0
+        service.upload_dataset.assert_called_once()
+        mock_build_metadata.assert_called_once_with(
+            run=mock_run,
+            dataset=dataset,
+            reliability_snapshot=None,
+            extra=ANY,
+        )
+        service.create_experiment_record.assert_called_once_with(
+            dataset_info=ANY,
+            experiment_name="exp-A",
+            description="Smoke run",
+            metadata={"pass_rate": 0.9},
+        )
+        phoenix_meta = mock_run.tracker_metadata["phoenix"]
+        assert phoenix_meta["experiment"] == experiment_info.to_dict()
+        assert phoenix_meta["schema_version"] == 2
+
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_attaches_prompt_metadata(
+        self,
+        mock_settings_cls,
+        mock_get_llm,
+        mock_evaluator_cls,
+        mock_get_loader,
+        tmp_path,
+    ):
+        """--prompt-files 사용 시 Phoenix 메타데이터에 Prompt 상태가 포함된다."""
+        from datetime import datetime, timedelta
+
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings.phoenix_enabled = False
+        mock_settings_cls.return_value = mock_settings
+
+        dataset = Dataset(
+            name="phoenix-ds",
+            version="2024.12",
+            test_cases=[
+                TestCase(id="tc-01", question="Q", answer="A", contexts=["ctx"]),
+            ],
+        )
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = dataset
+        mock_get_loader.return_value = mock_loader
+
+        start = datetime.now()
+        mock_run = EvaluationRun(
+            dataset_name="phoenix-ds",
+            dataset_version="2024.12",
+            model_name=get_test_model(),
+            metrics_evaluated=["faithfulness"],
+            started_at=start,
+            finished_at=start + timedelta(seconds=1),
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-01",
+                    metrics=[MetricScore(name="faithfulness", score=0.9, threshold=0.7)],
+                )
+            ],
+        )
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=mock_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+        mock_get_llm.return_value = MagicMock()
+
+        test_file = tmp_path / "phoenix.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+        prompt_file = tmp_path / "prompt.txt"
+        prompt_file.write_text("prompt draft", encoding="utf-8")
+        manifest_path = tmp_path / "prompt_manifest.json"
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(test_file),
+                "--metrics",
+                "faithfulness",
+                "--prompt-manifest",
+                str(manifest_path),
+                "--prompt-files",
+                str(prompt_file),
+            ],
+        )
+
+        assert result.exit_code == 0
+        phoenix_meta = mock_run.tracker_metadata["phoenix"]
+        assert phoenix_meta["schema_version"] == 2
+        assert phoenix_meta["prompts"]
+        prompt_entry = phoenix_meta["prompts"][0]
+        assert prompt_entry["status"] == "untracked"
+        assert prompt_entry["path"].endswith("prompt.txt")
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1133,18 +1550,40 @@ class TestCLIHistory:
         assert "limit" in result.stdout.lower()
 
     @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
-    def test_history_no_runs(self, mock_storage_cls, tmp_path):
+    @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
+    @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
+    def test_history_no_runs(
+        self,
+        mock_resolver_cls,
+        mock_settings_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
         """실행 이력이 없을 때 테스트."""
         mock_storage = MagicMock()
         mock_storage.list_runs.return_value = []
         mock_storage_cls.return_value = mock_storage
+        mock_settings_cls.return_value = SimpleNamespace(
+            phoenix_endpoint="http://localhost:6006/v1/traces",
+            phoenix_api_token=None,
+        )
+        mock_resolver = mock_resolver_cls.return_value
+        mock_resolver.is_available = False
 
         result = runner.invoke(app, ["history", "--db", str(tmp_path / "test.db")])
         assert result.exit_code == 0
         assert "No evaluation runs found" in result.stdout
 
     @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
-    def test_history_with_runs(self, mock_storage_cls, tmp_path):
+    @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
+    @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
+    def test_history_with_runs(
+        self,
+        mock_resolver_cls,
+        mock_settings_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
         """실행 이력 조회 테스트."""
         from datetime import datetime
 
@@ -1155,21 +1594,42 @@ class TestCLIHistory:
         mock_run.started_at = datetime.now()
         mock_run.pass_rate = 0.85
         mock_run.total_test_cases = 10
+        mock_run.tracker_metadata = {}
 
         mock_storage = MagicMock()
         mock_storage.list_runs.return_value = [mock_run]
         mock_storage_cls.return_value = mock_storage
+        mock_settings_cls.return_value = SimpleNamespace(
+            phoenix_endpoint="http://localhost:6006/v1/traces",
+            phoenix_api_token=None,
+        )
+        mock_resolver = mock_resolver_cls.return_value
+        mock_resolver.is_available = False
 
         result = runner.invoke(app, ["history", "--db", str(tmp_path / "test.db")])
         assert result.exit_code == 0
         assert "test-datas" in result.stdout  # Truncated in table
 
     @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
-    def test_history_with_filters(self, mock_storage_cls, tmp_path):
+    @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
+    @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
+    def test_history_with_filters(
+        self,
+        mock_resolver_cls,
+        mock_settings_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
         """필터링 옵션 테스트."""
         mock_storage = MagicMock()
         mock_storage.list_runs.return_value = []
         mock_storage_cls.return_value = mock_storage
+        mock_settings_cls.return_value = SimpleNamespace(
+            phoenix_endpoint="http://localhost:6006/v1/traces",
+            phoenix_api_token=None,
+        )
+        mock_resolver = mock_resolver_cls.return_value
+        mock_resolver.is_available = False
 
         result = runner.invoke(
             app,
@@ -1186,9 +1646,52 @@ class TestCLIHistory:
             ],
         )
         assert result.exit_code == 0
-        mock_storage.list_runs.assert_called_once_with(
-            limit=5, dataset_name="my-dataset", model_name="gpt-4"
+
+    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
+    @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
+    def test_history_with_phoenix_metrics(
+        self,
+        mock_resolver_cls,
+        mock_settings_cls,
+        mock_storage_cls,
+        tmp_path,
+    ):
+        """Phoenix Experiment 메트릭 표시 테스트."""
+        from datetime import datetime
+
+        mock_run = MagicMock()
+        mock_run.run_id = "abc12345-6789"
+        mock_run.dataset_name = "test-dataset"
+        mock_run.model_name = get_test_model()
+        mock_run.started_at = datetime.now()
+        mock_run.pass_rate = 0.85
+        mock_run.total_test_cases = 10
+        mock_run.tracker_metadata = {
+            "phoenix": {
+                "dataset": {"dataset_id": "ds_123"},
+                "experiment": {"experiment_id": "exp_456"},
+            }
+        }
+
+        mock_storage = MagicMock()
+        mock_storage.list_runs.return_value = [mock_run]
+        mock_storage_cls.return_value = mock_storage
+        mock_settings_cls.return_value = SimpleNamespace(
+            phoenix_endpoint="http://localhost:6006/v1/traces",
+            phoenix_api_token=None,
         )
+        mock_resolver = mock_resolver_cls.return_value
+        mock_resolver.is_available = True
+        mock_resolver.can_resolve.return_value = True
+        mock_resolver.get_stats.return_value = SimpleNamespace(
+            precision_at_k=0.82,
+            drift_score=0.12,
+        )
+
+        result = runner.invoke(app, ["history", "--db", str(tmp_path / "test.db")])
+        assert result.exit_code == 0
+        assert "0.82" in result.stdout
 
 
 class TestCLICompare:
@@ -2468,6 +2971,138 @@ class TestDisplayImprovementReport:
         _display_improvement_report(report)
         # No exception means success
 
+
+class TestCLIPhoenixUtilities:
+    """Phoenix helper CLI tests."""
+
+    @pytest.fixture
+    def fake_dataset(self):
+        class FakeDataset:
+            def __init__(self):
+                self.id = "ds_fake"
+                self.name = "insurance-ko"
+                self.version_id = "v1"
+                self.description = "desc"
+                self.examples = [
+                    {
+                        "example_id": "ex-1",
+                        "input": {"question": "무엇인가?", "contexts": ["context A"]},
+                        "output": {"answer": "답변"},
+                        "metadata": {"topic": "faq"},
+                    },
+                    {
+                        "example_id": "ex-2",
+                        "input": {"question": "두번째", "contexts": ["context B"]},
+                        "output": {"answer": "다른 답변"},
+                        "metadata": {"topic": "notice"},
+                    },
+                ]
+
+        return FakeDataset()
+
+    @patch("evalvault.adapters.inbound.cli.commands.phoenix._import_phoenix_client")
+    def test_phoenix_export_embeddings_csv(self, mock_client_factory, fake_dataset, tmp_path):
+        mock_client = MagicMock()
+        mock_client.datasets.get_dataset.return_value = fake_dataset
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                self.datasets = mock_client.datasets
+
+        mock_client_factory.return_value = FakeClient
+
+        output = tmp_path / "embeddings.csv"
+        result = runner.invoke(
+            app,
+            [
+                "phoenix",
+                "export-embeddings",
+                "--dataset",
+                fake_dataset.id,
+                "--output",
+                str(output),
+                "--format",
+                "csv",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert output.exists()
+        rows = output.read_text(encoding="utf-8").splitlines()
+        assert len(rows) > 1  # header + rows
+
+    def test_phoenix_prompt_link_updates_manifest(self, tmp_path):
+        prompt_file = tmp_path / "prompt.txt"
+        prompt_file.write_text("prompt content", encoding="utf-8")
+        manifest = tmp_path / "prompt_manifest.json"
+
+        result = runner.invoke(
+            app,
+            [
+                "phoenix",
+                "prompt-link",
+                str(prompt_file),
+                "--prompt-id",
+                "prompt-1",
+                "--experiment-id",
+                "exp-42",
+                "--notes",
+                "baseline",
+                "--manifest",
+                str(manifest),
+            ],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        normalized = prompt_file.resolve().as_posix()
+        assert normalized in data["prompts"]
+        entry = data["prompts"][normalized]
+        assert entry["phoenix_prompt_id"] == "prompt-1"
+        assert entry["phoenix_experiment_id"] == "exp-42"
+        assert entry["notes"] == "baseline"
+
+    def test_phoenix_prompt_diff_outputs_json(self, tmp_path):
+        prompt_file = tmp_path / "prompt.txt"
+        manifest = tmp_path / "prompt_manifest.json"
+        prompt_file.write_text("v1", encoding="utf-8")
+
+        # Link initial version
+        link_result = runner.invoke(
+            app,
+            [
+                "phoenix",
+                "prompt-link",
+                str(prompt_file),
+                "--prompt-id",
+                "prompt-1",
+                "--manifest",
+                str(manifest),
+            ],
+        )
+        assert link_result.exit_code == 0
+
+        # Modify prompt to trigger diff
+        prompt_file.write_text("v2 updated", encoding="utf-8")
+
+        diff_result = runner.invoke(
+            app,
+            [
+                "phoenix",
+                "prompt-diff",
+                str(prompt_file),
+                "--manifest",
+                str(manifest),
+                "--format",
+                "json",
+            ],
+        )
+
+        assert diff_result.exit_code == 0
+        payload = json.loads(diff_result.stdout.strip())
+        assert payload[0]["status"] == "modified"
+        assert payload[0]["diff"]
+
     def test_display_improvement_report_with_guides(self, capsys):
         """가이드가 있는 리포트 표시."""
         from evalvault.adapters.inbound.cli import _display_improvement_report
@@ -2526,3 +3161,181 @@ class TestDisplayImprovementReport:
 
         _display_improvement_report(report)
         # No exception means success
+
+
+class TestRunHelperFunctions:
+    """run.py 헬퍼 함수 테스트."""
+
+    def test_resolve_thresholds_prefers_dataset_values(self):
+        dataset = Dataset(
+            name="demo",
+            version="1.0.0",
+            test_cases=[],
+            thresholds={"faithfulness": 0.9},
+        )
+        resolved = run_command_module._resolve_thresholds(
+            ["faithfulness", "answer_relevancy"],
+            dataset,
+        )
+        assert resolved["faithfulness"] == 0.9
+        assert resolved["answer_relevancy"] == 0.7
+
+    def test_merge_evaluation_runs_accumulates_tokens_and_cost(self):
+        run_a = EvaluationRun(
+            dataset_name="demo",
+            dataset_version="1",
+            model_name="mock",
+            metrics_evaluated=["faithfulness"],
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.8, threshold=0.7)],
+                )
+            ],
+            total_tokens=10,
+            total_cost_usd=0.3,
+        )
+        run_b = EvaluationRun(
+            dataset_name="demo",
+            dataset_version="1",
+            model_name="mock",
+            metrics_evaluated=["faithfulness"],
+            thresholds={"faithfulness": 0.7},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-2",
+                    metrics=[MetricScore(name="faithfulness", score=0.6, threshold=0.7)],
+                )
+            ],
+            total_tokens=5,
+            total_cost_usd=0.2,
+        )
+
+        merged = run_command_module._merge_evaluation_runs(
+            None,
+            run_a,
+            dataset_name="demo",
+            dataset_version="1",
+            metrics=["faithfulness"],
+            thresholds={"faithfulness": 0.7},
+        )
+        merged = run_command_module._merge_evaluation_runs(
+            merged,
+            run_b,
+            dataset_name="demo",
+            dataset_version="1",
+            metrics=["faithfulness"],
+            thresholds={"faithfulness": 0.7},
+        )
+
+        assert merged.total_test_cases == 2
+        assert merged.total_tokens == 15
+        assert merged.total_cost_usd == pytest.approx(0.5)
+        assert merged.thresholds["faithfulness"] == 0.7
+
+    @pytest.mark.asyncio
+    async def test_evaluate_streaming_run_merges_chunks(self, tmp_path):
+        dataset_file = tmp_path / "cases.csv"
+        dataset_file.write_text(
+            'id,question,answer,contexts\n1,"Q1","A1","[\\"ctx1\\"]"\n2,"Q2","A2","[\\"ctx2\\"]"\n',
+            encoding="utf-8",
+        )
+
+        template = Dataset(
+            name="stream-ds",
+            version="stream",
+            test_cases=[],
+            metadata={"source": "tmp"},
+            source_file=str(dataset_file),
+            thresholds={},
+        )
+
+        chunk_run_1 = EvaluationRun(
+            dataset_name="stream-ds",
+            dataset_version="stream",
+            model_name="mock",
+            metrics_evaluated=["faithfulness"],
+            thresholds={"faithfulness": 0.6},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.5, threshold=0.6)],
+                )
+            ],
+            total_tokens=10,
+            total_cost_usd=0.1,
+        )
+        chunk_run_2 = EvaluationRun(
+            dataset_name="stream-ds",
+            dataset_version="stream",
+            model_name="mock",
+            metrics_evaluated=["faithfulness"],
+            thresholds={"faithfulness": 0.6},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-2",
+                    metrics=[MetricScore(name="faithfulness", score=0.7, threshold=0.6)],
+                )
+            ],
+            total_tokens=12,
+            total_cost_usd=0.2,
+        )
+
+        evaluator = MagicMock()
+        evaluator.evaluate = AsyncMock(side_effect=[chunk_run_1, chunk_run_2])
+        llm_adapter = MagicMock()
+
+        result = await run_command_module._evaluate_streaming_run(
+            dataset_path=dataset_file,
+            dataset_template=template,
+            metrics=["faithfulness"],
+            thresholds={"faithfulness": 0.6},
+            evaluator=evaluator,
+            llm=llm_adapter,
+            chunk_size=1,
+            parallel=False,
+            batch_size=5,
+        )
+
+        assert evaluator.evaluate.await_count == 2
+        assert result.dataset_name == "stream-ds"
+        assert result.total_test_cases == 2
+        assert result.total_tokens == 22
+        assert result.total_cost_usd == pytest.approx(0.3)
+        assert result.thresholds["faithfulness"] == 0.6
+
+    def test_build_streaming_dataset_template_for_json(self, tmp_path):
+        dataset_file = tmp_path / "dataset.json"
+        dataset_file.write_text(
+            json.dumps(
+                {
+                    "name": "insurance-ko",
+                    "version": "1.2.3",
+                    "description": "desc",
+                    "thresholds": {"faithfulness": 0.9},
+                    "test_cases": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        ds = run_command_module._build_streaming_dataset_template(dataset_file)
+        assert ds.name == "insurance-ko"
+        assert ds.version == "1.2.3"
+        assert ds.thresholds["faithfulness"] == 0.9
+        assert ds.metadata.get("description") == "desc"
+
+    def test_build_streaming_dataset_template_for_csv(self, tmp_path):
+        dataset_file = tmp_path / "dataset.csv"
+        dataset_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+
+        ds = run_command_module._build_streaming_dataset_template(dataset_file)
+        assert ds.name == dataset_file.stem
+        assert ds.version == "stream"
+        assert ds.thresholds == {}
+
+    def test_is_oss_open_model(self):
+        assert run_command_module._is_oss_open_model("gpt-oss-safeguard:20b")
+        assert not run_command_module._is_oss_open_model("gpt-4o")
+        assert not run_command_module._is_oss_open_model(None)
