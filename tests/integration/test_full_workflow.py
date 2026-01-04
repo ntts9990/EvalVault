@@ -222,6 +222,7 @@ class TestFullWorkflow:
         except ValueError as e:
             print(f"  ⚠ Embeddings not available: {e}")
 
+    @pytest.mark.slow
     @pytest.mark.requires_openai
     async def test_03_ragas_evaluation(self, sample_dataset_json, settings, storage):
         """3. Ragas 평가 테스트 (실제 API 사용)."""
@@ -329,6 +330,7 @@ class TestFullWorkflow:
 
         TestFullWorkflow._kg_result = kg
 
+    @pytest.mark.slow
     @pytest.mark.requires_langfuse
     async def test_05_langfuse_tracking(self, sample_dataset_json, settings):
         """5. Langfuse 트래킹 테스트."""

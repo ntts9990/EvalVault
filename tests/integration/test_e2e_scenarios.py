@@ -481,6 +481,7 @@ class TestRealEvaluationE2E(TestE2EFixturePaths):
     이 테스트는 OPENAI_API_KEY가 설정되어 있을 때만 실행됩니다.
     """
 
+    @pytest.mark.slow
     @pytest.mark.requires_openai
     async def test_real_evaluation_korean_dataset(self, korean_json, e2e_results_db):
         """실제 OpenAI API를 사용한 한국어 데이터셋 평가.
@@ -518,6 +519,7 @@ class TestRealEvaluationE2E(TestE2EFixturePaths):
         run_id = e2e_results_db.save_run(run)
         print(f"\n  [Korean] Saved run: {run_id} | Pass rate: {run.pass_rate:.1%}")
 
+    @pytest.mark.slow
     @pytest.mark.requires_openai
     async def test_real_evaluation_english_dataset(self, english_json, e2e_results_db):
         """실제 OpenAI API를 사용한 영어 데이터셋 평가.
@@ -546,6 +548,7 @@ class TestRealEvaluationE2E(TestE2EFixturePaths):
         run_id = e2e_results_db.save_run(run)
         print(f"\n  [English] Saved run: {run_id} | Pass rate: {run.pass_rate:.1%}")
 
+    @pytest.mark.slow
     @pytest.mark.requires_openai
     async def test_real_evaluation_with_storage(self, korean_json, e2e_results_db):
         """실제 평가 후 영구 저장소에 저장.

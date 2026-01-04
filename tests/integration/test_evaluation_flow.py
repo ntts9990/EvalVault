@@ -188,6 +188,7 @@ class TestRealEvaluationFlow:
             ],
         )
 
+    @pytest.mark.slow
     @pytest.mark.requires_openai
     @pytest.mark.asyncio
     async def test_real_evaluation_faithfulness(self, small_dataset):
