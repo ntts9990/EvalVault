@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 
 from evalvault.domain.entities import Dataset, EvaluationRun
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.outbound.domain_memory_port import MemoryInsightPort
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.tracer_port import TracerPort
 
@@ -36,6 +37,9 @@ class MemoryAwareEvaluator:
         thresholds: Mapping[str, float] | None = None,
         parallel: bool = False,
         batch_size: int = 5,
+        retriever: RetrieverPort | None = None,
+        retriever_top_k: int = 5,
+        retriever_doc_ids: Sequence[str] | None = None,
     ) -> EvaluationRun:
         """Run evaluation after adjusting thresholds with memory reliability."""
 
@@ -56,6 +60,9 @@ class MemoryAwareEvaluator:
             thresholds=adjusted_thresholds,
             parallel=parallel,
             batch_size=batch_size,
+            retriever=retriever,
+            retriever_top_k=retriever_top_k,
+            retriever_doc_ids=retriever_doc_ids,
         )
 
     def augment_context_with_facts(

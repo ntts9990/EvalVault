@@ -115,6 +115,21 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 - GraphRAG 확장 attributes: `graph_nodes`, `graph_edges`, `subgraph_size`, `community_id`
 - span attributes: `retriever.graphrag.*` (예: `retriever.graphrag.search_ms`)
 
+예시 (graphrag-smoke / test_case_id: graphrag-001):
+
+```json
+{
+  "doc_ids": ["doc-001", "doc-002"],
+  "top_k": 5,
+  "scores": [0.016353781068217874, 0.01616869381279746],
+  "retrieval_time_ms": 1415.9693329129368,
+  "graph_nodes": 2,
+  "graph_edges": 1,
+  "subgraph_size": 3,
+  "community_id": null
+}
+```
+
 StageEvent는 DB 저장 및 JSONL로 추출되며, Phoenix/Langfuse 트레이스와 연결됩니다.
 
 ## 5. 성능/품질 튜닝 포인트

@@ -99,14 +99,17 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         """Apply schema migrations for legacy databases."""
         cursor = conn.execute(
             """
-            SELECT 1
+            SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'evaluation_runs'
-              AND column_name = 'metadata'
+              AND column_name IN ('metadata', 'retrieval_metadata')
             """
         )
-        if cursor.fetchone() is None:
+        columns = {row[0] for row in cursor.fetchall()}
+        if "metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata JSONB")
+        if "retrieval_metadata" not in columns:
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata JSONB")
 
     # Experiment 관련 메서드
 

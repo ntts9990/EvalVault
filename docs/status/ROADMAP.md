@@ -366,11 +366,13 @@ evalvault kg build documents/ \
 ```
 
 **작업 항목**:
-- [ ] `ParallelKGBuilder` 구현 (ProcessPoolExecutor)
-- [ ] FAISS 벡터 인덱스 통합 (optional dependency)
-- [ ] 스트리밍 KG 구축 (메모리 효율)
-- [ ] 배치 임베딩 최적화 (GPU 지원)
-- [ ] 진행률 표시 개선 (Rich progress bar)
+- [x] `ParallelKGBuilder` 구현 (ProcessPoolExecutor)
+- [x] FAISS 벡터 인덱스 통합 (optional dependency)
+- [x] 스트리밍 KG 구축 (메모리 효율)
+- [x] 배치 임베딩 최적화 (GPU 지원)
+- [x] 진행률 표시 개선 (Rich progress bar)
+- [x] `evalvault kg build` CLI 명령어 추가
+- [x] pyproject.toml에 `perf` extra 추가 (faiss-cpu, ijson)
 
 **구체 계획 (병렬)**:
 - Track A: 병렬 KG 구축
@@ -387,6 +389,17 @@ evalvault kg build documents/ \
 - 1000건 문서 기준 KG 구축 시간/메모리 지표 개선
 - 동일 데이터셋에서 성능 저하 없이 평가 수행
 
+**완료 체크리스트 (보고서용)**:
+- [x] `ParallelKGBuilder` 구현 (병렬 엔티티 추출, 배치 처리)
+- [x] Dense retriever 배치 자동 튜닝 및 FAISS CPU/GPU 자동 선택
+- [x] ijson 스트리밍 JSON 로더 경로 추가
+- [x] `evalvault kg build` CLI 명령어 추가
+  - 옵션: `--workers`, `--batch-size`, `--output`, `--store-documents`, `--verbose`
+  - ParallelKGBuilder 연결 및 Rich 테이블 출력
+- [x] pyproject.toml에 `perf` optional extra 추가 (`faiss-cpu>=1.8.0`, `ijson>=3.3.0`)
+- [x] 테스트 추가 (7개 kg build 테스트)
+- [x] 완료 보고서: `docs/internal/reports/R3_PROGRESS_REPORT.md` (중간 완료 → 완료로 갱신 필요)
+
 ---
 
 ### R4: 하이브리드 서치 효과 벤치마크 도구 (1주)
@@ -401,6 +414,7 @@ evalvault kg build documents/ \
 ```
 1. 검색 품질
    - Recall@K (K=5, 10, 20)
+   - Precision@K (K=5, 10, 20)
    - MRR (Mean Reciprocal Rank)
    - nDCG@10
 
@@ -433,6 +447,7 @@ evalvault benchmark retrieval insurance_docs/ \
 │ 메트릭          │ BM25    │ Dense   │ Hybrid  │ GraphRAG    │
 ├─────────────────┼─────────┼─────────┼─────────┼─────────────┤
 │ Recall@5        │ 0.72    │ 0.78    │ 0.89    │ 0.91        │
+│ Precision@5     │ 0.32    │ 0.35    │ 0.41    │ 0.43        │
 │ MRR             │ 0.65    │ 0.71    │ 0.82    │ 0.85        │
 │ nDCG@10         │ 0.68    │ 0.74    │ 0.86    │ 0.88        │
 │ 보험용어 매칭   │ 0.95    │ 0.62    │ 0.91    │ 0.93        │
@@ -467,7 +482,7 @@ evalvault benchmark retrieval insurance_docs/ \
 
 **검증 지표**:
 - 출력 JSON에 `methods_compared`, `results`, `overall` 필드 포함
-- 최소 3개 메트릭(Recall@K, MRR, nDCG@K) 계산
+- 최소 4개 메트릭(Precision@K, Recall@K, MRR, nDCG@K) 계산
 - 동일 입력에서 재실행 시 결과 포맷 불변(스키마 안정성)
 
 ---

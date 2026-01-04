@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS evaluation_runs (
     thresholds TEXT,  -- JSON object of metric thresholds
     langfuse_trace_id TEXT,
     metadata TEXT,  -- Tracker metadata (Phoenix, Langfuse, etc.)
+    retrieval_metadata TEXT,  -- Retrieval metadata by test case
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

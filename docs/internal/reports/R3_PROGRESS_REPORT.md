@@ -1,16 +1,18 @@
-# R3 중간 완료 보고서
+# R3 완료 보고서
 
-> 업데이트: 2026-01-07
+> 업데이트: 2026-01-04
 > 범위: R3 1000건 대규모 문서 처리 최적화 (Track D 중심)
 
 ---
 
-## 1. 완료 요약 (중간 완료)
+## 1. 완료 요약
 
 - 병렬/배치 기반 KG 구축 모듈 추가로 대용량 처리 경로 확보
 - Dense retriever에 배치 자동 튜닝 및 FAISS CPU/GPU 자동 선택 로직 적용
 - JSON 스트리밍 로더에 ijson 경로 추가(설치 시 진짜 스트리밍 파싱)
 - R3 스모크 스크립트 + JSONL 로그 포맷 확정 및 실측 저장 완료
+- **`evalvault kg build` CLI 명령 추가** (ParallelKGBuilder 연결)
+- **`pyproject.toml`에 `perf` optional extra 추가** (`faiss-cpu`, `ijson`)
 
 ---
 
@@ -34,6 +36,14 @@
   - 성능 attributes pass-through (`index_build_time_ms`, `batch_size` 등)
 - Langfuse 메타데이터 보강: `src/evalvault/adapters/outbound/tracker/langfuse_adapter.py`
   - trace_id/trace_url를 `tracker_metadata`와 `langfuse_trace_id`에 저장
+- **CLI 명령 추가**: `src/evalvault/adapters/inbound/cli/commands/kg.py`
+  - `evalvault kg build` 명령으로 ParallelKGBuilder 연결
+  - 옵션: `--output`, `--workers`, `--batch-size`, `--store-documents`, `--verbose`
+  - Rich 테이블로 빌드 결과 통계 출력
+  - JSON 파일 저장 지원 (`--output`)
+- **pyproject.toml 확장**: `pyproject.toml`
+  - `perf` optional extra 추가: `faiss-cpu>=1.8.0`, `ijson>=3.3.0`
+  - 설치: `uv sync --extra perf`
 
 ---
 
@@ -55,6 +65,7 @@
 - `uv run pytest tests/unit/adapters/outbound/kg/test_parallel_kg_builder.py -v`
 - `uv run pytest tests/unit/test_korean_dense.py -v`
 - `uv run pytest tests/unit/test_streaming_loader.py -v`
+- `uv run pytest tests/unit/test_cli.py -k "kg_build" -v` (7 tests: help, basic, output, workers, verbose, empty, directory)
 
 ### 3.3 evalvault run 기반 샘플 (DB/리포트)
 
@@ -106,11 +117,11 @@
 
 ---
 
-## 4. 조율 필요/후속 항목
+## 4. 후속 항목 (R3 범위 외)
 
-- CLI 연결(수정 금지 영역): `evalvault kg build`에 ParallelKGBuilder 연결 필요
-- 공유 파일: `pyproject.toml`에 `faiss-cpu`, `ijson` optional extra 반영 필요
-- CUDA 환경 검증: macOS 환경 제약으로 FAISS GPU 실검증은 보류
+- ~~CLI 연결: `evalvault kg build`에 ParallelKGBuilder 연결 필요~~ ✅ 완료
+- ~~공유 파일: `pyproject.toml`에 `faiss-cpu`, `ijson` optional extra 반영 필요~~ ✅ 완료
+- CUDA 환경 검증: macOS 환경 제약으로 FAISS GPU 실검증은 보류 (Linux/CUDA 환경에서 후속 검증)
 - Langfuse trace_url/CLI 표시 연동은 P4.1 이후 CLI/로깅 조율 필요
 - R2 GraphRAG 최적화 경로는 R2 완료 이후 연동 예정
 

@@ -316,6 +316,7 @@ class TestPostgreSQLStorageAdapter:
                 "thresholds": '{"faithfulness": 0.7}',
                 "langfuse_trace_id": "trace-123",
                 "metadata": '{"phoenix":{"prompts":[{"path":"agent/prompts/baseline.txt","status":"missing_file"}]}}',
+                "retrieval_metadata": None,
             },
             None,  # End of test_case_results
         ]
@@ -374,6 +375,7 @@ class TestPostgreSQLStorageAdapter:
             "thresholds": '{"faithfulness": 0.7}',
             "langfuse_trace_id": "trace-123",
             "metadata": None,
+            "retrieval_metadata": None,
         }
 
         # Mock test case results and metrics

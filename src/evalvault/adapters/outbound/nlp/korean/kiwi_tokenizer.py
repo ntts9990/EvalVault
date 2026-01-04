@@ -12,7 +12,13 @@ Example:
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
+import platform
+import sys
+import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,6 +33,42 @@ if TYPE_CHECKING:
     from kiwipiepy import Kiwi
 
 logger = logging.getLogger(__name__)
+
+_KIWI_NEON_QUANT_WARNING = "Quantization is not supported for ArchType::neon"
+
+
+def _should_suppress_kiwi_quant_warning(model_type: str | None) -> bool:
+    machine = platform.machine().lower()
+    if "arm" not in machine and "aarch" not in machine:
+        return False
+    return model_type not in {"knlm", "sbg"}
+
+
+@contextlib.contextmanager
+def _suppress_kiwi_quant_warning(model_type: str | None) -> Iterator[None]:
+    if not _should_suppress_kiwi_quant_warning(model_type):
+        yield
+        return
+    try:
+        stderr_fd = sys.stderr.fileno()
+    except (AttributeError, OSError):
+        yield
+        return
+    saved_fd = os.dup(stderr_fd)
+    with tempfile.TemporaryFile(mode="w+t") as temp:
+        os.dup2(temp.fileno(), stderr_fd)
+        try:
+            yield
+        finally:
+            os.dup2(saved_fd, stderr_fd)
+            os.close(saved_fd)
+            temp.seek(0)
+            output = temp.read()
+    if output:
+        filtered = [line for line in output.splitlines() if _KIWI_NEON_QUANT_WARNING not in line]
+        if filtered:
+            sys.stderr.write("\n".join(filtered) + "\n")
+            sys.stderr.flush()
 
 
 @dataclass
@@ -104,6 +146,7 @@ class KiwiTokenizer:
         min_token_length: int = 1,
         user_dict_path: str | Path | None = None,
         num_workers: int = 0,
+        model_type: str | None = None,
     ):
         """KiwiTokenizer 초기화.
 
@@ -116,6 +159,7 @@ class KiwiTokenizer:
             min_token_length: 최소 토큰 길이
             user_dict_path: 사용자 사전 경로 (TSV 형식)
             num_workers: 병렬 처리 워커 수 (0=자동)
+            model_type: Kiwi 모델 타입 (cong, cong-global 등)
         """
         self.remove_particles = remove_particles
         self.remove_endings = remove_endings
@@ -128,6 +172,7 @@ class KiwiTokenizer:
         self._user_dict_path = Path(user_dict_path) if user_dict_path else None
         # num_workers: -1=single thread, 0=auto (deprecated), >0=specific count
         self._num_workers = num_workers if num_workers != 0 else -1
+        self._model_type = model_type
 
     @property
     def kiwi(self) -> Kiwi:
@@ -146,7 +191,8 @@ class KiwiTokenizer:
                 "'uv add kiwipiepy' 또는 'pip install kiwipiepy'로 설치하세요."
             ) from e
 
-        kiwi = Kiwi(num_workers=self._num_workers)
+        with _suppress_kiwi_quant_warning(self._model_type):
+            kiwi = Kiwi(num_workers=self._num_workers, model_type=self._model_type)
 
         # 사용자 사전 로드
         if self._user_dict_path and self._user_dict_path.exists():

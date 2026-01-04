@@ -1,6 +1,7 @@
 """Tests for Ragas evaluator service."""
 
 import asyncio
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -109,6 +110,60 @@ class TestRagasEvaluator:
             assert result.total_tokens == 270  # 150 + 120
             assert result.results[0].tokens_used == 150
             assert result.results[1].tokens_used == 120
+
+    @pytest.mark.asyncio
+    async def test_evaluate_applies_retriever_when_contexts_empty(self, mock_llm):
+        """빈 컨텍스트에 대해 retriever가 적용되는지 확인."""
+
+        @dataclass(frozen=True)
+        class DummyRetrievalResult:
+            document: str
+            doc_id: int
+            score: float
+
+        class DummyRetriever:
+            def __init__(self) -> None:
+                self.calls: list[str] = []
+
+            def search(self, query: str, top_k: int = 5):
+                self.calls.append(query)
+                return [
+                    DummyRetrievalResult(document="컨텍스트 A", doc_id=0, score=0.9),
+                    DummyRetrievalResult(document="컨텍스트 B", doc_id=1, score=0.8),
+                ][:top_k]
+
+        dataset = Dataset(
+            name="retriever-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(id="tc-1", question="Q1", answer="A1", contexts=[]),
+                TestCase(id="tc-2", question="Q2", answer="A2", contexts=["existing"]),
+            ],
+        )
+        evaluator = RagasEvaluator()
+        retriever = DummyRetriever()
+        mock_results = {
+            "tc-1": TestCaseEvalResult(scores={"faithfulness": 0.9}),
+            "tc-2": TestCaseEvalResult(scores={"faithfulness": 0.8}),
+        }
+
+        with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
+            mock_eval.return_value = mock_results
+
+            result = await evaluator.evaluate(
+                dataset=dataset,
+                metrics=["faithfulness"],
+                llm=mock_llm,
+                retriever=retriever,
+                retriever_top_k=2,
+                retriever_doc_ids=["doc-1", "doc-2"],
+            )
+
+        assert retriever.calls == ["Q1"]
+        assert dataset.test_cases[0].contexts
+        assert dataset.test_cases[1].contexts == ["existing"]
+        assert result.retrieval_metadata["tc-1"]["doc_ids"] == ["doc-1", "doc-2"]
+        assert "tc-2" not in result.retrieval_metadata
 
     @pytest.mark.asyncio
     async def test_evaluate_aggregates_scores_correctly(self, sample_dataset, mock_llm, thresholds):

@@ -68,7 +68,7 @@
   - `tests/fixtures/e2e/graphrag_smoke.json`
   - `tests/fixtures/e2e/graphrag_retriever_docs.json`
 - 요청 사항
-  - 확장 attributes 예시 (`graph_nodes/graph_edges/community_id/subgraph_size`)
+  - 확장 attributes 예시 문서화 완료 (`graph_nodes/graph_edges/community_id/subgraph_size`)
 
 참고 문서: `docs/internal/reports/R2_COMPLETION_REPORT.md`
 
