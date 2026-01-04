@@ -529,6 +529,93 @@ class TestKGCLI:
         data = json.loads(report.read_text(encoding="utf-8"))
         assert data["type"] == "kg_stats_report"
 
+    def test_kg_build_help(self):
+        """kg build help 출력."""
+        result = runner.invoke(app, ["kg", "build", "--help"])
+        assert result.exit_code == 0
+        assert "--workers" in result.stdout or "-w" in result.stdout
+        assert "--batch-size" in result.stdout or "-b" in result.stdout
+        assert "--output" in result.stdout or "-o" in result.stdout
+
+    def test_kg_build_runs_on_text_file(self, tmp_path):
+        """간단한 텍스트 파일로 kg build 실행."""
+        sample_file = tmp_path / "doc.txt"
+        sample_file.write_text("삼성생명의 종신보험은 사망보험금을 보장합니다.", encoding="utf-8")
+
+        result = runner.invoke(app, ["kg", "build", str(sample_file)])
+
+        assert result.exit_code == 0
+        assert "KG Build Summary" in result.stdout
+        assert "Documents Processed" in result.stdout
+
+    def test_kg_build_with_output(self, tmp_path):
+        """--output 옵션으로 JSON 저장."""
+        sample_file = tmp_path / "doc.txt"
+        sample_file.write_text("삼성생명의 종신보험은 사망보험금을 보장합니다.", encoding="utf-8")
+        output = tmp_path / "kg_result.json"
+
+        result = runner.invoke(
+            app,
+            ["kg", "build", str(sample_file), "--output", str(output)],
+        )
+
+        assert result.exit_code == 0
+        assert output.exists()
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["type"] == "kg_build_result"
+        assert "stats" in data
+        assert "graph" in data
+
+    def test_kg_build_with_workers_and_batch(self, tmp_path):
+        """--workers, --batch-size 옵션 전달."""
+        sample_file = tmp_path / "doc.txt"
+        sample_file.write_text("삼성생명의 종신보험은 사망보험금을 보장합니다.", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["kg", "build", str(sample_file), "--workers", "2", "--batch-size", "16"],
+        )
+
+        assert result.exit_code == 0
+        assert "workers=2" in result.stdout
+        assert "batch_size=16" in result.stdout
+
+    def test_kg_build_verbose(self, tmp_path):
+        """--verbose 옵션으로 상세 진행 출력."""
+        sample_file = tmp_path / "doc.txt"
+        sample_file.write_text("삼성생명의 종신보험은 사망보험금을 보장합니다.", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["kg", "build", str(sample_file), "--verbose"],
+        )
+
+        assert result.exit_code == 0
+        # verbose 모드에서는 Chunk 진행 상황이 출력됨
+        assert "Chunk" in result.stdout or "KG Build Summary" in result.stdout
+
+    def test_kg_build_empty_file(self, tmp_path):
+        """빈 파일에서 에러 처리."""
+        empty_file = tmp_path / "empty.txt"
+        empty_file.write_text("", encoding="utf-8")
+
+        result = runner.invoke(app, ["kg", "build", str(empty_file)])
+
+        assert result.exit_code == 1
+        assert "Error" in result.stdout
+
+    def test_kg_build_directory(self, tmp_path):
+        """디렉터리에서 여러 파일 처리."""
+        doc1 = tmp_path / "doc1.txt"
+        doc2 = tmp_path / "doc2.txt"
+        doc1.write_text("삼성생명의 종신보험은 사망보험금을 보장합니다.", encoding="utf-8")
+        doc2.write_text("현대해상의 자동차보험은 사고 시 보상합니다.", encoding="utf-8")
+
+        result = runner.invoke(app, ["kg", "build", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "2 documents" in result.stdout
+
 
 class TestCLIConfig:
     """CLI config 명령 테스트."""

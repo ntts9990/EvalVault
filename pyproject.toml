@@ -112,6 +112,10 @@ web = [
     "plotly>=5.18.0",
     "watchdog>=3.0.0",                # Hot reload for Streamlit
 ]
+perf = [
+    "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)
+    "ijson>=3.3.0",                   # JSON 스트리밍 파싱 (대용량 데이터셋)
+]
 
 [project.scripts]
 evalvault = "evalvault.adapters.inbound.cli:app"

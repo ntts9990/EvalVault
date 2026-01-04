@@ -11,6 +11,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from evalvault.adapters.outbound.kg.parallel_kg_builder import (
+    KGBuilderStats,
+    KGBuildResult,
+    ParallelKGBuilder,
+)
 from evalvault.adapters.outbound.llm import LLMRelationAugmenter, get_llm_adapter
 from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 from evalvault.config.settings import Settings, apply_profile
@@ -107,6 +112,86 @@ def create_kg_app(console: Console) -> typer.Typer:
             )
         if trace_id:
             console.print(f"[cyan]Langfuse trace ID:[/cyan] {trace_id}")
+
+    @kg_app.command("build")
+    def kg_build(
+        source: Path = typer.Argument(
+            ...,
+            exists=True,
+            readable=True,
+            help="문서 파일 또는 디렉터리 경로.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="그래프를 JSON으로 저장할 경로.",
+        ),
+        workers: int = typer.Option(
+            4,
+            "--workers",
+            "-w",
+            min=1,
+            help="병렬 처리 워커 수 (기본값: 4).",
+        ),
+        batch_size: int = typer.Option(
+            32,
+            "--batch-size",
+            "-b",
+            min=1,
+            help="배치 크기 (기본값: 32).",
+        ),
+        store_documents: bool = typer.Option(
+            False,
+            "--store-documents",
+            help="원본 문서를 결과에 포함할지 여부.",
+        ),
+        verbose: bool = typer.Option(
+            False,
+            "--verbose",
+            "-v",
+            help="상세 진행 메시지 표시.",
+        ),
+    ) -> None:
+        """문서 집합으로 지식그래프를 병렬 구축합니다."""
+
+        try:
+            documents = _load_documents_from_source(source)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            console.print(f"[red]Error loading documents:[/red] {exc}")
+            raise typer.Exit(1) from exc
+
+        if not documents:
+            console.print("[red]Error:[/red] 문서를 읽을 수 없습니다. 파일 내용을 확인하세요.")
+            raise typer.Exit(1)
+
+        console.print(
+            f"[bold]Building knowledge graph from {len(documents)} documents "
+            f"(workers={workers}, batch_size={batch_size})...[/bold]"
+        )
+
+        def progress_callback(stats: KGBuilderStats) -> None:
+            if verbose:
+                console.print(
+                    f"  [dim]Chunk {stats.chunks_processed}: "
+                    f"{stats.documents_processed} docs, "
+                    f"{stats.entities_added} entities, "
+                    f"{stats.relations_added} relations[/dim]"
+                )
+
+        builder = ParallelKGBuilder(
+            workers=workers,
+            batch_size=batch_size,
+            store_documents=store_documents,
+            progress_callback=progress_callback if verbose else None,
+        )
+
+        result = builder.build(documents)
+        _display_build_result(result, console)
+
+        if output:
+            _save_build_result(output, result, source, workers, batch_size, store_documents)
+            console.print(f"[green]Saved KG build result to {output}[/green]")
 
     return kg_app
 
@@ -338,6 +423,96 @@ def _save_kg_report(
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _display_build_result(result: KGBuildResult, console: Console) -> None:
+    """ParallelKGBuilder 결과를 Rich 테이블로 출력."""
+
+    stats = result.stats
+    graph_stats = result.graph.get_statistics()
+
+    # Build summary table
+    summary = Table(title="KG Build Summary", show_header=False)
+    summary.add_column("Metric", style="bold", justify="left")
+    summary.add_column("Value", justify="right")
+
+    summary.add_row("Documents Processed", str(stats.documents_processed))
+    summary.add_row("Entities Processed", str(stats.entities_processed))
+    summary.add_row("Entities Added", str(stats.entities_added))
+    summary.add_row("Relations Added", str(stats.relations_added))
+    summary.add_row("Chunks Processed", str(stats.chunks_processed))
+    summary.add_row("Elapsed Time (ms)", f"{stats.elapsed_ms:.2f}")
+    console.print(summary)
+
+    # Graph statistics
+    graph_table = Table(title="Graph Statistics", show_header=False)
+    graph_table.add_column("Metric", style="bold", justify="left")
+    graph_table.add_column("Value", justify="right")
+
+    graph_table.add_row("Total Entities", str(graph_stats.get("num_entities", 0)))
+    graph_table.add_row("Total Relations", str(graph_stats.get("num_relations", 0)))
+    # isolated_entities can be int (from NetworkXKnowledgeGraph) or list
+    isolated = graph_stats.get("isolated_entities", 0)
+    isolated_count = isolated if isinstance(isolated, int) else len(isolated)
+    graph_table.add_row("Isolated Entities", str(isolated_count))
+    console.print(graph_table)
+
+    # Entity types
+    entity_types = graph_stats.get("entity_types", {})
+    if entity_types:
+        entity_table = Table(title="Entity Types", show_header=True, header_style="bold cyan")
+        entity_table.add_column("Type")
+        entity_table.add_column("Count", justify="right")
+        for entity_type, count in sorted(entity_types.items()):
+            entity_table.add_row(entity_type, str(count))
+        console.print(entity_table)
+
+    # Relation types
+    relation_types = graph_stats.get("relation_types", {})
+    if relation_types:
+        relation_table = Table(title="Relation Types", show_header=True, header_style="bold cyan")
+        relation_table.add_column("Type")
+        relation_table.add_column("Count", justify="right")
+        for relation_type, count in sorted(relation_types.items()):
+            relation_table.add_row(relation_type, str(count))
+        console.print(relation_table)
+
+    # Isolated entities preview (only if list is available)
+    if isinstance(isolated, list) and isolated:
+        preview = ", ".join(isolated[:5])
+        console.print(
+            f"[yellow]Isolated entities ({len(isolated)}):[/yellow] "
+            f"{preview}{'...' if len(isolated) > 5 else ''}"
+        )
+
+
+def _save_build_result(
+    output: Path,
+    result: KGBuildResult,
+    source: Path,
+    workers: int,
+    batch_size: int,
+    store_documents: bool,
+) -> None:
+    """kg build 결과를 JSON 파일로 저장."""
+
+    payload: dict[str, Any] = {
+        "type": "kg_build_result",
+        "generated_at": datetime.now().isoformat(),
+        "source": str(source),
+        "config": {
+            "workers": workers,
+            "batch_size": batch_size,
+            "store_documents": store_documents,
+        },
+        "stats": result.stats.snapshot(),
+        "graph": result.graph.to_dict(),
+    }
+
+    if store_documents and result.documents_by_id:
+        payload["documents"] = result.documents_by_id
+
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 __all__ = [
     "create_kg_app",
     "_load_documents_from_source",
@@ -346,4 +521,6 @@ __all__ = [
     "_display_kg_stats",
     "_log_kg_stats_to_langfuse",
     "_save_kg_report",
+    "_display_build_result",
+    "_save_build_result",
 ]
