@@ -1,0 +1,74 @@
+"""FastAPI entry point for EvalVault API."""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+
+from evalvault.adapters.inbound.web.adapter import WebUIAdapter, create_adapter
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle manager for the FastAPI app."""
+    # Startup: Initialize adapter
+    adapter = create_adapter()
+    app.state.adapter = adapter
+    yield
+    # Shutdown: Cleanup if necessary
+    pass
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="EvalVault API",
+        description="REST API for EvalVault RAG Evaluation System",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],  # Vite default port
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Import and include routers here (to avoid circular imports)
+    from .routers import runs
+
+    app.include_router(runs.router, prefix="/api/v1/runs", tags=["runs"])
+
+    @app.get("/health")
+    def health_check():
+        return {"status": "ok"}
+
+    @app.get("/")
+    def root():
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(url="/docs")
+
+    return app
+
+
+# Dependency to get the adapter
+def get_adapter(app: FastAPI) -> WebUIAdapter:
+    """Dependency to retrieve the WebUIAdapter from app state."""
+    # When using Depends(), we can't easily access 'app' directly in standard dependency signature
+    # unless we use Request. So we usually do:
+    pass
+
+
+def get_web_adapter(request: Request) -> WebUIAdapter:
+    """FastAPI dependency to get the WebUIAdapter."""
+    return request.app.state.adapter
+
+
+AdapterDep = Annotated[WebUIAdapter, Depends(get_web_adapter)]
