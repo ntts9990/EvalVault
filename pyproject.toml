@@ -76,6 +76,12 @@ dev = [
     "pytest-html",      # HTML test reports
     "ruff",
 ]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "pymdown-extensions>=10.7.0",
+]
 analysis = [
     "scikit-learn>=1.8.0",
 ]
@@ -137,6 +143,13 @@ testpaths = ["tests"]
 addopts = "--tb=short"
 # JUnit XML output for CI/CD integration
 junit_family = "xunit2"
+# Custom markers
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "requires_openai: marks tests that require OpenAI API key",
+    "requires_langfuse: marks tests that require Langfuse credentials",
+    "requires_phoenix: marks tests that require Phoenix/OpenTelemetry dependencies",
+]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
