@@ -92,11 +92,15 @@ markdown_extensions:
       toc_depth: 3
 
 nav:
-  - Home: INDEX.md
+  - Home: README.md
   - Getting Started:
-    - Installation: README.md
+    - Installation: getting-started/INSTALLATION.md
     - Quickstart: tutorials/01-quickstart.md
-    - Development Guide: DEV_GUIDE.md
+  - Guides:
+    - User Guide: guides/USER_GUIDE.md
+    - CLI Guide: guides/CLI_GUIDE.md
+    - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
+    - Development Guide: guides/DEV_GUIDE.md
   - Tutorials:
     - Basic Evaluation: tutorials/02-basic-evaluation.md
     - Custom Metrics: tutorials/03-custom-metrics.md
@@ -104,14 +108,11 @@ nav:
     - Korean RAG: tutorials/05-korean-rag.md
     - Production Tips: tutorials/06-production-tips.md
     - Domain Memory: tutorials/07-domain-memory.md
-  - User Guide:
-    - Overview: USER_GUIDE.md
-    - CLI Guide: CLI_GUIDE.md
   - Architecture:
-    - Overview: ARCHITECTURE.md
-    - C4 Model: internal/ARCHITECTURE_C4.md
-    - Class Catalog: internal/CLASS_CATALOG.md
-    - Feature Specs: internal/FEATURE_SPECS.md
+    - Overview: architecture/ARCHITECTURE.md
+    - C4 Model: internal/reference/ARCHITECTURE_C4.md
+    - Class Catalog: internal/reference/CLASS_CATALOG.md
+    - Feature Specs: internal/reference/FEATURE_SPECS.md
   - API Reference:
     - Domain:
       - Entities: api/domain/entities.md
@@ -125,11 +126,12 @@ nav:
       - Outbound: api/adapters/outbound.md
     - Configuration: api/config.md
   - Development:
-    - Roadmap: ROADMAP.md
-    - Status: STATUS.md
-    - Observability Playbook: OBSERVABILITY_PLAYBOOK.md
+    - Roadmap: status/ROADMAP.md
+    - Status: status/STATUS.md
+    - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
   - Internal:
-    - Query Analysis: internal/QUERY_BASED_ANALYSIS_PIPELINE.md
+    - Development Guide: internal/reference/DEVELOPMENT_GUIDE.md
+    - Query Analysis: internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md
 
 extra:
   social:

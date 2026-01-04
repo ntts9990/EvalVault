@@ -172,6 +172,22 @@ uv run evalvault run dataset.json --metrics faithfulness \
   --phoenix-experiment gemma3-baseline
 ```
 
+Phoenix Embeddings export:
+
+```bash
+uv run evalvault phoenix export-embeddings \
+  --dataset insurance-qa \
+  --embedding-mode model \
+  --embedding-model text-embedding-3-small \
+  --batch-size 64 \
+  --output reports/phoenix_embeddings.csv
+```
+
+- `--embedding-mode`: `model`(실제 임베딩 모델) 또는 `tfidf`
+- `--embedding-model`: 모델 이름 오버라이드 (프로필/환경변수 대신 사용)
+- `--batch-size`: 임베딩 요청 배치 크기
+- `--max-chars`: 예제 텍스트를 지정 길이로 잘라 전송
+
 Langfuse/MLflow 플래그는 기존 동작 그대로 유지되며, Phoenix 전송이 실패해도 평가 실행은 계속됩니다.
 
 ---

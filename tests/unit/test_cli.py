@@ -3240,6 +3240,7 @@ class TestCLIPhoenixUtilities:
 
         return FakeDataset()
 
+    @pytest.mark.requires_openai
     @patch("evalvault.adapters.inbound.cli.commands.phoenix._import_phoenix_client")
     def test_phoenix_export_embeddings_csv(self, mock_client_factory, fake_dataset, tmp_path):
         mock_client = MagicMock()

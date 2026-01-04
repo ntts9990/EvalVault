@@ -8,7 +8,7 @@
 
 ## 현재 상태 (요약)
 
-- **Current Version**: 릴리스는 git tag 기준 (pyproject 버전은 자동 업데이트되지 않음)
+- **Current Version**: 릴리스는 git tag 기준 (pyproject 버전은 릴리스 워크플로에서 동기화)
 - **Core Focus**: 병렬 리팩토링 단계 (R1~R4, D1 샘플/리포트 확보)
 - **Tests**: 약 1.3k+ (unit 1,261 + integration 91 기준)
 
@@ -27,6 +27,14 @@ uv run pytest tests --collect-only -q
 - **관측성(Observability)**: Phoenix(OpenTelemetry/OpenInference) 중심, 필요 시 Langfuse/MLflow 병행
 - **Domain Memory**: 평가 결과 학습 → threshold 보정/컨텍스트 보강/트렌드 분석
 - **분석 파이프라인**: Query → Intent 분류 → DAG 모듈 실행(요약/검증/비교/분석)
+
+---
+
+## 현재 제한 사항 (투명 공개)
+
+- **Web UI 리포트**: 기본/상세 템플릿 + LLM 보고서만 제공, 비교 템플릿은 준비 중
+- **Domain Memory 인사이트**: CLI(`evalvault analyze`, `domain memory`) 중심으로 노출, Web UI 패널은 미제공
+- **MemoryBasedAnalysis**: CLI 분석 경로에서 제공, Web UI 보고서에는 아직 미연동
 
 ---
 

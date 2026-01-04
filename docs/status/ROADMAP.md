@@ -1,7 +1,7 @@
 # EvalVault Development Roadmap
 
 > Last Updated: 2026-01-07
-> Current Version: git tag 기준 (pyproject 버전은 자동 업데이트되지 않음)
+> Current Version: git tag 기준 (pyproject 버전은 릴리스 워크플로에서 동기화)
 > Status: 병렬 리팩토링/통합 단계 (R1~R4, D1 중심)
 
 ---

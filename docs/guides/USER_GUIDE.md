@@ -169,6 +169,7 @@ uv run evalvault export <run_id> -o run.json
 uv run evalvault web --browser
 ```
 Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
+현재 Web UI 보고서는 기본/상세 템플릿과 LLM 보고서가 중심이며, 비교 템플릿과 Domain Memory 인사이트 패널은 준비 중입니다.
 
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
@@ -296,7 +297,8 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 
 ## Domain Memory & 분석 기능
 - `--use-domain-memory` : 평가 전 Domain Memory의 신뢰도로 메트릭 임계값을 자동 조정하고 관련 사실을 컨텍스트에 보강합니다.
-- `MemoryBasedAnalysis` : `evalvault analyze` 또는 Web UI 리포트에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다.
+- `MemoryBasedAnalysis` : `evalvault analyze`에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다. (Web UI 미노출)
+- **Web UI 인사이트**: Domain Memory/MemoryBasedAnalysis 인사이트는 CLI 출력 기준으로만 제공됩니다.
 - `ImprovementGuideService` : 규칙 기반 패턴 탐지 + LLM 인사이트를 결합해 우선순위가 매겨진 개선 액션을 제공합니다.
 - `Analysis Pipeline` : `evalvault pipeline run --query "요약해줘"` 형태로 12가지 의도를 분류하고 DAG 모듈을 실행합니다.
 

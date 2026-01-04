@@ -1,6 +1,6 @@
 [project]
 name = "evalvault"
-version = "0.1.0"
+version = "1.38.0"
 description = "RAG evaluation system using Ragas with Phoenix/Langfuse tracing"
 readme = "README.md"
 requires-python = ">=3.12"
