@@ -43,8 +43,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current version from pyproject.toml
-          CURRENT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          # Get current version from latest git tag
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
           echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
 
           # Check if there's a new version to release (based on conventional commits)
@@ -68,6 +68,15 @@ jobs:
             echo "No version determined by semantic-release"
           fi
 
+      - name: Sync pyproject version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+          git add pyproject.toml
+          git commit -m "chore(release): ${VERSION} [skip ci]"
+          git push origin HEAD:main
+
       - name: Create release tag
         if: steps.version.outputs.should_release == 'true'
         run: |
@@ -78,9 +87,6 @@ jobs:
       - name: Build package with new version
         if: steps.version.outputs.should_release == 'true'
         run: |
-          VERSION="${{ steps.version.outputs.next_version }}"
-          # Update version in pyproject.toml for build (not committed)
-          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
           uv build
 
       - name: Publish to PyPI

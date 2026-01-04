@@ -23,7 +23,11 @@ EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 Streamlit Web UI�
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
 - 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
 
-상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](USER_GUIDE.md)를 참고하세요.
+**현재 상태 메모**
+- Web UI 보고서는 기본/상세 템플릿 + LLM 보고서 중심이며 비교 템플릿은 준비 중입니다.
+- Domain Memory 인사이트는 CLI 중심으로 제공되며 Web UI 패널은 준비 중입니다.
+
+상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](guides/USER_GUIDE.md)를 참고하세요.
 
 ---
 
@@ -84,7 +88,7 @@ uv sync --extra dev
    uv run evalvault web --browser
    ```
 
-Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [USER_GUIDE.md](USER_GUIDE.md)에 정리되어 있습니다.
+Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
 
 ## 실행 모드 (Simple / Full)
 
@@ -115,8 +119,8 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 ## 문서
 - [README.md](README.md): 전체 문서 인덱스
-- [USER_GUIDE.md](USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
-- [ARCHITECTURE.md](ARCHITECTURE.md): 설계 문서
+- [guides/USER_GUIDE.md](guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
+- [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): 설계 문서
 - [CHANGELOG.md](../CHANGELOG.md): 릴리스 히스토리
 
 ---

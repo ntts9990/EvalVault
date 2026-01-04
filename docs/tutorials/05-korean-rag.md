@@ -194,6 +194,18 @@ for doc, score in results:
     print(f"[{score:.3f}] {doc}")
 ```
 
+FAISS 인덱스 옵션 예시:
+
+```python
+retriever = KoreanDenseRetriever(
+    model_name="dragonkue/BGE-m3-ko",
+    use_faiss=True,
+    faiss_index_type="hnsw",
+    faiss_hnsw_m=32,
+    faiss_hnsw_ef_search=128,
+)
+```
+
 ### Hybrid 검색 (BM25 + Dense)
 
 ```python

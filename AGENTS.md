@@ -33,7 +33,7 @@ main 브랜치에 머지되면 Conventional Commits 규칙에 따라 자동으�
 - `fix:`, `perf:` → Patch version bump (0.0.x)
 - `docs:`, `chore:`, `ci:`, `test:`, `style:`, `refactor:` → No release
 
-**주의**: `pyproject.toml`의 버전은 자동 업데이트되지 않음. 실제 배포 버전은 git 태그 기반.
+**주의**: `pyproject.toml`의 버전은 릴리스 워크플로에서 git 태그와 동기화됨. 실제 배포 버전은 git 태그 기반.
 
 ## CI/CD Pipeline
 CI는 Ubuntu, macOS, Windows에서 Python 3.12/3.13으로 테스트를 실행합니다. PR 머지 전 모든 테스트와 린트가 통과해야 합니다. main 브랜치 푸시 시 Release 워크플로우가 자동으로 버전 태그 생성, PyPI 배포, GitHub Release 생성을 수행합니다.

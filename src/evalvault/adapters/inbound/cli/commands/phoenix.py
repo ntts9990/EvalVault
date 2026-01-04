@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import json
 from dataclasses import asdict
@@ -12,6 +13,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from evalvault.adapters.outbound.llm import get_llm_adapter
+from evalvault.adapters.outbound.llm.base import LLMConfigurationError
+from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.prompt_manifest import (
     load_prompt_manifest,
     record_prompt_entry,
@@ -124,6 +128,60 @@ def _export_rows_to_parquet(rows: list[dict[str, Any]], output: Path) -> None:
     df.to_parquet(output, index=False)
 
 
+def _apply_profile_from_env(settings: Settings) -> Settings:
+    profile_name = settings.evalvault_profile
+    if profile_name:
+        return apply_profile(settings, profile_name)
+    return settings
+
+
+def _resolve_embedding_model_name(settings: Settings) -> str:
+    provider = settings.llm_provider
+    if provider == "ollama":
+        return settings.ollama_embedding_model
+    if provider == "azure":
+        return settings.azure_embedding_deployment or ""
+    return settings.openai_embedding_model
+
+
+def _override_embedding_model(settings: Settings, embedding_model: str) -> None:
+    provider = settings.llm_provider
+    if provider == "ollama":
+        settings.ollama_embedding_model = embedding_model
+    elif provider == "azure":
+        settings.azure_embedding_deployment = embedding_model
+    else:
+        settings.openai_embedding_model = embedding_model
+
+
+def _run_async(coro):
+    try:
+        return asyncio.run(coro)
+    except RuntimeError as exc:
+        raise typer.BadParameter(
+            "Async embeddings require a standalone event loop. "
+            "Run this command from the CLI or use --embedding-mode tfidf."
+        ) from exc
+
+
+def _embed_texts(embeddings: Any, texts: list[str]) -> list[list[float]]:
+    if hasattr(embeddings, "embed_texts"):
+        return embeddings.embed_texts(texts)
+    if hasattr(embeddings, "embed_documents"):
+        return embeddings.embed_documents(texts)
+    if hasattr(embeddings, "aembed_texts"):
+        return _run_async(embeddings.aembed_texts(texts))
+    if hasattr(embeddings, "aembed_documents"):
+        return _run_async(embeddings.aembed_documents(texts))
+    raise typer.BadParameter("Embedding backend does not support embed_texts().")
+
+
+def _truncate_text(text: str, max_chars: int | None) -> str:
+    if max_chars is None or max_chars <= 0:
+        return text
+    return text[:max_chars]
+
+
 @PhoenixApp.command("export-embeddings")
 def export_embeddings(  # noqa: PLR0913
     dataset: str = typer.Option(..., "--dataset", "-d", help="Phoenix dataset ID or name."),
@@ -141,6 +199,28 @@ def export_embeddings(  # noqa: PLR0913
         "-o",
         help="Destination file (CSV or Parquet).",
     ),
+    embedding_mode: str = typer.Option(
+        "model",
+        "--embedding-mode",
+        help="Embedding backend: model or tfidf.",
+        case_sensitive=False,
+    ),
+    embedding_model: str | None = typer.Option(
+        None,
+        "--embedding-model",
+        help="Override the embedding model name for model mode.",
+    ),
+    batch_size: int = typer.Option(
+        64,
+        "--batch-size",
+        "-b",
+        help="Batch size for embedding requests (model mode).",
+    ),
+    max_chars: int | None = typer.Option(
+        None,
+        "--max-chars",
+        help="Optional max characters per example (truncate before embedding).",
+    ),
     fmt: str = typer.Option(
         "csv",
         "--format",
@@ -155,6 +235,9 @@ def export_embeddings(  # noqa: PLR0913
     client_cls = _import_phoenix_client()
     client = client_cls(base_url=endpoint, api_key=api_token)
     fmt_lower = fmt.lower()
+    embedding_mode_value = embedding_mode.lower()
+    if embedding_mode_value not in {"model", "tfidf"}:
+        raise typer.BadParameter("Embedding mode must be 'model' or 'tfidf'.")
 
     with console.status("[bold green]Fetching dataset from Phoenix..."):
         dataset_obj = client.datasets.get_dataset(dataset=dataset)
@@ -175,7 +258,9 @@ def export_embeddings(  # noqa: PLR0913
         text_blob = " ".join(
             part for part in (question, answer, contexts, _flatten_accessors(metadata)) if part
         )
-        texts.append(text_blob or f"{question} {answer} {contexts}")
+        text_blob = text_blob or f"{question} {answer} {contexts}"
+        text_blob = _truncate_text(text_blob.strip(), max_chars)
+        texts.append(text_blob or "empty")
         rows.append(
             {
                 "example_id": example.get("example_id")
@@ -188,11 +273,42 @@ def export_embeddings(  # noqa: PLR0913
             }
         )
 
-    console.print(f"[dim]Computing TF-IDF vectors for {len(texts)} examples...[/dim]")
-    from sklearn.feature_extraction.text import TfidfVectorizer
+    if embedding_mode_value == "tfidf":
+        console.print(f"[dim]Computing TF-IDF vectors for {len(texts)} examples...[/dim]")
+        from sklearn.feature_extraction.text import TfidfVectorizer
 
-    vectorizer = TfidfVectorizer(max_features=4096)
-    vectors = vectorizer.fit_transform(texts)
+        vectorizer = TfidfVectorizer(max_features=4096)
+        vectors = vectorizer.fit_transform(texts)
+    else:
+        settings = _apply_profile_from_env(Settings())
+        if embedding_model:
+            _override_embedding_model(settings, embedding_model)
+
+        try:
+            llm_adapter = get_llm_adapter(settings)
+            embeddings_backend = llm_adapter.as_ragas_embeddings()
+        except (LLMConfigurationError, ValueError) as exc:
+            raise typer.BadParameter(
+                "Embedding model is not configured. Check provider settings and API keys in .env."
+            ) from exc
+
+        resolved_model = _resolve_embedding_model_name(settings)
+        model_label = resolved_model or settings.llm_provider
+        console.print(
+            f"[dim]Computing embeddings for {len(texts)} examples (model: {model_label})...[/dim]"
+        )
+
+        if batch_size <= 0:
+            raise typer.BadParameter("Batch size must be a positive integer.")
+
+        vectors = []
+        for start in range(0, len(texts), batch_size):
+            batch = texts[start : start + batch_size]
+            batch_vectors = _embed_texts(embeddings_backend, batch)
+            vectors.extend(batch_vectors)
+
+        if len(vectors) != len(texts):
+            raise typer.BadParameter("Embedding backend returned unexpected vector counts.")
 
     console.print("[dim]Running dimensionality reduction (UMAP/PCA)...[/dim]")
     projected = _reduce_to_2d(vectors)

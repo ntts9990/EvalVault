@@ -23,7 +23,11 @@ EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
 - DAG-based analysis pipeline with statistical/NLP/causal modules
 
-See the [User Guide](docs/USER_GUIDE.md) for full workflows, Phoenix automation, and troubleshooting.
+**Status notes**
+- Web UI reports focus on basic/detailed templates and LLM analysis; comparison templates are in progress.
+- Domain Memory insights are CLI-first today; a Web UI panel is planned.
+
+See the [User Guide](docs/guides/USER_GUIDE.md) for full workflows, Phoenix automation, and troubleshooting.
 
 ---
 
@@ -84,7 +88,7 @@ Add extras as needed:
    uv run evalvault web --browser
    ```
 
-More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/USER_GUIDE.md).
+More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).
 
 ---
 
@@ -116,8 +120,8 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ---
 
 ## Documentation
-- [User Guide](docs/USER_GUIDE.md): installation, configuration, CLI recipes, Web UI, Phoenix, automation.
-- [Architecture](docs/ARCHITECTURE.md) & [C4 Diagram](docs/ARCHITECTURE_C4.md): design details.
+- [User Guide](docs/guides/USER_GUIDE.md): installation, configuration, CLI recipes, Web UI, Phoenix, automation.
+- [Architecture](docs/architecture/ARCHITECTURE.md) & [C4 Diagram](docs/internal/reference/ARCHITECTURE_C4.md): design details.
 - [CHANGELOG](CHANGELOG.md) for release history.
 
 ---
