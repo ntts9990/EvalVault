@@ -155,6 +155,14 @@ class KoreanDenseRetriever:
         profile: str | None = None,
         use_faiss: bool = False,
         faiss_use_gpu: bool | None = None,
+        faiss_index_type: str = "flat",
+        faiss_ivf_nlist: int = 128,
+        faiss_ivf_nprobe: int = 16,
+        faiss_hnsw_m: int = 32,
+        faiss_hnsw_ef_search: int = 128,
+        faiss_hnsw_ef_construction: int = 200,
+        faiss_pq_m: int = 16,
+        faiss_pq_nbits: int = 8,
         query_cache_size: int = 256,
         search_cache_size: int = 256,
         normalize_embeddings: bool = True,
@@ -177,6 +185,14 @@ class KoreanDenseRetriever:
                 - 'prod': qwen3-embedding:8b, dim=1024
             use_faiss: FAISS 인덱스 사용 여부 (선택)
             faiss_use_gpu: FAISS GPU 사용 여부 (None이면 CUDA 가능 시 자동 선택)
+            faiss_index_type: FAISS 인덱스 타입 (flat, hnsw, ivf, ivf_pq)
+            faiss_ivf_nlist: IVF 클러스터 수 (ivf/ivf_pq 전용)
+            faiss_ivf_nprobe: IVF 검색 시 탐색할 클러스터 수
+            faiss_hnsw_m: HNSW 그래프 차수
+            faiss_hnsw_ef_search: HNSW 검색 효율 파라미터
+            faiss_hnsw_ef_construction: HNSW 구축 효율 파라미터
+            faiss_pq_m: PQ 서브벡터 수 (ivf_pq 전용)
+            faiss_pq_nbits: PQ 비트 수 (ivf_pq 전용)
             query_cache_size: 쿼리 임베딩 캐시 크기
             search_cache_size: 검색 결과 캐시 크기
             normalize_embeddings: 코사인 유사도 계산을 위한 정규화 여부
@@ -207,6 +223,16 @@ class KoreanDenseRetriever:
         self._matryoshka_dim = matryoshka_dim
         self._use_faiss = use_faiss
         self._faiss_use_gpu = faiss_use_gpu
+        self._faiss_index_type = (faiss_index_type or "flat").lower()
+        self._faiss_ivf_nlist = max(1, faiss_ivf_nlist)
+        self._faiss_ivf_nprobe = max(1, faiss_ivf_nprobe)
+        self._faiss_hnsw_m = max(4, faiss_hnsw_m)
+        self._faiss_hnsw_ef_search = max(1, faiss_hnsw_ef_search)
+        self._faiss_hnsw_ef_construction = max(1, faiss_hnsw_ef_construction)
+        self._faiss_pq_m = max(1, faiss_pq_m)
+        self._faiss_pq_nbits = max(1, faiss_pq_nbits)
+        self._faiss_ivf_nlist_used: int | None = None
+        self._faiss_ivf_nprobe_used: int | None = None
         self._normalize_embeddings = normalize_embeddings or use_faiss
         self._query_cache_size = max(query_cache_size, 0)
         self._search_cache_size = max(search_cache_size, 0)
@@ -516,7 +542,63 @@ class KoreanDenseRetriever:
         embeddings = np.asarray(embeddings, dtype=np.float32)
         dimension = embeddings.shape[1]
 
-        index: Any = faiss.IndexFlatIP(dimension)
+        index_type = self._faiss_index_type
+        metric = faiss.METRIC_INNER_PRODUCT
+        index: Any
+        ivf_nlist = min(self._faiss_ivf_nlist, max(1, embeddings.shape[0]))
+        ivf_nprobe = min(self._faiss_ivf_nprobe, ivf_nlist)
+
+        if index_type in {"ivf_pq", "pq"} and dimension % self._faiss_pq_m != 0:
+            logger.warning(
+                "FAISS PQ requires dimension divisible by m=%s. Falling back to IVF flat.",
+                self._faiss_pq_m,
+            )
+            index_type = "ivf"
+
+        if index_type == "flat":
+            index = faiss.IndexFlatIP(dimension)
+        elif index_type == "hnsw":
+            try:
+                index = faiss.IndexHNSWFlat(dimension, self._faiss_hnsw_m, metric)
+            except TypeError:
+                index = faiss.IndexHNSWFlat(dimension, self._faiss_hnsw_m)
+                if hasattr(index, "metric_type"):
+                    index.metric_type = metric
+            if hasattr(index, "hnsw"):
+                index.hnsw.efSearch = self._faiss_hnsw_ef_search
+                index.hnsw.efConstruction = self._faiss_hnsw_ef_construction
+        elif index_type in {"ivf", "ivf_flat"}:
+            quantizer = faiss.IndexFlatIP(dimension)
+            try:
+                index = faiss.IndexIVFFlat(quantizer, dimension, ivf_nlist, metric)
+            except TypeError:
+                index = faiss.IndexIVFFlat(quantizer, dimension, ivf_nlist)
+        elif index_type in {"ivf_pq", "pq"}:
+            quantizer = faiss.IndexFlatIP(dimension)
+            try:
+                index = faiss.IndexIVFPQ(
+                    quantizer,
+                    dimension,
+                    ivf_nlist,
+                    self._faiss_pq_m,
+                    self._faiss_pq_nbits,
+                    metric,
+                )
+            except TypeError:
+                index = faiss.IndexIVFPQ(
+                    quantizer,
+                    dimension,
+                    ivf_nlist,
+                    self._faiss_pq_m,
+                    self._faiss_pq_nbits,
+                )
+        else:
+            logger.warning("Unknown FAISS index type '%s'. Falling back to flat.", index_type)
+            index = faiss.IndexFlatIP(dimension)
+
+        if hasattr(index, "is_trained") and not index.is_trained:
+            index.train(embeddings)
+
         use_gpu = self._resolve_faiss_gpu(faiss)
         self._faiss_gpu_active = False
 
@@ -527,6 +609,14 @@ class KoreanDenseRetriever:
                 self._faiss_gpu_active = True
             except Exception as exc:  # pragma: no cover - optional GPU path
                 logger.warning("Failed to enable FAISS GPU: %s", exc)
+
+        if hasattr(index, "nprobe"):
+            index.nprobe = ivf_nprobe
+            self._faiss_ivf_nlist_used = ivf_nlist
+            self._faiss_ivf_nprobe_used = ivf_nprobe
+        else:
+            self._faiss_ivf_nlist_used = None
+            self._faiss_ivf_nprobe_used = None
 
         index.add(embeddings)
         self._faiss_index = index
@@ -714,6 +804,16 @@ class KoreanDenseRetriever:
             index_build_time_ms = (time.perf_counter() - index_started_at) * 1000
 
             if span and self._embeddings is not None:
+                faiss_attrs = {"retriever.faiss_index_type": self._faiss_index_type}
+                if self._faiss_index_type in {"ivf", "ivf_flat", "ivf_pq", "pq"}:
+                    faiss_attrs["retriever.faiss_nlist"] = (
+                        self._faiss_ivf_nlist_used or self._faiss_ivf_nlist
+                    )
+                    faiss_attrs["retriever.faiss_nprobe"] = (
+                        self._faiss_ivf_nprobe_used or self._faiss_ivf_nprobe
+                    )
+                if self._faiss_index_type == "hnsw":
+                    faiss_attrs["retriever.faiss_hnsw_m"] = self._faiss_hnsw_m
                 set_span_attributes(
                     span,
                     {
@@ -723,6 +823,7 @@ class KoreanDenseRetriever:
                         "retriever.batch_size": batch_size,
                         "retriever.faiss_gpu_active": self._faiss_gpu_active,
                         "retriever.index_build_time_ms": index_build_time_ms,
+                        **faiss_attrs,
                     },
                 )
 
@@ -804,6 +905,7 @@ class KoreanDenseRetriever:
                         "retriever.total_docs_searched": self.document_count,
                         "retriever.cache_hit": cache_hit,
                         "retriever.faiss_gpu_active": self._faiss_gpu_active,
+                        "retriever.faiss_index_type": self._faiss_index_type,
                     },
                 )
 
