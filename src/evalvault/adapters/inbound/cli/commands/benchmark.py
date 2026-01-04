@@ -182,6 +182,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
 
         results: dict[str, dict[str, Any]] = {}
         recall_key = f"recall_at_{top_k}"
+        precision_key = f"precision_at_{top_k}"
         ndcg_key = f"ndcg_at_{ndcg_k or top_k}"
         normalized_profile = _normalize_embedding_profile(embedding_profile)
         ollama_adapter = _build_ollama_adapter(
@@ -218,15 +219,33 @@ def create_benchmark_app(console: Console) -> typer.Typer:
                 summary["backend"] = backend
             results[method] = summary
 
-        _print_retrieval_table(console, results, recall_key=recall_key, ndcg_key=ndcg_key)
+        _print_retrieval_table(
+            console,
+            results,
+            recall_key=recall_key,
+            precision_key=precision_key,
+            ndcg_key=ndcg_key,
+        )
 
         if output:
             payload = {
                 "methods_compared": method_list,
                 "results": results,
-                "overall": _build_overall_summary(results, recall_key, ndcg_key),
+                "overall": _build_overall_summary(
+                    results,
+                    recall_key,
+                    precision_key,
+                    ndcg_key,
+                ),
             }
-            _write_retrieval_output(output, payload, results, recall_key, ndcg_key)
+            _write_retrieval_output(
+                output,
+                payload,
+                results,
+                recall_key,
+                precision_key,
+                ndcg_key,
+            )
             console.print(f"[green]Results saved to {output}[/green]")
 
     @benchmark_app.command("list")
@@ -561,6 +580,7 @@ def _print_retrieval_table(
     results: dict[str, dict[str, Any]],
     *,
     recall_key: str,
+    precision_key: str,
     ndcg_key: str,
 ) -> None:
     table = Table(title="Retrieval Benchmark Results", show_header=True, header_style="bold cyan")
@@ -568,7 +588,7 @@ def _print_retrieval_table(
     for method in results:
         table.add_column(method, justify="right")
 
-    for metric_key in [recall_key, "mrr", ndcg_key]:
+    for metric_key in [recall_key, precision_key, "mrr", ndcg_key]:
         label = _format_metric_label(metric_key)
         row = [label]
         for method in results:
@@ -585,6 +605,8 @@ def _print_retrieval_table(
 
 
 def _format_metric_label(metric_key: str) -> str:
+    if metric_key.startswith("precision_at_"):
+        return f"Precision@{metric_key.split('_')[-1]}"
     if metric_key.startswith("recall_at_"):
         return f"Recall@{metric_key.split('_')[-1]}"
     if metric_key.startswith("ndcg_at_"):
@@ -597,10 +619,11 @@ def _format_metric_label(metric_key: str) -> str:
 def _build_overall_summary(
     results: dict[str, dict[str, Any]],
     recall_key: str,
+    precision_key: str,
     ndcg_key: str,
 ) -> dict[str, Any]:
     best_by_metric: dict[str, dict[str, Any]] = {}
-    for metric_key in [recall_key, "mrr", ndcg_key]:
+    for metric_key in [recall_key, precision_key, "mrr", ndcg_key]:
         best_method = max(
             results.keys(),
             key=lambda method: results[method].get(metric_key, float("-inf")),
@@ -617,18 +640,22 @@ def _write_retrieval_output(
     payload: dict[str, Any],
     results: dict[str, dict[str, Any]],
     recall_key: str,
+    precision_key: str,
     ndcg_key: str,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix.lower() == ".csv":
         with path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle)
-            writer.writerow(["method", recall_key, "mrr", ndcg_key, "test_cases", "backend"])
+            writer.writerow(
+                ["method", recall_key, precision_key, "mrr", ndcg_key, "test_cases", "backend"]
+            )
             for method, metrics in results.items():
                 writer.writerow(
                     [
                         method,
                         metrics.get(recall_key, 0.0),
+                        metrics.get(precision_key, 0.0),
                         metrics.get("mrr", 0.0),
                         metrics.get(ndcg_key, 0.0),
                         metrics.get("test_cases", 0),

@@ -494,6 +494,7 @@ class TestKoreanRAGBenchmarkRunner:
             assert result.total_tests == 2
             if result.test_results:
                 metrics = result.test_results[0].metrics
+                assert "precision_at_5" in metrics
                 assert "recall_at_5" in metrics
                 assert "mrr" in metrics
                 assert "ndcg_at_5" in metrics

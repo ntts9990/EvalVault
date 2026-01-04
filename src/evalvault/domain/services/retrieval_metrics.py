@@ -25,7 +25,7 @@ def compute_retrieval_metrics(
     recall_k: int,
     ndcg_k: int | None = None,
 ) -> dict[str, float]:
-    """Compute Recall@K, MRR, and nDCG@K for a single query."""
+    """Compute Precision@K, Recall@K, MRR, and nDCG@K for a single query."""
 
     normalized_retrieved = [str(doc_id) for doc_id in retrieved_doc_ids]
     relevant_set = {str(doc_id) for doc_id in relevant_doc_ids}
@@ -35,6 +35,8 @@ def compute_retrieval_metrics(
 
     retrieved_top_k = normalized_retrieved[:recall_k]
     relevant_found = len(set(retrieved_top_k) & relevant_set)
+    retrieved_count = len(retrieved_top_k)
+    precision = relevant_found / retrieved_count if retrieved_count else 0.0
     recall = relevant_found / len(relevant_set) if relevant_set else 0.0
 
     mrr = 0.0
@@ -46,6 +48,7 @@ def compute_retrieval_metrics(
     ndcg = _ndcg_at_k(normalized_retrieved, relevant_set, ndcg_k)
 
     return {
+        f"precision_at_{recall_k}": precision,
         f"recall_at_{recall_k}": recall,
         "mrr": mrr,
         f"ndcg_at_{ndcg_k}": ndcg,
