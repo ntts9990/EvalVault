@@ -13,6 +13,7 @@ from .agent import register_agent_commands
 from .analyze import register_analyze_commands
 from .benchmark import create_benchmark_app
 from .config import register_config_commands
+from .debug import create_debug_app
 from .domain import create_domain_app
 from .experiment import register_experiment_commands
 from .gate import register_gate_commands
@@ -74,6 +75,7 @@ SUB_APPLICATIONS: tuple[SubAppModule, ...] = (
     SubAppModule("benchmark", create_benchmark_app),
     SubAppModule("phoenix", create_phoenix_app),
     SubAppModule("stage", create_stage_app),
+    SubAppModule("debug", create_debug_app),
 )
 
 

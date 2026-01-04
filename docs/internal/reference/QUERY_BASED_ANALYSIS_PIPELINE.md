@@ -163,6 +163,32 @@ class AnalysisNode:
 - DataLoaderModule은 StoragePort(예: SQLite/SQLiteStorageAdapter)를 사용해 `run_id` 기반 EvaluationRun을 불러오고, 로드된 객체와 메트릭 시리즈를 다음 노드에 전달합니다.
 - StatisticalAnalyzerModule은 `StatisticalAnalysisAdapter`를 주입받아 `analyze(run)`을 실행하고, 생성된 `StatisticalAnalysis`를 요약/통계 딕셔너리로 직렬화하여 후속 보고서 모듈이 그대로 소비하도록 합니다.
 
+### 3.5 파이프라인 정책
+
+#### 빈 파이프라인 정책
+
+`PipelineOrchestrator.build_pipeline()`은 템플릿이 없는 의도에 대해 빈 파이프라인(`AnalysisPipeline(intent=intent)`)을 반환합니다. 이는 다음과 같은 설계 결정에 기반합니다:
+
+- **허용**: 빈 파이프라인은 유효한 상태로 간주됩니다. 실행 시 노드가 없으므로 즉시 완료되며, `PipelineResult.all_succeeded`는 `True`를 반환합니다.
+- **용도**: 새로운 의도 추가 시 점진적 구현을 지원하고, 테스트 환경에서 파이프라인 인프라만 검증할 때 유용합니다.
+- **현황**: 현재 모든 12개 `AnalysisIntent`에 대해 템플릿이 등록되어 있어 실제 운영에서 빈 파이프라인이 생성되지 않습니다.
+
+#### 모듈 미등록 처리
+
+등록되지 않은 모듈을 참조하는 노드 실행 시:
+
+```python
+NodeResult(
+    node_id=node.id,
+    status=NodeExecutionStatus.FAILED,
+    error=f"Module not found: {node.module}",
+)
+```
+
+- **실패 전파**: 실패한 노드에 의존하는 후속 노드는 `SKIPPED` 상태로 처리됩니다.
+- **에러 메시지**: 누락된 모듈 ID가 에러 메시지에 포함되어 디버깅을 용이하게 합니다.
+- **권장 사항**: 새 템플릿 추가 시 `scripts/pipeline_template_inspect.py`로 모듈 등록 상태를 먼저 확인하세요.
+
 ## 4. 쿼리-파이프라인 매핑
 
 ### 4.1 예시 쿼리와 생성되는 파이프라인
