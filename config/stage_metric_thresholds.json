@@ -1,0 +1,26 @@
+{
+  "default": {
+    "retrieval.precision_at_k": 0.2,
+    "retrieval.recall_at_k": 0.6,
+    "retrieval.result_count": 1.0,
+    "retrieval.avg_score": 0.2,
+    "retrieval.score_gap": 0.1,
+    "retrieval.latency_ms": 500.0,
+    "rerank.keep_rate": 0.25,
+    "rerank.avg_score": 0.2,
+    "rerank.score_gap": 0.1,
+    "rerank.latency_ms": 800.0,
+    "output.latency_ms": 3000.0,
+    "output.citation_count": 1.0
+  },
+  "profiles": {
+    "dev": {
+      "output.latency_ms": 4000.0,
+      "output.citation_count": 1.0
+    },
+    "prod": {
+      "output.latency_ms": 2000.0,
+      "output.citation_count": 2.0
+    }
+  }
+}

@@ -129,3 +129,43 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
+
+-- Stage events for pipeline-level observability
+CREATE TABLE IF NOT EXISTS stage_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
+    parent_stage_id TEXT,
+    stage_type TEXT NOT NULL,
+    stage_name TEXT,
+    status TEXT,
+    attempt INTEGER DEFAULT 1,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    duration_ms REAL,
+    input_ref TEXT,
+    output_ref TEXT,
+    attributes TEXT,
+    metadata TEXT,
+    trace_id TEXT,
+    span_id TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stage_events_run_stage_id
+    ON stage_events(run_id, stage_id);
+CREATE INDEX IF NOT EXISTS idx_stage_events_run_id ON stage_events(run_id);
+CREATE INDEX IF NOT EXISTS idx_stage_events_stage_type ON stage_events(stage_type);
+
+-- Stage-level evaluation metrics
+CREATE TABLE IF NOT EXISTS stage_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    score REAL NOT NULL,
+    threshold REAL,
+    evidence TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_metrics_run_id ON stage_metrics(run_id);
+CREATE INDEX IF NOT EXISTS idx_stage_metrics_stage_id ON stage_metrics(stage_id);

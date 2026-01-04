@@ -1,0 +1,5 @@
+{"run_id":"run_20260103_001","stage_id":"stg_sys_01","stage_type":"system_prompt","stage_name":"system_prompt_v1","duration_ms":18,"attributes":{"prompt_id":"sys-01","checksum":"abc123"}}
+{"run_id":"run_20260103_001","stage_id":"stg_input_01","parent_stage_id":"stg_sys_01","stage_type":"input","stage_name":"user_query","duration_ms":6,"attributes":{"query":"Summarize the insurance coverage","language":"en"}}
+{"run_id":"run_20260103_001","stage_id":"stg_retrieval_01","parent_stage_id":"stg_input_01","stage_type":"retrieval","stage_name":"hybrid_retriever","duration_ms":120,"attributes":{"top_k":3,"doc_ids":["doc-1","doc-7","doc-9"],"scores":[0.91,0.72,0.45]}}
+{"run_id":"run_20260103_001","stage_id":"stg_rerank_01","parent_stage_id":"stg_retrieval_01","stage_type":"rerank","stage_name":"cross_encoder_rerank","duration_ms":220,"attributes":{"input_count":3,"output_count":2,"scores":[0.88,0.62]}}
+{"run_id":"run_20260103_001","stage_id":"stg_output_01","parent_stage_id":"stg_rerank_01","stage_type":"output","stage_name":"final_answer","duration_ms":1400,"attributes":{"answer":"...","citations":["doc-1","doc-7"],"tokens_in":900,"tokens_out":210}}

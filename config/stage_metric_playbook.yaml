@@ -1,0 +1,93 @@
+version: "1.0.0"
+metrics:
+  retrieval.recall_at_k:
+    title: "Improve retrieval recall"
+    description: "Recall@K is below threshold. Review query rewrite/expansion and top_k."
+    implementation_hint: "Enable rewrite/expansion; consider hybrid search or higher top_k."
+    expected_improvement: 0.08
+    expected_improvement_range: [0.04, 0.12]
+    effort: "medium"
+  retrieval.precision_at_k:
+    title: "Improve retrieval precision"
+    description: "Precision@K is low. Filter or rerank to keep relevant documents."
+    implementation_hint: "Strengthen rerank/filter; remove duplicates."
+    expected_improvement: 0.06
+    expected_improvement_range: [0.03, 0.10]
+    effort: "medium"
+  retrieval.result_count:
+    title: "Address empty retrieval"
+    description: "No documents returned. Confirm indexing, filters, and retrieval query."
+    implementation_hint: "Validate index coverage and filter rules; inspect rewrite/expansion."
+    expected_improvement: 0.1
+    expected_improvement_range: [0.05, 0.15]
+    effort: "medium"
+  retrieval.avg_score:
+    title: "Improve retrieval score quality"
+    description: "Average retrieval score is low. Check query formulation and index quality."
+    implementation_hint: "Tune embeddings, enable hybrid search, or adjust retrieval parameters."
+    expected_improvement: 0.05
+    expected_improvement_range: [0.02, 0.08]
+    effort: "medium"
+  retrieval.score_gap:
+    title: "Increase retrieval score separation"
+    description: "Score gap is small. Results are too similar or weakly ranked."
+    implementation_hint: "Tighten filters or add rerank to sharpen top results."
+    expected_improvement: 0.04
+    expected_improvement_range: [0.02, 0.07]
+    effort: "low"
+  retrieval.latency_ms:
+    title: "Reduce retrieval latency"
+    description: "Retrieval latency exceeds the target. Inspect index and query execution."
+    implementation_hint: "Optimize filters, enable caching, or reduce top_k."
+    expected_improvement: 0.05
+    expected_improvement_range: [0.03, 0.08]
+    effort: "medium"
+  rerank.keep_rate:
+    title: "Review rerank pruning"
+    description: "Keep rate is low. Verify the rerank cutoff and minimum context size."
+    implementation_hint: "Relax the cutoff or increase the minimum kept documents."
+    expected_improvement: 0.04
+    expected_improvement_range: [0.02, 0.08]
+    effort: "low"
+  rerank.score_gap:
+    title: "Improve rerank score separation"
+    description: "Score gap is small. Tune or replace the reranker."
+    implementation_hint: "Tune cross-encoder; expand training data."
+    expected_improvement: 0.05
+    expected_improvement_range: [0.02, 0.08]
+    effort: "medium"
+  rerank.avg_score:
+    title: "Improve rerank score quality"
+    description: "Average rerank score is low. Check reranker alignment."
+    implementation_hint: "Review reranker prompts/features or switch to a stronger model."
+    expected_improvement: 0.05
+    expected_improvement_range: [0.02, 0.08]
+    effort: "medium"
+  rerank.latency_ms:
+    title: "Reduce rerank latency"
+    description: "Rerank latency exceeds the target. Review batch size and model size."
+    implementation_hint: "Batch requests, reduce candidates, or use a faster reranker."
+    expected_improvement: 0.04
+    expected_improvement_range: [0.02, 0.07]
+    effort: "medium"
+  output.latency_ms:
+    title: "Reduce generation latency"
+    description: "Output latency exceeds the target. Review model size and decoding settings."
+    implementation_hint: "Lower max_tokens, enable caching, or use a faster model."
+    expected_improvement: 0.06
+    expected_improvement_range: [0.03, 0.1]
+    effort: "medium"
+  output.token_ratio:
+    title: "Increase answer completeness"
+    description: "Output token ratio is below target. Answers may be too short."
+    implementation_hint: "Raise max_tokens or provide richer context."
+    expected_improvement: 0.04
+    expected_improvement_range: [0.02, 0.07]
+    effort: "low"
+  output.citation_count:
+    title: "Increase citation coverage"
+    description: "Citation count is low. Answers may lack supporting sources."
+    implementation_hint: "Ensure citations are collected and enforce grounding steps."
+    expected_improvement: 0.05
+    expected_improvement_range: [0.02, 0.08]
+    effort: "low"
