@@ -1,0 +1,22 @@
+{
+  "name": "retrieval-ground-truth-min",
+  "version": "1.0.0",
+  "description": "Minimal retrieval ground truth fixture with doc_id mapping.",
+  "documents": [
+    {"doc_id": "doc-001", "content": "Premium is 15 dollars per month."},
+    {"doc_id": "doc-002", "content": "Coverage amount is 100,000 dollars."},
+    {"doc_id": "doc-003", "content": "Waiting period is 90 days."}
+  ],
+  "test_cases": [
+    {
+      "test_id": "ret-001",
+      "query": "monthly premium",
+      "relevant_doc_ids": ["doc-001"]
+    },
+    {
+      "test_id": "ret-002",
+      "query": "coverage amount",
+      "relevant_doc_ids": ["doc-002"]
+    }
+  ]
+}

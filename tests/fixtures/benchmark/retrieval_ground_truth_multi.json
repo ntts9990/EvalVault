@@ -1,0 +1,24 @@
+{
+  "name": "retrieval-ground-truth-multi",
+  "version": "1.0.0",
+  "description": "Multi-label retrieval ground truth fixture for nDCG@K.",
+  "documents": [
+    {"doc_id": "doc-101", "content": "Claim documents include invoice and ID."},
+    {"doc_id": "doc-102", "content": "Policy cancellation is allowed within 15 days."},
+    {"doc_id": "doc-103", "content": "Medical certificate is required for claims."},
+    {"doc_id": "doc-104", "content": "Waiting period is 30 days for new policies."},
+    {"doc_id": "doc-105", "content": "Premiums can be paid monthly or yearly."}
+  ],
+  "test_cases": [
+    {
+      "test_id": "ret-101",
+      "query": "claim documents",
+      "relevant_doc_ids": ["doc-101", "doc-103"]
+    },
+    {
+      "test_id": "ret-102",
+      "query": "policy cancellation window",
+      "relevant_doc_ids": ["doc-102", "doc-104"]
+    }
+  ]
+}

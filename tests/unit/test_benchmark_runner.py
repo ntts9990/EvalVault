@@ -94,6 +94,7 @@ def sample_retrieval_data() -> dict:
     return {
         "name": "test-retrieval-benchmark",
         "version": "1.0.0",
+        "evaluation_metrics": ["recall@5", "mrr", "ndcg@5"],
         "documents": [
             {"doc_id": "doc-001", "content": "보험료는 월 15만원입니다."},
             {"doc_id": "doc-002", "content": "사망보험금은 1억원입니다."},
@@ -104,13 +105,34 @@ def sample_retrieval_data() -> dict:
                 "test_id": "ret-001",
                 "category": "baseline",
                 "query": "보험료",
-                "relevant_docs": ["doc-001"],
+                "relevant_doc_ids": ["doc-001"],
             },
             {
                 "test_id": "ret-002",
                 "category": "particle_variation",
                 "query": "사망보험금이 얼마인가요",
-                "relevant_docs": ["doc-002"],
+                "relevant_doc_ids": ["doc-002"],
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def sample_retrieval_data_legacy() -> dict:
+    """레거시 relevant_docs 테스트 데이터."""
+    return {
+        "name": "test-retrieval-benchmark-legacy",
+        "version": "1.0.0",
+        "documents": [
+            {"doc_id": "doc-001", "content": "보험료는 월 15만원입니다."},
+            {"doc_id": "doc-002", "content": "사망보험금은 1억원입니다."},
+        ],
+        "test_cases": [
+            {
+                "test_id": "ret-legacy-001",
+                "category": "baseline",
+                "query": "보험료",
+                "relevant_docs": ["doc-001"],
             },
         ],
     }
@@ -470,6 +492,26 @@ class TestKoreanRAGBenchmarkRunner:
 
             assert result.task_type == TaskType.RETRIEVAL
             assert result.total_tests == 2
+            if result.test_results:
+                metrics = result.test_results[0].metrics
+                assert "recall_at_5" in metrics
+                assert "mrr" in metrics
+                assert "ndcg_at_5" in metrics
+
+    def test_run_retrieval_benchmark_legacy_field(
+        self,
+        benchmark_runner: KoreanRAGBenchmarkRunner,
+        sample_retrieval_data_legacy: dict,
+    ) -> None:
+        """relevant_docs 필드 호환 테스트."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(sample_retrieval_data_legacy, f)
+            f.flush()
+
+            result = benchmark_runner.run_retrieval_benchmark(f.name)
+
+            assert result.task_type == TaskType.RETRIEVAL
+            assert result.total_tests == 1
 
     def test_simple_faithfulness_fallback(
         self,
