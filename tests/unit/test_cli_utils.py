@@ -250,4 +250,6 @@ def test_handle_storage_error_calls_print(monkeypatch: pytest.MonkeyPatch) -> No
     assert captured["message"] == "Failed to save to: output.json"
     assert captured["details"] == "disk full"
     fixes = cast(list[str], captured["fixes"])
-    assert "Path: results/output.json" in "\n".join(fixes)
+    # Use str(Path(...)) for cross-platform path comparison
+    expected_path = str(Path("results/output.json"))
+    assert f"Path: {expected_path}" in "\n".join(fixes)
