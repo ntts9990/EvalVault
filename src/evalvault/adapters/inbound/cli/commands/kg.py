@@ -41,11 +41,13 @@ def create_kg_app(console: Console) -> typer.Typer:
         use_llm: bool = typer.Option(
             False,
             "--use-llm",
+            "-L",
             help="LLM 보강기를 사용해 저신뢰 관계를 검증합니다.",
         ),
         threshold: float = typer.Option(
             0.6,
             "--threshold",
+            "-T",
             help="LLM 보강을 트리거할 confidence 임계값 (0~1).",
         ),
         log_langfuse: bool = typer.Option(
@@ -56,6 +58,7 @@ def create_kg_app(console: Console) -> typer.Typer:
         report_file: Path | None = typer.Option(
             None,
             "--report-file",
+            "-r",
             help="그래프 통계를 JSON 파일로 저장.",
         ),
     ) -> None:

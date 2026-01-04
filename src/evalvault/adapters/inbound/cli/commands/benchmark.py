@@ -126,11 +126,13 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         methods: str = typer.Option(
             "bm25,dense,hybrid",
             "--methods",
+            "-m",
             help="Comma-separated retrieval methods (bm25,dense,hybrid,graphrag).",
         ),
         top_k: int = typer.Option(
             5,
             "--top-k",
+            "-k",
             min=1,
             help="Top-K cutoff for Recall@K and MRR.",
         ),

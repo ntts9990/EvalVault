@@ -38,19 +38,22 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
     @app.command()
     def analyze(  # noqa: PLR0913 - CLI 옵션 다양성을 위한 길이 허용
         run_id: str = typer.Argument(..., help="Run ID to analyze"),
-        nlp: bool = typer.Option(False, "--nlp", help="Include NLP analysis"),
-        causal: bool = typer.Option(False, "--causal", help="Include causal analysis"),
+        nlp: bool = typer.Option(False, "--nlp", "-N", help="Include NLP analysis"),
+        causal: bool = typer.Option(False, "--causal", "-c", help="Include causal analysis"),
         playbook: bool = typer.Option(
-            False, "--playbook", help="Include playbook-based improvement analysis"
+            False, "--playbook", "-B", help="Include playbook-based improvement analysis"
         ),
         enable_llm: bool = typer.Option(
-            False, "--enable-llm", help="Enable LLM-based insight generation for playbook analysis"
+            False,
+            "--enable-llm",
+            "-L",
+            help="Enable LLM-based insight generation for playbook analysis",
         ),
         output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
         report: Path | None = typer.Option(
             None, "--report", "-r", help="Output report file (*.md or *.html)"
         ),
-        save: bool = typer.Option(False, "--save", help="Save analysis to database"),
+        save: bool = typer.Option(False, "--save", "-S", help="Save analysis to database"),
         db_path: Path = db_option(help_text="Database path"),
         profile: str | None = profile_option(
             help_text="Model profile for NLP embeddings (dev, prod, openai)",
