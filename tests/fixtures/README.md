@@ -9,6 +9,9 @@ tests/fixtures/
 ├── sample_dataset.csv      # 단위 테스트용 샘플 (영어)
 ├── sample_dataset.json     # 단위 테스트용 샘플 (영어)
 ├── sample_dataset.xlsx     # 단위 테스트용 샘플 (영어)
+├── benchmark/              # 벤치마크용 doc_id ground_truth
+│   ├── retrieval_ground_truth_min.json
+│   └── retrieval_ground_truth_multi.json
 └── e2e/                    # E2E 및 통합 테스트용 데이터셋
     ├── insurance_qa_korean.*    # 한국어 보험 QA
     ├── insurance_qa_english.*   # 영어 보험 QA

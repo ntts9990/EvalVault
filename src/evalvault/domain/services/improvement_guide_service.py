@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from collections import defaultdict
+from collections.abc import Mapping
+from typing import Any
 
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.improvement import (
@@ -21,6 +24,8 @@ from evalvault.domain.entities.improvement import (
     RAGComponent,
     RAGImprovementGuide,
 )
+from evalvault.domain.entities.stage import StageMetric
+from evalvault.domain.services.stage_metric_guide_service import StageMetricGuideService
 from evalvault.ports.outbound.improvement_port import (
     ActionDefinitionProtocol,
     InsightGeneratorPort,
@@ -49,6 +54,7 @@ class ImprovementGuideService:
         pattern_detector: PatternDetectorPort,
         insight_generator: InsightGeneratorPort | None = None,
         playbook: PlaybookPort | None = None,
+        stage_metric_playbook: Mapping[str, Mapping[str, Any]] | None = None,
         *,
         enable_llm_enrichment: bool = True,
         max_llm_samples: int = 5,
@@ -65,6 +71,7 @@ class ImprovementGuideService:
         self._detector = pattern_detector
         self._generator = insight_generator
         self._playbook = playbook
+        self._stage_metric_playbook = stage_metric_playbook
         self._enable_llm = enable_llm_enrichment and insight_generator is not None
         self._max_llm_samples = max_llm_samples
 
@@ -72,6 +79,7 @@ class ImprovementGuideService:
         self,
         run: EvaluationRun,
         metrics: list[str] | None = None,
+        stage_metrics: list[StageMetric] | None = None,
         *,
         include_llm_analysis: bool | None = None,
     ) -> ImprovementReport:
@@ -136,10 +144,17 @@ class ImprovementGuideService:
                 metric_thresholds=metric_thresholds,
             )
 
-        # 5. 가이드 정렬 (우선순위 순)
+        # 5. StageMetric 기반 가이드 추가 (선택)
+        if stage_metrics:
+            stage_guides = StageMetricGuideService(
+                action_overrides=self._stage_metric_playbook
+            ).build_guides(stage_metrics)
+            guides.extend(stage_guides)
+
+        # 6. 가이드 정렬 (우선순위 순)
         guides = self._sort_guides(guides)
 
-        # 6. 예상 개선폭 계산
+        # 7. 예상 개선폭 계산
         total_expected = {}
         for guide in guides:
             for metric in guide.target_metrics:
@@ -147,7 +162,11 @@ class ImprovementGuideService:
                     total_expected[metric] = 0.0
                 total_expected[metric] += guide.total_expected_improvement
 
-        # 7. 리포트 생성
+        # 8. 리포트 생성
+        metadata: dict[str, Any] = {}
+        if stage_metrics:
+            metadata["stage_metrics_summary"] = _summarize_stage_metrics(stage_metrics)
+
         report = ImprovementReport(
             run_id=run.run_id,
             total_test_cases=run.total_test_cases,
@@ -159,6 +178,7 @@ class ImprovementGuideService:
             guides=guides,
             total_expected_improvement=total_expected,
             analysis_methods_used=analysis_methods,
+            metadata=metadata,
         )
 
         logger.info(
@@ -428,3 +448,46 @@ evalvault compare baseline after_fix --metrics {metric}"""
                 results[metric] = suggestions
 
         return results
+
+
+def _summarize_stage_metrics(metrics: list[StageMetric]) -> dict[str, Any]:
+    total = len(metrics)
+    evaluated = 0
+    passed = 0
+    failed = 0
+    failures: dict[str, list[StageMetric]] = defaultdict(list)
+
+    for metric in metrics:
+        if metric.threshold is None:
+            continue
+        evaluated += 1
+        if metric.passed:
+            passed += 1
+        else:
+            failed += 1
+            failures[metric.metric_name].append(metric)
+
+    pass_rate = (passed / evaluated) if evaluated else None
+    top_failures: list[dict[str, Any]] = []
+    for name, items in failures.items():
+        avg_score = sum(item.score for item in items) / len(items)
+        threshold = next((item.threshold for item in items if item.threshold is not None), None)
+        top_failures.append(
+            {
+                "metric_name": name,
+                "count": len(items),
+                "avg_score": avg_score,
+                "threshold": threshold,
+            }
+        )
+
+    top_failures.sort(key=lambda item: item["count"], reverse=True)
+
+    return {
+        "total": total,
+        "evaluated": evaluated,
+        "passed": passed,
+        "failed": failed,
+        "pass_rate": pass_rate,
+        "top_failures": top_failures[:5],
+    }

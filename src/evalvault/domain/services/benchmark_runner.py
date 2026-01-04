@@ -36,6 +36,10 @@ from evalvault.domain.entities.benchmark import (
     RAGTestCaseResult,
     TaskType,
 )
+from evalvault.domain.services.retrieval_metrics import (
+    compute_retrieval_metrics,
+    resolve_doc_id,
+)
 from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort
 
 logger = logging.getLogger(__name__)
@@ -349,6 +353,9 @@ class KoreanRAGBenchmarkRunner:
     def run_retrieval_benchmark(
         self,
         test_file: str | Path,
+        *,
+        top_k: int = 5,
+        ndcg_k: int | None = None,
     ) -> BenchmarkResult:
         """검색 벤치마크 실행.
 
@@ -363,6 +370,13 @@ class KoreanRAGBenchmarkRunner:
         data = self.load_test_data(test_file)
         documents = data.get("documents", [])
         test_cases = data.get("test_cases", [])
+        doc_ids = _normalize_document_ids(documents)
+        doc_contents = [str(doc.get("content", "")) for doc in documents]
+        recall_k, resolved_ndcg_k = _resolve_retrieval_ks(
+            data,
+            default_recall_k=top_k,
+            default_ndcg_k=ndcg_k,
+        )
 
         result = BenchmarkResult(
             task_name=data.get("name", "korean-retrieval-benchmark"),
@@ -372,19 +386,19 @@ class KoreanRAGBenchmarkRunner:
         )
 
         # 검색기 초기화
-        doc_contents = [d.get("content", "") for d in documents]
         retriever = self._build_retriever(doc_contents)
-
-        doc_id_map = {d.get("doc_id"): i for i, d in enumerate(documents)}
+        recall_key = f"recall_at_{recall_k}"
+        ndcg_key = f"ndcg_at_{resolved_ndcg_k}"
 
         for tc in test_cases:
             start_time = time.time()
 
             query = tc.get("query", "")
-            relevant_doc_ids = tc.get("relevant_docs", [])
-            relevant_indices = {
-                doc_id_map[doc_id] for doc_id in relevant_doc_ids if doc_id in doc_id_map
-            }
+            if "relevant_doc_ids" in tc:
+                relevant_doc_ids = tc.get("relevant_doc_ids", [])
+            else:
+                relevant_doc_ids = tc.get("relevant_docs", [])
+            relevant_doc_ids = [str(doc_id) for doc_id in relevant_doc_ids]
 
             rag_case = RAGTestCase(
                 test_id=tc.get("test_id", ""),
@@ -402,58 +416,42 @@ class KoreanRAGBenchmarkRunner:
                 if retriever:
                     if self.use_hybrid_search and hasattr(retriever, "has_embeddings"):
                         results = retriever.search(
-                            query, top_k=5, use_dense=retriever.has_embeddings
+                            query, top_k=recall_k, use_dense=retriever.has_embeddings
                         )
                     else:
-                        results = retriever.search(query, top_k=5)
-                    # 검색 결과에서 doc_id 추출
-                    retrieved_doc_ids = set()
-                    for i, res in enumerate(results):
-                        if hasattr(res, "doc_id"):
-                            retrieved_doc_ids.add(res.doc_id)
-                        else:
-                            retrieved_doc_ids.add(i)
-
-                    # Recall@5 계산
-                    hits = len(relevant_indices & retrieved_doc_ids)
-                    recall_at_5 = hits / len(relevant_indices) if relevant_indices else 0.0
-                    metrics["recall_at_5"] = recall_at_5
-
-                    # MRR 계산
-                    for rank, res in enumerate(results, 1):
-                        doc_id = res.doc_id if hasattr(res, "doc_id") else rank - 1
-                        if doc_id in relevant_indices:
-                            metrics["mrr"] = 1.0 / rank
-                            break
-                    else:
-                        metrics["mrr"] = 0.0
+                        results = retriever.search(query, top_k=recall_k)
+                    retrieved_doc_ids = [
+                        resolve_doc_id(getattr(res, "doc_id", None), doc_ids, idx)
+                        for idx, res in enumerate(results, start=1)
+                    ]
+                    metrics.update(
+                        compute_retrieval_metrics(
+                            retrieved_doc_ids,
+                            relevant_doc_ids,
+                            recall_k=recall_k,
+                            ndcg_k=resolved_ndcg_k,
+                        )
+                    )
                 else:
                     # retriever 없으면 단순 키워드 매칭
-                    doc_contents = [d.get("content", "") for d in documents]
-                    query_words = set(query.lower().split())
-                    scores = []
-                    for i, doc in enumerate(doc_contents):
-                        doc_words = set(doc.lower().split())
-                        overlap = len(query_words & doc_words)
-                        scores.append((i, overlap))
-                    scores.sort(key=lambda x: x[1], reverse=True)
-                    retrieved_ids = {s[0] for s in scores[:5]}
-
-                    hits = len(relevant_indices & retrieved_ids)
-                    recall_at_5 = hits / len(relevant_indices) if relevant_indices else 0.0
-                    metrics["recall_at_5"] = recall_at_5
-                    metrics["mrr"] = 0.0
-                    for rank, (doc_id, _) in enumerate(scores[:5], 1):
-                        if doc_id in relevant_indices:
-                            metrics["mrr"] = 1.0 / rank
-                            break
+                    retrieved_doc_ids = _keyword_search(doc_contents, doc_ids, query, recall_k)
+                    metrics.update(
+                        compute_retrieval_metrics(
+                            retrieved_doc_ids,
+                            relevant_doc_ids,
+                            recall_k=recall_k,
+                            ndcg_k=resolved_ndcg_k,
+                        )
+                    )
 
             except Exception as e:
                 error = str(e)
-                metrics["recall_at_5"] = 0.0
+                metrics[recall_key] = 0.0
+                metrics["mrr"] = 0.0
+                metrics[ndcg_key] = 0.0
 
             duration_ms = (time.time() - start_time) * 1000
-            success = metrics.get("recall_at_5", 0) >= 0.5
+            success = metrics.get(recall_key, 0) >= 0.5
 
             test_result = RAGTestCaseResult(
                 test_case=rag_case,
@@ -469,8 +467,9 @@ class KoreanRAGBenchmarkRunner:
                 status = "✓" if success else "✗"
                 print(
                     f"  {status} {tc.get('test_id')}: "
-                    f"recall@5={metrics.get('recall_at_5', 0):.3f}, "
-                    f"mrr={metrics.get('mrr', 0):.3f}"
+                    f"recall@{recall_k}={metrics.get(recall_key, 0):.3f}, "
+                    f"mrr={metrics.get('mrr', 0):.3f}, "
+                    f"ndcg@{resolved_ndcg_k}={metrics.get(ndcg_key, 0):.3f}"
                 )
 
         result.finalize()
@@ -635,6 +634,80 @@ class KoreanRAGBenchmarkRunner:
                     )
 
         return comparisons
+
+
+# =============================================================================
+# Retrieval helpers
+# =============================================================================
+
+
+def _normalize_document_ids(documents: list[dict[str, Any]]) -> list[str]:
+    doc_ids: list[str] = []
+    for idx, doc in enumerate(documents, start=1):
+        doc_id = doc.get("doc_id") or doc.get("id") or f"doc_{idx}"
+        doc_ids.append(str(doc_id))
+    return doc_ids
+
+
+def _keyword_search(
+    documents: list[str],
+    doc_ids: list[str],
+    query: str,
+    top_k: int,
+) -> list[str]:
+    query_words = set(query.lower().split())
+    scores: list[tuple[int, int, str]] = []
+    for i, doc in enumerate(documents):
+        doc_words = set(doc.lower().split())
+        overlap = len(query_words & doc_words)
+        scores.append((overlap, i, doc_ids[i]))
+    scores.sort(key=lambda item: (-item[0], item[1]))
+    return [doc_id for _, _, doc_id in scores[:top_k]]
+
+
+def _resolve_retrieval_ks(
+    data: dict[str, Any],
+    *,
+    default_recall_k: int,
+    default_ndcg_k: int | None,
+) -> tuple[int, int]:
+    metrics = data.get("evaluation_metrics")
+    recall_k = _extract_metric_k(metrics, "recall") or _coerce_int(data.get("top_k"))
+    resolved_recall_k = recall_k or default_recall_k
+    ndcg_k = _extract_metric_k(metrics, "ndcg") or default_ndcg_k
+    resolved_ndcg_k = ndcg_k or resolved_recall_k
+    return resolved_recall_k, resolved_ndcg_k
+
+
+def _extract_metric_k(metrics: Any, prefix: str) -> int | None:
+    if not isinstance(metrics, list):
+        return None
+    for metric in metrics:
+        if not isinstance(metric, str):
+            continue
+        candidate = metric.lower()
+        if not candidate.startswith(prefix):
+            continue
+        if "@" in candidate:
+            suffix = candidate.split("@", 1)[1]
+        elif "_at_" in candidate:
+            suffix = candidate.split("_at_", 1)[1]
+        else:
+            continue
+        try:
+            return int(suffix)
+        except ValueError:
+            continue
+    return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 # =============================================================================

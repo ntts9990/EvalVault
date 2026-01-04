@@ -1324,7 +1324,7 @@ def run(
 ### 즉시 조치 (Quick Wins)
 
 1. **버전 표기 일관성 검증**: OBSERVABILITY_PLAYBOOK의 "EvalVault 3.2" 표기와 STATUS 버전 불일치 수정
-2. **NEXT_TASKS 범위 재정의**: "기존 개발 완료" vs "엔터프라이즈화 백로그" 분리
+2. **단기 작업 범위 재정의**: ROADMAP의 단기 작업과 엔터프라이즈 백로그 분리
 
 ---
 

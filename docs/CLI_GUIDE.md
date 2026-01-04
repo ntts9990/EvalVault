@@ -8,7 +8,7 @@ EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있
 
 | 영역 | 설명 | 엔트리 포인트 |
 |------|------|---------------|
-| 루트 명령 | `run`, `gate`, `generate`, `pipeline`, `analyze`, `experiment`, `agent`, `config`, `web`, `langfuse` | `register_all_commands()` |
+| 루트 명령 | `run`, `gate`, `generate`, `pipeline`, `analyze`, `experiment`, `agent`, `config`, `web`, `langfuse`, `stage` | `register_all_commands()` |
 | 서브앱 | `domain`, `kg`, `benchmark` | `attach_sub_apps()` |
 | 공통 옵션 | `--profile/-p`, `--db/-D`, `--memory-db/-M` | `cli/utils/options.py` |
 
@@ -60,6 +60,28 @@ evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   - `--memory-domain` / `--memory-language`: 도메인·언어를 강제 지정합니다.
   - `--augment-context`: 평가 전 각 테스트 케이스에 `[관련 사실]` 블록을 추가해 컨텍스트를 확장합니다.
   - `--memory-db/-M`: 메모리 DB 경로를 재지정합니다.
+- Retriever 연동:
+  - `--retriever`: `bm25`, `dense`, `hybrid`, `graphrag` 중 컨텍스트 자동 생성용 검색기를 선택합니다.
+  - `--retriever-docs`: 검색에 사용할 문서 파일(.json/.jsonl/.txt)을 지정합니다.
+  - `--retriever-top-k`: 검색 결과 상위 k개를 컨텍스트로 사용합니다.
+  - `--kg`: GraphRAG용 Knowledge Graph JSON 파일을 지정합니다.
+  - `--stream` 모드에서는 retriever 적용을 건너뜁니다.
+- `run-simple`/`run-full`에서도 동일한 retriever 옵션을 사용할 수 있습니다.
+
+예시:
+
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --retriever hybrid \
+  --retriever-docs examples/benchmarks/korean_rag/retrieval_test.json \
+  --retriever-top-k 5
+
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --retriever graphrag \
+  --retriever-docs examples/benchmarks/korean_rag/retrieval_test.json \
+  --kg tests/fixtures/kg/minimal_graph.json \
+  --retriever-top-k 5
+```
 
 ### 3.2 `pipeline`
 ```bash
@@ -79,6 +101,35 @@ evalvault domain init insurance --languages ko,en --description "보험 QA"
 evalvault domain list
 evalvault domain show insurance
 ```
+
+### 3.5 `stage`
+```bash
+evalvault stage ingest stage_events.jsonl --db evalvault.db
+evalvault stage summary run_20260103_001 --db evalvault.db
+evalvault stage compute-metrics run_20260103_001 --thresholds-json config/stage_metric_thresholds.json
+```
+- `ingest`: JSON/JSONL stage events를 저장합니다.
+- `summary`: 단계별 카운트/평균 지연과 필수 단계 누락 여부를 확인합니다.
+- `compute-metrics`: stage events로 StageMetric을 계산해 저장합니다.
+  - `--thresholds-json` 미지정 시 `config/stage_metric_thresholds.json`이 존재하면 자동 적용
+  - `--thresholds-profile` 미지정 시 `Settings.evalvault_profile` 사용
+
+### 3.6 `benchmark`
+```bash
+evalvault benchmark run --name korean-rag
+evalvault benchmark retrieval tests/fixtures/benchmark/retrieval_ground_truth_min.json \
+  --methods bm25,dense,hybrid \
+  --top-k 5 \
+  --ndcg-k 10 \
+  --output reports/retrieval_benchmark.json
+```
+- `run`: 한국어 RAG 벤치마크 스위트를 실행합니다.
+- `retrieval`: 검색 방식별 Recall/MRR/nDCG를 비교하고 JSON/CSV로 저장합니다.
+  - `--methods`: `bm25,dense,hybrid,graphrag` 중 복수 지정
+  - `--embedding-profile`: `dev/prod` (Ollama Qwen3-Embedding 사용)
+  - `--embedding-model`: Dense/Hybrid 임베딩 모델명 오버라이드
+  - `--kg`: GraphRAG 선택 시 필수
+  - `--output`: `.json` 또는 `.csv` 저장
 
 ---
 

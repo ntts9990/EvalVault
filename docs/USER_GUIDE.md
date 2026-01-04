@@ -19,6 +19,7 @@
    - [CLI 실행](#cli-실행)
    - [히스토리/비교/내보내기](#히스토리비교내보내기)
    - [Web UI](#web-ui)
+   - [단계별 성능 평가 (stage)](#단계별-성능-평가-stage)
 4. [저장·추적](#저장추적)
    - [SQLite/PostgreSQL](#sqlitepostgresql)
    - [Langfuse](#langfuse)
@@ -168,6 +169,32 @@ uv run evalvault export <run_id> -o run.json
 uv run evalvault web --browser
 ```
 Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
+
+### 단계별 성능 평가 (stage)
+단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
+
+```bash
+uv run evalvault stage ingest examples/stage_events.jsonl --db evalvault.db
+uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage compute-metrics run_20260103_001 \
+  --thresholds-json config/stage_metric_thresholds.json \
+  --thresholds-profile dev
+```
+
+- `output.attributes.citations`를 기록하면 `output.citation_count` 지표가 계산됩니다.
+- 임계값은 `config/stage_metric_thresholds.json`의 `default`/`profiles`로 관리합니다.
+- 지연 메트릭은 `duration_ms` 또는 `started_at`/`finished_at`이 있어야 계산됩니다.
+
+실제 평가 파이프라인 실행 예시:
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --profile dev \
+  --db evalvault.db
+```
+- 평가 실행 후 `evalvault history --limit 1 --db evalvault.db`로 `run_id`를 확인합니다.
+- 동일한 `run_id`로 stage 이벤트를 기록하면 `evalvault analyze <run_id> --playbook`에서
+  단계별 개선 가이드까지 확인할 수 있습니다.
 
 ---
 

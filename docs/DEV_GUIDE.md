@@ -2,7 +2,7 @@
 
 > Audience: 기여자/개발자
 > Purpose: 로컬 개발·테스트·린트·문서 갱신의 기본 루틴을 표준화
-> Last Updated: 2026-01-03
+> Last Updated: 2026-01-04
 
 ---
 
@@ -51,7 +51,7 @@ uv run evalvault web
 
 ## 문서 작업 규칙 (Docs)
 
-- "현재 상태"는 [STATUS.md](STATUS.md)가 단일 출처(SSoT)입니다.
+- "내부 상태"는 [internal/STATUS.md](internal/STATUS.md)가 단일 출처(SSoT)입니다.
 - 사용자 문서는 `README.ko.md`/`USER_GUIDE.md`/`tutorials/`에, 내부 설계/운영은 `internal/`에 둡니다.
 - 새 문서를 추가하면 [README.md](README.md)에 링크를 반드시 추가합니다.
 

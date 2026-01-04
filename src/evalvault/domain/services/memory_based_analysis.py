@@ -6,13 +6,13 @@ from collections import defaultdict
 from typing import Any
 
 from evalvault.domain.entities import EvaluationRun, TestCase
-from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
+from evalvault.ports.outbound.domain_memory_port import MemoryInsightPort
 
 
 class MemoryBasedAnalysis:
     """Generate insights by combining EvaluationRun data with Domain Memory."""
 
-    def __init__(self, memory_port: DomainMemoryPort):
+    def __init__(self, memory_port: MemoryInsightPort):
         self.memory_port = memory_port
 
     def generate_insights(

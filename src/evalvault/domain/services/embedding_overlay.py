@@ -10,7 +10,7 @@ from evalvault.domain.entities.memory import FactType, FactualFact
 
 def _as_float(value: Any) -> float | None:
     try:
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, str) and value.strip():
             return float(value.strip())

@@ -54,6 +54,7 @@ class PatternType(str, Enum):
 
     # 기타
     UNKNOWN = "unknown"
+    STAGE_METRIC_BELOW_THRESHOLD = "stage_metric_below_threshold"
 
 
 class EffortLevel(str, Enum):
@@ -430,6 +431,38 @@ class ImprovementReport:
             gap = self.metric_gaps.get(metric, threshold - score)
             status = "✅" if score >= threshold else "❌"
             lines.append(f"| {metric} | {score:.3f} | {threshold:.2f} | {gap:+.3f} | {status} |")
+
+        stage_summary = self.metadata.get("stage_metrics_summary")
+        if stage_summary:
+            pass_rate = stage_summary.get("pass_rate")
+            pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "n/a"
+            lines.extend(
+                [
+                    "",
+                    "### 단계 메트릭 요약",
+                    "",
+                    f"- 총 메트릭: {stage_summary.get('total', 0)}개",
+                    f"- 평가 대상(임계값 있음): {stage_summary.get('evaluated', 0)}개",
+                    f"- 통과: {stage_summary.get('passed', 0)}개 / 실패: {stage_summary.get('failed', 0)}개",
+                    f"- 통과율: {pass_rate_text}",
+                ]
+            )
+            top_failures = stage_summary.get("top_failures", [])
+            if top_failures:
+                lines.extend(
+                    [
+                        "",
+                        "| 메트릭 | 실패 건수 | 평균 점수 | 임계값 |",
+                        "|--------|----------|-----------|--------|",
+                    ]
+                )
+                for item in top_failures:
+                    threshold = item.get("threshold")
+                    threshold_text = f"{threshold:.3f}" if threshold is not None else "-"
+                    lines.append(
+                        f"| {item.get('metric_name')} | {item.get('count', 0)} | "
+                        f"{item.get('avg_score', 0.0):.3f} | {threshold_text} |"
+                    )
 
         lines.extend(["", "---", ""])
 

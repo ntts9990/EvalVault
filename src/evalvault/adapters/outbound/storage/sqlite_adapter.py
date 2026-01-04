@@ -22,6 +22,7 @@ from evalvault.domain.entities.analysis import (
     TopicCluster,
 )
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.entities.stage import StageEvent, StageMetric, StagePayloadRef
 
 
 class SQLiteStorageAdapter(BaseSQLStorageAdapter):
@@ -601,3 +602,178 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             topic_clusters=topic_clusters,
             insights=result_data.get("insights", []),
         )
+
+    # Stage event/metric 관련 메서드
+
+    def save_stage_event(self, event: StageEvent) -> str:
+        """단계 이벤트를 저장합니다."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO stage_events (
+                    run_id, stage_id, parent_stage_id, stage_type, stage_name,
+                    status, attempt, started_at, finished_at, duration_ms,
+                    input_ref, output_ref, attributes, metadata, trace_id, span_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                self._serialize_stage_event(event),
+            )
+            conn.commit()
+        return event.stage_id
+
+    def save_stage_events(self, events: list[StageEvent]) -> int:
+        """여러 단계 이벤트를 저장합니다."""
+        if not events:
+            return 0
+        with self._get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO stage_events (
+                    run_id, stage_id, parent_stage_id, stage_type, stage_name,
+                    status, attempt, started_at, finished_at, duration_ms,
+                    input_ref, output_ref, attributes, metadata, trace_id, span_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [self._serialize_stage_event(event) for event in events],
+            )
+            conn.commit()
+        return len(events)
+
+    def list_stage_events(
+        self,
+        run_id: str,
+        *,
+        stage_type: str | None = None,
+    ) -> list[StageEvent]:
+        """특정 실행의 단계 이벤트를 조회합니다."""
+        query = """
+            SELECT run_id, stage_id, parent_stage_id, stage_type, stage_name,
+                   status, attempt, started_at, finished_at, duration_ms,
+                   input_ref, output_ref, attributes, metadata, trace_id, span_id
+            FROM stage_events
+            WHERE run_id = ?
+        """
+        params: list[Any] = [run_id]
+        if stage_type:
+            query += " AND stage_type = ?"
+            params.append(stage_type)
+        query += " ORDER BY id"
+        with self._get_connection() as conn:
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+        return [self._deserialize_stage_event(row) for row in rows]
+
+    def save_stage_metrics(self, metrics: list[StageMetric]) -> int:
+        """여러 단계 메트릭을 저장합니다."""
+        if not metrics:
+            return 0
+        with self._get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO stage_metrics (
+                    run_id, stage_id, metric_name, score, threshold, evidence
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [self._serialize_stage_metric(metric) for metric in metrics],
+            )
+            conn.commit()
+        return len(metrics)
+
+    def list_stage_metrics(
+        self,
+        run_id: str,
+        *,
+        stage_id: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[StageMetric]:
+        """특정 실행의 단계 메트릭을 조회합니다."""
+        query = """
+            SELECT run_id, stage_id, metric_name, score, threshold, evidence
+            FROM stage_metrics
+            WHERE run_id = ?
+        """
+        params: list[Any] = [run_id]
+        if stage_id:
+            query += " AND stage_id = ?"
+            params.append(stage_id)
+        if metric_name:
+            query += " AND metric_name = ?"
+            params.append(metric_name)
+        query += " ORDER BY id"
+        with self._get_connection() as conn:
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+        return [self._deserialize_stage_metric(row) for row in rows]
+
+    def _serialize_stage_event(self, event: StageEvent) -> tuple[Any, ...]:
+        return (
+            event.run_id,
+            event.stage_id,
+            event.parent_stage_id,
+            event.stage_type,
+            event.stage_name,
+            event.status,
+            event.attempt,
+            self._serialize_datetime(event.started_at),
+            self._serialize_datetime(event.finished_at),
+            event.duration_ms,
+            self._serialize_payload_ref(event.input_ref),
+            self._serialize_payload_ref(event.output_ref),
+            self._serialize_json(event.attributes),
+            self._serialize_json(event.metadata),
+            event.trace_id,
+            event.span_id,
+        )
+
+    def _deserialize_stage_event(self, row: sqlite3.Row) -> StageEvent:
+        return StageEvent(
+            run_id=row["run_id"],
+            stage_id=row["stage_id"],
+            parent_stage_id=row["parent_stage_id"],
+            stage_type=row["stage_type"],
+            stage_name=row["stage_name"],
+            status=row["status"],
+            attempt=row["attempt"],
+            started_at=self._deserialize_datetime(row["started_at"]),
+            finished_at=self._deserialize_datetime(row["finished_at"]),
+            duration_ms=self._maybe_float(row["duration_ms"]),
+            input_ref=self._deserialize_payload_ref(row["input_ref"]),
+            output_ref=self._deserialize_payload_ref(row["output_ref"]),
+            attributes=self._deserialize_json(row["attributes"]) or {},
+            metadata=self._deserialize_json(row["metadata"]) or {},
+            trace_id=row["trace_id"],
+            span_id=row["span_id"],
+        )
+
+    def _serialize_stage_metric(self, metric: StageMetric) -> tuple[Any, ...]:
+        return (
+            metric.run_id,
+            metric.stage_id,
+            metric.metric_name,
+            metric.score,
+            metric.threshold,
+            self._serialize_json(metric.evidence),
+        )
+
+    def _deserialize_stage_metric(self, row: sqlite3.Row) -> StageMetric:
+        return StageMetric(
+            run_id=row["run_id"],
+            stage_id=row["stage_id"],
+            metric_name=row["metric_name"],
+            score=self._maybe_float(row["score"]) or 0.0,
+            threshold=self._maybe_float(row["threshold"]),
+            evidence=self._deserialize_json(row["evidence"]),
+        )
+
+    def _serialize_payload_ref(self, ref: StagePayloadRef | None) -> str | None:
+        if ref is None:
+            return None
+        return json.dumps(ref.to_dict(), ensure_ascii=False)
+
+    def _deserialize_payload_ref(self, raw: Any) -> StagePayloadRef | None:
+        payload = self._deserialize_json(raw)
+        if not payload:
+            return None
+        if isinstance(payload, dict):
+            return StagePayloadRef.from_dict(payload)
+        return None

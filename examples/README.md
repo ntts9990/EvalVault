@@ -4,6 +4,17 @@ EvalVault 사용 예제를 담고 있는 디렉터리입니다.
 
 ## 예제 목록
 
+### stage_events.jsonl
+
+Stage 이벤트 샘플 데이터입니다. `evalvault stage` 명령으로 수집/요약/평가를 확인할 때
+사용합니다.
+
+```bash
+uv run evalvault stage ingest examples/stage_events.jsonl --db evalvault.db
+uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage compute-metrics run_20260103_001 --thresholds-json config/stage_metric_thresholds.json
+```
+
 ### kg_generator_demo.py
 
 Knowledge Graph 기반 테스트셋 생성 데모입니다.

@@ -9,7 +9,9 @@ from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 from evalvault.domain.entities.improvement import (
     EvidenceSource,
     ImprovementPriority,
+    RAGComponent,
 )
+from evalvault.domain.entities.stage import StageMetric
 from evalvault.domain.services.improvement_guide_service import ImprovementGuideService
 
 
@@ -131,6 +133,50 @@ class TestImprovementGuideService:
 
         assert "faithfulness" in report.metric_scores
         # context_precision은 분석에 포함되지 않을 수 있음
+
+    def test_generate_report_with_stage_metrics(self):
+        """StageMetric 기반 가이드 생성."""
+        detector = PatternDetector(min_sample_size=999)
+        stage_metric_playbook = {
+            "retrieval.recall_at_k": {
+                "title": "Custom recall improvement",
+                "expected_improvement": 0.2,
+                "expected_improvement_range": [0.1, 0.3],
+                "effort": "high",
+            }
+        }
+        service = ImprovementGuideService(
+            pattern_detector=detector,
+            enable_llm_enrichment=False,
+            stage_metric_playbook=stage_metric_playbook,
+        )
+
+        run = create_test_run(num_cases=5)
+        stage_metrics = [
+            StageMetric(
+                run_id=run.run_id,
+                stage_id="stg-retrieval-01",
+                metric_name="retrieval.recall_at_k",
+                score=0.4,
+                threshold=0.6,
+            )
+        ]
+
+        report = service.generate_report(run, stage_metrics=stage_metrics)
+        retriever_guides = [
+            guide for guide in report.guides if guide.component == RAGComponent.RETRIEVER
+        ]
+        assert retriever_guides
+        assert retriever_guides[0].actions[0].title == "Custom recall improvement"
+        stage_summary = report.metadata.get("stage_metrics_summary")
+        assert stage_summary is not None
+        assert stage_summary["total"] == 1
+        assert stage_summary["failed"] == 1
+        assert stage_summary["pass_rate"] == 0.0
+        assert stage_summary["top_failures"][0]["metric_name"] == "retrieval.recall_at_k"
+
+        markdown = report.to_markdown()
+        assert "단계 메트릭 요약" in markdown
 
     def test_generate_report_markdown(self):
         """마크다운 리포트 생성."""

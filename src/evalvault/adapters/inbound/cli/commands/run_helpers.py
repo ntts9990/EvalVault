@@ -1,0 +1,1028 @@
+"""`evalvault run` 명령을 보조하는 헬퍼 모음."""
+
+from __future__ import annotations
+
+import json
+import time
+from collections.abc import Callable, Sequence
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Literal
+
+import typer
+from click.core import ParameterSource
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+from evalvault.adapters.outbound.dataset import StreamingConfig, StreamingDatasetLoader
+from evalvault.adapters.outbound.kg.networkx_adapter import NetworkXKnowledgeGraph
+from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.phoenix_support import (
+    get_phoenix_trace_url,
+    instrumentation_span,
+    set_span_attributes,
+)
+from evalvault.config.settings import Settings
+from evalvault.domain.entities import (
+    Dataset,
+    EvaluationRun,
+    GenerationData,
+    RAGTraceData,
+    RetrievalData,
+    RetrievedDocument,
+    StageEvent,
+)
+from evalvault.domain.services.evaluator import RagasEvaluator
+from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+from evalvault.domain.services.prompt_manifest import (
+    PromptDiffSummary,
+    load_prompt_manifest,
+    summarize_prompt_entry,
+)
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort, RetrieverResultProtocol
+from evalvault.ports.outbound.llm_port import LLMPort
+from evalvault.ports.outbound.tracker_port import TrackerPort
+
+from ..utils.console import print_cli_error, print_cli_warning
+from ..utils.formatters import format_score, format_status
+
+TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
+
+
+@dataclass(frozen=True)
+class RunModePreset:
+    """심플/전체 실행 모드를 정의한다."""
+
+    name: str
+    label: str
+    description: str
+    default_metrics: tuple[str, ...] | None = None
+    default_tracker: TrackerType | None = None
+    allow_domain_memory: bool = True
+    allow_prompt_metadata: bool = True
+
+
+RUN_MODE_PRESETS: dict[str, RunModePreset] = {
+    "simple": RunModePreset(
+        name="simple",
+        label="Simple",
+        description="기본 메트릭 2종과 Phoenix 추적만 활성화된 간편 실행 모드.",
+        default_metrics=("faithfulness", "answer_relevancy"),
+        default_tracker="phoenix",
+        allow_domain_memory=False,
+        allow_prompt_metadata=False,
+    ),
+    "full": RunModePreset(
+        name="full",
+        label="Full",
+        description="모든 CLI 옵션과 Domain Memory, Prompt manifest를 활용하는 전체 모드.",
+    ),
+}
+
+
+def _display_results(result, console: Console, verbose: bool = False) -> None:
+    """Display evaluation results in a formatted table."""
+    duration = result.duration_seconds
+    duration_str = f"{duration:.2f}s" if duration is not None else "N/A"
+
+    summary = f"""
+[bold]Evaluation Summary[/bold]
+  Run ID: {result.run_id}
+  Dataset: {result.dataset_name} v{result.dataset_version}
+  Model: {result.model_name}
+  Duration: {duration_str}
+
+[bold]Results[/bold]
+  Total Test Cases: {result.total_test_cases}
+  Passed: [green]{result.passed_test_cases}[/green]
+  Failed: [red]{result.total_test_cases - result.passed_test_cases}[/red]
+  Pass Rate: {"[green]" if result.pass_rate >= 0.7 else "[red]"}{result.pass_rate:.1%}[/]
+"""
+    console.print(Panel(summary, title="Evaluation Results", border_style="blue"))
+
+    table = Table(title="Metric Scores", show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Average Score", justify="right")
+    table.add_column("Threshold", justify="right")
+    table.add_column("Status", justify="center")
+
+    for metric in result.metrics_evaluated:
+        avg_score = result.get_avg_score(metric)
+        threshold = result.thresholds.get(metric, 0.7)
+        passed = avg_score >= threshold
+        table.add_row(
+            metric,
+            format_score(avg_score, passed),
+            f"{threshold:.2f}",
+            format_status(passed),
+        )
+
+    console.print(table)
+
+    if verbose:
+        console.print("\n[bold]Detailed Results[/bold]\n")
+        for tc_result in result.results:
+            status = format_status(tc_result.all_passed)
+            console.print(f"  {tc_result.test_case_id}: {status}")
+            for metric in tc_result.metrics:
+                m_status = format_status(metric.passed, success_text="+", failure_text="-")
+                score = format_score(metric.score, metric.passed)
+                console.print(
+                    f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
+                )
+
+
+def _display_memory_insights(insights: dict[str, Any], console: Console) -> None:
+    """Render Domain Memory insights panel."""
+
+    if not insights:
+        return
+
+    recommendations = insights.get("recommendations") or []
+    trends = insights.get("trends") or {}
+    if not recommendations and not trends:
+        return
+
+    trend_lines: list[str] = []
+    for metric, info in list(trends.items())[:3]:
+        delta = info.get("delta", 0.0)
+        baseline = info.get("baseline", 0.0)
+        current = info.get("current", 0.0)
+        trend_lines.append(
+            f"- {metric}: Δ {delta:+.2f} (current {current:.2f} / baseline {baseline:.2f})"
+        )
+
+    recommendation_lines = [f"- {rec}" for rec in recommendations[:3]]
+    if not trend_lines and not recommendation_lines:
+        return
+
+    panel_body = ""
+    if trend_lines:
+        panel_body += "[bold]Trend Signals[/bold]\n" + "\n".join(trend_lines) + "\n"
+    if recommendation_lines:
+        if panel_body:
+            panel_body += "\n"
+        panel_body += "[bold]Recommendations[/bold]\n" + "\n".join(recommendation_lines)
+
+    console.print(Panel(panel_body, title="Domain Memory Insights", border_style="magenta"))
+
+
+def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> TrackerPort | None:
+    """Get the appropriate tracker adapter based on type."""
+    if tracker_type == "langfuse":
+        if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+            print_cli_warning(
+                console,
+                "Langfuse 자격 증명이 설정되지 않아 로깅을 건너뜁니다.",
+                tips=["LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY를 .env에 추가하세요."],
+            )
+            return None
+        from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
+
+        return LangfuseAdapter(
+            public_key=settings.langfuse_public_key,
+            secret_key=settings.langfuse_secret_key,
+            host=settings.langfuse_host,
+        )
+
+    elif tracker_type == "mlflow":
+        if not settings.mlflow_tracking_uri:
+            print_cli_warning(
+                console,
+                "MLflow tracking URI가 설정되지 않아 로깅을 건너뜁니다.",
+                tips=["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."],
+            )
+            return None
+        try:
+            from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
+
+            return MLflowAdapter(
+                tracking_uri=settings.mlflow_tracking_uri,
+                experiment_name=settings.mlflow_experiment_name,
+            )
+        except ImportError:
+            print_cli_warning(
+                console,
+                "MLflow extra가 설치되지 않았습니다.",
+                tips=["uv sync --extra mlflow 명령으로 구성요소를 설치하세요."],
+            )
+            return None
+
+    elif tracker_type == "phoenix":
+        try:
+            from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
+
+            return PhoenixAdapter(
+                endpoint=settings.phoenix_endpoint,
+                service_name="evalvault",
+            )
+        except ImportError:
+            print_cli_warning(
+                console,
+                "Phoenix extra가 설치되지 않았습니다.",
+                tips=["uv sync --extra phoenix 명령으로 의존성을 추가하세요."],
+            )
+            return None
+
+    else:
+        print_cli_warning(
+            console,
+            f"알 수 없는 tracker 타입입니다: {tracker_type}",
+            tips=["langfuse/mlflow/phoenix/none 중 하나를 지정하세요."],
+        )
+        return None
+
+
+def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
+    """Build a Phoenix UI URL for the given trace ID."""
+
+    base = endpoint.rstrip("/")
+    suffix = "/v1/traces"
+    if base.endswith(suffix):
+        base = base[: -len(suffix)]
+    return f"{base.rstrip('/')}/#/traces/{trace_id}"
+
+
+def _log_to_tracker(
+    settings: Settings,
+    result,
+    console: Console,
+    tracker_type: str,
+    *,
+    phoenix_options: dict[str, Any] | None = None,
+    log_phoenix_traces_fn: Callable[..., int] | None = None,
+) -> None:
+    """Log evaluation results to the specified tracker."""
+    tracker = _get_tracker(settings, tracker_type, console)
+    if tracker is None:
+        return
+
+    tracker_name = tracker_type.capitalize()
+    trace_id: str | None = None
+    with console.status(f"[bold green]Logging to {tracker_name}..."):
+        try:
+            trace_id = tracker.log_evaluation_run(result)
+            console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
+            if trace_id and tracker_type == "phoenix":
+                endpoint = getattr(settings, "phoenix_endpoint", "http://localhost:6006/v1/traces")
+                if not isinstance(endpoint, str) or not endpoint:
+                    endpoint = "http://localhost:6006/v1/traces"
+                phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+                phoenix_meta.update(
+                    {
+                        "trace_id": trace_id,
+                        "endpoint": endpoint,
+                        "trace_url": _build_phoenix_trace_url(endpoint, trace_id),
+                    }
+                )
+                phoenix_meta.setdefault("schema_version", 2)
+                trace_url = get_phoenix_trace_url(result.tracker_metadata)
+                if trace_url:
+                    console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
+        except Exception as exc:  # pragma: no cover - telemetry best-effort
+            print_cli_warning(
+                console,
+                f"{tracker_name} 로깅에 실패했습니다.",
+                tips=[str(exc)],
+            )
+            return
+
+    if tracker_type == "phoenix":
+        options = phoenix_options or {}
+        log_traces = log_phoenix_traces_fn or log_phoenix_traces
+        extra = log_traces(
+            tracker,
+            result,
+            max_traces=options.get("max_traces"),
+            metadata=options.get("metadata"),
+        )
+        if extra:
+            console.print(
+                f"[dim]Recorded {extra} Phoenix RAG trace(s) for detailed observability.[/dim]"
+            )
+
+
+def _save_to_db(
+    db_path: Path,
+    result,
+    console: Console,
+    *,
+    storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
+) -> None:
+    """Persist evaluation run to SQLite database."""
+    with console.status(f"[bold green]Saving to database {db_path}..."):
+        try:
+            storage = storage_cls(db_path=db_path)
+            storage.save_run(result)
+            console.print(f"[green]Results saved to database: {db_path}[/green]")
+            console.print(f"[dim]Run ID: {result.run_id}[/dim]")
+        except Exception as exc:  # pragma: no cover - persistence errors
+            print_cli_error(
+                console,
+                "데이터베이스에 저장하지 못했습니다.",
+                details=str(exc),
+                fixes=["경로 권한과 DB 파일 잠금 상태를 확인하세요."],
+            )
+
+
+def _save_results(output: Path, result, console: Console) -> None:
+    """Write evaluation summary to disk."""
+    with console.status(f"[bold green]Saving to {output}..."):
+        try:
+            data = result.to_summary_dict()
+            data["results"] = [
+                {
+                    "test_case_id": r.test_case_id,
+                    "all_passed": r.all_passed,
+                    "metrics": [
+                        {
+                            "name": m.name,
+                            "score": m.score,
+                            "threshold": m.threshold,
+                            "passed": m.passed,
+                        }
+                        for m in r.metrics
+                    ],
+                }
+                for r in result.results
+            ]
+
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+            console.print(f"[green]Results saved to {output}[/green]")
+        except Exception as exc:  # pragma: no cover - filesystem errors
+            print_cli_error(
+                console,
+                "결과 파일 저장에 실패했습니다.",
+                details=str(exc),
+                fixes=["출력 경로 쓰기 권한을 확인하고 재시도하세요."],
+            )
+
+
+def enrich_dataset_with_memory(
+    *,
+    dataset: Dataset,
+    memory_evaluator: MemoryAwareEvaluator,
+    domain: str,
+    language: str,
+) -> int:
+    """Append memory-derived facts to dataset contexts."""
+
+    span_attrs = {
+        "domain_memory.domain": domain,
+        "domain_memory.language": language,
+        "dataset.name": dataset.name,
+        "dataset.version": dataset.version,
+    }
+    enriched = 0
+    with instrumentation_span("domain_memory.enrich_dataset", span_attrs) as span:
+        for test_case in dataset.test_cases:
+            augmented = memory_evaluator.augment_context_with_facts(
+                question=test_case.question,
+                original_context="",
+                domain=domain,
+                language=language,
+            ).strip()
+            if augmented and augmented not in test_case.contexts:
+                test_case.contexts.append(augmented)
+                enriched += 1
+        if span:
+            set_span_attributes(
+                span,
+                {
+                    "domain_memory.enriched_cases": enriched,
+                    "dataset.test_cases": len(dataset.test_cases),
+                },
+            )
+    return enriched
+
+
+def apply_retriever_to_dataset(
+    *,
+    dataset: Dataset,
+    retriever: RetrieverPort,
+    top_k: int,
+    doc_ids: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    """Populate empty contexts via retriever and return retrieval metadata."""
+
+    retrieval_metadata: dict[str, dict[str, Any]] = {}
+
+    for test_case in dataset.test_cases:
+        if _has_contexts(test_case.contexts):
+            continue
+        started_at = time.perf_counter()
+        results = retriever.search(test_case.question, top_k=top_k)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        contexts, resolved_doc_ids, scores = _normalize_retrieval_results(
+            results,
+            doc_ids=doc_ids,
+        )
+        if contexts:
+            test_case.contexts.extend(contexts)
+        metadata: dict[str, Any] = {
+            "doc_ids": resolved_doc_ids,
+            "top_k": top_k,
+            "retrieval_time_ms": elapsed_ms,
+        }
+        if scores:
+            metadata["scores"] = scores
+        metadata.update(_extract_graphrag_attributes(results, retriever))
+        retrieval_metadata[test_case.id] = metadata
+
+    return retrieval_metadata
+
+
+def load_knowledge_graph(file_path: Path) -> NetworkXKnowledgeGraph:
+    """Load a knowledge graph JSON file."""
+
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid knowledge graph JSON") from exc
+
+    if isinstance(payload, dict) and "knowledge_graph" in payload:
+        payload = payload["knowledge_graph"]
+
+    if not isinstance(payload, dict):
+        raise ValueError("knowledge graph JSON must be an object with entities and relations")
+
+    return NetworkXKnowledgeGraph.from_dict(payload)
+
+
+def load_retriever_documents(file_path: Path) -> tuple[list[str], list[str]]:
+    """Load retrieval documents and their ids from JSON/JSONL/text files."""
+
+    suffix = file_path.suffix.lower()
+    if suffix == ".jsonl":
+        items = _load_retriever_jsonl(file_path)
+    elif suffix == ".json":
+        items = _load_retriever_json(file_path)
+    else:
+        items = _load_retriever_text(file_path)
+
+    documents: list[str] = []
+    doc_ids: list[str] = []
+
+    for idx, item in enumerate(items, start=1):
+        content, doc_id = _normalize_document_item(item, idx)
+        if not content:
+            continue
+        documents.append(content)
+        doc_ids.append(doc_id)
+
+    if not documents:
+        raise ValueError("retriever documents are empty")
+
+    return documents, doc_ids
+
+
+def _has_contexts(contexts: Sequence[str]) -> bool:
+    return any(ctx.strip() for ctx in contexts)
+
+
+def _normalize_retrieval_results(
+    results: Sequence[RetrieverResultProtocol],
+    *,
+    doc_ids: Sequence[str],
+) -> tuple[list[str], list[str], list[float]]:
+    contexts: list[str] = []
+    resolved_doc_ids: list[str] = []
+    scores: list[float] = []
+    all_scored = True
+
+    for idx, result in enumerate(results, start=1):
+        document = _extract_document(result)
+        if not document:
+            continue
+        contexts.append(document)
+
+        resolved_doc_ids.append(_resolve_doc_id(result, doc_ids, idx))
+
+        score = _extract_score(result)
+        if score is None:
+            all_scored = False
+        else:
+            scores.append(score)
+
+    if not all_scored:
+        scores = []
+
+    return contexts, resolved_doc_ids, scores
+
+
+def _extract_document(result: RetrieverResultProtocol) -> str | None:
+    document = getattr(result, "document", None)
+    if isinstance(document, str):
+        return document
+    content = getattr(result, "content", None)
+    if isinstance(content, str):
+        return content
+    return None
+
+
+def _extract_score(result: RetrieverResultProtocol) -> float | None:
+    score = getattr(result, "score", None)
+    if score is None:
+        return None
+    try:
+        return float(score)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_doc_id(
+    result: RetrieverResultProtocol,
+    doc_ids: Sequence[str],
+    fallback_index: int,
+) -> str:
+    raw_doc_id = getattr(result, "doc_id", None)
+    if isinstance(raw_doc_id, int) and 0 <= raw_doc_id < len(doc_ids):
+        return str(doc_ids[raw_doc_id])
+    if raw_doc_id is not None:
+        return str(raw_doc_id)
+    return f"doc_{fallback_index}"
+
+
+def _extract_graphrag_attributes(
+    results: Sequence[RetrieverResultProtocol],
+    retriever: RetrieverPort,
+) -> dict[str, Any]:
+    graphrag_cls: type | None = None
+    try:
+        from evalvault.adapters.outbound.kg.graph_rag_retriever import GraphRAGRetriever
+
+        graphrag_cls = GraphRAGRetriever
+    except Exception:
+        pass
+
+    is_graphrag = graphrag_cls is not None and isinstance(retriever, graphrag_cls)
+    nodes: set[str] = set()
+    edges: set[str] = set()
+    community_ids: set[str] = set()
+
+    for result in results:
+        metadata = getattr(result, "metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+
+        kg_meta = metadata.get("kg")
+        if isinstance(kg_meta, dict):
+            for entity in kg_meta.get("entities", []) or []:
+                nodes.add(str(entity))
+            for relation in kg_meta.get("relations", []) or []:
+                edges.add(str(relation))
+            community_id = kg_meta.get("community_id")
+            if community_id is not None:
+                community_ids.add(str(community_id))
+
+        community_id = metadata.get("community_id")
+        if community_id is not None:
+            community_ids.add(str(community_id))
+
+    if not is_graphrag and not (nodes or edges or community_ids):
+        return {}
+
+    attributes = {
+        "graph_nodes": len(nodes),
+        "graph_edges": len(edges),
+        "subgraph_size": len(nodes) + len(edges),
+    }
+    if community_ids:
+        attributes["community_id"] = _compact_values(community_ids)
+    else:
+        attributes["community_id"] = None
+
+    return attributes
+
+
+def _compact_values(values: set[str]) -> str | list[str]:
+    if len(values) == 1:
+        return next(iter(values))
+    return sorted(values)
+
+
+def _load_retriever_json(file_path: Path) -> list[Any]:
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid JSON retriever documents") from exc
+
+    if isinstance(payload, dict) and "documents" in payload:
+        items = payload["documents"]
+    else:
+        items = payload
+
+    if not isinstance(items, list):
+        raise ValueError("retriever JSON must be a list or contain 'documents'")
+
+    return items
+
+
+def _load_retriever_jsonl(file_path: Path) -> list[Any]:
+    items: list[Any] = []
+    with file_path.open(encoding="utf-8") as handle:
+        for idx, line in enumerate(handle, start=1):
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                items.append(json.loads(raw))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid JSONL at line {idx}") from exc
+    return items
+
+
+def _load_retriever_text(file_path: Path) -> list[str]:
+    items: list[str] = []
+    with file_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            content = line.strip()
+            if content:
+                items.append(content)
+    return items
+
+
+def _normalize_document_item(item: Any, index: int) -> tuple[str | None, str]:
+    if isinstance(item, str):
+        return item, f"doc_{index}"
+    if isinstance(item, dict):
+        content = item.get("content") or item.get("text") or item.get("document")
+        doc_id = item.get("doc_id") or item.get("id") or f"doc_{index}"
+        return (str(content) if isinstance(content, str) else None, str(doc_id))
+    return None, f"doc_{index}"
+
+
+def log_phoenix_traces(
+    tracker: TrackerPort,
+    run: EvaluationRun,
+    *,
+    max_traces: int | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> int:
+    """Log per-test-case RAG traces when Phoenix adapter supports it."""
+
+    log_trace = getattr(tracker, "log_rag_trace", None)
+    if not callable(log_trace):
+        return 0
+
+    limit = max_traces if max_traces is not None else run.total_test_cases
+
+    count = 0
+    for result in run.results:
+        retrieval_data = None
+        if result.contexts:
+            docs = []
+            for idx, ctx in enumerate(result.contexts, start=1):
+                docs.append(
+                    RetrievedDocument(
+                        content=ctx,
+                        score=max(0.1, 1 - 0.05 * (idx - 1)),
+                        rank=idx,
+                        source=f"context_{idx}",
+                    )
+                )
+            retrieval_data = RetrievalData(
+                query=result.question or "",
+                retrieval_method="dataset",
+                top_k=len(docs),
+                retrieval_time_ms=result.latency_ms or 0,
+                candidates=docs,
+            )
+
+        generation_data = GenerationData(
+            model=run.model_name,
+            prompt=result.question or "",
+            response=result.answer or "",
+            generation_time_ms=result.latency_ms or 0,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=result.tokens_used,
+        )
+
+        trace_metadata = {
+            "run_id": run.run_id,
+            "test_case_id": result.test_case_id,
+        }
+        if metadata:
+            trace_metadata.update(metadata)
+
+        rag_trace = RAGTraceData(
+            query=result.question or "",
+            retrieval=retrieval_data,
+            generation=generation_data,
+            final_answer=result.answer or "",
+            total_time_ms=result.latency_ms or 0,
+            metadata=trace_metadata,
+        )
+
+        try:
+            log_trace(rag_trace)
+            count += 1
+        except Exception:  # pragma: no cover - telemetry best effort
+            break
+
+        if limit is not None and count >= limit:
+            break
+
+    return count
+
+
+def _write_stage_events_jsonl(path: Path, events: Sequence[StageEvent]) -> int:
+    """Persist stage events as JSONL for downstream ingestion."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for event in events:
+            handle.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+    return len(events)
+
+
+def _is_oss_open_model(model_name: str | None) -> bool:
+    """Return True when a model should be routed through the OSS/Ollama backend."""
+
+    if not model_name:
+        return False
+    normalized = model_name.lower()
+    return normalized.startswith("gpt-oss-")
+
+
+def _build_streaming_dataset_template(dataset_path: Path) -> Dataset:
+    """Construct a Dataset stub for streaming mode using metadata from source file."""
+
+    path = Path(dataset_path)
+    metadata: dict[str, Any] = {"source_file": str(path)}
+    thresholds: dict[str, float] = {}
+    name = path.stem
+    version = "stream"
+
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        (
+            name,
+            version,
+            metadata_from_file,
+            thresholds_from_file,
+        ) = _load_json_metadata_for_stream(path)
+        metadata.update(metadata_from_file)
+        thresholds.update(thresholds_from_file)
+
+    return Dataset(
+        name=name,
+        version=version,
+        test_cases=[],
+        metadata=metadata,
+        source_file=str(path),
+        thresholds=thresholds,
+    )
+
+
+def _load_json_metadata_for_stream(path: Path) -> tuple[str, str, dict[str, Any], dict[str, float]]:
+    """Read lightweight metadata/thresholds from a JSON dataset for streaming mode."""
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception:
+        return (path.stem, "stream", {}, {})
+
+    name = payload.get("name", path.stem)
+    version = payload.get("version", "stream")
+
+    metadata = payload.get("metadata", {}).copy()
+    description = payload.get("description")
+    if description and "description" not in metadata:
+        metadata["description"] = description
+
+    thresholds: dict[str, float] = {}
+    raw_thresholds = payload.get("thresholds") or {}
+    for metric, value in raw_thresholds.items():
+        try:
+            thresholds[metric] = float(value)
+        except (TypeError, ValueError):
+            continue
+
+    return (name, version, metadata, thresholds)
+
+
+def _resolve_thresholds(metrics: list[str], dataset: Dataset) -> dict[str, float]:
+    """Resolve thresholds by preferring dataset values and falling back to defaults."""
+
+    base_thresholds = dataset.thresholds or {}
+    resolved: dict[str, float] = {}
+    for metric in metrics:
+        resolved[metric] = base_thresholds.get(metric, 0.7)
+    return resolved
+
+
+def _merge_evaluation_runs(
+    existing: EvaluationRun | None,
+    incoming: EvaluationRun,
+    *,
+    dataset_name: str,
+    dataset_version: str,
+    metrics: list[str],
+    thresholds: dict[str, float],
+) -> EvaluationRun:
+    """Merge chunk-level evaluation runs into a single aggregate result."""
+
+    if existing is None:
+        merged = incoming
+    else:
+        merged = existing
+        merged.results.extend(incoming.results)
+        merged.total_tokens = (merged.total_tokens or 0) + (incoming.total_tokens or 0)
+        if merged.total_cost_usd is None and incoming.total_cost_usd is None:
+            merged.total_cost_usd = None
+        else:
+            merged.total_cost_usd = (merged.total_cost_usd or 0.0) + (
+                incoming.total_cost_usd or 0.0
+            )
+        merged.finished_at = incoming.finished_at
+
+    merged.dataset_name = dataset_name
+    merged.dataset_version = dataset_version
+    merged.metrics_evaluated = list(metrics)
+    merged.thresholds = dict(thresholds)
+    return merged
+
+
+async def _evaluate_streaming_run(
+    *,
+    dataset_path: Path,
+    dataset_template: Dataset,
+    metrics: list[str],
+    thresholds: dict[str, float],
+    evaluator: RagasEvaluator,
+    llm: LLMPort,
+    chunk_size: int,
+    parallel: bool,
+    batch_size: int,
+) -> EvaluationRun:
+    """Evaluate a dataset in streaming mode, chunk by chunk."""
+
+    config = StreamingConfig(chunk_size=chunk_size)
+    loader = StreamingDatasetLoader(config)
+    merged_run: EvaluationRun | None = None
+    metadata_template = dict(dataset_template.metadata or {})
+    threshold_template = dict(dataset_template.thresholds or {})
+    source_file = dataset_template.source_file or str(dataset_path)
+
+    for chunk in loader.load_chunked(dataset_path, chunk_size=chunk_size):
+        if not chunk:
+            continue
+        chunk_dataset = Dataset(
+            name=dataset_template.name,
+            version=dataset_template.version,
+            test_cases=list(chunk),
+            metadata=dict(metadata_template),
+            source_file=source_file,
+            thresholds=dict(threshold_template),
+        )
+        chunk_run = await evaluator.evaluate(
+            dataset=chunk_dataset,
+            metrics=metrics,
+            llm=llm,
+            thresholds=thresholds,
+            parallel=parallel,
+            batch_size=batch_size,
+        )
+        merged_run = _merge_evaluation_runs(
+            merged_run,
+            chunk_run,
+            dataset_name=dataset_template.name,
+            dataset_version=dataset_template.version,
+            metrics=metrics,
+            thresholds=thresholds,
+        )
+
+    if merged_run is None:
+        empty_dataset = Dataset(
+            name=dataset_template.name,
+            version=dataset_template.version,
+            test_cases=[],
+            metadata=dict(metadata_template),
+            source_file=source_file,
+            thresholds=dict(threshold_template),
+        )
+        merged_run = await evaluator.evaluate(
+            dataset=empty_dataset,
+            metrics=metrics,
+            llm=llm,
+            thresholds=thresholds,
+            parallel=parallel,
+            batch_size=batch_size,
+        )
+
+    merged_run.thresholds = dict(thresholds)
+    merged_run.metrics_evaluated = list(metrics)
+    merged_run.dataset_name = dataset_template.name
+    merged_run.dataset_version = dataset_template.version
+    return merged_run
+
+
+def _collect_prompt_metadata(
+    *,
+    manifest_path: Path | None,
+    prompt_files: list[Path],
+    console: Console | None = None,
+) -> list[dict[str, Any]]:
+    """Read prompt files and summarize manifest differences."""
+
+    if not prompt_files:
+        return []
+
+    manifest_data = None
+    if manifest_path:
+        try:
+            manifest_data = load_prompt_manifest(manifest_path)
+        except Exception as exc:  # pragma: no cover - guardrail
+            if console:
+                print_cli_warning(
+                    console,
+                    f"Prompt manifest를 불러오지 못했습니다: {manifest_path}",
+                    tips=[str(exc)],
+                )
+            manifest_data = None
+
+    summaries: list[dict[str, Any]] = []
+    for prompt_file in prompt_files:
+        target = prompt_file.expanduser()
+        try:
+            content = target.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            normalized = target
+            try:
+                normalized = target.resolve()
+            except FileNotFoundError:
+                normalized = target
+            summary = PromptDiffSummary(
+                path=normalized.as_posix(),
+                status="missing_file",
+            )
+            summaries.append(asdict(summary))
+            if console:
+                print_cli_warning(
+                    console,
+                    f"프롬프트 파일을 찾을 수 없습니다: {target}",
+                    tips=["경로/파일명을 확인하고 다시 시도하세요."],
+                )
+            continue
+
+        summary = summarize_prompt_entry(
+            manifest_data,
+            prompt_path=target,
+            content=content,
+        )
+        summary.content_preview = _build_content_preview(content)
+        summaries.append(asdict(summary))
+
+    return summaries
+
+
+def _build_content_preview(content: str, *, max_chars: int = 4000) -> str:
+    """Trim prompt content to a safe preview size."""
+
+    if not content:
+        return ""
+    normalized = content.strip()
+    if len(normalized) <= max_chars:
+        return normalized
+    remaining = len(normalized) - max_chars
+    return normalized[:max_chars].rstrip() + f"\n... (+{remaining} chars)"
+
+
+def _option_was_provided(ctx: typer.Context, param_name: str) -> bool:
+    """Check whether a CLI option was explicitly provided."""
+
+    if ctx is None:
+        return False
+    try:
+        source = ctx.get_parameter_source(param_name)
+    except (AttributeError, KeyError):
+        return False
+    return source == ParameterSource.COMMANDLINE
+
+
+def _print_run_mode_banner(console: Console, preset: RunModePreset) -> None:
+    """Render a short banner describing the selected run mode."""
+
+    bullet_lines: list[str] = []
+    if preset.default_metrics:
+        bullet_lines.append(f"- Metrics: {', '.join(preset.default_metrics)} (locked)")
+    if preset.default_tracker:
+        bullet_lines.append(f"- Tracker: {preset.default_tracker}")
+    bullet_lines.append(
+        "- Domain Memory: enabled" if preset.allow_domain_memory else "- Domain Memory: disabled"
+    )
+    if not preset.allow_prompt_metadata:
+        bullet_lines.append("- Prompt manifest capture: disabled")
+
+    body = preset.description
+    if bullet_lines:
+        body = f"{preset.description}\n\n" + "\n".join(bullet_lines)
+
+    border_style = "cyan" if preset.name == "simple" else "blue"
+    console.print(Panel(body, title=f"Run Mode: {preset.label}", border_style=border_style))

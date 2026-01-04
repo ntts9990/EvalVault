@@ -3,24 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import click
 import typer
-from click.core import ParameterSource
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
-from evalvault.adapters.outbound.dataset import (
-    StreamingConfig,
-    StreamingDatasetLoader,
-    get_loader,
-)
+from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.phoenix.sync_service import (
@@ -30,70 +21,77 @@ from evalvault.adapters.outbound.phoenix.sync_service import (
     build_experiment_metadata,
 )
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-from evalvault.config.phoenix_support import (
-    ensure_phoenix_instrumentation,
-    get_phoenix_trace_url,
-    instrumentation_span,
-    set_span_attributes,
-)
+from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTracerAdapter
+from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings, apply_profile
-from evalvault.domain.entities import (
-    Dataset,
-    EvaluationRun,
-    GenerationData,
-    RAGTraceData,
-    RetrievalData,
-    RetrievedDocument,
-)
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
-from evalvault.domain.services.prompt_manifest import (
-    PromptDiffSummary,
-    load_prompt_manifest,
-    summarize_prompt_entry,
-)
-from evalvault.ports.outbound.llm_port import LLMPort
-from evalvault.ports.outbound.tracker_port import TrackerPort
+from evalvault.domain.services.stage_event_builder import StageEventBuilder
 
 from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
-from ..utils.formatters import format_score, format_status
 from ..utils.options import db_option, memory_db_option, profile_option
-from ..utils.validators import parse_csv_option, validate_choices
+from ..utils.validators import parse_csv_option, validate_choice, validate_choices
+from . import run_helpers
+from .run_helpers import (
+    RUN_MODE_PRESETS,
+    _build_streaming_dataset_template,
+    _collect_prompt_metadata,
+    _display_memory_insights,
+    _display_results,
+    _evaluate_streaming_run,
+    _is_oss_open_model,
+    _log_to_tracker,
+    _option_was_provided,
+    _print_run_mode_banner,
+    _resolve_thresholds,
+    _save_results,
+    _save_to_db,
+    _write_stage_events_jsonl,
+    apply_retriever_to_dataset,
+    enrich_dataset_with_memory,
+    load_knowledge_graph,
+    load_retriever_documents,
+    log_phoenix_traces,
+)
 
-TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
 DEFAULT_RUN_MODE = "full"
+_merge_evaluation_runs = run_helpers._merge_evaluation_runs
 
 
-@dataclass(frozen=True)
-class RunModePreset:
-    """심플/전체 실행 모드를 정의한다."""
+def _build_dense_retriever(
+    *,
+    documents: list[str],
+    settings: Settings,
+    profile_name: str | None,
+) -> Any:
+    """Build and index a dense retriever, preferring Ollama embeddings when available."""
 
-    name: str
-    label: str
-    description: str
-    default_metrics: tuple[str, ...] | None = None
-    default_tracker: TrackerType | None = None
-    allow_domain_memory: bool = True
-    allow_prompt_metadata: bool = True
+    from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
 
+    embedding_model = settings.ollama_embedding_model
+    if settings.llm_provider == "ollama":
+        model_info = KoreanDenseRetriever.SUPPORTED_MODELS.get(embedding_model)
+        if model_info and model_info.get("type") == "ollama":
+            from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 
-RUN_MODE_PRESETS: dict[str, RunModePreset] = {
-    "simple": RunModePreset(
-        name="simple",
-        label="Simple",
-        description="기본 메트릭 2종과 Phoenix 추적만 활성화된 간편 실행 모드.",
-        default_metrics=("faithfulness", "answer_relevancy"),
-        default_tracker="phoenix",
-        allow_domain_memory=False,
-        allow_prompt_metadata=False,
-    ),
-    "full": RunModePreset(
-        name="full",
-        label="Full",
-        description="모든 CLI 옵션과 Domain Memory, Prompt manifest를 활용하는 전체 모드.",
-    ),
-}
+            ollama_adapter = OllamaAdapter(settings)
+            if profile_name in {"dev", "prod"}:
+                dense_retriever = KoreanDenseRetriever(
+                    profile=profile_name,
+                    ollama_adapter=ollama_adapter,
+                )
+            else:
+                dense_retriever = KoreanDenseRetriever(
+                    model_name=embedding_model,
+                    ollama_adapter=ollama_adapter,
+                )
+            dense_retriever.index(documents)
+            return dense_retriever
+
+    dense_retriever = KoreanDenseRetriever()
+    dense_retriever.index(documents)
+    return dense_retriever
 
 
 def register_run_commands(
@@ -131,6 +129,40 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        retriever: str | None = typer.Option(
+            None,
+            "--retriever",
+            help="Retriever to fill empty contexts (bm25, dense, hybrid, graphrag).",
+            rich_help_panel="Full mode options",
+        ),
+        retriever_docs: Path | None = typer.Option(
+            None,
+            "--retriever-docs",
+            help="Documents file for retriever (.json/.jsonl/.txt).",
+            rich_help_panel="Full mode options",
+        ),
+        kg: Path | None = typer.Option(
+            None,
+            "--kg",
+            help="Knowledge graph JSON file for GraphRAG retriever.",
+            rich_help_panel="Full mode options",
+        ),
+        retriever_top_k: int = typer.Option(
+            5,
+            "--retriever-top-k",
+            help="Top-K documents to retrieve (default: 5).",
+            rich_help_panel="Full mode options",
+        ),
+        stage_events: Path | None = typer.Option(
+            None,
+            "--stage-events",
+            help="Write stage events as JSONL for later ingestion.",
+        ),
+        stage_store: bool = typer.Option(
+            False,
+            "--stage-store/--no-stage-store",
+            help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
             "none",
@@ -333,7 +365,8 @@ def register_run_commands(
             )
             if prompt_metadata_entries:
                 console.print(
-                    f"[dim]Collected Phoenix prompt metadata for {len(prompt_metadata_entries)} file(s).[/dim]"
+                    "[dim]Collected Phoenix prompt metadata for "
+                    f"{len(prompt_metadata_entries)} file(s).[/dim]"
                 )
                 unsynced = [
                     entry for entry in prompt_metadata_entries if entry.get("status") != "synced"
@@ -464,6 +497,155 @@ def register_run_commands(
                     )
                     raise typer.Exit(1) from exc
 
+        retriever_metadata: dict[str, dict[str, Any]] | None = None
+        if retriever:
+            validate_choice(
+                retriever,
+                ("bm25", "dense", "hybrid", "graphrag"),
+                console,
+                value_label="retriever",
+            )
+            if stream:
+                print_cli_warning(
+                    console,
+                    "Streaming 모드에서는 retriever 적용을 건너뜁니다.",
+                    tips=["--stream을 끄거나 streaming용 retriever 지원을 기다려주세요."],
+                )
+            elif not retriever_docs:
+                print_cli_warning(
+                    console,
+                    "Retriever를 사용하려면 문서 파일이 필요합니다.",
+                    tips=["--retriever-docs <documents.json> 옵션을 함께 지정하세요."],
+                )
+            elif retriever == "graphrag" and not kg:
+                print_cli_warning(
+                    console,
+                    "GraphRAG retriever를 사용하려면 KG 파일이 필요합니다.",
+                    tips=["--kg <knowledge_graph.json> 옵션을 함께 지정하세요."],
+                )
+            else:
+                try:
+                    documents, doc_ids = load_retriever_documents(retriever_docs)
+                except Exception as exc:
+                    print_cli_error(
+                        console,
+                        "Retriever 문서를 불러오지 못했습니다.",
+                        details=str(exc),
+                        fixes=["JSON/JSONL/TXT 형식을 확인하세요."],
+                    )
+                    raise typer.Exit(1) from exc
+
+                try:
+                    if retriever == "graphrag":
+                        from evalvault.adapters.outbound.kg.graph_rag_retriever import (
+                            GraphRAGRetriever,
+                        )
+
+                        try:
+                            kg_graph = load_knowledge_graph(kg)
+                        except Exception as exc:
+                            print_cli_error(
+                                console,
+                                "Knowledge Graph 파일을 불러오지 못했습니다.",
+                                details=str(exc),
+                                fixes=["KG JSON 스키마와 경로를 확인하세요."],
+                            )
+                            raise typer.Exit(1) from exc
+
+                        bm25_retriever = None
+                        try:
+                            from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+                            toolkit = KoreanNLPToolkit()
+                            bm25_retriever = toolkit.build_retriever(
+                                documents,
+                                use_hybrid=False,
+                                verbose=verbose,
+                            )
+                        except Exception as exc:  # pragma: no cover - optional dependency
+                            print_cli_warning(
+                                console,
+                                "GraphRAG용 BM25 retriever 초기화에 실패했습니다.",
+                                tips=[str(exc)],
+                            )
+
+                        dense_retriever = None
+                        try:
+                            dense_retriever = _build_dense_retriever(
+                                documents=documents,
+                                settings=settings,
+                                profile_name=profile_name,
+                            )
+                        except Exception as exc:  # pragma: no cover - optional dependency
+                            print_cli_warning(
+                                console,
+                                "GraphRAG용 Dense retriever 초기화에 실패했습니다.",
+                                tips=[str(exc)],
+                            )
+
+                        kg_doc_ids = {
+                            str(entity.source_document_id)
+                            for entity in kg_graph.get_all_entities()
+                            if entity.source_document_id
+                        }
+                        if kg_doc_ids and not (kg_doc_ids & set(doc_ids)):
+                            preview = ", ".join(sorted(kg_doc_ids)[:3])
+                            print_cli_warning(
+                                console,
+                                "KG의 doc_id가 문서 doc_id와 매칭되지 않습니다.",
+                                tips=[
+                                    "문서 파일의 doc_id를 KG source_document_id와 동일하게 지정하세요.",
+                                    f"예시 KG doc_id: {preview}",
+                                ],
+                            )
+
+                        retriever_instance = GraphRAGRetriever(
+                            kg_graph,
+                            bm25_retriever=bm25_retriever,
+                            dense_retriever=dense_retriever,
+                            documents=documents,
+                            document_ids=doc_ids,
+                        )
+                    elif retriever == "dense":
+                        retriever_instance = _build_dense_retriever(
+                            documents=documents,
+                            settings=settings,
+                            profile_name=profile_name,
+                        )
+                    else:
+                        from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+                        toolkit = KoreanNLPToolkit()
+                        retriever_instance = toolkit.build_retriever(
+                            documents,
+                            use_hybrid=retriever == "hybrid",
+                            verbose=verbose,
+                        )
+                except Exception as exc:  # pragma: no cover - dependency/IO issues
+                    print_cli_warning(
+                        console,
+                        "Retriever 초기화에 실패했습니다.",
+                        tips=[str(exc)],
+                    )
+                    retriever_instance = None
+
+                if retriever_instance:
+                    retriever_metadata = apply_retriever_to_dataset(
+                        dataset=ds,
+                        retriever=retriever_instance,
+                        top_k=retriever_top_k,
+                        doc_ids=doc_ids,
+                    )
+                    if retriever_metadata:
+                        console.print(
+                            f"[dim]Applied {retriever} retriever to "
+                            f"{len(retriever_metadata)} test case(s).[/dim]"
+                        )
+                    phoenix_trace_metadata["retriever.mode"] = retriever
+                    phoenix_trace_metadata["retriever.docs"] = str(retriever_docs)
+                    if retriever == "graphrag" and kg:
+                        phoenix_trace_metadata["retriever.kg"] = str(kg)
+
         resolved_thresholds = _resolve_thresholds(metric_list, ds)
 
         phoenix_dataset_name = phoenix_dataset
@@ -530,10 +712,13 @@ def register_run_commands(
             try:
                 memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
                 memory_evaluator = MemoryAwareEvaluator(
-                    evaluator=evaluator, memory_port=memory_adapter
+                    evaluator=evaluator,
+                    memory_port=memory_adapter,
+                    tracer=PhoenixTracerAdapter(),
                 )
                 console.print(
-                    f"[dim]Domain Memory enabled for '{memory_domain_name}' ({memory_language}).[/dim]"
+                    "[dim]Domain Memory enabled for "
+                    f"'{memory_domain_name}' ({memory_language}).[/dim]"
                 )
                 if memory_adapter:
                     reliability = memory_adapter.get_aggregated_reliability(
@@ -746,6 +931,28 @@ def register_run_commands(
             phoenix_meta.setdefault("schema_version", 2)
             phoenix_meta["prompts"] = prompt_metadata_entries
 
+        if stage_events or stage_store:
+            stage_event_builder = StageEventBuilder()
+            stage_event_payload = stage_event_builder.build_for_run(
+                result,
+                prompt_metadata=prompt_metadata_entries or None,
+                retrieval_metadata=retriever_metadata,
+            )
+            if stage_events:
+                stored = _write_stage_events_jsonl(stage_events, stage_event_payload)
+                console.print(f"[green]Saved {stored} stage event(s).[/green]")
+            if stage_store:
+                if db_path:
+                    storage = SQLiteStorageAdapter(db_path=db_path)
+                    stored = storage.save_stage_events(stage_event_payload)
+                    console.print(f"[green]Stored {stored} stage event(s).[/green]")
+                else:
+                    print_cli_warning(
+                        console,
+                        "Stage 이벤트를 저장하려면 --db 경로가 필요합니다.",
+                        tips=["--db <sqlite_path> 옵션을 함께 지정하세요."],
+                    )
+
         if effective_tracker != "none":
             phoenix_opts = None
             if effective_tracker == "phoenix":
@@ -759,9 +966,10 @@ def register_run_commands(
                 console,
                 effective_tracker,
                 phoenix_options=phoenix_opts,
+                log_phoenix_traces_fn=log_phoenix_traces,
             )
         if db_path:
-            _save_to_db(db_path, result, console)
+            _save_to_db(db_path, result, console, storage_cls=SQLiteStorageAdapter)
         if output:
             _save_results(output, result, console)
 
@@ -795,6 +1003,36 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        retriever: str | None = typer.Option(
+            None,
+            "--retriever",
+            help="Retriever to fill empty contexts (bm25, dense, hybrid, graphrag).",
+        ),
+        retriever_docs: Path | None = typer.Option(
+            None,
+            "--retriever-docs",
+            help="Documents file for retriever (.json/.jsonl/.txt).",
+        ),
+        kg: Path | None = typer.Option(
+            None,
+            "--kg",
+            help="Knowledge graph JSON file for GraphRAG retriever.",
+        ),
+        retriever_top_k: int = typer.Option(
+            5,
+            "--retriever-top-k",
+            help="Top-K documents to retrieve (default: 5).",
+        ),
+        stage_events: Path | None = typer.Option(
+            None,
+            "--stage-events",
+            help="Write stage events as JSONL for later ingestion.",
+        ),
+        stage_store: bool = typer.Option(
+            False,
+            "--stage-store/--no-stage-store",
+            help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
             "none",
@@ -911,6 +1149,12 @@ def register_run_commands(
                 profile=profile,
                 model=model,
                 output=output,
+                retriever=retriever,
+                retriever_docs=retriever_docs,
+                kg=kg,
+                retriever_top_k=retriever_top_k,
+                stage_events=stage_events,
+                stage_store=stage_store,
                 tracker=tracker,
                 langfuse=langfuse,
                 phoenix_max_traces=phoenix_max_traces,
@@ -967,6 +1211,36 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        retriever: str | None = typer.Option(
+            None,
+            "--retriever",
+            help="Retriever to fill empty contexts (bm25, dense, hybrid, graphrag).",
+        ),
+        retriever_docs: Path | None = typer.Option(
+            None,
+            "--retriever-docs",
+            help="Documents file for retriever (.json/.jsonl/.txt).",
+        ),
+        kg: Path | None = typer.Option(
+            None,
+            "--kg",
+            help="Knowledge graph JSON file for GraphRAG retriever.",
+        ),
+        retriever_top_k: int = typer.Option(
+            5,
+            "--retriever-top-k",
+            help="Top-K documents to retrieve (default: 5).",
+        ),
+        stage_events: Path | None = typer.Option(
+            None,
+            "--stage-events",
+            help="Write stage events as JSONL for later ingestion.",
+        ),
+        stage_store: bool = typer.Option(
+            False,
+            "--stage-store/--no-stage-store",
+            help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
             "none",
@@ -1083,6 +1357,12 @@ def register_run_commands(
                 profile=profile,
                 model=model,
                 output=output,
+                retriever=retriever,
+                retriever_docs=retriever_docs,
+                kg=kg,
+                retriever_top_k=retriever_top_k,
+                stage_events=stage_events,
+                stage_store=stage_store,
                 tracker=tracker,
                 langfuse=langfuse,
                 phoenix_max_traces=phoenix_max_traces,
@@ -1109,676 +1389,11 @@ def register_run_commands(
             if ctx:
                 ctx.meta.pop("run_mode_alias", None)
 
-    def _display_results(result, console: Console, verbose: bool = False) -> None:
-        """Display evaluation results in a formatted table."""
-        duration = result.duration_seconds
-        duration_str = f"{duration:.2f}s" if duration is not None else "N/A"
 
-        summary = f"""
-[bold]Evaluation Summary[/bold]
-  Run ID: {result.run_id}
-  Dataset: {result.dataset_name} v{result.dataset_version}
-  Model: {result.model_name}
-  Duration: {duration_str}
-
-[bold]Results[/bold]
-  Total Test Cases: {result.total_test_cases}
-  Passed: [green]{result.passed_test_cases}[/green]
-  Failed: [red]{result.total_test_cases - result.passed_test_cases}[/red]
-  Pass Rate: {"[green]" if result.pass_rate >= 0.7 else "[red]"}{result.pass_rate:.1%}[/]
-"""
-        console.print(Panel(summary, title="Evaluation Results", border_style="blue"))
-
-        table = Table(title="Metric Scores", show_header=True, header_style="bold cyan")
-        table.add_column("Metric", style="bold")
-        table.add_column("Average Score", justify="right")
-        table.add_column("Threshold", justify="right")
-        table.add_column("Status", justify="center")
-
-        for metric in result.metrics_evaluated:
-            avg_score = result.get_avg_score(metric)
-            threshold = result.thresholds.get(metric, 0.7)
-            passed = avg_score >= threshold
-            table.add_row(
-                metric,
-                format_score(avg_score, passed),
-                f"{threshold:.2f}",
-                format_status(passed),
-            )
-
-        console.print(table)
-
-        if verbose:
-            console.print("\n[bold]Detailed Results[/bold]\n")
-            for tc_result in result.results:
-                status = format_status(tc_result.all_passed)
-                console.print(f"  {tc_result.test_case_id}: {status}")
-                for metric in tc_result.metrics:
-                    m_status = format_status(metric.passed, success_text="+", failure_text="-")
-                    score = format_score(metric.score, metric.passed)
-                    console.print(
-                        f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
-                    )
-
-    def _display_memory_insights(insights: dict[str, Any], console: Console) -> None:
-        """Render Domain Memory insights panel."""
-
-        if not insights:
-            return
-
-        recommendations = insights.get("recommendations") or []
-        trends = insights.get("trends") or {}
-        if not recommendations and not trends:
-            return
-
-        trend_lines: list[str] = []
-        for metric, info in list(trends.items())[:3]:
-            delta = info.get("delta", 0.0)
-            baseline = info.get("baseline", 0.0)
-            current = info.get("current", 0.0)
-            trend_lines.append(
-                f"- {metric}: Δ {delta:+.2f} (current {current:.2f} / baseline {baseline:.2f})"
-            )
-
-        recommendation_lines = [f"- {rec}" for rec in recommendations[:3]]
-        if not trend_lines and not recommendation_lines:
-            return
-
-        panel_body = ""
-        if trend_lines:
-            panel_body += "[bold]Trend Signals[/bold]\n" + "\n".join(trend_lines) + "\n"
-        if recommendation_lines:
-            if panel_body:
-                panel_body += "\n"
-            panel_body += "[bold]Recommendations[/bold]\n" + "\n".join(recommendation_lines)
-
-        console.print(Panel(panel_body, title="Domain Memory Insights", border_style="magenta"))
-
-    def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> TrackerPort | None:
-        """Get the appropriate tracker adapter based on type."""
-        if tracker_type == "langfuse":
-            if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-                print_cli_warning(
-                    console,
-                    "Langfuse 자격 증명이 설정되지 않아 로깅을 건너뜁니다.",
-                    tips=["LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY를 .env에 추가하세요."],
-                )
-                return None
-            from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
-
-            return LangfuseAdapter(
-                public_key=settings.langfuse_public_key,
-                secret_key=settings.langfuse_secret_key,
-                host=settings.langfuse_host,
-            )
-
-        elif tracker_type == "mlflow":
-            if not settings.mlflow_tracking_uri:
-                print_cli_warning(
-                    console,
-                    "MLflow tracking URI가 설정되지 않아 로깅을 건너뜁니다.",
-                    tips=["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."],
-                )
-                return None
-            try:
-                from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
-
-                return MLflowAdapter(
-                    tracking_uri=settings.mlflow_tracking_uri,
-                    experiment_name=settings.mlflow_experiment_name,
-                )
-            except ImportError:
-                print_cli_warning(
-                    console,
-                    "MLflow extra가 설치되지 않았습니다.",
-                    tips=["uv sync --extra mlflow 명령으로 구성요소를 설치하세요."],
-                )
-                return None
-
-        elif tracker_type == "phoenix":
-            try:
-                from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
-
-                return PhoenixAdapter(
-                    endpoint=settings.phoenix_endpoint,
-                    service_name="evalvault",
-                )
-            except ImportError:
-                print_cli_warning(
-                    console,
-                    "Phoenix extra가 설치되지 않았습니다.",
-                    tips=["uv sync --extra phoenix 명령으로 의존성을 추가하세요."],
-                )
-                return None
-
-        else:
-            print_cli_warning(
-                console,
-                f"알 수 없는 tracker 타입입니다: {tracker_type}",
-                tips=["langfuse/mlflow/phoenix/none 중 하나를 지정하세요."],
-            )
-            return None
-
-    def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
-        """Build a Phoenix UI URL for the given trace ID."""
-
-        base = endpoint.rstrip("/")
-        suffix = "/v1/traces"
-        if base.endswith(suffix):
-            base = base[: -len(suffix)]
-        return f"{base.rstrip('/')}/#/traces/{trace_id}"
-
-    def _log_to_tracker(
-        settings: Settings,
-        result,
-        console: Console,
-        tracker_type: str,
-        *,
-        phoenix_options: dict[str, Any] | None = None,
-    ) -> None:
-        """Log evaluation results to the specified tracker."""
-        tracker = _get_tracker(settings, tracker_type, console)
-        if tracker is None:
-            return
-
-        tracker_name = tracker_type.capitalize()
-        trace_id: str | None = None
-        with console.status(f"[bold green]Logging to {tracker_name}..."):
-            try:
-                trace_id = tracker.log_evaluation_run(result)
-                console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
-                if trace_id and tracker_type == "phoenix":
-                    endpoint = getattr(
-                        settings, "phoenix_endpoint", "http://localhost:6006/v1/traces"
-                    )
-                    if not isinstance(endpoint, str) or not endpoint:
-                        endpoint = "http://localhost:6006/v1/traces"
-                    phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-                    phoenix_meta.update(
-                        {
-                            "trace_id": trace_id,
-                            "endpoint": endpoint,
-                            "trace_url": _build_phoenix_trace_url(endpoint, trace_id),
-                        }
-                    )
-                    phoenix_meta.setdefault("schema_version", 2)
-                    trace_url = get_phoenix_trace_url(result.tracker_metadata)
-                    if trace_url:
-                        console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
-            except Exception as exc:  # pragma: no cover - telemetry best-effort
-                print_cli_warning(
-                    console,
-                    f"{tracker_name} 로깅에 실패했습니다.",
-                    tips=[str(exc)],
-                )
-                return
-
-        if tracker_type == "phoenix":
-            options = phoenix_options or {}
-            extra = log_phoenix_traces(
-                tracker,
-                result,
-                max_traces=options.get("max_traces"),
-                metadata=options.get("metadata"),
-            )
-            if extra:
-                console.print(
-                    f"[dim]Recorded {extra} Phoenix RAG trace(s) for detailed observability.[/dim]"
-                )
-
-    def _save_to_db(db_path: Path, result, console: Console) -> None:
-        """Persist evaluation run to SQLite database."""
-        with console.status(f"[bold green]Saving to database {db_path}..."):
-            try:
-                storage = SQLiteStorageAdapter(db_path=db_path)
-                storage.save_run(result)
-                console.print(f"[green]Results saved to database: {db_path}[/green]")
-                console.print(f"[dim]Run ID: {result.run_id}[/dim]")
-            except Exception as exc:  # pragma: no cover - persistence errors
-                print_cli_error(
-                    console,
-                    "데이터베이스에 저장하지 못했습니다.",
-                    details=str(exc),
-                    fixes=["경로 권한과 DB 파일 잠금 상태를 확인하세요."],
-                )
-
-    def _save_results(output: Path, result, console: Console) -> None:
-        """Write evaluation summary to disk."""
-        with console.status(f"[bold green]Saving to {output}..."):
-            try:
-                data = result.to_summary_dict()
-                data["results"] = [
-                    {
-                        "test_case_id": r.test_case_id,
-                        "all_passed": r.all_passed,
-                        "metrics": [
-                            {
-                                "name": m.name,
-                                "score": m.score,
-                                "threshold": m.threshold,
-                                "passed": m.passed,
-                            }
-                            for m in r.metrics
-                        ],
-                    }
-                    for r in result.results
-                ]
-
-                with open(output, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False, default=str)
-
-                console.print(f"[green]Results saved to {output}[/green]")
-            except Exception as exc:  # pragma: no cover - filesystem errors
-                print_cli_error(
-                    console,
-                    "결과 파일 저장에 실패했습니다.",
-                    details=str(exc),
-                    fixes=["출력 경로 쓰기 권한을 확인하고 재시도하세요."],
-                )
-
-
-def enrich_dataset_with_memory(
-    *,
-    dataset: Dataset,
-    memory_evaluator: MemoryAwareEvaluator,
-    domain: str,
-    language: str,
-) -> int:
-    """Append memory-derived facts to dataset contexts."""
-
-    span_attrs = {
-        "domain_memory.domain": domain,
-        "domain_memory.language": language,
-        "dataset.name": dataset.name,
-        "dataset.version": dataset.version,
-    }
-    enriched = 0
-    with instrumentation_span("domain_memory.enrich_dataset", span_attrs) as span:
-        for test_case in dataset.test_cases:
-            augmented = memory_evaluator.augment_context_with_facts(
-                question=test_case.question,
-                original_context="",
-                domain=domain,
-                language=language,
-            ).strip()
-            if augmented and augmented not in test_case.contexts:
-                test_case.contexts.append(augmented)
-                enriched += 1
-        if span:
-            set_span_attributes(
-                span,
-                {
-                    "domain_memory.enriched_cases": enriched,
-                    "dataset.test_cases": len(dataset.test_cases),
-                },
-            )
-    return enriched
-
-
-def log_phoenix_traces(
-    tracker: TrackerPort,
-    run: EvaluationRun,
-    *,
-    max_traces: int | None = None,
-    metadata: dict[str, Any] | None = None,
-) -> int:
-    """Log per-test-case RAG traces when Phoenix adapter supports it."""
-
-    log_trace = getattr(tracker, "log_rag_trace", None)
-    if not callable(log_trace):
-        return 0
-
-    limit = max_traces if max_traces is not None else run.total_test_cases
-
-    count = 0
-    for result in run.results:
-        retrieval_data = None
-        if result.contexts:
-            docs = []
-            for idx, ctx in enumerate(result.contexts, start=1):
-                docs.append(
-                    RetrievedDocument(
-                        content=ctx,
-                        score=max(0.1, 1 - 0.05 * (idx - 1)),
-                        rank=idx,
-                        source=f"context_{idx}",
-                    )
-                )
-            retrieval_data = RetrievalData(
-                query=result.question or "",
-                retrieval_method="dataset",
-                top_k=len(docs),
-                retrieval_time_ms=result.latency_ms or 0,
-                candidates=docs,
-            )
-
-        generation_data = GenerationData(
-            model=run.model_name,
-            prompt=result.question or "",
-            response=result.answer or "",
-            generation_time_ms=result.latency_ms or 0,
-            input_tokens=0,
-            output_tokens=0,
-            total_tokens=result.tokens_used,
-        )
-
-        trace_metadata = {
-            "run_id": run.run_id,
-            "test_case_id": result.test_case_id,
-        }
-        if metadata:
-            trace_metadata.update(metadata)
-
-        rag_trace = RAGTraceData(
-            query=result.question or "",
-            retrieval=retrieval_data,
-            generation=generation_data,
-            final_answer=result.answer or "",
-            total_time_ms=result.latency_ms or 0,
-            metadata=trace_metadata,
-        )
-
-        try:
-            log_trace(rag_trace)
-            count += 1
-        except Exception:  # pragma: no cover - telemetry best effort
-            break
-
-        if limit is not None and count >= limit:
-            break
-
-    return count
-
-
-def _is_oss_open_model(model_name: str | None) -> bool:
-    """Return True when a model should be routed through the OSS/Ollama backend."""
-
-    if not model_name:
-        return False
-    normalized = model_name.lower()
-    return normalized.startswith("gpt-oss-")
-
-
-def _build_streaming_dataset_template(dataset_path: Path) -> Dataset:
-    """Construct a Dataset stub for streaming mode using metadata from source file."""
-
-    path = Path(dataset_path)
-    metadata: dict[str, Any] = {"source_file": str(path)}
-    thresholds: dict[str, float] = {}
-    name = path.stem
-    version = "stream"
-
-    suffix = path.suffix.lower()
-    if suffix == ".json":
-        (
-            name,
-            version,
-            metadata_from_file,
-            thresholds_from_file,
-        ) = _load_json_metadata_for_stream(path)
-        metadata.update(metadata_from_file)
-        thresholds.update(thresholds_from_file)
-
-    return Dataset(
-        name=name,
-        version=version,
-        test_cases=[],
-        metadata=metadata,
-        source_file=str(path),
-        thresholds=thresholds,
-    )
-
-
-def _load_json_metadata_for_stream(path: Path) -> tuple[str, str, dict[str, Any], dict[str, float]]:
-    """Read lightweight metadata/thresholds from a JSON dataset for streaming mode."""
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception:
-        return (path.stem, "stream", {}, {})
-
-    name = payload.get("name", path.stem)
-    version = payload.get("version", "stream")
-
-    metadata = payload.get("metadata", {}).copy()
-    description = payload.get("description")
-    if description and "description" not in metadata:
-        metadata["description"] = description
-
-    thresholds: dict[str, float] = {}
-    raw_thresholds = payload.get("thresholds") or {}
-    for metric, value in raw_thresholds.items():
-        try:
-            thresholds[metric] = float(value)
-        except (TypeError, ValueError):
-            continue
-
-    return (name, version, metadata, thresholds)
-
-
-def _resolve_thresholds(metrics: list[str], dataset: Dataset) -> dict[str, float]:
-    """Resolve thresholds by preferring dataset values and falling back to defaults."""
-
-    base_thresholds = dataset.thresholds or {}
-    resolved: dict[str, float] = {}
-    for metric in metrics:
-        if metric in base_thresholds:
-            resolved[metric] = base_thresholds[metric]
-        else:
-            resolved[metric] = 0.7
-    return resolved
-
-
-def _merge_evaluation_runs(
-    existing: EvaluationRun | None,
-    incoming: EvaluationRun,
-    *,
-    dataset_name: str,
-    dataset_version: str,
-    metrics: list[str],
-    thresholds: dict[str, float],
-) -> EvaluationRun:
-    """Merge chunk-level evaluation runs into a single aggregate result."""
-
-    if existing is None:
-        merged = incoming
-    else:
-        merged = existing
-        merged.results.extend(incoming.results)
-        merged.total_tokens = (merged.total_tokens or 0) + (incoming.total_tokens or 0)
-        if merged.total_cost_usd is None and incoming.total_cost_usd is None:
-            merged.total_cost_usd = None
-        else:
-            merged.total_cost_usd = (merged.total_cost_usd or 0.0) + (
-                incoming.total_cost_usd or 0.0
-            )
-        merged.finished_at = incoming.finished_at
-
-    merged.dataset_name = dataset_name
-    merged.dataset_version = dataset_version
-    merged.metrics_evaluated = list(metrics)
-    merged.thresholds = dict(thresholds)
-    return merged
-
-
-async def _evaluate_streaming_run(
-    *,
-    dataset_path: Path,
-    dataset_template: Dataset,
-    metrics: list[str],
-    thresholds: dict[str, float],
-    evaluator: RagasEvaluator,
-    llm: LLMPort,
-    chunk_size: int,
-    parallel: bool,
-    batch_size: int,
-) -> EvaluationRun:
-    """Evaluate a dataset in streaming mode, chunk by chunk."""
-
-    config = StreamingConfig(chunk_size=chunk_size)
-    loader = StreamingDatasetLoader(config)
-    merged_run: EvaluationRun | None = None
-    metadata_template = dict(dataset_template.metadata or {})
-    threshold_template = dict(dataset_template.thresholds or {})
-    source_file = dataset_template.source_file or str(dataset_path)
-
-    for chunk in loader.load_chunked(dataset_path, chunk_size=chunk_size):
-        if not chunk:
-            continue
-        chunk_dataset = Dataset(
-            name=dataset_template.name,
-            version=dataset_template.version,
-            test_cases=list(chunk),
-            metadata=dict(metadata_template),
-            source_file=source_file,
-            thresholds=dict(threshold_template),
-        )
-        chunk_run = await evaluator.evaluate(
-            dataset=chunk_dataset,
-            metrics=metrics,
-            llm=llm,
-            thresholds=thresholds,
-            parallel=parallel,
-            batch_size=batch_size,
-        )
-        merged_run = _merge_evaluation_runs(
-            merged_run,
-            chunk_run,
-            dataset_name=dataset_template.name,
-            dataset_version=dataset_template.version,
-            metrics=metrics,
-            thresholds=thresholds,
-        )
-
-    if merged_run is None:
-        empty_dataset = Dataset(
-            name=dataset_template.name,
-            version=dataset_template.version,
-            test_cases=[],
-            metadata=dict(metadata_template),
-            source_file=source_file,
-            thresholds=dict(threshold_template),
-        )
-        merged_run = await evaluator.evaluate(
-            dataset=empty_dataset,
-            metrics=metrics,
-            llm=llm,
-            thresholds=thresholds,
-            parallel=parallel,
-            batch_size=batch_size,
-        )
-
-    merged_run.thresholds = dict(thresholds)
-    merged_run.metrics_evaluated = list(metrics)
-    merged_run.dataset_name = dataset_template.name
-    merged_run.dataset_version = dataset_template.version
-    return merged_run
-
-
-def _collect_prompt_metadata(
-    *,
-    manifest_path: Path | None,
-    prompt_files: list[Path],
-    console: Console | None = None,
-) -> list[dict[str, Any]]:
-    """Read prompt files and summarize manifest differences."""
-
-    if not prompt_files:
-        return []
-
-    manifest_data = None
-    if manifest_path:
-        try:
-            manifest_data = load_prompt_manifest(manifest_path)
-        except Exception as exc:  # pragma: no cover - guardrail
-            if console:
-                print_cli_warning(
-                    console,
-                    f"Prompt manifest를 불러오지 못했습니다: {manifest_path}",
-                    tips=[str(exc)],
-                )
-            manifest_data = None
-
-    summaries: list[dict[str, Any]] = []
-    for prompt_file in prompt_files:
-        target = prompt_file.expanduser()
-        try:
-            content = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            normalized = target
-            try:
-                normalized = target.resolve()
-            except FileNotFoundError:
-                normalized = target
-            summary = PromptDiffSummary(
-                path=normalized.as_posix(),
-                status="missing_file",
-            )
-            summaries.append(asdict(summary))
-            if console:
-                print_cli_warning(
-                    console,
-                    f"프롬프트 파일을 찾을 수 없습니다: {target}",
-                    tips=["경로/파일명을 확인하고 다시 시도하세요."],
-                )
-            continue
-
-        summary = summarize_prompt_entry(
-            manifest_data,
-            prompt_path=target,
-            content=content,
-        )
-        summary.content_preview = _build_content_preview(content)
-        summaries.append(asdict(summary))
-
-    return summaries
-
-
-def _build_content_preview(content: str, *, max_chars: int = 4000) -> str:
-    """Trim prompt content to a safe preview size."""
-
-    if not content:
-        return ""
-    normalized = content.strip()
-    if len(normalized) <= max_chars:
-        return normalized
-    remaining = len(normalized) - max_chars
-    return normalized[:max_chars].rstrip() + f"\n... (+{remaining} chars)"
-
-
-def _option_was_provided(ctx: typer.Context, param_name: str) -> bool:
-    """Check whether a CLI option was explicitly provided."""
-
-    if ctx is None:
-        return False
-    try:
-        source = ctx.get_parameter_source(param_name)
-    except (AttributeError, KeyError):
-        return False
-    return source == ParameterSource.COMMANDLINE
-
-
-def _print_run_mode_banner(console: Console, preset: RunModePreset) -> None:
-    """Render a short banner describing the selected run mode."""
-
-    bullet_lines: list[str] = []
-    if preset.default_metrics:
-        bullet_lines.append(f"- Metrics: {', '.join(preset.default_metrics)} (locked)")
-    if preset.default_tracker:
-        bullet_lines.append(f"- Tracker: {preset.default_tracker}")
-    bullet_lines.append(
-        "- Domain Memory: enabled" if preset.allow_domain_memory else "- Domain Memory: disabled"
-    )
-    if not preset.allow_prompt_metadata:
-        bullet_lines.append("- Prompt manifest capture: disabled")
-
-    body = preset.description
-    if bullet_lines:
-        body = f"{preset.description}\n\n" + "\n".join(bullet_lines)
-
-    border_style = "cyan" if preset.name == "simple" else "blue"
-    console.print(Panel(body, title=f"Run Mode: {preset.label}", border_style=border_style))
-
-
-__all__ = ["register_run_commands", "enrich_dataset_with_memory", "log_phoenix_traces"]
+__all__ = [
+    "register_run_commands",
+    "enrich_dataset_with_memory",
+    "apply_retriever_to_dataset",
+    "load_retriever_documents",
+    "log_phoenix_traces",
+]

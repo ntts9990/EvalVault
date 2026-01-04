@@ -1,0 +1,14 @@
+{
+  "name": "r3_bm25_smoke",
+  "version": "1.0",
+  "description": "R3 debug report smoke dataset (empty contexts for retriever).",
+  "test_cases": [
+    {
+      "id": "r3-bm25-001",
+      "question": "이 보험의 사망보험금은 얼마인가요?",
+      "answer": "사망보험금은 1억원입니다.",
+      "contexts": [],
+      "ground_truth": "사망보험금은 1억원입니다."
+    }
+  ]
+}

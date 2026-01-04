@@ -1,7 +1,7 @@
 """Domain Learning Hook service.
 
 Implements the Formation dynamics by extracting and storing memories
-from evaluation results. Coordinates between StoragePort and DomainMemoryPort.
+from evaluation results. Coordinates between StoragePort and MemoryLifecyclePort.
 """
 
 from evalvault.domain.entities.memory import (
@@ -10,7 +10,7 @@ from evalvault.domain.entities.memory import (
     LearningMemory,
 )
 from evalvault.domain.entities.result import EvaluationRun
-from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
+from evalvault.ports.outbound.domain_memory_port import MemoryLifecyclePort
 
 
 class DomainLearningHook:
@@ -32,7 +32,7 @@ class DomainLearningHook:
         print(f"Extracted {len(result['facts'])} facts")
     """
 
-    def __init__(self, memory_port: DomainMemoryPort):
+    def __init__(self, memory_port: MemoryLifecyclePort):
         """Initialize the domain learning hook.
 
         Args:

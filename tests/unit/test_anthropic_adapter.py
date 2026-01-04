@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytest.importorskip("anthropic")
-
 from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
 from evalvault.adapters.outbound.llm.base import TokenUsage
 from evalvault.config.settings import Settings
+
+pytest.importorskip("anthropic")
 
 
 class TestTokenUsage:

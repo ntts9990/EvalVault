@@ -42,6 +42,13 @@ from evalvault.domain.entities.result import (
     MetricType,
     TestCaseResult,
 )
+from evalvault.domain.entities.stage import (
+    REQUIRED_STAGE_TYPES,
+    StageEvent,
+    StageMetric,
+    StagePayloadRef,
+    StageSummary,
+)
 
 __all__ = [
     # Analysis
@@ -83,6 +90,12 @@ __all__ = [
     "RetrievalData",
     "RetrievalMethod",
     "RetrievedDocument",
+    # Stage
+    "REQUIRED_STAGE_TYPES",
+    "StageEvent",
+    "StageMetric",
+    "StagePayloadRef",
+    "StageSummary",
     # Result
     "EvaluationRun",
     "MetricScore",

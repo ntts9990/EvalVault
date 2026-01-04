@@ -31,6 +31,7 @@ class LangfuseAdapter(TrackerPort):
             secret_key=secret_key,
             host=host,
         )
+        self._host = host
         self._traces: dict[str, Any] = {}  # trace_id -> root span
 
     def start_trace(self, name: str, metadata: dict[str, Any] | None = None) -> str:
@@ -305,6 +306,7 @@ class LangfuseAdapter(TrackerPort):
         trace_name = f"evaluation-run-{run.run_id}"
         trace_id = self.start_trace(name=trace_name)
         root_span = self._traces[trace_id]
+        self._record_trace_metadata(run, trace_id)
 
         if hasattr(root_span, "update_trace"):
             root_span.update_trace(
@@ -486,3 +488,20 @@ class LangfuseAdapter(TrackerPort):
             del self._traces[trace_id]
 
         return trace_id
+
+    def _record_trace_metadata(self, run: EvaluationRun, trace_id: str) -> None:
+        tracker_metadata = run.tracker_metadata or {}
+        langfuse_meta = tracker_metadata.setdefault("langfuse", {})
+        langfuse_meta["trace_id"] = trace_id
+        langfuse_meta["host"] = self._host
+
+        trace_url = None
+        try:
+            trace_url = self._client.get_trace_url(trace_id=trace_id)
+        except Exception:
+            trace_url = None
+        if trace_url:
+            langfuse_meta["trace_url"] = trace_url
+
+        run.tracker_metadata = tracker_metadata
+        run.langfuse_trace_id = trace_id

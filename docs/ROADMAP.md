@@ -1,8 +1,8 @@
 # EvalVault Development Roadmap
 
-> Last Updated: 2026-01-07
-> Current Version: 1.5.0
-> Status: Phase 1-14 Complete ✅ | Focusing on Improvement & Future Features
+> Last Updated: 2026-01-04
+> Current Version: git tag 기준 (pyproject 버전은 자동 업데이트되지 않음)
+> Status: 병렬 리팩토링/통합 단계 (R1~R4, D1 중심)
 
 ---
 
@@ -13,24 +13,24 @@
 3. [현재 진행 중 (2026 Q1)](#현재-진행-중-2026-q1)
 4. [향후 계획 (2026 Q2-Q4)](#향후-계획-2026-q2-q4)
 5. [Enterprise Track](#enterprise-track)
-6. [미래 연구 (2027+)](#미래-연구-2027)
+6. [근시일 착수 (기존 2027+ 항목)](#근시일-착수-기존-2027-항목)
 
 ---
 
 ## 개요
 
-EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 1-14를 완료하여 안정적인 기반을 갖추었습니다. 이제 코드 품질 개선과 새로운 가치 창출에 집중합니다.
+EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 1-14 완료를 기반으로 현재는 리팩토링/품질 개선에 집중합니다.
 
 ### 현재 상태 요약
 
 | 지표 | 값 |
 |------|-----|
-| Version | 1.5.0 |
-| Tests | 1,671 tests collected (`pytest --collect-only`) |
-| Coverage | 89% |
-| LOC | ~59,000 |
-| Phases Completed | 14/14 (100%) |
-| PyPI | ✅ Published |
+| Version | git tag 기준 |
+| Tests | 약 1.3k+ (내부 기준) |
+| Coverage | 재측정 예정 |
+| LOC | 재측정 예정 |
+| Phases Completed | Phase 1-14 완료 + 리팩토링 단계 |
+| PyPI | ✅ Published (tag 기반) |
 | CI/CD | ✅ Cross-platform |
 
 ### 문서 구조
@@ -38,7 +38,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | 문서 | 역할 | 설명 |
 |------|------|------|
 | **[ROADMAP.md](./ROADMAP.md)** (이 문서) | 전체 로드맵 | 현재 상태 요약 + 향후 개발 계획 |
-| [STATUS.md](./STATUS.md) | 현재 상태 | 버전, 테스트 수, 완료 항목 요약 |
+| [STATUS.md](./STATUS.md) | 현재 상태 | 공개 요약 (내부 SSoT는 internal/STATUS.md) |
 | [README.md](./README.md) | 문서 인덱스 | 전체 문서 구조 및 탐색 가이드 |
 | [internal/DEVELOPMENT_GUIDE.md](./internal/DEVELOPMENT_GUIDE.md) | 개발 가이드 | 개발 환경, 코드 품질, 에이전트 시스템 |
 
@@ -65,7 +65,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | Phase 9 | Korean RAG Optimization | ✅ Complete | +24 |
 | Phase 10-13 | Streamlit Web UI | ✅ Complete | +138 |
 | Phase 14 | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
-| **Total** | | **✅ 100%** | **1,671** |
+| **Total** | | **✅ 100%** | **legacy 기준** |
 
 ### 주요 달성 사항
 
@@ -84,7 +84,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 - ✅ DAG Analysis Pipeline
 
 #### 개발 인프라
-- ✅ 1,671 tests collected (89% coverage)
+- ✅ 약 1.3k+ tests (coverage 재측정 예정)
 - ✅ CI/CD (Ubuntu, macOS, Windows)
 - ✅ PyPI 자동 배포
 - ✅ Semantic Versioning
@@ -97,6 +97,381 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 >
 > **개발 자동화**: AI 에이전트 기반 병렬 개발 워크플로우 도입
 
+### 우선 작업 대상 (요구사항 기반)
+
+> **배경**: 한국 보험 RAG 요구사항에 맞춰 성능/운영 격차를 빠르게 해소
+
+| 요구사항 | 현재 커버리지 | 추가 개발 | 우선 작업 |
+|----------|---------------|-----------|-----------|
+| 1000건 문서 RAG 정확도 | 85% | 병렬 처리 최적화 | **R3** |
+| RAG 시스템 개발 지원 | 90% | 파이프라인 통합 | **R1** |
+| 한국 보험 업계 반영 | 95% | 용어사전 확장 | 완료 |
+| 하이브리드 서치 | 100% (구현) / 40% (통합) | 평가 파이프라인 연동 | **R1, R4** |
+| GraphRAG 전략 | 80% (테스트셋) / 100% (검색) | GraphRAG 검색기 | **R2** |
+
+**관점별 우선순위 판단**
+| 관점 | 우선 작업 | 이유 |
+|------|-----------|------|
+| 개발 전문가 | **R1 + R4** | 파이프라인 결합과 측정 체계가 먼저 고정돼야 리스크가 줄어듦 |
+| RAG 성능 발전 전문가 | **R1 → R4 → R2 → R3** | 베이스라인/검증 체계를 만든 뒤 성능 개선 적용 |
+| 리팩토링 전문가 | **R1 우선, R2/R4 병렬, R3 후행** | 인터페이스 고정 후 확장 구현이 유지보수에 유리 |
+| 고객(보험) | **R1 + R4** | 개선 효과를 숫자로 확인 가능한 기능이 최우선 |
+| 개발자 | **R1 → R4 → R2 → R3** | 개발 경험 개선과 빠른 피드백 루프가 중요 |
+
+**우선순위 정렬**
+1. **P0**: R1 (E2E 통합) + R4 (벤치마크) - 연결과 검증 체계가 먼저 필요
+2. **P1**: R2 (GraphRAG) - 성능 개선 구현(검색기) 선행
+3. **P2**: R3 (대용량 최적화) - GraphRAG 기반 최적화는 R2 이후
+
+**의존성/병렬성 메모**
+- R1, R2, R4는 병렬 진행 가능
+- R3는 GraphRAG 기반 최적화 분량은 R2 이후 착수 권장
+
+**근거 요약 (하이브리드/리랭킹)**
+- 연구/벤치마크에서 하이브리드 + 리랭킹이 품질 향상으로 반복 검증됨
+- 한국어 형태소 기반 BM25 + Dense 조합이 보험 도메인 쿼리에 유리
+  - 참고: https://arxiv.org/html/2404.07220v1
+  - 참고: https://superlinked.com/vectorhub/articles/optimizing-rag-with-hybrid-search-reranking
+  - 참고: https://infiniflow.org/blog/best-hybrid-search-solution
+
+### 병렬 진행 기본 원칙
+
+- 각 R 단위 안에서도 2~3개의 병렬 트랙으로 분리한다.
+- 최소 의존 단위를 먼저 완료하고, 인터페이스를 고정해 병렬 개발을 지속한다.
+- YAGNI 원칙으로 확장 기능은 optional 플래그/옵션으로 먼저 제공한다.
+
+**병렬 트랙 제안**
+| Track | 병렬 작업 | 주 대상 |
+|-------|-----------|---------|
+| A | 파이프라인/포트 인터페이스 설계 + CLI 옵션 | R1 |
+| B | 평가/메트릭/리포트 라인업 확장 | R1, R4 |
+| C | KG/인덱싱 성능 개선 (병렬/스트리밍) | R3 |
+| D | GraphRAG 검색기 기본 구현 | R2 |
+
+---
+
+### R1: 하이브리드 서치 평가 파이프라인 통합 (2주)
+
+**목표**: 기존 `KoreanHybridRetriever`를 평가 파이프라인에 완벽 통합
+
+**현재 상태**:
+- ✅ `KoreanHybridRetriever` 완전 구현 (BM25 + Dense + RRF)
+- ✅ `KoreanDenseRetriever` (BGE-m3-ko) 구현
+- ⚠️ 검색기가 평가 파이프라인과 분리됨 (독립 사용만 가능)
+
+**개선 방향**:
+```python
+# 현재: 검색과 평가 분리
+retriever = KoreanHybridRetriever(...)
+contexts = retriever.search(query, top_k=5)
+# → 별도로 평가 실행
+
+# 개선: 평가 시 검색기 통합
+result = evalvault.run(
+    questions=["질문1", "질문2"],
+    retriever=KoreanHybridRetriever(...),
+    documents=documents,
+    metrics=["context_precision", "context_recall"],
+)
+```
+
+**작업 항목**:
+- [ ] `EvaluatorPort`에 retriever 주입 인터페이스 추가
+- [ ] `RagasEvaluator`에서 검색기 호출 로직 구현
+- [ ] CLI `--retriever` 옵션 추가 (bm25, dense, hybrid)
+- [ ] Context 자동 생성 모드 구현
+- [ ] 검색 품질 메트릭 (`retrieval_precision`, `retrieval_recall`) 추가
+
+**예상 효과**:
+- 검색 단계부터 평가까지 E2E 파이프라인
+- 하이브리드 서치 효과 정량적 측정 가능
+
+**구체 계획 (병렬)**:
+- Track A: Port/Adapter 정의
+  - `RetrieverPort` 계약 정의 (search/top_k/metadata)
+  - 기본 구현체 매핑 (bm25, dense, hybrid)
+- Track B: 평가 파이프라인 연결
+  - contexts가 비어 있을 때 retriever 호출
+  - StageEvent에 `doc_ids/scores/top_k` 기록
+- Track C: CLI/설정/테스트
+  - `--retriever`, `--retriever-top-k`, `--retriever-config` 옵션
+  - 단위 테스트: retriever 주입 경로, stage event 생성 검증
+
+**완료 기준**:
+- `evalvault run ... --retriever hybrid` 실행 시 contexts 생성 및 평가 완료
+- `stage report`에서 retrieval 관련 메트릭이 출력됨
+- 최소 단위 테스트 3건 이상 추가
+
+**검증 지표**:
+- contexts 미보유 테스트 케이스의 `retrieval.result_count >= 1` 비율 ≥ 90%
+- 기존 contexts 보유 데이터셋에서 E2E pass rate 변화 ≤ ±5%
+- `retrieval.precision_at_k`, `retrieval.recall_at_k` 산출 및 저장 확인
+
+**완료 체크리스트 (보고서용)**:
+- [x] `--retriever/--retriever-docs/--retriever-top-k` 옵션 구현
+- [x] contexts 비어있는 케이스 자동 채움 로직 연결
+- [x] StageEvent에 `doc_ids/scores/top_k` 기록
+- [x] `stage report`에서 retrieval 메트릭 출력 확인
+- [x] 유닛 테스트 추가 (헬퍼/StageEvent)
+- [x] CLI 통합 테스트 추가
+- [x] 스모크 스크립트 추가 및 실행
+- [x] 문서 업데이트 (CLI/개발 가이드)
+- [x] 완료 보고서 작성 (`docs/internal/R1_COMPLETION_REPORT.md`)
+
+---
+
+### R2: GraphRAG 스타일 검색 최적화 (3주)
+
+**목표**: 기존 KG 인프라를 검색 최적화에 활용 (LightRAG 아이디어 적용)
+
+**현재 상태**:
+- ✅ `KnowledgeGraphGenerator` (NetworkX MultiDiGraph)
+- ✅ Entity/Relation 추출 (Regex + LLM 보강)
+- ✅ 다중 홉 질문 생성
+- ⚠️ KG가 테스트셋 생성에만 사용됨 (검색 최적화 미활용)
+
+**LightRAG 연구 기반 전략**:
+
+| 연구 결과 | EvalVault 적용 |
+|-----------|----------------|
+| Entity + Relation 검색이 chunk 검색보다 우수 | KG 기반 검색기 구현 |
+| 증분 업데이트로 50% 시간 절감 | KG 점진적 업데이트 지원 |
+| Multi-hop 추론에서 20-30ms 속도 향상 | 서브그래프 캐싱 |
+
+**구현 계획**:
+```python
+# 새로운 검색기: GraphRAGRetriever
+class GraphRAGRetriever:
+    """LightRAG 스타일 Entity + Relation 기반 검색"""
+
+    def __init__(
+        self,
+        kg: KnowledgeGraph,
+        dense_retriever: KoreanDenseRetriever,
+        entity_weight: float = 0.4,
+        relation_weight: float = 0.3,
+        chunk_weight: float = 0.3,
+    ):
+        ...
+
+    def search(self, query: str, top_k: int = 5) -> list[GraphRAGResult]:
+        # 1. 쿼리에서 엔티티 추출
+        query_entities = self.extract_entities(query)
+
+        # 2. KG에서 관련 엔티티/관계 검색
+        kg_context = self.kg.find_subgraph(query_entities, depth=2)
+
+        # 3. Dense 검색으로 보완
+        dense_results = self.dense_retriever.search(query, top_k=top_k*2)
+
+        # 4. 융합 (RRF)
+        return self.fuse_results(kg_context, dense_results, top_k)
+
+# CLI 사용
+evalvault run data.csv \
+    --retriever graphrag \
+    --kg documents_kg.json \
+    --metrics faithfulness,context_precision
+```
+
+**작업 항목**:
+- [x] `GraphRAGRetriever` 클래스 구현
+- [x] KG 서브그래프 추출 최적화
+- [x] Entity-Query 매칭 로직 (형태소 분석 활용)
+- [x] 3-way 융합 (Entity + Relation + Chunk)
+- [x] 증분 KG 업데이트 지원
+- [x] CLI `--retriever graphrag` 옵션
+
+**참고 연구**:
+- [LightRAG Paper](https://arxiv.org/html/2410.05779v1): 증분 업데이트, dual-level 검색
+- [GraphRAG-Bench](https://github.com/GraphRAG-Bench/GraphRAG-Benchmark): 벤치마크 기준
+
+**구체 계획 (병렬)**:
+- Track A: GraphRAGRetriever 최소 기능
+  - KG 서브그래프 조회 + Dense 검색 + BM25 결합 (RRF)
+  - 기본 랭킹/스코어 합산 규칙 정의
+- Track B: 엔티티 매칭/쿼리 분석
+  - Kiwi 기반 엔티티 후보 추출
+  - 질의-엔티티 매칭 스코어링
+- Track C: 캐싱/증분 업데이트
+  - 서브그래프 LRU 캐싱
+  - 증분 업데이트는 옵션 플래그로 분리 (YAGNI)
+
+**완료 기준**:
+- `evalvault run --retriever graphrag` 경로 동작
+- GraphRAG 결과가 StageEvent로 기록되고 리포트에서 확인 가능
+- 벤치마크에서 hybrid 대비 성능 비교 가능
+
+**검증 지표**:
+- GraphRAG 모드에서 `retrieval.result_count >= 1` 비율 ≥ 90%
+- Hybrid 대비 `Recall@5` 또는 `nDCG@10` ≥ baseline(선정 테스트셋 기준)
+- p95 retrieval latency 증가 ≤ 30% (hybrid 대비)
+
+---
+
+### R3: 1000건 대규모 문서 처리 최적화 (2주)
+
+**목표**: 1000건 이상 문서에서 효율적인 KG 구축 및 검색
+
+**현재 상태**:
+- ✅ 스트리밍 로더 구현
+- ✅ 배치 평가 지원
+- ⚠️ KG 구축 시 메모리 사용량 최적화 필요
+- ⚠️ 대규모 임베딩 계산 시간 오래 걸림
+
+**최적화 전략**:
+
+| 영역 | 현재 | 목표 | 방법 |
+|------|------|------|------|
+| KG 구축 시간 | 1000건 ~30분 | ~10분 | 병렬 엔티티 추출 |
+| 메모리 사용 | ~2GB | ~500MB | 스트리밍 처리 |
+| 임베딩 계산 | 순차 | 병렬 | batch + GPU |
+| 검색 응답 | ~500ms | ~100ms | FAISS 인덱스 |
+
+**구현 계획**:
+```python
+# 1. 병렬 KG 구축
+from concurrent.futures import ProcessPoolExecutor
+
+class ParallelKGBuilder:
+    def build(self, documents: list[str], workers: int = 4):
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            # 문서별 병렬 엔티티 추출
+            entity_futures = [
+                executor.submit(self.extract_entities, doc)
+                for doc in documents
+            ]
+            # 결과 병합
+            ...
+
+# 2. FAISS 벡터 인덱스 지원
+class FAISSIndexedRetriever:
+    def __init__(self, use_gpu: bool = False):
+        self.index = faiss.IndexFlatIP(dimension)  # 또는 IVF
+
+    def index(self, documents: list[str]):
+        embeddings = self.encode_batch(documents, batch_size=64)
+        self.index.add(embeddings)
+
+    def search(self, query: str, top_k: int = 5):
+        query_vec = self.encode([query])
+        distances, indices = self.index.search(query_vec, top_k)
+        return indices
+
+# CLI 사용
+evalvault kg build documents/ \
+    --workers 4 \
+    --batch-size 100 \
+    --output kg.json
+```
+
+**작업 항목**:
+- [ ] `ParallelKGBuilder` 구현 (ProcessPoolExecutor)
+- [ ] FAISS 벡터 인덱스 통합 (optional dependency)
+- [ ] 스트리밍 KG 구축 (메모리 효율)
+- [ ] 배치 임베딩 최적화 (GPU 지원)
+- [ ] 진행률 표시 개선 (Rich progress bar)
+
+**구체 계획 (병렬)**:
+- Track A: 병렬 KG 구축
+  - 문서 단위 엔티티 추출 병렬화
+  - 병합 단계에서 메모리 피크 최소화
+- Track B: 스트리밍/배치 최적화
+  - 스트리밍 로더와 배치 임베딩 경로 정리
+  - batch_size 자동 튜닝 (간단한 휴리스틱)
+- Track C: 인덱스 최적화 (선택)
+  - FAISS optional 의존성으로 분리
+  - 미설치 시 기존 dense 검색 경로 유지
+
+**완료 기준**:
+- 1000건 문서 기준 KG 구축 시간/메모리 지표 개선
+- 동일 데이터셋에서 성능 저하 없이 평가 수행
+
+---
+
+### R4: 하이브리드 서치 효과 벤치마크 도구 (1주)
+
+**목표**: BM25 vs Dense vs Hybrid 성능 비교 자동화
+
+**배경**:
+- 2025 연구에 따르면 하이브리드 검색이 단일 방식 대비 48% 향상
+- 한국어 보험 도메인에서 효과 검증 필요
+
+**벤치마크 항목**:
+```
+1. 검색 품질
+   - Recall@K (K=5, 10, 20)
+   - MRR (Mean Reciprocal Rank)
+   - nDCG@10
+
+2. 용어 매칭 정확도
+   - 보험 용어 정확 매칭률
+   - 조사/어미 변형 처리율
+
+3. 의미 이해도
+   - 동의어 매칭률
+   - Multi-hop 추론 정확도
+
+4. 성능
+   - 검색 응답 시간 (p50, p99)
+   - 인덱싱 시간
+   - 메모리 사용량
+```
+
+**구현**:
+```bash
+# CLI 명령어
+evalvault benchmark retrieval insurance_docs/ \
+    --methods bm25,dense,hybrid \
+    --testset ground_truth.json \
+    --output benchmark_results.json
+
+# 출력 예시
+┌──────────────────────────────────────────────────────────────┐
+│                   검색 방식 벤치마크 결과                      │
+├─────────────────┬─────────┬─────────┬─────────┬─────────────┤
+│ 메트릭          │ BM25    │ Dense   │ Hybrid  │ GraphRAG    │
+├─────────────────┼─────────┼─────────┼─────────┼─────────────┤
+│ Recall@5        │ 0.72    │ 0.78    │ 0.89    │ 0.91        │
+│ MRR             │ 0.65    │ 0.71    │ 0.82    │ 0.85        │
+│ nDCG@10         │ 0.68    │ 0.74    │ 0.86    │ 0.88        │
+│ 보험용어 매칭   │ 0.95    │ 0.62    │ 0.91    │ 0.93        │
+│ 응답시간 (ms)   │ 15      │ 120     │ 145     │ 180         │
+└─────────────────┴─────────┴─────────┴─────────┴─────────────┘
+
+결론: Hybrid 검색이 BM25 대비 +23.6% Recall 향상
+      보험 용어 매칭 정확도 유지 (95% → 91%)
+```
+
+**작업 항목**:
+- [x] `evalvault benchmark retrieval` CLI 명령어
+- [x] Ground truth 데이터셋 포맷 정의
+- [x] 4가지 검색 방식 자동 비교
+- [x] Rich 테이블 출력
+- [x] JSON/CSV 결과 저장
+
+**구체 계획 (병렬)**:
+- Track A: CLI/입출력 포맷
+  - ground_truth 스키마 정의
+  - JSON/CSV 출력 포맷 고정
+- Track B: 메트릭 계산기
+  - Recall@K, MRR, nDCG@K 계산 유틸 추가
+  - 결과 요약 테이블 템플릿
+- Track C: 메서드 어댑터
+  - bm25/dense/hybrid/graphrag 어댑터 연결
+  - R1에서 정의한 retriever 포트 재사용
+
+**완료 기준**:
+- 단일 명령으로 4가지 검색 방식 비교 리포트 생성
+- 결과를 JSON/CSV로 저장 가능
+
+**검증 지표**:
+- 출력 JSON에 `methods_compared`, `results`, `overall` 필드 포함
+- 최소 3개 메트릭(Recall@K, MRR, nDCG@K) 계산
+- 동일 입력에서 재실행 시 결과 포맷 불변(스키마 안정성)
+
+---
+
 ### 진행 중인 개선 작업 (병렬)
 
 | ID | 작업 | 상태 | 참고 |
@@ -108,6 +483,25 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | P6 | 문서화 개선 | 🚧 진행 중 | `docs/internal/PARALLEL_WORK_PLAN.md` |
 
 상세 범위와 일정은 `docs/internal/PARALLEL_WORK_PLAN.md`에서 관리합니다.
+
+### 단기 작업 목록 (NEXT_TASKS 통합)
+
+1. **P2.2 Web UI 컴포넌트 재구조화**
+   - Streamlit 컴포넌트 구조 정리, 공통 컴포넌트 분리
+2. **P3 성능 최적화**
+   - 배치 평가 + 병렬화
+   - 스트리밍 로더 구현
+   - LRU + TTL 캐싱 개선
+3. **P4.1 CLI 명령어 개선**
+   - 명령어/옵션 UX 정리 및 온보딩 개선
+4. **P5 테스트 개선**
+   - 느린 테스트 최적화
+   - 커버리지 목표 상향
+5. **P6 문서화 개선**
+   - API 문서 자동화
+   - 튜토리얼 강화
+6. **P8.5 Domain Memory 확장 과제**
+   - 개선 가이드 통합, 시각화 확장, 행동 패턴 루프
 
 ### 개발 자동화 에이전트 시스템
 
@@ -560,49 +954,31 @@ evalvault run-pipeline config.yaml \
 
 #### Phase 19: Knowledge Graph 고도화
 
-**목표**: NetworkX 기반 고급 KG 기능 및 KG 기반 평가
+**목표**: KG 기반 평가 메트릭 및 검색 최적화
 
-**현재 상태**:
-- Phase 6에서 기본 KG 생성 및 테스트셋 생성 완료
-- 하지만 KG 분석, 시각화, KG 기반 메트릭 부족
+**현재 상태** (2026-01-04 업데이트):
+- ✅ **NetworkX 마이그레이션 완료** (nx.MultiDiGraph 기반)
+- ✅ Entity/Relation 추출 (Regex + LLM 보강)
+- ✅ 다중 홉 경로 탐색 (find_path, find_all_paths)
+- ✅ 질문 생성 전략 4종 (single-hop, multi-hop, comparison, composite)
+- ⚠️ KG 기반 평가 메트릭 미구현
+- ⚠️ KG 기반 검색 최적화 미구현 (R2에서 진행)
 
-**개선 방향**:
-
-**19.1 NetworkX 마이그레이션**
+**현재 구현된 NetworkX 기능** (`kg_generator.py`):
 ```python
-# 현재: 단순 dict 기반 그래프
-class KnowledgeGraph:
-    nodes: dict[str, Entity]
-    edges: list[Relation]
-
-# 개선: NetworkX 기반
-import networkx as nx
-
 class KnowledgeGraph:
     def __init__(self):
-        self.graph = nx.MultiDiGraph()
+        self._graph = nx.MultiDiGraph()  # ✅ 이미 구현됨
 
-    def add_entity(self, entity: Entity):
-        self.graph.add_node(
-            entity.id,
-            type=entity.type,
-            **entity.attributes
-        )
-
-    def add_relation(self, relation: Relation):
-        self.graph.add_edge(
-            relation.source,
-            relation.target,
-            type=relation.type,
-            **relation.attributes
-        )
-
-    # NetworkX 기능 활용
-    def shortest_path(self, source, target):
-        return nx.shortest_path(self.graph, source, target)
-
-    def centrality(self):
-        return nx.betweenness_centrality(self.graph)
+    # ✅ 구현 완료된 기능
+    def add_entity(entity: EntityModel)
+    def add_relation(relation: RelationModel)
+    def has_entity(name: str) -> bool
+    def has_relation(source: str, target: str) -> bool
+    def get_neighbors(name: str) -> list[str]
+    def get_relations_for_entity(name: str) -> list[RelationModel]
+    def get_entities_by_type(entity_type: str) -> list[EntityModel]
+    def get_isolated_entities() -> list[EntityModel]
 ```
 
 **19.2 KG 기반 평가 메트릭**
@@ -801,9 +1177,9 @@ evalvault run data.csv --endpoint https://api.company.com
 
 ---
 
-## 미래 연구 (2027+)
+## 근시일 착수 (기존 2027+ 항목)
 
-> **Note**: 아래 기능들은 장기 연구 주제이며, 실제 필요성이 검증된 후 구현합니다.
+> **Note**: 아래 항목은 기존에 장기 연구로 분류됐지만, 현재는 근시일 착수 대상으로 재분류했습니다.
 
 ### Agent System Integration
 

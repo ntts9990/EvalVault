@@ -1,0 +1,17 @@
+{
+  "name": "graphrag-smoke",
+  "version": "1.0.0",
+  "description": "GraphRAG smoke dataset",
+  "thresholds": {
+    "faithfulness": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "graphrag-001",
+      "question": "What does AlphaCorp provide?",
+      "answer": "AlphaCorp provides BetaPlan.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    }
+  ]
+}
