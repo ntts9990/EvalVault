@@ -28,6 +28,7 @@ from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 
 from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
 from ..utils.options import db_option, memory_db_option, profile_option
@@ -49,7 +50,6 @@ from .run_helpers import (
     _save_results,
     _save_to_db,
     _write_stage_events_jsonl,
-    apply_retriever_to_dataset,
     enrich_dataset_with_memory,
     load_knowledge_graph,
     load_retriever_documents,
@@ -58,6 +58,7 @@ from .run_helpers import (
 
 DEFAULT_RUN_MODE = "full"
 _merge_evaluation_runs = run_helpers._merge_evaluation_runs
+apply_retriever_to_dataset = run_helpers.apply_retriever_to_dataset
 
 
 def _build_dense_retriever(
@@ -541,7 +542,8 @@ def register_run_commands(
                     )
                     raise typer.Exit(1) from exc
 
-        retriever_metadata: dict[str, dict[str, Any]] | None = None
+        retriever_instance: RetrieverPort | None = None
+        retriever_doc_ids: list[str] | None = None
         if retriever:
             validate_choice(
                 retriever,
@@ -570,6 +572,7 @@ def register_run_commands(
             else:
                 try:
                     documents, doc_ids = load_retriever_documents(retriever_docs)
+                    retriever_doc_ids = doc_ids
                 except Exception as exc:
                     print_cli_error(
                         console,
@@ -674,17 +677,6 @@ def register_run_commands(
                     retriever_instance = None
 
                 if retriever_instance:
-                    retriever_metadata = apply_retriever_to_dataset(
-                        dataset=ds,
-                        retriever=retriever_instance,
-                        top_k=retriever_top_k,
-                        doc_ids=doc_ids,
-                    )
-                    if retriever_metadata:
-                        console.print(
-                            f"[dim]Applied {retriever} retriever to "
-                            f"{len(retriever_metadata)} test case(s).[/dim]"
-                        )
                     phoenix_trace_metadata["retriever.mode"] = retriever
                     phoenix_trace_metadata["retriever.docs"] = str(retriever_docs)
                     if retriever == "graphrag" and kg:
@@ -855,6 +847,9 @@ def register_run_commands(
                             batch_size=final_batch_size,
                             domain=memory_domain_name,
                             language=memory_language,
+                            retriever=retriever_instance,
+                            retriever_top_k=retriever_top_k,
+                            retriever_doc_ids=retriever_doc_ids,
                         )
                     )
                 else:
@@ -866,6 +861,9 @@ def register_run_commands(
                             thresholds=resolved_thresholds,
                             parallel=final_parallel,
                             batch_size=final_batch_size,
+                            retriever=retriever_instance,
+                            retriever_top_k=retriever_top_k,
+                            retriever_doc_ids=retriever_doc_ids,
                         )
                     )
                 update_progress("📊 결과 집계 중...")
@@ -884,6 +882,13 @@ def register_run_commands(
         phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
 
         result.tracker_metadata.setdefault("run_mode", preset.name)
+
+        retriever_metadata: dict[str, dict[str, Any]] | None = result.retrieval_metadata or None
+        if retriever_instance and retriever_metadata:
+            console.print(
+                f"[dim]Applied {retriever} retriever to "
+                f"{len(retriever_metadata)} test case(s).[/dim]"
+            )
 
         _display_results(result, console, verbose)
 

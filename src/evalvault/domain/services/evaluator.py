@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -31,6 +32,8 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
 from evalvault.domain.entities import Dataset, EvaluationRun, MetricScore, TestCase, TestCaseResult
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.services.batch_executor import run_in_batches
+from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 from evalvault.ports.outbound.llm_port import LLMPort
 
 logger = logging.getLogger(__name__)
@@ -113,6 +116,9 @@ class RagasEvaluator:
         thresholds: dict[str, float] | None = None,
         parallel: bool = False,
         batch_size: int = 5,
+        retriever: RetrieverPort | None = None,
+        retriever_top_k: int = 5,
+        retriever_doc_ids: Sequence[str] | None = None,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -120,9 +126,13 @@ class RagasEvaluator:
             dataset: 평가할 데이터셋
             metrics: 평가할 메트릭 리스트 (예: ['faithfulness', 'answer_relevancy'])
             llm: LLM 어댑터 (Ragas가 사용)
-            thresholds: 메트릭별 임계값 (CLI에서 전달, 없으면 dataset.thresholds 사용)
+            thresholds: 메트릭별 임계값 (CLI에서 전달, 없으면
+                dataset.thresholds 사용)
             parallel: 병렬 처리 활성화 여부 (기본값: False)
             batch_size: 병렬 처리 시 배치 크기 (기본값: 5)
+            retriever: 컨텍스트가 비어 있을 때 사용할 retriever
+            retriever_top_k: retriever 결과 상위 k개 사용
+            retriever_doc_ids: retriever 결과 doc_id 인덱스 해석용 문서 ID 목록
 
         Returns:
             평가 결과가 담긴 EvaluationRun
@@ -152,6 +162,16 @@ class RagasEvaluator:
             metrics_evaluated=metrics,
             thresholds=resolved_thresholds,
         )
+
+        retrieval_metadata: dict[str, dict[str, Any]] = {}
+        if retriever and dataset.test_cases:
+            retrieval_metadata = apply_retriever_to_dataset(
+                dataset=dataset,
+                retriever=retriever,
+                top_k=retriever_top_k,
+                doc_ids=retriever_doc_ids,
+            )
+        run.retrieval_metadata = retrieval_metadata
 
         # Handle empty dataset
         if len(dataset.test_cases) == 0:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pytest
 
 from evalvault.domain.entities import (
@@ -15,6 +17,7 @@ from evalvault.domain.entities.memory import BehaviorEntry, FactualFact, Learnin
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
@@ -40,6 +43,9 @@ class DummyEvaluator(RagasEvaluator):
         thresholds: dict[str, float] | None = None,
         parallel: bool = False,
         batch_size: int = 5,
+        retriever: RetrieverPort | None = None,
+        retriever_top_k: int = 5,
+        retriever_doc_ids: Sequence[str] | None = None,
     ) -> EvaluationRun:
         self.captured_thresholds = dict(thresholds or {})
         run = EvaluationRun(dataset_name=dataset.name, dataset_version=dataset.version)

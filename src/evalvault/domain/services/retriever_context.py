@@ -1,0 +1,158 @@
+"""Utilities for applying retrievers to datasets."""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Sequence
+from typing import Any
+
+from evalvault.domain.entities import Dataset
+from evalvault.ports.outbound.korean_nlp_port import RetrieverPort, RetrieverResultProtocol
+
+
+def apply_retriever_to_dataset(
+    *,
+    dataset: Dataset,
+    retriever: RetrieverPort,
+    top_k: int,
+    doc_ids: Sequence[str] | None,
+) -> dict[str, dict[str, Any]]:
+    """Populate empty contexts via retriever and return retrieval metadata."""
+
+    retrieval_metadata: dict[str, dict[str, Any]] = {}
+    resolved_doc_ids = list(doc_ids or [])
+
+    for test_case in dataset.test_cases:
+        if _has_contexts(test_case.contexts):
+            continue
+        started_at = time.perf_counter()
+        results = retriever.search(test_case.question, top_k=top_k)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        contexts, doc_id_list, scores = _normalize_retrieval_results(
+            results,
+            doc_ids=resolved_doc_ids,
+        )
+        if contexts:
+            test_case.contexts.extend(contexts)
+        metadata: dict[str, Any] = {
+            "doc_ids": doc_id_list,
+            "top_k": top_k,
+            "retrieval_time_ms": elapsed_ms,
+        }
+        if scores:
+            metadata["scores"] = scores
+        metadata.update(_extract_graph_attributes(results))
+        retrieval_metadata[test_case.id] = metadata
+
+    return retrieval_metadata
+
+
+def _has_contexts(contexts: Sequence[str]) -> bool:
+    return any(ctx.strip() for ctx in contexts)
+
+
+def _normalize_retrieval_results(
+    results: Sequence[RetrieverResultProtocol],
+    *,
+    doc_ids: Sequence[str],
+) -> tuple[list[str], list[str], list[float]]:
+    contexts: list[str] = []
+    resolved_doc_ids: list[str] = []
+    scores: list[float] = []
+    all_scored = True
+
+    for idx, result in enumerate(results, start=1):
+        document = _extract_document(result)
+        if not document:
+            continue
+        contexts.append(document)
+
+        resolved_doc_ids.append(_resolve_doc_id(result, doc_ids, idx))
+
+        score = _extract_score(result)
+        if score is None:
+            all_scored = False
+        else:
+            scores.append(score)
+
+    if not all_scored:
+        scores = []
+
+    return contexts, resolved_doc_ids, scores
+
+
+def _extract_document(result: RetrieverResultProtocol) -> str | None:
+    document = getattr(result, "document", None)
+    if isinstance(document, str):
+        return document
+    content = getattr(result, "content", None)
+    if isinstance(content, str):
+        return content
+    return None
+
+
+def _extract_score(result: RetrieverResultProtocol) -> float | None:
+    score = getattr(result, "score", None)
+    if score is None:
+        return None
+    try:
+        return float(score)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_doc_id(
+    result: RetrieverResultProtocol,
+    doc_ids: Sequence[str],
+    fallback_index: int,
+) -> str:
+    raw_doc_id = getattr(result, "doc_id", None)
+    if isinstance(raw_doc_id, int) and 0 <= raw_doc_id < len(doc_ids):
+        return str(doc_ids[raw_doc_id])
+    if raw_doc_id is not None:
+        return str(raw_doc_id)
+    return f"doc_{fallback_index}"
+
+
+def _extract_graph_attributes(
+    results: Sequence[RetrieverResultProtocol],
+) -> dict[str, Any]:
+    nodes: set[str] = set()
+    edges: set[str] = set()
+    community_ids: set[str] = set()
+
+    for result in results:
+        metadata = getattr(result, "metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+
+        kg_meta = metadata.get("kg")
+        if isinstance(kg_meta, dict):
+            for entity in kg_meta.get("entities", []) or []:
+                nodes.add(str(entity))
+            for relation in kg_meta.get("relations", []) or []:
+                edges.add(str(relation))
+            community_id = kg_meta.get("community_id")
+            if community_id is not None:
+                community_ids.add(str(community_id))
+
+        community_id = metadata.get("community_id")
+        if community_id is not None:
+            community_ids.add(str(community_id))
+
+    if not (nodes or edges or community_ids):
+        return {}
+
+    attributes: dict[str, Any] = {
+        "graph_nodes": len(nodes),
+        "graph_edges": len(edges),
+        "subgraph_size": len(nodes) + len(edges),
+        "community_id": _compact_values(community_ids) if community_ids else None,
+    }
+    return attributes
+
+
+def _compact_values(values: set[str]) -> str | list[str]:
+    if len(values) == 1:
+        return next(iter(values))
+    return sorted(values)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,6 +32,7 @@ from evalvault.domain.entities import (
     RetrievedDocument,
     StageEvent,
 )
+from evalvault.domain.services import retriever_context
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.prompt_manifest import (
@@ -40,7 +40,6 @@ from evalvault.domain.services.prompt_manifest import (
     load_prompt_manifest,
     summarize_prompt_entry,
 )
-from evalvault.ports.outbound.korean_nlp_port import RetrieverPort, RetrieverResultProtocol
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
@@ -48,6 +47,7 @@ from ..utils.console import print_cli_error, print_cli_warning
 from ..utils.formatters import format_score, format_status
 
 TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
+apply_retriever_to_dataset = retriever_context.apply_retriever_to_dataset
 
 
 @dataclass(frozen=True)
@@ -347,6 +347,8 @@ def _save_results(output: Path, result, console: Console) -> None:
                 }
                 for r in result.results
             ]
+            if result.retrieval_metadata:
+                data["retrieval_metadata"] = result.retrieval_metadata
 
             with open(output, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False, default=str)
@@ -399,42 +401,6 @@ def enrich_dataset_with_memory(
     return enriched
 
 
-def apply_retriever_to_dataset(
-    *,
-    dataset: Dataset,
-    retriever: RetrieverPort,
-    top_k: int,
-    doc_ids: Sequence[str],
-) -> dict[str, dict[str, Any]]:
-    """Populate empty contexts via retriever and return retrieval metadata."""
-
-    retrieval_metadata: dict[str, dict[str, Any]] = {}
-
-    for test_case in dataset.test_cases:
-        if _has_contexts(test_case.contexts):
-            continue
-        started_at = time.perf_counter()
-        results = retriever.search(test_case.question, top_k=top_k)
-        elapsed_ms = (time.perf_counter() - started_at) * 1000
-        contexts, resolved_doc_ids, scores = _normalize_retrieval_results(
-            results,
-            doc_ids=doc_ids,
-        )
-        if contexts:
-            test_case.contexts.extend(contexts)
-        metadata: dict[str, Any] = {
-            "doc_ids": resolved_doc_ids,
-            "top_k": top_k,
-            "retrieval_time_ms": elapsed_ms,
-        }
-        if scores:
-            metadata["scores"] = scores
-        metadata.update(_extract_graphrag_attributes(results, retriever))
-        retrieval_metadata[test_case.id] = metadata
-
-    return retrieval_metadata
-
-
 def load_knowledge_graph(file_path: Path) -> NetworkXKnowledgeGraph:
     """Load a knowledge graph JSON file."""
 
@@ -477,131 +443,6 @@ def load_retriever_documents(file_path: Path) -> tuple[list[str], list[str]]:
         raise ValueError("retriever documents are empty")
 
     return documents, doc_ids
-
-
-def _has_contexts(contexts: Sequence[str]) -> bool:
-    return any(ctx.strip() for ctx in contexts)
-
-
-def _normalize_retrieval_results(
-    results: Sequence[RetrieverResultProtocol],
-    *,
-    doc_ids: Sequence[str],
-) -> tuple[list[str], list[str], list[float]]:
-    contexts: list[str] = []
-    resolved_doc_ids: list[str] = []
-    scores: list[float] = []
-    all_scored = True
-
-    for idx, result in enumerate(results, start=1):
-        document = _extract_document(result)
-        if not document:
-            continue
-        contexts.append(document)
-
-        resolved_doc_ids.append(_resolve_doc_id(result, doc_ids, idx))
-
-        score = _extract_score(result)
-        if score is None:
-            all_scored = False
-        else:
-            scores.append(score)
-
-    if not all_scored:
-        scores = []
-
-    return contexts, resolved_doc_ids, scores
-
-
-def _extract_document(result: RetrieverResultProtocol) -> str | None:
-    document = getattr(result, "document", None)
-    if isinstance(document, str):
-        return document
-    content = getattr(result, "content", None)
-    if isinstance(content, str):
-        return content
-    return None
-
-
-def _extract_score(result: RetrieverResultProtocol) -> float | None:
-    score = getattr(result, "score", None)
-    if score is None:
-        return None
-    try:
-        return float(score)
-    except (TypeError, ValueError):
-        return None
-
-
-def _resolve_doc_id(
-    result: RetrieverResultProtocol,
-    doc_ids: Sequence[str],
-    fallback_index: int,
-) -> str:
-    raw_doc_id = getattr(result, "doc_id", None)
-    if isinstance(raw_doc_id, int) and 0 <= raw_doc_id < len(doc_ids):
-        return str(doc_ids[raw_doc_id])
-    if raw_doc_id is not None:
-        return str(raw_doc_id)
-    return f"doc_{fallback_index}"
-
-
-def _extract_graphrag_attributes(
-    results: Sequence[RetrieverResultProtocol],
-    retriever: RetrieverPort,
-) -> dict[str, Any]:
-    graphrag_cls: type | None = None
-    try:
-        from evalvault.adapters.outbound.kg.graph_rag_retriever import GraphRAGRetriever
-
-        graphrag_cls = GraphRAGRetriever
-    except Exception:
-        pass
-
-    is_graphrag = graphrag_cls is not None and isinstance(retriever, graphrag_cls)
-    nodes: set[str] = set()
-    edges: set[str] = set()
-    community_ids: set[str] = set()
-
-    for result in results:
-        metadata = getattr(result, "metadata", None)
-        if not isinstance(metadata, dict):
-            continue
-
-        kg_meta = metadata.get("kg")
-        if isinstance(kg_meta, dict):
-            for entity in kg_meta.get("entities", []) or []:
-                nodes.add(str(entity))
-            for relation in kg_meta.get("relations", []) or []:
-                edges.add(str(relation))
-            community_id = kg_meta.get("community_id")
-            if community_id is not None:
-                community_ids.add(str(community_id))
-
-        community_id = metadata.get("community_id")
-        if community_id is not None:
-            community_ids.add(str(community_id))
-
-    if not is_graphrag and not (nodes or edges or community_ids):
-        return {}
-
-    attributes = {
-        "graph_nodes": len(nodes),
-        "graph_edges": len(edges),
-        "subgraph_size": len(nodes) + len(edges),
-    }
-    if community_ids:
-        attributes["community_id"] = _compact_values(community_ids)
-    else:
-        attributes["community_id"] = None
-
-    return attributes
-
-
-def _compact_values(values: set[str]) -> str | list[str]:
-    if len(values) == 1:
-        return next(iter(values))
-    return sorted(values)
 
 
 def _load_retriever_json(file_path: Path) -> list[Any]:

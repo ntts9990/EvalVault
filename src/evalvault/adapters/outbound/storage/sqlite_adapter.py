@@ -67,6 +67,8 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         columns = {row[1] for row in cursor.fetchall()}
         if "metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata TEXT")
+        if "retrieval_metadata" not in columns:
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata TEXT")
 
     # Experiment 관련 메서드
 

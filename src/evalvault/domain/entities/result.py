@@ -94,6 +94,7 @@ class EvaluationRun:
     # Langfuse 연동
     langfuse_trace_id: str | None = None
     tracker_metadata: dict[str, Any] = field(default_factory=dict)
+    retrieval_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def total_test_cases(self) -> int:

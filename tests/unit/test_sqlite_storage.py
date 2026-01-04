@@ -169,6 +169,39 @@ class TestSQLiteStorageAdapter:
         metadata = json.loads(raw_metadata)
         assert metadata["phoenix"]["prompts"][0]["status"] == "missing_file"
 
+    def test_save_run_stores_retrieval_metadata(self, storage_adapter, temp_db):
+        """Ensure retrieval metadata is persisted for later analysis."""
+        run = EvaluationRun(
+            run_id="retrieval-meta-001",
+            dataset_name="insurance-qa",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 1, 10, 0, 0),
+            retrieval_metadata={
+                "tc-1": {"doc_ids": ["doc-1"], "top_k": 1, "scores": [0.9]},
+            },
+        )
+
+        storage_adapter.save_run(run)
+
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT retrieval_metadata FROM evaluation_runs WHERE run_id = ?",
+            (run.run_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        assert row is not None
+        raw_metadata = row[0]
+        assert raw_metadata is not None
+        stored = json.loads(raw_metadata)
+        assert stored["tc-1"]["doc_ids"] == ["doc-1"]
+
+        retrieved_run = storage_adapter.get_run(run.run_id)
+        assert retrieved_run.retrieval_metadata == run.retrieval_metadata
+
     def test_save_run_stores_test_case_results(self, storage_adapter, sample_run, temp_db):
         """Test that save_run stores test case results."""
         storage_adapter.save_run(sample_run)
