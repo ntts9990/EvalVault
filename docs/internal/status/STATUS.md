@@ -18,11 +18,11 @@
 
 | ID | 상태 | 핵심 산출물 | 다음 액션 |
 |----|------|------------|-----------|
-| R1 | 완료 | run_id, stage report, stage_events JSONL | - |
-| R2 | 완료(샘플 확보) | GraphRAG 구현 + run_id/DB/stage_events | 확장 attributes 예시 확인/정리 |
-| R3 | 중간 완료 | performance JSONL + stage_events + DB run + debug report | - |
-| R4 | 완료 | 벤치마크 스모크 결과/리포트 | 오케스트레이터 공유 |
-| D1 | 구현 완료(샘플 3종 검증 완료) | DebugReportService + R1/R2/R3 리포트 | - |
+| R1 | ✅ 완료 | Evaluator retriever injection + retrieval_metadata DB storage | - |
+| R2 | ✅ 완료 | GraphRAG 구현 + run_id/DB/stage_events | - |
+| R3 | ✅ 완료 | kg build CLI + perf extras + ParallelKGBuilder | - |
+| R4 | ✅ 완료 | precision_at_k benchmark metric | - |
+| D1 | ✅ 완료 | DebugReportService + R1/R2/R3 리포트 | - |
 
 ---
 
@@ -30,7 +30,7 @@
 
 ### R1 (하이브리드 서치 파이프라인 통합)
 
-- 상태: 완료
+- 상태: ✅ 완료
 - run_id: `3dcb2b80-1744-4efd-837c-d7aea9348ebe`
 - DB 경로: `scratch/r1_smoke/evalvault.db`
 - stage_events: `scratch/r1_smoke/stage_events.jsonl`
@@ -47,7 +47,7 @@
 
 ### R2 (GraphRAG 검색 최적화)
 
-- 상태: 완료
+- 상태: ✅ 완료
 - run_id: `d60bce6a-ce38-4210-a63e-c8d73d9ecfe7`
 - DB 경로: `reports/r2_graphrag.db`
 - stage_events: `reports/r2_graphrag_stage_events.jsonl`
@@ -76,7 +76,7 @@
 
 ### R3 (대용량 처리 최적화)
 
-- 상태: 중간 완료
+- 상태: ✅ 완료
 - 성능 JSONL: `scripts/perf/r3_smoke_real.jsonl`
 - run_id(성능 로그): `r3-smoke-1767502115`
 - stage_events 샘플: `scripts/perf/r3_stage_events_sample.jsonl`
@@ -126,7 +126,7 @@
 
 ### R4 (벤치마크 doc_id 스키마)
 
-- 상태: 완료
+- 상태: ✅ 완료
 - testset
   - `examples/benchmarks/korean_rag/retrieval_test.json`
 - ground_truth fixture
@@ -145,7 +145,7 @@
 
 ### D1 (디버깅 레이어)
 
-- 상태: 구현 완료(샘플 3종 검증 완료)
+- 상태: ✅ 완료 (샘플 3종 검증 완료)
 - MVP 범위: DebugReportService + Markdown/JSON 렌더러 (CLI 연결은 P4.1 이후)
 - 완료 산출물
   - DebugReportService: `src/evalvault/domain/services/debug_report_service.py`
