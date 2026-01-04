@@ -5,9 +5,9 @@
 [![PyPI](https://img.shields.io/pypi/v/evalvault.svg)](https://pypi.org/project/evalvault/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../LICENSE.md)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/ntts9990/EvalVault/blob/main/LICENSE.md)
 
-English version? See the [root README](../README.md).
+English version? See the [root README](https://github.com/ntts9990/EvalVault/blob/main/README.md).
 
 ---
 
@@ -118,15 +118,15 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ---
 
 ## 문서
-- [README.md](README.md): 전체 문서 인덱스
+- [INDEX.md](INDEX.md): 전체 문서 인덱스
 - [guides/USER_GUIDE.md](guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): 설계 문서
-- [CHANGELOG.md](../CHANGELOG.md): 릴리스 히스토리
+- [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md): 릴리스 히스토리
 
 ---
 
 ## 기여 & 라이선스
 
-Pull Request는 언제든 환영합니다. [CONTRIBUTING.md](../CONTRIBUTING.md)를 참고하고 제출 전 `uv run ruff check`, `uv run pytest`를 실행해주세요.
+Pull Request는 언제든 환영합니다. [CONTRIBUTING.md](https://github.com/ntts9990/EvalVault/blob/main/CONTRIBUTING.md)를 참고하고 제출 전 `uv run ruff check`, `uv run pytest`를 실행해주세요.
 
-EvalVault는 [Apache 2.0](../LICENSE.md) 라이선스를 따릅니다.
+EvalVault는 [Apache 2.0](https://github.com/ntts9990/EvalVault/blob/main/LICENSE.md) 라이선스를 따릅니다.

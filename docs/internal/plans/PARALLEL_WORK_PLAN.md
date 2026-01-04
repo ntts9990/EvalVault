@@ -303,17 +303,17 @@ adapters/outbound/cache/
 
 ### 세부 태스크
 
-| # | 태스크 | 예상 변경 파일 |
-|---|--------|---------------|
-| 1 | 배치 크기 자동 조절 로직 | `batch_executor.py`, `async_batch_executor.py` |
-| 2 | LRU + TTL 하이브리드 캐시 개선 | `hybrid_cache.py` |
-| 3 | 스트리밍 로더 최적화 | `adapters/outbound/dataset/streaming_loader.py` |
-| 4 | 캐시 적중률 측정 메트릭 추가 | `hybrid_cache.py`, 신규 `cache_metrics.py` |
+| # | 태스크 | 상태 | 예상 변경 파일 |
+|---|--------|------|---------------|
+| 1 | 배치 크기 자동 조절 로직 | 완료 | `batch_executor.py`, `async_batch_executor.py` |
+| 2 | LRU + TTL 하이브리드 캐시 개선 | 완료 | `hybrid_cache.py` |
+| 3 | 스트리밍 로더 최적화 | 완료(기존 구현 확인) | `adapters/outbound/dataset/streaming_loader.py` |
+| 4 | 캐시 적중률 측정 메트릭 추가 | 완료 | `hybrid_cache.py`, 신규 `cache_metrics.py` |
 
 ### 산출물
 
-- [ ] 적응형 배치 크기 조절
-- [ ] 캐시 hit/miss 통계 API
+- [x] 적응형 배치 크기 조절
+- [x] 캐시 hit/miss 통계 API
 - [ ] 벤치마크 결과 문서
 
 ---
@@ -374,7 +374,7 @@ tests/
 ├── fixtures/       # 테스트 데이터
 └── conftest.py
 
-현재: 1,655 tests, 89% coverage
+현재: 1,583 tests (167 skipped), unit coverage 68% (pytest --cov=src 기준)
 ```
 
 ### 목표
@@ -393,12 +393,24 @@ tests/
 | 4 | 커버리지 미달 영역 테스트 추가 | 신규 테스트 파일 |
 | 5 | `@pytest.mark.slow` 마크 정리 | 전체 테스트 파일 |
 
+### 진행 현황
+
+| 태스크 | 상태 | 비고 |
+|--------|------|------|
+| 관련 문서 업데이트 | ✅ 완료 | `docs/status/STATUS.md`, `docs/status/ROADMAP.md` |
+| 느린 테스트 식별/최적화 | ✅ 완료 | Kiwi 기반 테스트 slow 마크 + 공유 토크나이저 |
+| 불필요한 fixture 정리 | ✅ 완료 | 사용하지 않는 통합 fixture 제거 |
+| pytest-xdist 적용 | ✅ 완료 | `EVALVAULT_XDIST=auto|N` 환경변수로 opt-in |
+| 옵션 의존성 스킵 처리 | ✅ 완료 | kiwi/bm25/web/sklearn 미설치 시 테스트 스킵 |
+| 커버리지 95% 달성 | 🚧 진행 중 | unit coverage 68% (옵션 deps 스킵 포함) |
+
 ### 산출물
 
-- [ ] pytest-xdist 적용
+- [x] pytest-xdist 적용 (opt-in)
+- [x] 옵션 의존성 미설치 시 테스트 스킵 처리
 - [ ] 테스트 실행 시간 50% 감소
 - [ ] 95% 커버리지 달성
-- [ ] 테스트 마크 체계화
+- [x] 테스트 마크 체계화
 
 ---
 
@@ -438,6 +450,10 @@ docs/
 - 튜토리얼 강화 (실행 가능한 예제)
 - 문서 간 일관성
 
+### 상태
+
+- ✅ 완료
+
 ### 세부 태스크
 
 | # | 태스크 | 예상 변경 파일 |
@@ -450,10 +466,10 @@ docs/
 
 ### 산출물
 
-- [ ] mkdocs 기반 문서 사이트
-- [ ] API 레퍼런스 자동 생성
-- [ ] 모든 튜토리얼 코드 검증됨
-- [ ] 문서 스타일 가이드
+- [x] mkdocs 기반 문서 사이트
+- [x] API 레퍼런스 자동 생성
+- [x] 모든 튜토리얼 코드 검증됨
+- [x] 문서 스타일 가이드
 
 ---
 

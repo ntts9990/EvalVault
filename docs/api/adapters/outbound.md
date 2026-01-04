@@ -123,9 +123,9 @@ tracker = LangfuseAdapter(
 ### PostgreSQL
 
 ```python
-from evalvault.adapters.outbound.storage import PostgreSQLAdapter
+from evalvault.adapters.outbound.storage import PostgreSQLStorageAdapter
 
-storage = PostgreSQLAdapter(
+storage = PostgreSQLStorageAdapter(
     host="localhost",
     port=5432,
     database="evalvault",

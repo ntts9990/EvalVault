@@ -1438,7 +1438,7 @@ services:
     build: .
     command: uvicorn evalvault.adapters.inbound.api.app:app --host 0.0.0.0 --port 8000
     environment:
-      - DATABASE_URL=postgresql://...
+      - POSTGRES_CONNECTION_STRING=postgresql://...
       - BROKER_URL=redis://redis:6379/0
     depends_on:
       - postgres
@@ -1453,7 +1453,7 @@ services:
     build: .
     command: celery -A evalvault.workers worker --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://...
+      - POSTGRES_CONNECTION_STRING=postgresql://...
       - BROKER_URL=redis://redis:6379/0
     depends_on:
       - postgres

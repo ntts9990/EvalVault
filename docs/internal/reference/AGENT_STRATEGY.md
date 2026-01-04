@@ -836,6 +836,6 @@ uv run python main.py --project-dir .. --agent-type coordinator
 ## 참고
 
 - [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md): 개발 가이드 (자동화 계획 포함)
-- [agent/README.md](../../../agent/README.md): 에이전트 시스템 가이드
+- [agent/README.md](https://github.com/ntts9990/EvalVault/blob/main/agent/README.md): 에이전트 시스템 가이드
 - [archive/COMPLETED.md](../archive/COMPLETED.md): Phase 1-14 완료 내역 (아카이브)
 - [ROADMAP.md](../../status/ROADMAP.md): 2026-2027 개발 로드맵

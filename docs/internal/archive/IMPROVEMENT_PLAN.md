@@ -14,7 +14,7 @@
 | **[IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)** (이 문서) | 개선 계획 | 코드 품질 개선 계획 (병렬 AI 에이전트 기반) |
 | [COMPLETED.md](./COMPLETED.md) | 완료 기록 | Phase 1-14 달성 기록 (상세) |
 | [AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md) | 에이전트 전략 | 전체 에이전트 활용 전략 (개발+운영) |
-| [agent/README.md](../../../agent/README.md) | 에이전트 사용법 | 에이전트 시스템 사용법 |
+| [agent/README.md](https://github.com/ntts9990/EvalVault/blob/main/agent/README.md) | 에이전트 사용법 | 에이전트 시스템 사용법 |
 | [PARALLEL_WORK_PLAN.md](./PARALLEL_WORK_PLAN.md) | 병렬 작업 계획 | 병렬 개발 작업 추적 (임시 문서) |
 | [PARALLEL_STATUS.md](./PARALLEL_STATUS.md) | 병렬 작업 상태 | 병렬 작업 진행 상황 (임시 문서) |
 | [OBSERVABILITY_PLAYBOOK.md](../../guides/OBSERVABILITY_PLAYBOOK.md) | 옵저버빌리티 가이드 | Phoenix Drift Watcher, 릴리즈 노트, Domain Memory 오버레이 절차 |
@@ -38,7 +38,7 @@
    - [P5: 테스트 개선](#p5-테스트-개선)
    - [P6: 문서화 개선](#p6-문서화-개선)
    - [P7: RAG Observability (Phoenix 통합)](#p7-rag-observability-phoenix-통합)
-   - [P8: Domain Memory 활용](#p8-domain-memory-활용-신규)
+   - [P8: Domain Memory 활용](#p8-domain-memory-활용-업데이트)
 6. [병렬 실행 로드맵](#병렬-실행-로드맵)
 7. [에이전트 메모리 시스템](#에이전트-메모리-시스템)
 8. [Quick Wins](#quick-wins)
@@ -1423,7 +1423,7 @@ def run(
 | **[AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md)** | 🔑 **에이전트 종합 활용 전략** (개발+운영 모드) |
 | `docs/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md` | RAG 성능 데이터 수집 전략 |
 | `docs/OBSERVABILITY_PLATFORM_COMPARISON.md` | Phoenix vs LangFuse vs MLflow |
-| **[agent/README.md](../../../agent/README.md)** | 에이전트 시스템 사용법 |
+| **[agent/README.md](https://github.com/ntts9990/EvalVault/blob/main/agent/README.md)** | 에이전트 시스템 사용법 |
 | `agent/memory/README.md` | 에이전트 메모리 시스템 가이드 |
 | `agent/memory/shared/decisions.md` | 주요 결정 기록 |
 | `agent/memory/shared/dependencies.md` | 작업 의존성 |

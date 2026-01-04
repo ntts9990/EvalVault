@@ -1,21 +1,12 @@
 # Custom Metrics
 
-This module contains custom evaluation metrics specific to the insurance domain and Korean language.
+This module contains custom evaluation metrics specific to the insurance domain.
 
 ## InsuranceTermAccuracy
 
 Custom metric for evaluating accuracy of insurance-specific terminology.
 
-::: evalvault.domain.metrics.insurance_term_accuracy.InsuranceTermAccuracy
-    options:
-      show_root_heading: true
-      show_source: true
-
-## KoreanSemanticSimilarity
-
-Custom metric for Korean semantic similarity evaluation.
-
-::: evalvault.domain.metrics.korean_semantic_similarity.KoreanSemanticSimilarity
+::: evalvault.domain.metrics.insurance.InsuranceTermAccuracy
     options:
       show_root_heading: true
       show_source: true

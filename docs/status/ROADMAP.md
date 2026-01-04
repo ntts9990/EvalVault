@@ -492,10 +492,10 @@ evalvault benchmark retrieval insurance_docs/ \
 | ID | 작업 | 상태 | 참고 |
 |----|------|------|------|
 | P2.2 | Web UI 재구조화 | 🚧 진행 중 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
-| P3 | 성능 최적화 | 🚧 진행 중 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
+| P3 | 성능 최적화 | ✅ 완료 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
 | P4.1 | CLI UX 개선 | 🚧 진행 중 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
 | P5 | 테스트 개선 | 🚧 진행 중 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
-| P6 | 문서화 개선 | 🚧 진행 중 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
+| P6 | 문서화 개선 | ✅ 완료 | `docs/internal/plans/PARALLEL_WORK_PLAN.md` |
 
 상세 범위와 일정은 `docs/internal/plans/PARALLEL_WORK_PLAN.md`에서 관리합니다.
 
@@ -503,16 +503,16 @@ evalvault benchmark retrieval insurance_docs/ \
 
 1. **P2.2 Web UI 컴포넌트 재구조화**
    - Streamlit 컴포넌트 구조 정리, 공통 컴포넌트 분리
-2. **P3 성능 최적화**
-   - 배치 평가 + 병렬화
-   - 스트리밍 로더 구현
-   - LRU + TTL 캐싱 개선
+2. **P3 성능 최적화 (완료)**
+   - 배치 평가 + 병렬화 ✅
+   - 스트리밍 로더 구현 ✅
+   - LRU + TTL 캐싱 개선 ✅
 3. **P4.1 CLI 명령어 개선**
    - 명령어/옵션 UX 정리 및 온보딩 개선
 4. **P5 테스트 개선**
    - 느린 테스트 최적화
    - 커버리지 목표 상향
-5. **P6 문서화 개선**
+5. **P6 문서화 개선 (완료)**
    - API 문서 자동화
    - 튜토리얼 강화
 6. **P8.5 Domain Memory 확장 과제**
@@ -540,7 +540,7 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **메모리 시스템**: `agent/memory/`에 에이전트별 세션 로그, 공유 결정사항, 의존성 추적
 
-**참조**: [agent/README.md](../../agent/README.md), [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md)
+**참조**: [agent/README.md](https://github.com/ntts9990/EvalVault/blob/main/agent/README.md), [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md)
 
 ---
 
@@ -725,27 +725,27 @@ class ConfigValidator:
 
 ### 2026 Q2 (4-6월): 성능 최적화 및 모듈화
 
-P2.2, P3는 병렬 작업으로 선행 진행 중이며 상세 범위는
+P2.2는 병렬 작업으로 선행 진행 중이며 P3는 완료되었고 상세 범위는
 `docs/internal/plans/PARALLEL_WORK_PLAN.md`에서 관리합니다.
 
 #### P3: 성능 최적화
 
 **3.1 평가 파이프라인 최적화**
-- [ ] 배치 처리 로직 개선
-- [ ] 비동기 평가 파이프라인
-- [ ] 캐싱 메커니즘 추가
+- [x] 배치 처리 로직 개선
+- [x] 비동기 평가 파이프라인
+- [x] 캐싱 메커니즘 추가
 
 **목표**: 1000 TC 평가 시간 30분 → 10분
 
 **3.2 데이터 로딩 최적화**
-- [ ] 스트리밍 로더 구현
-- [ ] 대용량 파일 지원
+- [x] 스트리밍 로더 구현
+- [x] 대용량 파일 지원
 
 **목표**: 10MB 파일 메모리 사용량 100MB → 10MB
 
 **3.3 캐싱 개선**
-- [ ] LRU + TTL 하이브리드 캐시
-- [ ] 캐시 hit rate 측정
+- [x] LRU + TTL 하이브리드 캐시
+- [x] 캐시 hit rate 측정
 
 **목표**: 캐시 hit rate 60% → 85%
 
@@ -1312,7 +1312,7 @@ evalvault profile <dataset_path> \
 - [USER_GUIDE.md](../guides/USER_GUIDE.md): 사용자 가이드
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md): 아키텍처 문서
 - [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md): 개발 가이드 (에이전트 워크플로우 포함)
-- [agent/README.md](../../agent/README.md): 자율 에이전트 시스템 사용 가이드
+- [agent/README.md](https://github.com/ntts9990/EvalVault/blob/main/agent/README.md): 자율 에이전트 시스템 사용 가이드
 
 ---
 
@@ -1326,13 +1326,13 @@ EvalVault는 오픈소스 프로젝트입니다. 기여를 환영합니다!
 4. PR 생성
 5. Code Review 및 Merge
 
-**기여 가이드**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
+**기여 가이드**: [CONTRIBUTING.md](https://github.com/ntts9990/EvalVault/blob/main/CONTRIBUTING.md)
 
 ---
 
 ## 라이선스
 
-EvalVault는 [Apache 2.0](../../LICENSE.md) 라이선스를 따릅니다.
+EvalVault는 [Apache 2.0](https://github.com/ntts9990/EvalVault/blob/main/LICENSE.md) 라이선스를 따릅니다.
 
 ---
 

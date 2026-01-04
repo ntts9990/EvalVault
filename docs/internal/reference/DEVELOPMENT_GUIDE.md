@@ -1363,7 +1363,7 @@ CREATE TABLE stage_metrics (
 
 ---
 
-## 6. 수집·분석 운영 흐름
+## 6. 수집·분석 운영 흐름 {#6-수집·분석-운영-흐름}
 
 1. **수집**: 각 단계에서 `StageEvent`를 기록하고, 대용량 데이터는 payload store로 분리.
    - CLI(JSONL): `evalvault run <dataset> --stage-events stage_events.jsonl`
@@ -1408,7 +1408,7 @@ CREATE TABLE stage_metrics (
 - [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md): 전체 아키텍처
 - [ROADMAP.md](../../status/ROADMAP.md): 개발 로드맵
 - [USER_GUIDE.md](../../guides/USER_GUIDE.md): 사용자 가이드
-- [tutorials/](../tutorials/): 튜토리얼
+- [tutorials/01-quickstart.md](../../tutorials/01-quickstart.md): 튜토리얼
 
 ---
 

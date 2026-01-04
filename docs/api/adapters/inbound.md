@@ -45,8 +45,8 @@ uv run evalvault run data.csv --metrics faithfulness,answer_relevancy
 # View metrics
 uv run evalvault metrics
 
-# Compare experiments
-uv run evalvault compare baseline.json optimized.json
+# Compare runs
+uv run evalvault compare RUN_ID_A RUN_ID_B
 ```
 
 ### Web UI

@@ -50,5 +50,5 @@ cp .env.example .env
 - 5분 빠른 시작: [tutorials/01-quickstart.md](../tutorials/01-quickstart.md)
 - 설치/환경설정/CLI/Web UI: [guides/USER_GUIDE.md](../guides/USER_GUIDE.md)
 - 명령어 참조: [guides/CLI_GUIDE.md](../guides/CLI_GUIDE.md)
-- 프로젝트 개요(한국어): [README.ko.md](../../README.ko.md)
-- 프로젝트 개요(영문): [README.md](../../README.md)
+- 프로젝트 개요(한국어): [README.ko.md](../README.ko.md)
+- 프로젝트 개요(영문): [README.md](https://github.com/ntts9990/EvalVault/blob/main/README.md)

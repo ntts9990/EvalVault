@@ -54,8 +54,11 @@ uv run evalvault web
 
 - "내부 상태"는 [internal/status/STATUS.md](../internal/status/STATUS.md)가 단일 출처(SSoT)입니다.
 - 사용자 문서는 `README.ko.md`(루트)/`docs/guides/USER_GUIDE.md`/`docs/tutorials/`에, 내부 설계/운영은 `docs/internal/`에 둡니다.
- - 새 문서를 추가하면 [README.md](../README.md)와 `mkdocs.yml` 네비게이션을 함께 갱신합니다.
- - [INDEX.md](../INDEX.md)는 README 안내용으로 유지합니다.
+- 새 문서를 추가하면 [INDEX.md](../INDEX.md)와 `mkdocs.yml` 네비게이션을 함께 갱신합니다.
+- [INDEX.md](../INDEX.md)는 문서 허브로 유지합니다.
+- 튜토리얼 코드는 `scripts/validate_tutorials.py`로 검증합니다.
+  - 실행: `uv run python scripts/validate_tutorials.py`
+- 문서 스타일 가이드는 [internal/reference/STYLE_GUIDE.md](../internal/reference/STYLE_GUIDE.md)를 따릅니다.
 
 ---
 

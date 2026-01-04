@@ -30,7 +30,7 @@ uv run python scripts/ops/phoenix_watch.py \
   --drift-threshold 0.2 \
   --slack-webhook https://hooks.slack.com/services/... \
   --issue-file reports/phoenix_watch.md \
-  --gate-command "uv run evalvault gate tests/fixtures/gates/regression.yaml --profile prod" \
+  --gate-command "uv run evalvault gate RUN_ID --format github-actions --db evalvault.db" \
   --run-regressions threshold \
   --regression-config config/regressions/default.json \
   --regression-suite integration-english-smoke \
@@ -76,7 +76,7 @@ Slack 스타일(`<http://...|Phoenix Trace>`)을 사용하면 Phoenix 링크를 
 
 ## 3. Embedding Overlay → Domain Memory
 
-Phoenix Embedding export 결과를 Domain Memory Facts로 옮기려면 `evalvault domain memory ingest-embeddings` 명령을 사용합니다. CSV/Parquet 파일에서 클러스터별 대표 질문과 컨텍스트를 추려서 `embedding_pattern` 사실로 저장합니다.
+Phoenix Embedding export 결과를 Domain Memory Facts로 옮기려면 `uv run evalvault domain memory ingest-embeddings` 명령을 사용합니다. CSV/Parquet 파일에서 클러스터별 대표 질문과 컨텍스트를 추려서 `embedding_pattern` 사실로 저장합니다.
 
 ```bash
 uv run evalvault phoenix export-embeddings --dataset ds_123 --output /tmp/phoenix.csv
@@ -101,7 +101,7 @@ uv run evalvault domain memory ingest-embeddings /tmp/phoenix.csv \
 ## 5. 운영 팁
 
 - Drift Watcher는 `systemd`/`supervisor`/GitHub Actions Cron 등 반복 실행 환경에서 구동하며, Slack WebHook 실패 시 stderr에 경고를 남기므로 로그로도 추적 가능합니다.
-- Release Notes 스크립트는 CI에서 `evalvault gate --output` 결과와 함께 실행해 릴리즈 PR description을 자동 채우는데 사용하세요.
+- Release Notes 스크립트는 CI에서 `uv run evalvault gate RUN_ID --format json` 결과와 함께 실행해 릴리즈 PR description을 자동 채우는데 사용하세요.
 - Phoenix 클러스터/드리프트 지표는 Dataset마다 다를 수 있으므로 `--drift-key`를 도메인별로 설정한 `.env.ops` 파일에 저장해두면 편리합니다.
 
 ---
@@ -130,7 +130,8 @@ uv run evalvault phoenix prompt-diff \
 3. **평가 실행 시 Prompt 상태 주입**
 
 ```bash
-uv run evalvault run data.json --metrics faithfulness \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness \
   --profile prod \
   --tracker phoenix \
   --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \

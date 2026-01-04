@@ -11,20 +11,29 @@ Primary interface for running evaluations.
       show_root_heading: true
       show_source: true
 
-## GeneratorPort
+## AnalysisPipelinePort
 
-Interface for test case and knowledge graph generation.
+Interface for building and executing analysis pipelines.
 
-::: evalvault.ports.inbound.generator_port.GeneratorPort
+::: evalvault.ports.inbound.analysis_pipeline_port.AnalysisPipelinePort
     options:
       show_root_heading: true
       show_source: true
 
-## AnalyzerPort
+## DomainLearningHookPort
 
-Interface for query analysis operations.
+Interface for forming domain memories after evaluation.
 
-::: evalvault.ports.inbound.analyzer_port.AnalyzerPort
+::: evalvault.ports.inbound.learning_hook_port.DomainLearningHookPort
+    options:
+      show_root_heading: true
+      show_source: true
+
+## WebUIPort
+
+Interface for web UI-driven evaluation and reporting.
+
+::: evalvault.ports.inbound.web_port.WebUIPort
     options:
       show_root_heading: true
       show_source: true
