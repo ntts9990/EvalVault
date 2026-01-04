@@ -49,11 +49,13 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
         chunk_size: int = typer.Option(
             500,
             "--chunk-size",
+            "-c",
             help="Chunk size for document splitting.",
         ),
         name: str = typer.Option(
             "generated-testset",
             "--name",
+            "-N",
             help="Dataset name.",
         ),
     ) -> None:

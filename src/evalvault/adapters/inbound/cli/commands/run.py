@@ -140,6 +140,7 @@ def register_run_commands(
         retriever: str | None = typer.Option(
             None,
             "--retriever",
+            "-r",
             help="Retriever to fill empty contexts (bm25, dense, hybrid, graphrag).",
             rich_help_panel="Full mode options",
         ),
@@ -152,6 +153,7 @@ def register_run_commands(
         kg: Path | None = typer.Option(
             None,
             "--kg",
+            "-k",
             help="Knowledge graph JSON file for GraphRAG retriever.",
             rich_help_panel="Full mode options",
         ),
@@ -267,11 +269,13 @@ def register_run_commands(
         verbose: bool = typer.Option(
             False,
             "--verbose",
+            "-v",
             help="Show detailed output.",
         ),
         parallel: bool = typer.Option(
             False,
             "--parallel",
+            "-P",
             help="Enable parallel evaluation for faster processing.",
         ),
         batch_size: int = typer.Option(
@@ -283,6 +287,7 @@ def register_run_commands(
         stream: bool = typer.Option(
             False,
             "--stream",
+            "-s",
             help="Enable streaming evaluation for large datasets (process file in chunks).",
         ),
         stream_chunk_size: int = typer.Option(
