@@ -1929,8 +1929,9 @@ class TestCLIHistory:
             ],
         )
         assert result.exit_code == 0
-        assert "simple-d" in result.stdout
-        assert "full-dataset" not in result.stdout
+        # Check for truncated dataset name (may vary by terminal width)
+        assert "simple-" in result.stdout or "simple-d" in result.stdout
+        assert "full-" not in result.stdout
 
 
 class TestCLICompare:
