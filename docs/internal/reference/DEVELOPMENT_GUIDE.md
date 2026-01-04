@@ -37,7 +37,7 @@
 uv sync --extra dev
 
 # 전체 기능 포함
-uv sync --extra dev --extra analysis --extra korean --extra web --extra phoenix
+uv sync --extra dev --extra analysis --extra korean --extra web --extra phoenix --extra docs
 ```
 
 ### 1.3 Optional Dependencies
@@ -50,6 +50,7 @@ uv sync --extra dev --extra analysis --extra korean --extra web --extra phoenix
 | `web` | streamlit, plotly | Web UI |
 | `postgres` | psycopg | PostgreSQL 지원 |
 | `mlflow` | mlflow | MLflow 트래커 |
+| `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix, opentelemetry | Phoenix 트레이싱 |
 
 ### 1.4 환경 변수
@@ -1404,9 +1405,9 @@ CREATE TABLE stage_metrics (
 
 ## 참고 문서
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md): 전체 아키텍처
-- [ROADMAP.md](../ROADMAP.md): 개발 로드맵
-- [USER_GUIDE.md](../USER_GUIDE.md): 사용자 가이드
+- [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md): 전체 아키텍처
+- [ROADMAP.md](../../status/ROADMAP.md): 개발 로드맵
+- [USER_GUIDE.md](../../guides/USER_GUIDE.md): 사용자 가이드
 - [tutorials/](../tutorials/): 튜토리얼
 
 ---

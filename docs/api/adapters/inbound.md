@@ -19,7 +19,7 @@ The CLI provides various commands for evaluation, analysis, and management:
 - **gate** - Quality gates
 - **experiment** - A/B testing
 
-For detailed CLI usage, see the [CLI Guide](../../CLI_GUIDE.md).
+For detailed CLI usage, see the [CLI Guide](../../guides/CLI_GUIDE.md).
 
 ## Web UI Adapter
 
@@ -59,4 +59,4 @@ uv run evalvault web
 uv run evalvault-web
 ```
 
-For detailed CLI usage, see the [CLI Guide](../../CLI_GUIDE.md).
+For detailed CLI usage, see the [CLI Guide](../../guides/CLI_GUIDE.md).

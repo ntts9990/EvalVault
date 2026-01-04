@@ -525,7 +525,7 @@ Claude Agent SDK 기반 자율 에이전트 시스템으로 개선 작업을 병
 
 **메모리 시스템**: `agent/memory/`에 에이전트별 세션 로그, 공유 결정사항, 의존성 추적
 
-**참조**: [agent/README.md](../agent/README.md), [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md)
+**참조**: [agent/README.md](../../agent/README.md), [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md)
 
 ---
 
@@ -1063,7 +1063,7 @@ evalvault run data.csv \
 
 > **목표**: 멀티테넌트, 비동기 작업 처리, RBAC 기반 엔터프라이즈 운영 환경 구축
 >
-> **상세 계획**: [enterprise/IMPLEMENTATION_PLAN.md](./enterprise/IMPLEMENTATION_PLAN.md)
+> **상세 계획**: [enterprise/IMPLEMENTATION_PLAN.md](../enterprise/IMPLEMENTATION_PLAN.md)
 
 ### Enterprise Phases
 
@@ -1297,7 +1297,7 @@ evalvault profile <dataset_path> \
 - [USER_GUIDE.md](../guides/USER_GUIDE.md): 사용자 가이드
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md): 아키텍처 문서
 - [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md): 개발 가이드 (에이전트 워크플로우 포함)
-- [agent/README.md](../agent/README.md): 자율 에이전트 시스템 사용 가이드
+- [agent/README.md](../../agent/README.md): 자율 에이전트 시스템 사용 가이드
 
 ---
 
@@ -1311,13 +1311,13 @@ EvalVault는 오픈소스 프로젝트입니다. 기여를 환영합니다!
 4. PR 생성
 5. Code Review 및 Merge
 
-**기여 가이드**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+**기여 가이드**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ---
 
 ## 라이선스
 
-EvalVault는 [Apache 2.0](../LICENSE.md) 라이선스를 따릅니다.
+EvalVault는 [Apache 2.0](../../LICENSE.md) 라이선스를 따릅니다.
 
 ---
 

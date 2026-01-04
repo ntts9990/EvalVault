@@ -15,6 +15,8 @@ docs/
 │   ├── README.md                    # 문서 허브 (이 문서)
 │   ├── INDEX.md                     # README.md로 안내
 │   ├── README.ko.md                 # 한국어 README
+│   ├── PROJECT_OVERVIEW.md          # 프로젝트 목표/추상화 문서
+│   ├── PROJECT_SOURCE_GUIDE.md      # 소스 레벨 가이드
 │   ├── getting-started/INSTALLATION.md
 │   ├── guides/                      # USER/CLI/DEV/OBS 가이드
 │   ├── architecture/ARCHITECTURE.md # 아키텍처 가이드
@@ -69,7 +71,9 @@ docs/
 
 | 문서 | 대상 | 설명 |
 |------|------|------|
+| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | 모든 사용자 | 프로젝트 목표, 범위, 상위 구조 요약 |
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 개발자/아키텍트 | Hexagonal Architecture, 컴포넌트, 데이터 플로우 |
+| [PROJECT_SOURCE_GUIDE.md](PROJECT_SOURCE_GUIDE.md) | 개발자/기여자 | 소스 구조, 실행 플로우, 확장 지점 |
 | [status/ROADMAP.md](status/ROADMAP.md) | 모든 사용자 | 향후 계획, 마일스톤 |
 | [status/STATUS.md](status/STATUS.md) | 모든 사용자 | 현재 상태 요약 (버전, 테스트, 완료 항목) |
 

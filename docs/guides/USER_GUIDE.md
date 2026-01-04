@@ -69,6 +69,17 @@ Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12
 
 ## 환경 구성
 
+### 프로젝트 초기화 (init)
+빠르게 시작하려면 초기화 명령으로 기본 파일을 생성합니다.
+
+```bash
+uv run evalvault init
+```
+
+- `.env` 템플릿과 `sample_dataset.json`을 생성합니다.
+- `--output-dir`로 생성 위치를 바꿀 수 있습니다.
+- `--skip-env`/`--skip-sample`로 단계별 생성을 끌 수 있습니다.
+
 ### .env 작성
 `cp .env.example .env` 후 아래 값을 채웁니다.
 
@@ -152,10 +163,16 @@ uv run evalvault run tests/fixtures/sample_dataset.json \
 
 옵션 요약:
 - `--metrics` : 쉼표로 구분된 메트릭 목록
-- `--parallel / --batch-size` : 대량 데이터 병렬 평가
+- `--preset` : `quick`/`production`/`comprehensive` 프리셋 적용
+- `--parallel / --batch-size (-b)` : 대량 데이터 병렬 평가
 - `--tracker {none,langfuse,phoenix,mlflow}` : 추적기 선택
 - `--db path/to.sqlite` : SQLite 저장소 지정
 - `--use-domain-memory` : Domain Memory 기반 threshold/컨텍스트 보강 활성화
+
+프리셋 예시:
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset production
+```
 
 ### 히스토리/비교/내보내기
 ```bash
