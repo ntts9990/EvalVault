@@ -27,6 +27,8 @@ Example:
 from __future__ import annotations
 
 import logging
+import time
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -151,6 +153,11 @@ class KoreanDenseRetriever:
         ollama_adapter: Any = None,
         matryoshka_dim: int | None = None,
         profile: str | None = None,
+        use_faiss: bool = False,
+        faiss_use_gpu: bool | None = None,
+        query_cache_size: int = 256,
+        search_cache_size: int = 256,
+        normalize_embeddings: bool = True,
     ) -> None:
         """KoreanDenseRetriever 초기화.
 
@@ -159,6 +166,7 @@ class KoreanDenseRetriever:
             use_fp16: FP16 양자화 사용 (메모리 절약)
             device: 디바이스 (auto, cpu, cuda, mps)
             batch_size: 인코딩 배치 크기
+                - 0 이하로 설정하면 간단한 휴리스틱으로 자동 결정
             ollama_adapter: Ollama LLM 어댑터 (Qwen3-Embedding 사용 시 필수)
             matryoshka_dim: Matryoshka 차원 (Qwen3-Embedding 전용)
                 - None: 모델 권장 차원 사용
@@ -167,6 +175,11 @@ class KoreanDenseRetriever:
             profile: 프로파일 이름 ('dev' 또는 'prod')
                 - 'dev': qwen3-embedding:0.6b, dim=256
                 - 'prod': qwen3-embedding:8b, dim=1024
+            use_faiss: FAISS 인덱스 사용 여부 (선택)
+            faiss_use_gpu: FAISS GPU 사용 여부 (None이면 CUDA 가능 시 자동 선택)
+            query_cache_size: 쿼리 임베딩 캐시 크기
+            search_cache_size: 검색 결과 캐시 크기
+            normalize_embeddings: 코사인 유사도 계산을 위한 정규화 여부
 
         Example:
             >>> # HuggingFace 모델 사용 (기존 방식)
@@ -192,6 +205,11 @@ class KoreanDenseRetriever:
         self._batch_size = batch_size
         self._ollama_adapter = ollama_adapter
         self._matryoshka_dim = matryoshka_dim
+        self._use_faiss = use_faiss
+        self._faiss_use_gpu = faiss_use_gpu
+        self._normalize_embeddings = normalize_embeddings or use_faiss
+        self._query_cache_size = max(query_cache_size, 0)
+        self._search_cache_size = max(search_cache_size, 0)
 
         # Validate Ollama adapter for Ollama models
         model_info = self.SUPPORTED_MODELS.get(self._model_name)
@@ -208,11 +226,19 @@ class KoreanDenseRetriever:
                 f"Auto-selected Matryoshka dimension: {self._matryoshka_dim} for {self._model_name}"
             )
 
+        if self._use_faiss and not normalize_embeddings:
+            logger.info("FAISS uses cosine similarity; enabling embedding normalization.")
+
         self._model: Any = None
         self._model_type: str | None = None
 
         self._documents: list[str] = []
         self._embeddings: np.ndarray | None = None
+        self._normalized_embeddings: np.ndarray | None = None
+        self._faiss_index: Any | None = None
+        self._faiss_gpu_active = False
+        self._query_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._search_cache: OrderedDict[tuple[str, int], list[tuple[int, float]]] = OrderedDict()
 
     @property
     def is_indexed(self) -> bool:
@@ -243,6 +269,11 @@ class KoreanDenseRetriever:
     def matryoshka_dim(self) -> int | None:
         """Matryoshka 차원 (설정된 경우)."""
         return self._matryoshka_dim
+
+    @property
+    def faiss_gpu_active(self) -> bool:
+        """FAISS GPU 인덱스 사용 여부."""
+        return bool(self._faiss_gpu_active)
 
     @property
     def model_name(self) -> str:
@@ -362,6 +393,185 @@ class KoreanDenseRetriever:
                 "sentence-transformers not installed. Install with: uv add sentence-transformers"
             ) from e
 
+    def _clear_search_cache(self) -> None:
+        """검색 결과 캐시를 초기화합니다."""
+        self._search_cache.clear()
+
+    def _clear_query_cache(self) -> None:
+        """쿼리 임베딩 캐시를 초기화합니다."""
+        self._query_cache.clear()
+
+    def _resolve_batch_size(self, total: int, override: int | None) -> int:
+        """배치 크기를 결정합니다."""
+        if override is not None:
+            return max(1, override)
+        if self._batch_size > 0:
+            return max(1, min(self._batch_size, total)) if total > 0 else max(1, self._batch_size)
+
+        base = 64 if self._device != "cpu" else 32
+        if self.dimension >= 2048:
+            base = max(8, base // 2)
+        if total > 0:
+            return max(1, min(base, total))
+        return base
+
+    def _normalize_matrix(self, embeddings: np.ndarray) -> np.ndarray:
+        """행 단위로 임베딩을 정규화합니다."""
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return embeddings / norms
+
+    def _normalize_vector(self, vector: np.ndarray) -> np.ndarray:
+        """벡터를 정규화합니다."""
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            return vector
+        return vector / norm
+
+    def _get_cached_query_embedding(self, query: str) -> np.ndarray:
+        """쿼리 임베딩 캐시 조회 또는 생성."""
+        if self._query_cache_size <= 0:
+            embedding = self.encode([query])[0]
+            return np.asarray(embedding, dtype=np.float32)
+
+        cached = self._query_cache.get(query)
+        if cached is not None:
+            self._query_cache.move_to_end(query)
+            return cached
+
+        embedding = self.encode([query])[0]
+        embedding = np.asarray(embedding, dtype=np.float32)
+        self._query_cache[query] = embedding
+        self._query_cache.move_to_end(query)
+
+        if len(self._query_cache) > self._query_cache_size:
+            self._query_cache.popitem(last=False)
+
+        return embedding
+
+    def _get_cached_search(self, query: str, top_k: int) -> list[tuple[int, float]] | None:
+        """검색 결과 캐시 조회."""
+        if self._search_cache_size <= 0:
+            return None
+        key = (query, top_k)
+        cached = self._search_cache.get(key)
+        if cached is not None:
+            self._search_cache.move_to_end(key)
+        return cached
+
+    def _store_search_cache(
+        self,
+        query: str,
+        top_k: int,
+        results: list[tuple[int, float]],
+    ) -> None:
+        """검색 결과 캐시 저장."""
+        if self._search_cache_size <= 0:
+            return
+        key = (query, top_k)
+        self._search_cache[key] = results
+        self._search_cache.move_to_end(key)
+        if len(self._search_cache) > self._search_cache_size:
+            self._search_cache.popitem(last=False)
+
+    def _select_top_k(self, scores: np.ndarray, top_k: int) -> np.ndarray:
+        """상위 k개 인덱스를 효율적으로 선택."""
+        if top_k >= len(scores):
+            return scores.argsort()[::-1]
+
+        top_indices = np.argpartition(scores, -top_k)[-top_k:]
+        top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+        return top_indices
+
+    def _faiss_gpu_available(self, faiss: Any) -> bool:
+        """FAISS GPU 사용 가능 여부 확인."""
+        try:
+            get_num_gpus = getattr(faiss, "get_num_gpus", None)
+            if callable(get_num_gpus):
+                return get_num_gpus() > 0
+        except Exception:
+            return False
+        return False
+
+    def _resolve_faiss_gpu(self, faiss: Any) -> bool:
+        """GPU 사용 여부를 결정합니다."""
+        available = self._faiss_gpu_available(faiss)
+        if self._faiss_use_gpu is None:
+            return available
+        if self._faiss_use_gpu and not available:
+            logger.warning("FAISS GPU requested but CUDA is unavailable. Falling back to CPU.")
+            return False
+        return bool(self._faiss_use_gpu)
+
+    def _build_faiss_index(self, embeddings: np.ndarray) -> None:
+        """FAISS 인덱스를 구축합니다."""
+        try:
+            import faiss  # type: ignore
+        except ImportError:
+            logger.warning("faiss not installed. Falling back to numpy search.")
+            self._faiss_index = None
+            self._faiss_gpu_active = False
+            return
+
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        dimension = embeddings.shape[1]
+
+        index: Any = faiss.IndexFlatIP(dimension)
+        use_gpu = self._resolve_faiss_gpu(faiss)
+        self._faiss_gpu_active = False
+
+        if use_gpu:
+            try:
+                resources = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(resources, 0, index)
+                self._faiss_gpu_active = True
+            except Exception as exc:  # pragma: no cover - optional GPU path
+                logger.warning("Failed to enable FAISS GPU: %s", exc)
+
+        index.add(embeddings)
+        self._faiss_index = index
+        logger.info("FAISS index ready: %s vectors", embeddings.shape[0])
+
+    def _search_with_faiss(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int,
+    ) -> list[tuple[int, float]]:
+        """FAISS 인덱스로 검색합니다."""
+        if self._faiss_index is None:
+            return []
+
+        query = np.asarray(query_embedding, dtype=np.float32).reshape(1, -1)
+        distances, indices = self._faiss_index.search(query, top_k)
+        results: list[tuple[int, float]] = []
+        for idx, score in zip(indices[0], distances[0], strict=False):
+            if idx < 0:
+                continue
+            results.append((int(idx), float(score)))
+        return results
+
+    def _build_results(
+        self,
+        doc_scores: list[tuple[int, float]],
+        include_embeddings: bool,
+    ) -> list[DenseRetrievalResult]:
+        """검색 결과 객체를 생성합니다."""
+        results = []
+        for doc_id, score in doc_scores:
+            embedding = None
+            if include_embeddings and self._embeddings is not None:
+                embedding = self._embeddings[doc_id].tolist()
+
+            results.append(
+                DenseRetrievalResult(
+                    document=self._documents[doc_id],
+                    score=score,
+                    doc_id=doc_id,
+                    embedding=embedding,
+                )
+            )
+        return results
+
     def encode(
         self,
         texts: list[str],
@@ -384,7 +594,7 @@ class KoreanDenseRetriever:
         """
         self._load_model()
 
-        batch_size = batch_size or self._batch_size
+        batch_size = self._resolve_batch_size(len(texts), batch_size)
 
         if self._model_type == "ollama":
             # Ollama Qwen3-Embedding with Matryoshka
@@ -409,7 +619,7 @@ class KoreanDenseRetriever:
                 convert_to_numpy=True,
             )
 
-        return np.array(embeddings)
+        return np.asarray(embeddings, dtype=np.float32)
 
     def _encode_with_ollama(
         self,
@@ -451,8 +661,8 @@ class KoreanDenseRetriever:
         Returns:
             임베딩 벡터
         """
-        embeddings = self.encode([query])
-        return embeddings[0].tolist()
+        embedding = self._get_cached_query_embedding(query)
+        return embedding.tolist()
 
     def index(self, documents: list[str]) -> int:
         """문서를 인덱싱합니다.
@@ -477,15 +687,42 @@ class KoreanDenseRetriever:
             "retriever.documents": len(documents),
             "retriever.model": self._model_name,
         }
+        batch_size = self._resolve_batch_size(len(documents), None)
+        index_started_at = time.perf_counter()
         with instrumentation_span("retriever.dense.index", span_attrs) as span:
             self._documents = documents
             self._embeddings = self.encode(documents, show_progress=True)
+
+            if self._embeddings is not None:
+                if self._normalize_embeddings:
+                    self._normalized_embeddings = self._normalize_matrix(self._embeddings)
+                else:
+                    self._normalized_embeddings = None
+
+                if self._use_faiss:
+                    embeddings_for_index = (
+                        self._normalized_embeddings
+                        if self._normalized_embeddings is not None
+                        else self._embeddings
+                    )
+                    self._build_faiss_index(embeddings_for_index)
+                else:
+                    self._faiss_index = None
+
+            self._clear_search_cache()
+
+            index_build_time_ms = (time.perf_counter() - index_started_at) * 1000
+
             if span and self._embeddings is not None:
                 set_span_attributes(
                     span,
                     {
                         "retriever.embedding_dim": int(self._embeddings.shape[1]),
-                        "retriever.device": self._device.value,
+                        "retriever.device": self._device,
+                        "retriever.index_size": len(documents),
+                        "retriever.batch_size": batch_size,
+                        "retriever.faiss_gpu_active": self._faiss_gpu_active,
+                        "retriever.index_build_time_ms": index_build_time_ms,
                     },
                 )
 
@@ -516,36 +753,59 @@ class KoreanDenseRetriever:
         if not self.is_indexed:
             raise ValueError("인덱스가 구축되지 않았습니다. index()를 먼저 호출하세요.")
 
+        if top_k <= 0:
+            return []
+
+        top_k = min(top_k, self.document_count)
+
         span_attrs = {
             "retriever.type": "dense",
             "retriever.top_k": top_k,
             "retriever.model": self._model_name,
         }
         with instrumentation_span("retriever.dense.search", span_attrs) as span:
-            # 쿼리 임베딩
-            query_embedding = self.encode([query])[0]
+            cached = self._get_cached_search(query, top_k)
+            cache_hit = cached is not None
+            if cache_hit:
+                results = self._build_results(cached, include_embeddings)
+            else:
+                query_embedding = self._get_cached_query_embedding(query)
+                if self._normalize_embeddings:
+                    query_embedding = self._normalize_vector(query_embedding)
 
-            # 코사인 유사도 계산
-            scores = self._cosine_similarity(query_embedding, self._embeddings)
+                if self._faiss_index is not None:
+                    doc_scores = self._search_with_faiss(query_embedding, top_k)
+                else:
+                    embeddings = (
+                        self._normalized_embeddings
+                        if self._normalize_embeddings and self._normalized_embeddings is not None
+                        else self._embeddings
+                    )
+                    if embeddings is None:
+                        raise ValueError(
+                            "임베딩이 초기화되지 않았습니다. index()를 다시 실행하세요."
+                        )
 
-            # 상위 k개 인덱스
-            top_indices = scores.argsort()[::-1][:top_k]
+                    if self._normalize_embeddings:
+                        scores = np.dot(embeddings, query_embedding)
+                    else:
+                        scores = self._cosine_similarity(query_embedding, embeddings)
+                    top_indices = self._select_top_k(scores, top_k)
+                    doc_scores = [(int(idx), float(scores[idx])) for idx in top_indices]
 
-            results = []
-            for idx in top_indices:
-                idx = int(idx)
-                score = float(scores[idx])
-
-                result = DenseRetrievalResult(
-                    document=self._documents[idx],
-                    score=score,
-                    doc_id=idx,
-                    embedding=self._embeddings[idx].tolist() if include_embeddings else None,
-                )
-                results.append(result)
+                self._store_search_cache(query, top_k, doc_scores)
+                results = self._build_results(doc_scores, include_embeddings)
 
             if span:
-                set_span_attributes(span, {"retriever.result_count": len(results)})
+                set_span_attributes(
+                    span,
+                    {
+                        "retriever.result_count": len(results),
+                        "retriever.total_docs_searched": self.document_count,
+                        "retriever.cache_hit": cache_hit,
+                        "retriever.faiss_gpu_active": self._faiss_gpu_active,
+                    },
+                )
 
             return results
 
@@ -595,5 +855,10 @@ class KoreanDenseRetriever:
     def clear(self) -> None:
         """인덱스를 초기화합니다."""
         self._embeddings = None
+        self._normalized_embeddings = None
+        self._faiss_index = None
+        self._faiss_gpu_active = False
         self._documents = []
+        self._clear_search_cache()
+        self._clear_query_cache()
         logger.info("Dense 인덱스 초기화")

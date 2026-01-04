@@ -162,7 +162,7 @@ class TestKoreanDenseRetrieverWithMock:
         embedding = mock_retriever.encode_query("테스트 쿼리")
 
         assert len(embedding) == 4
-        assert embedding == [0.1, 0.2, 0.3, 0.4]
+        assert embedding == pytest.approx([0.1, 0.2, 0.3, 0.4])
 
     def test_index_with_mock(self, mock_retriever):
         """인덱싱 테스트 (모킹)."""
@@ -198,6 +198,29 @@ class TestKoreanDenseRetrieverWithMock:
         assert all(isinstance(r, DenseRetrievalResult) for r in results)
         # 점수 내림차순 정렬 확인
         assert results[0].score >= results[1].score
+
+    def test_search_uses_cache(self, mock_retriever):
+        """검색 캐시가 동일 쿼리에서 재사용되는지 확인."""
+        documents = [
+            "보험료 납입 기간은 20년입니다.",
+            "보장금액은 1억원입니다.",
+        ]
+
+        mock_retriever._model.encode.return_value = np.array(
+            [
+                [0.1, 0.2, 0.3, 0.4],
+                [0.5, 0.6, 0.7, 0.8],
+            ]
+        )
+        mock_retriever.index(documents)
+
+        mock_retriever._model.encode.reset_mock()
+        mock_retriever._model.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])
+
+        mock_retriever.search("보험료", top_k=1)
+        mock_retriever.search("보험료", top_k=1)
+
+        assert mock_retriever._model.encode.call_count == 1
 
     def test_search_before_index(self, mock_retriever):
         """인덱스 없이 검색 시 에러."""
@@ -374,6 +397,33 @@ class TestKoreanDenseRetrieverIntegration:
         assert results[0].document in documents
         # 점수가 유효한 범위인지 확인
         assert -1.0 <= results[0].score <= 1.0
+
+
+class TestKoreanDenseRetrieverFaiss:
+    """FAISS 인덱스 경로 테스트 (설치된 경우만)."""
+
+    def test_faiss_search_optional(self):
+        """FAISS가 설치된 경우 검색 경로가 동작하는지 확인."""
+        pytest.importorskip("faiss")
+
+        retriever = KoreanDenseRetriever(use_faiss=True, device="cpu")
+        retriever._model = MagicMock()
+        retriever._model_type = "sentence-transformers"
+        retriever._model.encode.side_effect = [
+            np.array(
+                [
+                    [0.1, 0.2, 0.3, 0.4],
+                    [0.5, 0.6, 0.7, 0.8],
+                    [0.9, 1.0, 1.1, 1.2],
+                ]
+            ),
+            np.array([[0.1, 0.2, 0.3, 0.4]]),
+        ]
+
+        retriever.index(["문서1", "문서2", "문서3"])
+        results = retriever.search("보험료", top_k=1)
+
+        assert len(results) == 1
 
 
 class TestHybridRetrieverDenseIntegration:

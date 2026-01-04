@@ -14,6 +14,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
 
 logger = logging.getLogger(__name__)
+_FALLBACK_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+")
 
 
 @dataclass
@@ -118,7 +120,13 @@ class KoreanBM25Retriever:
                 return 0
 
             self._documents = documents
-            self._tokenized_docs = [self._tokenizer.tokenize(doc) for doc in documents]
+            tokenized_docs: list[list[str]] = []
+            for doc in documents:
+                tokens = self._tokenizer.tokenize(doc)
+                if not tokens:
+                    tokens = self._fallback_tokenize(doc)
+                tokenized_docs.append(tokens)
+            self._tokenized_docs = tokenized_docs
 
             # 빈 토큰 리스트 처리
             self._tokenized_docs = [tokens if tokens else [""] for tokens in self._tokenized_docs]
@@ -169,6 +177,8 @@ class KoreanBM25Retriever:
             # 쿼리 토큰화
             query_tokens = self._tokenizer.tokenize(query)
             if not query_tokens:
+                query_tokens = self._fallback_tokenize(query)
+            if not query_tokens:
                 logger.warning(f"쿼리에서 토큰을 추출할 수 없음: {query}")
                 return []
 
@@ -195,6 +205,11 @@ class KoreanBM25Retriever:
                 set_span_attributes(span, {"retriever.result_count": len(results)})
 
             return results
+
+    def _fallback_tokenize(self, text: str) -> list[str]:
+        if not text:
+            return []
+        return [token.lower() for token in _FALLBACK_TOKEN_PATTERN.findall(text)]
 
     def search_with_scores(
         self,
