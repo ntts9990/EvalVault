@@ -2,6 +2,7 @@
 
 import json
 import re
+from importlib.metadata import version as get_version
 from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
@@ -52,7 +53,8 @@ class TestCLIVersion:
         """--version 플래그 테스트."""
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.stdout
+        expected_version = get_version("evalvault")
+        assert expected_version in result.stdout
 
 
 class TestCLIRun:

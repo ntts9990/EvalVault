@@ -8,11 +8,22 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pass
 
+from importlib.metadata import version as get_version
+
 import typer
 from rich import print as rprint
 from rich.console import Console
 
 from .commands import attach_sub_apps, register_all_commands
+
+
+def _get_package_version() -> str:
+    """Get package version from metadata, fallback to 'dev' if not installed."""
+    try:
+        return get_version("evalvault")
+    except Exception:  # pragma: no cover
+        return "dev"
+
 
 app = typer.Typer(
     name="evalvault",
@@ -39,7 +50,8 @@ def version_callback(value: bool):
     """Print version and exit."""
 
     if value:
-        rprint("[bold]EvalVault[/bold] version [cyan]0.1.0[/cyan]")
+        pkg_version = _get_package_version()
+        rprint(f"[bold]EvalVault[/bold] version [cyan]{pkg_version}[/cyan]")
         raise typer.Exit()
 
 
