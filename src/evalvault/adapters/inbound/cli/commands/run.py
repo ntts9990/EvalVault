@@ -31,6 +31,7 @@ from evalvault.domain.services.stage_event_builder import StageEventBuilder
 
 from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
 from ..utils.options import db_option, memory_db_option, profile_option
+from ..utils.presets import format_preset_help, get_preset, list_presets
 from ..utils.validators import parse_csv_option, validate_choice, validate_choices
 from . import run_helpers
 from .run_helpers import (
@@ -109,11 +110,16 @@ def register_run_commands(
             exists=True,
             readable=True,
         ),
+        evaluation_preset: str | None = typer.Option(
+            None,
+            "--preset",
+            help=f"Use a preset configuration (quick/production/comprehensive). {format_preset_help()}",
+        ),
         metrics: str = typer.Option(
             "faithfulness,answer_relevancy",
             "--metrics",
             "-m",
-            help="Comma-separated list of metrics to evaluate.",
+            help="Comma-separated list of metrics to evaluate. Overrides preset if both are specified.",
             rich_help_panel="Simple mode preset",
         ),
         profile: str | None = profile_option(
@@ -270,6 +276,7 @@ def register_run_commands(
         batch_size: int = typer.Option(
             5,
             "--batch-size",
+            "-b",
             help="Batch size for parallel evaluation (default: 5).",
         ),
         stream: bool = typer.Option(
@@ -289,9 +296,23 @@ def register_run_commands(
           • Simple — 안전한 기본값(2개 메트릭 + Phoenix 트래커 + Domain Memory 비활성)을 강제합니다.
           • Full — 모든 프롬프트/Domain Memory/스트리밍 옵션을 그대로 노출합니다.
 
+        Presets:
+          • quick — Fast iteration with faithfulness metric only
+          • production — Balanced evaluation with 4 core metrics
+          • comprehensive — Complete evaluation with all 6 metrics
+
         예시:
+          # Using mode shortcuts
           uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json
           uv run evalvault run-simple tests/fixtures/e2e/insurance_qa_korean.json
+
+          # Using presets
+          uv run evalvault run --preset quick dataset.json
+          uv run evalvault run --preset production dataset.json -o results.json
+          uv run evalvault run --preset comprehensive dataset.json
+
+          # Override preset metrics
+          uv run evalvault run --preset quick -m faithfulness,answer_relevancy dataset.json
         """
         try:
             ctx = click.get_current_context()
@@ -315,8 +336,31 @@ def register_run_commands(
         ):
             _print_run_mode_banner(console, preset)
 
+        # Handle evaluation preset
+        eval_preset_config = None
+        if evaluation_preset:
+            eval_preset_config = get_preset(evaluation_preset)
+            if not eval_preset_config:
+                print_cli_error(
+                    console,
+                    f"Invalid preset: {evaluation_preset}",
+                    fixes=[
+                        f"Available presets: {', '.join(list_presets())}",
+                        "Run 'evalvault run --help' to see preset descriptions",
+                    ],
+                )
+                raise typer.Exit(1)
+            console.print(
+                f"[dim]Using preset '{eval_preset_config.name}': {eval_preset_config.description}[/dim]"
+            )
+
         metric_list = parse_csv_option(metrics)
         metrics_override = _option_was_provided(ctx, "metrics")
+
+        # Apply preset metrics if preset is specified and metrics not explicitly overridden
+        if eval_preset_config and not metrics_override:
+            metric_list = list(eval_preset_config.metrics)
+            console.print(f"[dim]Preset metrics: {', '.join(metric_list)}[/dim]")
         if preset.default_metrics:
             preset_metrics = list(preset.default_metrics)
             if metrics_override and set(metric_list) != set(preset_metrics):
@@ -764,10 +808,23 @@ def register_run_commands(
                 console.print(f"  [dim]{metric}: {threshold}[/dim]")
             console.print()
 
+        # Apply preset parallelization settings if not explicitly overridden
+        final_parallel = parallel
+        final_batch_size = batch_size
+        if eval_preset_config:
+            if not _option_was_provided(ctx, "parallel"):
+                final_parallel = eval_preset_config.parallel
+            if not _option_was_provided(ctx, "batch_size"):
+                final_batch_size = eval_preset_config.batch_size
+            if final_parallel != parallel or final_batch_size != batch_size:
+                console.print(
+                    f"[dim]Preset parallelization: parallel={final_parallel}, batch_size={final_batch_size}[/dim]"
+                )
+
         if stream:
             status_msg = f"📡 Streaming evaluation (chunk_size={stream_chunk_size})"
-        elif parallel:
-            status_msg = f"⚡ Parallel evaluation (batch_size={batch_size})"
+        elif final_parallel:
+            status_msg = f"⚡ Parallel evaluation (batch_size={final_batch_size})"
         else:
             status_msg = "🤖 Evaluation in progress"
         with progress_spinner(console, status_msg) as update_progress:
@@ -782,8 +839,8 @@ def register_run_commands(
                             evaluator=evaluator,
                             llm=llm_adapter,
                             chunk_size=stream_chunk_size,
-                            parallel=parallel,
-                            batch_size=batch_size,
+                            parallel=final_parallel,
+                            batch_size=final_batch_size,
                         )
                     )
                 elif memory_evaluator and use_domain_memory:
@@ -794,8 +851,8 @@ def register_run_commands(
                             metrics=metric_list,
                             llm=llm_adapter,
                             thresholds=resolved_thresholds,
-                            parallel=parallel,
-                            batch_size=batch_size,
+                            parallel=final_parallel,
+                            batch_size=final_batch_size,
                             domain=memory_domain_name,
                             language=memory_language,
                         )
@@ -807,8 +864,8 @@ def register_run_commands(
                             metrics=metric_list,
                             llm=llm_adapter,
                             thresholds=resolved_thresholds,
-                            parallel=parallel,
-                            batch_size=batch_size,
+                            parallel=final_parallel,
+                            batch_size=final_batch_size,
                         )
                     )
                 update_progress("📊 결과 집계 중...")
@@ -1122,6 +1179,7 @@ def register_run_commands(
         batch_size: int = typer.Option(
             5,
             "--batch-size",
+            "-b",
             help="Batch size for parallel evaluation (default: 5).",
         ),
         stream: bool = typer.Option(
@@ -1145,6 +1203,7 @@ def register_run_commands(
         try:
             run(
                 dataset=dataset,
+                evaluation_preset=None,
                 metrics=metrics,
                 profile=profile,
                 model=model,
@@ -1330,6 +1389,7 @@ def register_run_commands(
         batch_size: int = typer.Option(
             5,
             "--batch-size",
+            "-b",
             help="Batch size for parallel evaluation (default: 5).",
         ),
         stream: bool = typer.Option(
@@ -1353,6 +1413,7 @@ def register_run_commands(
         try:
             run(
                 dataset=dataset,
+                evaluation_preset=None,
                 metrics=metrics,
                 profile=profile,
                 model=model,

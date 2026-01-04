@@ -18,6 +18,7 @@ from .experiment import register_experiment_commands
 from .gate import register_gate_commands
 from .generate import register_generate_commands
 from .history import register_history_commands
+from .init import register_init_command
 from .kg import create_kg_app
 from .langfuse import register_langfuse_commands
 from .phoenix import create_phoenix_app
@@ -52,6 +53,7 @@ class SubAppModule:
 
 
 COMMAND_MODULES: tuple[CommandModule, ...] = (
+    CommandModule(register_init_command),
     CommandModule(register_run_commands, needs_metrics=True),
     CommandModule(register_pipeline_commands),
     CommandModule(register_history_commands),
