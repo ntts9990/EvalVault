@@ -16,14 +16,23 @@ from evalvault.adapters.outbound.nlp.korean import (
     KoreanDenseRetriever,
 )
 from evalvault.ports.outbound import EmbeddingResult
+from tests.optional_deps import kiwi_ready, rank_bm25_ready
 
 # Check if kiwipiepy is available (needed for hybrid retriever tests)
 try:
     from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer  # noqa: F401
 
-    HAS_KIWI = True
+    HAS_KIWI, KIWI_SKIP_REASON = kiwi_ready()
 except ImportError:
     HAS_KIWI = False
+    KIWI_SKIP_REASON = "kiwipiepy not installed"
+
+HAS_BM25, BM25_SKIP_REASON = rank_bm25_ready()
+KOREAN_READY = HAS_KIWI and HAS_BM25
+if not HAS_KIWI:
+    KOREAN_SKIP_REASON = KIWI_SKIP_REASON or "kiwipiepy unavailable"
+else:
+    KOREAN_SKIP_REASON = BM25_SKIP_REASON or "rank_bm25 unavailable"
 
 
 class TestDeviceType:
@@ -426,6 +435,7 @@ class TestKoreanDenseRetrieverFaiss:
         assert len(results) == 1
 
 
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestHybridRetrieverDenseIntegration:
     """KoreanHybridRetriever와 Dense 통합 테스트."""
 

@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from tests.optional_deps import kiwi_ready
+
 # Check if kiwipiepy is available
 try:
     from evalvault.adapters.outbound.nlp.korean import (
@@ -21,9 +23,11 @@ try:
         SemanticSimilarityResult,
     )
 
-    HAS_KIWI = True
+    HAS_KIWI, KIWI_SKIP_REASON = kiwi_ready()
+    KIWI_SKIP_REASON = KIWI_SKIP_REASON or "kiwipiepy unavailable"
 except ImportError:
     HAS_KIWI = False
+    KIWI_SKIP_REASON = "kiwipiepy not installed"
     # Define placeholders for type hints
     from dataclasses import dataclass, field
 
@@ -129,7 +133,7 @@ class TestSemanticSimilarityResult:
         assert result.preprocessed is True
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not HAS_KIWI, reason=KIWI_SKIP_REASON)
 class TestKoreanFaithfulnessChecker:
     """KoreanFaithfulnessChecker 테스트."""
 
@@ -300,7 +304,7 @@ class TestKoreanFaithfulnessChecker:
         assert "보험료" in all_claims2 or len(claims2) > 0
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not HAS_KIWI, reason=KIWI_SKIP_REASON)
 class TestKoreanSemanticSimilarity:
     """KoreanSemanticSimilarity 테스트."""
 
@@ -473,7 +477,7 @@ class TestKoreanSemanticSimilarity:
         assert result == 0.0
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not HAS_KIWI, reason=KIWI_SKIP_REASON)
 class TestIntegration:
     """통합 테스트."""
 
