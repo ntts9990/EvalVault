@@ -14,13 +14,13 @@ Style = Literal["markdown", "plain", "slack"]
 
 
 def _format_percentage(value: Any) -> str:
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return f"{value:.1%}"
     return "N/A"
 
 
 def _format_float(value: Any) -> str:
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return f"{value:.3f}"
     return "N/A"
 
@@ -74,7 +74,7 @@ def build_release_notes(
                 threshold = metric.get("threshold")
                 metric_bits.append(
                     f"{name} {score:.2f}/{threshold:.2f}"
-                    if isinstance(score, (int, float)) and isinstance(threshold, (int, float))
+                    if isinstance(score, int | float) and isinstance(threshold, int | float)
                     else f"{name}"
                 )
             metric_summary = ", ".join(metric_bits) if metric_bits else "metric details unavailable"

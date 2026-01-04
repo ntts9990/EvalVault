@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import nullcontext
 
-from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.domain.entities import Dataset, EvaluationRun
 from evalvault.domain.services.evaluator import RagasEvaluator
-from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
+from evalvault.ports.outbound.domain_memory_port import MemoryInsightPort
 from evalvault.ports.outbound.llm_port import LLMPort
+from evalvault.ports.outbound.tracer_port import TracerPort
 
 
 class MemoryAwareEvaluator:
@@ -17,10 +18,12 @@ class MemoryAwareEvaluator:
     def __init__(
         self,
         evaluator: RagasEvaluator,
-        memory_port: DomainMemoryPort,
+        memory_port: MemoryInsightPort,
+        tracer: TracerPort | None = None,
     ):
         self._evaluator = evaluator
         self._memory_port = memory_port
+        self._tracer = tracer
 
     async def evaluate_with_memory(
         self,
@@ -66,22 +69,27 @@ class MemoryAwareEvaluator:
     ) -> str:
         """Augment an existing context block with retrieved factual memories."""
 
-        with instrumentation_span(
-            "domain_memory.augment_context",
-            {
-                "domain_memory.domain": domain,
-                "domain_memory.language": language,
-                "domain_memory.limit": limit,
-            },
-        ) as span:
+        span_context = (
+            self._tracer.span(
+                "domain_memory.augment_context",
+                {
+                    "domain_memory.domain": domain,
+                    "domain_memory.language": language,
+                    "domain_memory.limit": limit,
+                },
+            )
+            if self._tracer
+            else nullcontext(None)
+        )
+        with span_context as span:
             facts = self._memory_port.search_facts(
                 query=question,
                 domain=domain,
                 language=language,
                 limit=limit,
             )
-            if span:
-                set_span_attributes(
+            if self._tracer and span:
+                self._tracer.set_span_attributes(
                     span,
                     {
                         "question.length": len(question or ""),
@@ -121,8 +129,8 @@ class MemoryAwareEvaluator:
         return adjusted
 
     @property
-    def memory_port(self) -> DomainMemoryPort:
-        """Expose the underlying DomainMemoryPort for advanced orchestration."""
+    def memory_port(self) -> MemoryInsightPort:
+        """Expose the underlying MemoryInsightPort for advanced orchestration."""
 
         return self._memory_port
 

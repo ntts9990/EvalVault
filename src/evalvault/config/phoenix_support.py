@@ -48,7 +48,7 @@ def ensure_phoenix_instrumentation(
         endpoint = "http://localhost:6006/v1/traces"
 
     sample_rate = getattr(settings, "phoenix_sample_rate", 1.0)
-    if not isinstance(sample_rate, (int, float)):
+    if not isinstance(sample_rate, int | float):
         sample_rate = 1.0
 
     api_token = getattr(settings, "phoenix_api_token", None)
@@ -181,7 +181,7 @@ def format_phoenix_links(
 
 
 def _coerce_numeric(value: Any) -> float | None:
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
         try:
@@ -367,7 +367,7 @@ class PhoenixExperimentResolver:
 
 
 def _normalize_attribute_value(value: Any) -> str | int | float | bool:
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str | int | float | bool):
         return value
     return str(value)
 

@@ -72,7 +72,7 @@ def register_langfuse_commands(app: typer.Typer, console: Console) -> None:
                 trace.get("id", "unknown"),
                 str(dataset_name),
                 str(model_name),
-                f"{pass_rate:.2f}" if isinstance(pass_rate, (int, float)) else "N/A",
+                f"{pass_rate:.2f}" if isinstance(pass_rate, int | float) else "N/A",
                 str(total_cases) if total_cases is not None else "N/A",
                 created_at,
             )

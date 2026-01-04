@@ -475,6 +475,62 @@ class TestNetworkXKnowledgeGraphSerialization:
         assert populated_kg.get_edge_count() == 0
 
 
+class TestNetworkXKnowledgeGraphMerge:
+    """NetworkXKnowledgeGraph 병합 테스트."""
+
+    def test_merge_adds_entities_and_relations(self, populated_kg: NetworkXKnowledgeGraph) -> None:
+        delta = NetworkXKnowledgeGraph()
+        delta.add_entity(
+            EntityModel(
+                name="추가회사",
+                entity_type="organization",
+                confidence=0.8,
+                provenance="manual",
+            )
+        )
+        delta.add_entity(
+            EntityModel(
+                name="추가상품",
+                entity_type="product",
+                confidence=0.7,
+                provenance="manual",
+            )
+        )
+        delta.add_relation(
+            RelationModel(
+                source="추가회사",
+                target="추가상품",
+                relation_type="provides",
+                confidence=0.6,
+                provenance="manual",
+            )
+        )
+
+        stats = populated_kg.merge(delta)
+
+        assert stats["entities_added"] == 2
+        assert stats["relations_added"] == 1
+        assert populated_kg.has_entity("추가회사")
+
+    def test_merge_updates_existing_entity(self, populated_kg: NetworkXKnowledgeGraph) -> None:
+        delta = NetworkXKnowledgeGraph()
+        delta.add_entity(
+            EntityModel(
+                name="삼성생명",
+                entity_type="organization",
+                confidence=0.99,
+                provenance="manual",
+            )
+        )
+
+        stats = populated_kg.merge(delta)
+
+        assert stats["entities_updated"] == 1
+        updated = populated_kg.get_entity("삼성생명")
+        assert updated is not None
+        assert updated.confidence == 0.99
+
+
 class TestNetworkXKnowledgeGraphIterator:
     """NetworkXKnowledgeGraph 이터레이터 테스트."""
 

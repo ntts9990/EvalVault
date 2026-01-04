@@ -46,7 +46,7 @@ def _flatten_accessors(payload: dict[str, Any] | None) -> str:
 
 def _join_contexts(input_block: dict[str, Any]) -> str:
     contexts = input_block.get("contexts")
-    if isinstance(contexts, (list, tuple)):
+    if isinstance(contexts, list | tuple):
         return " ".join(str(item) for item in contexts if item)
     if isinstance(contexts, str):
         return contexts

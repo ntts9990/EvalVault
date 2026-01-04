@@ -799,13 +799,15 @@ def render_improvement_page(adapter, session):
         st.subheader("4. 개선 가이드")
 
         # 요약
-        st.markdown(f"""
+        st.markdown(
+            f"""
         **분석 요약**
         - 분석 대상: {report.run_id}
         - 테스트 케이스: {report.total_test_cases}개
         - 실패 케이스: {report.failed_test_cases}개
         - 통과율: {report.pass_rate:.1%}
-        """)
+        """
+        )
 
         # 가이드 목록
         if report.guides:

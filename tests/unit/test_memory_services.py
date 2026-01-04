@@ -49,7 +49,7 @@ class DummyEvaluator(RagasEvaluator):
 
 
 class FakeMemoryPort:
-    """Minimal DomainMemoryPort stub."""
+    """Minimal MemoryInsightPort stub."""
 
     def __init__(self):
         self.reliability = {"faithfulness": 0.55, "answer_relevancy": 0.9}

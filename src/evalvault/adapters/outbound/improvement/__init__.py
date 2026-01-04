@@ -22,6 +22,9 @@ from evalvault.adapters.outbound.improvement.playbook_loader import (
     PlaybookLoader,
     get_default_playbook,
 )
+from evalvault.adapters.outbound.improvement.stage_metric_playbook_loader import (
+    StageMetricPlaybookLoader,
+)
 
 __all__ = [
     # Playbook
@@ -32,6 +35,7 @@ __all__ = [
     "Playbook",
     "PlaybookLoader",
     "get_default_playbook",
+    "StageMetricPlaybookLoader",
     # Pattern Detector
     "FeatureVector",
     "PatternDetector",

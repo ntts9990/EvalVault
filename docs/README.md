@@ -1,6 +1,6 @@
 # EvalVault 문서 허브 (Docs Hub)
 
-> **Last Updated**: 2026-01-03
+> **Last Updated**: 2026-01-04
 
 이 디렉터리(`docs/`)는 **배포/공개용 문서**와 **개발·운영 내부용 문서**를 분리하여 관리합니다.
 목적, 기능, 시점에 따라 아래 구조를 참고하세요.
@@ -30,6 +30,11 @@ docs/
         ├── ARCHITECTURE_C4.md      # C4 모델 다이어그램
         ├── AGENT_STRATEGY.md       # AI 에이전트 전략
         ├── QUERY_BASED_ANALYSIS_PIPELINE.md  # DAG 파이프라인 설계
+        ├── STATUS.md               # 내부 상태 SSoT
+        ├── PARALLEL_WORK_PLAN.md   # 병렬 작업 기준 문서
+        ├── O1_PARALLEL_STATUS.md   # 오케스트레이터 요약
+        ├── O1_D1_DEBUG_REPORT_SUMMARY.md # D1 DebugReport 요약
+        ├── DOCS_REFACTOR_PLAN.md   # 문서 통합/최신화 계획
         └── archive/                # 아카이브 (완료/통합된 문서)
 ```
 
@@ -87,6 +92,16 @@ docs/
 | [FEATURE_SPECS.md](internal/FEATURE_SPECS.md) | 한국어 RAG, DAG Pipeline, 임베딩, Phoenix, Domain Memory 상세 스펙 |
 | [CLASS_CATALOG.md](internal/CLASS_CATALOG.md) | 전체 클래스 분류 (200+ 클래스) |
 
+### 진행/운영 문서 (SSoT 포함)
+
+| 문서 | 설명 |
+|------|------|
+| [STATUS.md](internal/STATUS.md) | 내부 상태 단일 진실(진행/산출물) |
+| [PARALLEL_WORK_PLAN.md](internal/PARALLEL_WORK_PLAN.md) | 병렬 작업 기준/규칙 |
+| [O1_PARALLEL_STATUS.md](internal/O1_PARALLEL_STATUS.md) | 오케스트레이터 요약 |
+| [O1_D1_DEBUG_REPORT_SUMMARY.md](internal/O1_D1_DEBUG_REPORT_SUMMARY.md) | DebugReport 요약 |
+| [DOCS_REFACTOR_PLAN.md](internal/DOCS_REFACTOR_PLAN.md) | 문서 통합/최신화 계획 |
+
 ### 설계 문서
 
 | 문서 | 설명 |
@@ -116,7 +131,7 @@ docs/
 
 ## 🔄 문서 운영 규칙
 
-1. **현재 상태**: `STATUS.md`가 단일 진실 소스 (버전, 테스트 수, 완료 항목)
+1. **현재 상태**: `internal/STATUS.md`가 단일 진실 소스 (진행/산출물)
 2. **배포용 문서**: 기능 변경 시 즉시 업데이트
 3. **개발용 문서**: 개발 완료 후 정리
 4. **아카이브**: 완료된 작업 추적 문서는 `internal/archive/`로 이동

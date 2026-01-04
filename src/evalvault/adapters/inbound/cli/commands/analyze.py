@@ -124,7 +124,19 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
 
         improvement_report = None
         if playbook:
-            improvement_report = _perform_playbook_analysis(run, enable_llm, profile)
+            stage_metrics = storage.list_stage_metrics(run_id)
+            if not stage_metrics:
+                _console.print(
+                    "[yellow]No stage metrics found. "
+                    "Run `evalvault stage compute-metrics <run_id>` to include stage guidance."
+                    "[/yellow]"
+                )
+            improvement_report = _perform_playbook_analysis(
+                run,
+                enable_llm,
+                profile,
+                stage_metrics=stage_metrics,
+            )
 
         if save:
             storage.save_analysis(analysis)
@@ -518,12 +530,21 @@ def _export_analysis_json(
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
-def _perform_playbook_analysis(run, enable_llm: bool, profile: str | None):
+def _perform_playbook_analysis(
+    run,
+    enable_llm: bool,
+    profile: str | None,
+    *,
+    stage_metrics=None,
+):
     """Perform playbook-based improvement analysis."""
 
     from evalvault.adapters.outbound.improvement.insight_generator import InsightGenerator
     from evalvault.adapters.outbound.improvement.pattern_detector import PatternDetector
     from evalvault.adapters.outbound.improvement.playbook_loader import get_default_playbook
+    from evalvault.adapters.outbound.improvement.stage_metric_playbook_loader import (
+        StageMetricPlaybookLoader,
+    )
     from evalvault.domain.services.improvement_guide_service import ImprovementGuideService
 
     _console.print("\n[bold cyan]Playbook-based Improvement Analysis[/bold cyan]\n")
@@ -542,15 +563,22 @@ def _perform_playbook_analysis(run, enable_llm: bool, profile: str | None):
         insight_generator = InsightGenerator(llm_adapter=llm_adapter)
         _console.print("[dim]LLM-based insight generation enabled[/dim]")
 
+    stage_metric_playbook = StageMetricPlaybookLoader().load()
+
     service = ImprovementGuideService(
         pattern_detector=detector,
         insight_generator=insight_generator,
         playbook=playbook,
+        stage_metric_playbook=stage_metric_playbook,
         enable_llm_enrichment=enable_llm,
     )
 
     with _console.status("[bold green]Analyzing patterns and generating recommendations..."):
-        report = service.generate_report(run, include_llm_analysis=enable_llm)
+        report = service.generate_report(
+            run,
+            include_llm_analysis=enable_llm,
+            stage_metrics=stage_metrics,
+        )
 
     _display_improvement_report(report)
     return report
@@ -579,6 +607,37 @@ Analysis Methods: {", ".join(m.value for m in report.analysis_methods_used)}
     _console.print(
         Panel(summary, title="[bold cyan]Improvement Analysis[/bold cyan]", border_style="cyan")
     )
+
+    stage_summary = report.metadata.get("stage_metrics_summary")
+    if stage_summary:
+        pass_rate = stage_summary.get("pass_rate")
+        pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "-"
+        _console.print(
+            "\n[bold]Stage Metrics Summary[/bold] "
+            f"(evaluated: {stage_summary.get('evaluated', 0)}, "
+            f"passed: {stage_summary.get('passed', 0)}, "
+            f"failed: {stage_summary.get('failed', 0)}, "
+            f"pass rate: {pass_rate_text})"
+        )
+        top_failures = stage_summary.get("top_failures", [])
+        if top_failures:
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("Metric")
+            table.add_column("Failures", justify="right")
+            table.add_column("Avg Score", justify="right")
+            table.add_column("Threshold", justify="right")
+            for item in top_failures:
+                threshold = item.get("threshold")
+                threshold_text = f"{threshold:.3f}" if threshold is not None else "-"
+                table.add_row(
+                    str(item.get("metric_name", "-")),
+                    str(item.get("count", 0)),
+                    f"{item.get('avg_score', 0.0):.3f}",
+                    threshold_text,
+                )
+            _console.print(table)
+        else:
+            _console.print("[green]No stage metric failures detected.[/green]")
 
     if not report.guides:
         _console.print("[yellow]No improvement guides generated.[/yellow]")
@@ -667,6 +726,29 @@ def _generate_report(
         content = adapter.generate_markdown(bundle, include_nlp=include_nlp)
 
     if improvement_report:
+        stage_summary = improvement_report.metadata.get("stage_metrics_summary")
+        if stage_summary:
+            pass_rate = stage_summary.get("pass_rate")
+            pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "n/a"
+            content += "\n\n## Stage Metrics Summary\n"
+            content += f"\n- Total metrics: {stage_summary.get('total', 0)}"
+            content += f"\n- Evaluated: {stage_summary.get('evaluated', 0)}"
+            content += (
+                f"\n- Passed: {stage_summary.get('passed', 0)} / "
+                f"Failed: {stage_summary.get('failed', 0)}"
+            )
+            content += f"\n- Pass rate: {pass_rate_text}\n"
+            top_failures = stage_summary.get("top_failures", [])
+            if top_failures:
+                content += "\n| Metric | Failures | Avg Score | Threshold |\n"
+                content += "|--------|----------|-----------|-----------|\n"
+                for item in top_failures:
+                    threshold = item.get("threshold")
+                    threshold_text = f"{threshold:.3f}" if threshold is not None else "-"
+                    content += (
+                        f"| {item.get('metric_name')} | {item.get('count', 0)} | "
+                        f"{item.get('avg_score', 0.0):.3f} | {threshold_text} |\n"
+                    )
         content += "\n\n" + improvement_report.to_markdown()
 
     with open(output_path, "w", encoding="utf-8") as file:

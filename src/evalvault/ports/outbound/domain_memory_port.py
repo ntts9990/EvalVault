@@ -20,19 +20,8 @@ if TYPE_CHECKING:
     from evalvault.domain.entities.result import EvaluationRun
 
 
-class DomainMemoryPort(Protocol):
-    """도메인 메모리 저장소 인터페이스.
-
-    세 가지 메모리 레이어를 관리합니다:
-    - Factual Layer: 검증된 도메인 사실 (SPO 트리플)
-    - Experiential Layer: 평가에서 학습된 패턴
-    - Working Layer: 현재 세션의 활성 컨텍스트
-
-    Dynamics 확장 포인트:
-    - Formation: 평가 결과에서 메모리 형성
-    - Evolution: 메모리 통합, 업데이트, 망각
-    - Retrieval: 하이브리드 검색 (키워드 + 의미론적)
-    """
+class FactualMemoryPort(Protocol):
+    """Factual memory CRUD operations."""
 
     # =========================================================================
     # Factual Layer - 검증된 사실 저장 (Phase 1)
@@ -124,6 +113,10 @@ class DomainMemoryPort(Protocol):
         """
         ...
 
+
+class LearningMemoryPort(Protocol):
+    """Experiential memory operations."""
+
     # =========================================================================
     # Experiential Layer - 학습된 패턴 (Phase 1)
     # =========================================================================
@@ -190,6 +183,10 @@ class DomainMemoryPort(Protocol):
             엔티티 타입 -> 평균 신뢰도 매핑
         """
         ...
+
+
+class BehaviorMemoryPort(Protocol):
+    """Behavior memory operations."""
 
     # =========================================================================
     # Behavior Layer - Metacognitive Reuse (Phase 1)
@@ -259,6 +256,10 @@ class DomainMemoryPort(Protocol):
         """
         ...
 
+
+class WorkingMemoryPort(Protocol):
+    """Session working memory operations."""
+
     # =========================================================================
     # Working Layer - 세션 컨텍스트 (Phase 1)
     # =========================================================================
@@ -308,6 +309,10 @@ class DomainMemoryPort(Protocol):
             삭제 성공 여부
         """
         ...
+
+
+class MemoryEvolutionPort(Protocol):
+    """Evolution dynamics for domain memory."""
 
     # =========================================================================
     # Dynamics: Evolution - 메모리 진화 (Phase 2)
@@ -406,6 +411,10 @@ class DomainMemoryPort(Protocol):
         """
         ...
 
+
+class MemoryRetrievalPort(Protocol):
+    """Retrieval strategies for domain memory."""
+
     # =========================================================================
     # Dynamics: Retrieval - 메모리 검색 (Phase 2)
     # =========================================================================
@@ -493,6 +502,10 @@ class DomainMemoryPort(Protocol):
         """
         ...
 
+
+class MemoryFormationPort(Protocol):
+    """Formation dynamics for domain memory."""
+
     # =========================================================================
     # Dynamics: Formation - 메모리 형성 (Phase 3)
     # =========================================================================
@@ -562,6 +575,10 @@ class DomainMemoryPort(Protocol):
             추출된 BehaviorEntry 리스트
         """
         ...
+
+
+class KGIntegrationPort(Protocol):
+    """Planar form operations for KG integration."""
 
     # =========================================================================
     # Phase 5: Planar Form - KG Integration
@@ -643,6 +660,10 @@ class DomainMemoryPort(Protocol):
             - relations: [(source, target, relation_type, confidence), ...]
         """
         ...
+
+
+class FactHierarchyPort(Protocol):
+    """Hierarchical summary operations for facts."""
 
     # =========================================================================
     # Phase 5: Hierarchical Form - Summary Layers
@@ -736,6 +757,10 @@ class DomainMemoryPort(Protocol):
         """
         ...
 
+
+class MemoryStatisticsPort(Protocol):
+    """Memory statistics utilities."""
+
     # =========================================================================
     # Utility Methods
     # =========================================================================
@@ -753,3 +778,51 @@ class DomainMemoryPort(Protocol):
             {"facts": N, "learnings": N, "behaviors": N, "contexts": N}
         """
         ...
+
+
+class MemoryInsightPort(LearningMemoryPort, MemoryRetrievalPort, Protocol):
+    """Insight helpers for analysis and memory-aware evaluation."""
+
+    ...
+
+
+class MemoryLifecyclePort(
+    FactualMemoryPort,
+    LearningMemoryPort,
+    BehaviorMemoryPort,
+    MemoryFormationPort,
+    MemoryEvolutionPort,
+    Protocol,
+):
+    """Formation/Evolution workflows for domain learning hooks."""
+
+    ...
+
+
+class DomainMemoryPort(
+    FactualMemoryPort,
+    LearningMemoryPort,
+    BehaviorMemoryPort,
+    WorkingMemoryPort,
+    MemoryEvolutionPort,
+    MemoryRetrievalPort,
+    MemoryFormationPort,
+    KGIntegrationPort,
+    FactHierarchyPort,
+    MemoryStatisticsPort,
+    Protocol,
+):
+    """도메인 메모리 저장소 인터페이스.
+
+    세 가지 메모리 레이어를 관리합니다:
+    - Factual Layer: 검증된 도메인 사실 (SPO 트리플)
+    - Experiential Layer: 평가에서 학습된 패턴
+    - Working Layer: 현재 세션의 활성 컨텍스트
+
+    Dynamics 확장 포인트:
+    - Formation: 평가 결과에서 메모리 형성
+    - Evolution: 메모리 통합, 업데이트, 망각
+    - Retrieval: 하이브리드 검색 (키워드 + 의미론적)
+    """
+
+    ...

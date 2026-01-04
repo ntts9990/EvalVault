@@ -589,6 +589,10 @@ class WebUIAdapter:
         if run is None:
             raise KeyError(f"Run not found: {run_id}")
 
+        stage_metrics = None
+        if hasattr(self._storage, "list_stage_metrics"):
+            stage_metrics = self._storage.list_stage_metrics(run_id)
+
         # 개선 가이드 서비스 초기화
         from evalvault.adapters.outbound.improvement.insight_generator import (
             InsightGenerator,
@@ -598,6 +602,9 @@ class WebUIAdapter:
         )
         from evalvault.adapters.outbound.improvement.playbook_loader import (
             PlaybookLoader,
+        )
+        from evalvault.adapters.outbound.improvement.stage_metric_playbook_loader import (
+            StageMetricPlaybookLoader,
         )
         from evalvault.domain.services.improvement_guide_service import (
             ImprovementGuideService,
@@ -627,15 +634,23 @@ class WebUIAdapter:
 
         # 서비스 초기화 및 리포트 생성
         # max_llm_samples=2로 설정하여 LLM 호출 수 감소 (속도 개선)
+        stage_metric_playbook = StageMetricPlaybookLoader().load()
+
         service = ImprovementGuideService(
             pattern_detector=detector,
             insight_generator=generator,
             playbook=playbook,
+            stage_metric_playbook=stage_metric_playbook,
             enable_llm_enrichment=include_llm,
             max_llm_samples=2,
         )
 
-        return service.generate_report(run, metrics=metrics, include_llm_analysis=include_llm)
+        return service.generate_report(
+            run,
+            metrics=metrics,
+            include_llm_analysis=include_llm,
+            stage_metrics=stage_metrics,
+        )
 
     def check_quality_gate(
         self,

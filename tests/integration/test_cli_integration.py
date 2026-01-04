@@ -6,6 +6,9 @@
 - openai: gpt-5-nano (OpenAI)
 """
 
+import json
+from pathlib import Path
+
 import pytest
 from typer.testing import CliRunner
 
@@ -66,6 +69,60 @@ class TestCLIProfileIntegration:
 
         assert result.exit_code == 0
         assert "0.1.0" in result.stdout
+
+    def test_run_with_retriever_populates_contexts(self, tmp_path: Path):
+        dataset_path = tmp_path / "dataset.json"
+        dataset_path.write_text(
+            json.dumps(
+                {
+                    "name": "retriever-demo",
+                    "version": "1.0.0",
+                    "test_cases": [
+                        {
+                            "id": "tc-1",
+                            "question": "보험료는 얼마인가요?",
+                            "answer": "보험료는 15만원입니다.",
+                            "contexts": [],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        docs_path = tmp_path / "docs.json"
+        docs_path.write_text(
+            json.dumps(
+                {
+                    "documents": [
+                        {"doc_id": "doc-1", "content": "보험료는 월 15만원입니다."},
+                        {"doc_id": "doc-2", "content": "보장금액은 1억원입니다."},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                str(dataset_path),
+                "--profile",
+                "dev",
+                "--metrics",
+                "faithfulness",
+                "--retriever",
+                "bm25",
+                "--retriever-docs",
+                str(docs_path),
+                "--retriever-top-k",
+                "1",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Applied bm25 retriever" in result.output
 
 
 class TestApplyProfileIntegration:

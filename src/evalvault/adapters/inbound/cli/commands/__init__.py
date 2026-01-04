@@ -23,6 +23,7 @@ from .langfuse import register_langfuse_commands
 from .phoenix import create_phoenix_app
 from .pipeline import register_pipeline_commands
 from .run import register_run_commands
+from .stage import create_stage_app
 from .web import register_web_command
 
 CommandFactory = Callable[[Console], typer.Typer]
@@ -70,6 +71,7 @@ SUB_APPLICATIONS: tuple[SubAppModule, ...] = (
     SubAppModule("domain", create_domain_app),
     SubAppModule("benchmark", create_benchmark_app),
     SubAppModule("phoenix", create_phoenix_app),
+    SubAppModule("stage", create_stage_app),
 )
 
 

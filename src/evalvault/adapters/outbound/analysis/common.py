@@ -90,7 +90,7 @@ class AnalysisDataProcessor:
             return value.value
         if isinstance(value, dict):
             return {key: self.to_serializable(val) for key, val in value.items()}
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, list | tuple):
             return [self.to_serializable(item) for item in value]
         return value
 

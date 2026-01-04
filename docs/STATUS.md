@@ -2,17 +2,17 @@
 
 > Audience: 개발자 · 운영자 · 리뷰어
 > Purpose: “지금 EvalVault가 어디까지 왔고, 무엇을 하고 있는지”를 1페이지로 공유
-> Last Updated: 2026-01-03
+> Last Updated: 2026-01-04
 
 ---
 
 ## 현재 상태 (요약)
 
-- **Current Version**: 1.5.0
-- **Core Phases**: Phase 1–14 완료 (기반 기능 100%)
-- **Tests**: 1,671 tests collected (`pytest --collect-only`, 2026-01-03 기준)
+- **Current Version**: 릴리스는 git tag 기준 (pyproject 버전은 자동 업데이트되지 않음)
+- **Core Focus**: 병렬 리팩토링 단계 (R1~R4, D1 샘플/리포트 확보)
+- **Tests**: 약 1.3k+ (unit 1,261 + integration 91 기준)
 
-테스트 수 기준(재현 가능):
+테스트 수 확인(재현 가능):
 
 ```bash
 uv run pytest tests --collect-only -q
@@ -32,22 +32,23 @@ uv run pytest tests --collect-only -q
 
 ## 현재 작업의 성격 (시점/우선순위)
 
-Phase 1–14 이후의 작업은 "새 기능 폭증"보다는 아래에 집중합니다.
+병렬 에이전트가 작업한 결과를 리팩토링/통합하는 단계입니다.
 
-- **코드 품질/구조 개선**: 중복 제거, 모듈 분리, 공통 옵션/도움말 표준화
-  - 자세한 계획: [internal/DEVELOPMENT_GUIDE.md](internal/DEVELOPMENT_GUIDE.md)
-- **운영 자동화/옵저버빌리티 표준화**: Drift 감시 → Gate → 릴리즈 노트 자동화
-  - 실행 절차: [OBSERVABILITY_PLAYBOOK.md](OBSERVABILITY_PLAYBOOK.md)
-- **문서/온보딩 정리**: 튜토리얼+가이드의 역할을 분리하고 SSoT를 고정
-  - 문서 허브: [README.md](README.md)
+- **병렬 리팩토링**: R1~R4 산출물 정합성/경로 최신화
+  - 기준 문서: [internal/PARALLEL_WORK_PLAN.md](internal/PARALLEL_WORK_PLAN.md)
+- **문서 통합/최신화**: 유사 문서 통합 후 최신화 진행
+  - 작업 계획: [internal/DOCS_REFACTOR_PLAN.md](internal/DOCS_REFACTOR_PLAN.md)
+- **CLI/Web/성능 리팩토링**: P2.2, P3, P4.1 단계 정비
+  - 로드맵: [ROADMAP.md](ROADMAP.md)
 
 ---
 
 ## 문서/작업 추적에서의 "정답" 위치
 
-- **현재 상태(이 문서)**: [STATUS.md](STATUS.md)
-- **전체 인덱스**: [README.md](README.md)
-- **계획(분기/백로그)**: [ROADMAP.md](ROADMAP.md)
+- **내부 상태 SSoT**: [internal/STATUS.md](internal/STATUS.md)
+- **병렬 작업 기준**: [internal/PARALLEL_WORK_PLAN.md](internal/PARALLEL_WORK_PLAN.md)
+- **문서 허브**: [README.md](README.md)
+- **계획/백로그**: [ROADMAP.md](ROADMAP.md)
 - **개발 가이드**: [internal/DEVELOPMENT_GUIDE.md](internal/DEVELOPMENT_GUIDE.md)
 - **배포/사용자 문서**: [README.ko.md](README.ko.md), [USER_GUIDE.md](USER_GUIDE.md), `tutorials/`
 - **아카이브 (완료 기록)**: `internal/archive/`

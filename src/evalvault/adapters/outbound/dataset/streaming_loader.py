@@ -260,6 +260,7 @@ class StreamingJSONLoader:
     """JSON 파일 스트리밍 로더.
 
     대용량 JSON 배열을 스트리밍으로 처리.
+    ijson이 설치된 경우 진짜 스트리밍 파싱을 사용합니다.
     """
 
     def __init__(self, config: StreamingConfig | None = None):
@@ -308,6 +309,10 @@ class StreamingJSONLoader:
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
+        if self._can_stream_json():
+            yield from self._stream_with_ijson(path, stats, progress_callback)
+            return
+
         with open(path, encoding="utf-8") as f:
             try:
                 data = json.load(f)
@@ -340,6 +345,73 @@ class StreamingJSONLoader:
                     progress_callback(stats)
 
                 yield test_case
+
+    def _can_stream_json(self) -> bool:
+        """ijson 사용 가능 여부 확인."""
+        try:
+            import ijson  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def _detect_json_container(self, path: Path) -> str:
+        """JSON 최상위 컨테이너 타입 감지."""
+        with open(path, "rb") as f:
+            while True:
+                char = f.read(1)
+                if not char:
+                    break
+                if char in b" \t\r\n":
+                    continue
+                if char == b"[":
+                    return "array"
+                if char == b"{":
+                    return "object"
+                break
+        return "unknown"
+
+    def _stream_with_ijson(
+        self,
+        path: Path,
+        stats: StreamingStats,
+        progress_callback: Callable[[StreamingStats], None] | None = None,
+    ) -> Generator[TestCase, None, None]:
+        """ijson 기반 스트리밍 파서."""
+        import ijson
+
+        container = self._detect_json_container(path)
+        if container == "array":
+            prefix = "item"
+        elif container == "object":
+            prefix = "test_cases.item"
+        else:
+            raise ValueError("JSON must be an array or object with 'test_cases' key")
+
+        rows_yielded = 0
+        skipped = 0
+        max_rows = self.config.max_rows
+
+        with open(path, "rb") as f:
+            items = ijson.items(f, prefix)
+            for item in items:
+                if skipped < self.config.skip_rows:
+                    skipped += 1
+                    continue
+
+                if max_rows and rows_yielded >= max_rows:
+                    break
+
+                test_case = self._item_to_test_case(item)
+                if test_case:
+                    rows_yielded += 1
+                    stats.rows_read = rows_yielded
+
+                    if progress_callback and rows_yielded % self.config.chunk_size == 0:
+                        stats.chunks_processed = rows_yielded // self.config.chunk_size
+                        stats.bytes_read = f.tell()
+                        progress_callback(stats)
+
+                    yield test_case
 
     def _item_to_test_case(self, item: dict[str, Any]) -> TestCase | None:
         """JSON 항목을 TestCase로 변환.

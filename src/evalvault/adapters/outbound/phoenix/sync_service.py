@@ -27,11 +27,11 @@ def _normalize_base_url(endpoint: str) -> str:
 def _as_serializable(value: Any) -> Any:
     """Best-effort conversion to JSON-serializable structures."""
 
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, str | int | float | bool) or value is None:
         return value
     if isinstance(value, dict):
         return {str(k): _as_serializable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         return [_as_serializable(v) for v in value]
     return str(value)
 
