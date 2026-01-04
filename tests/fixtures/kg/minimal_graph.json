@@ -1,0 +1,27 @@
+{
+  "entities": [
+    {
+      "name": "AlphaCorp",
+      "entity_type": "organization",
+      "source_document_id": "doc-001",
+      "confidence": 0.9,
+      "provenance": "manual"
+    },
+    {
+      "name": "BetaPlan",
+      "entity_type": "product",
+      "source_document_id": "doc-002",
+      "confidence": 0.8,
+      "provenance": "manual"
+    }
+  ],
+  "relations": [
+    {
+      "source": "AlphaCorp",
+      "target": "BetaPlan",
+      "relation_type": "provides",
+      "confidence": 0.7,
+      "provenance": "manual"
+    }
+  ]
+}

@@ -174,6 +174,29 @@ class NetworkXKnowledgeGraph:
         key = self._graph.add_edge(relation.source, relation.target, **attrs)
         self._relation_metadata[(relation.source, relation.target, key)] = relation
 
+    def merge(self, other: NetworkXKnowledgeGraph) -> dict[str, int]:
+        """다른 Knowledge Graph를 병합합니다."""
+
+        stats = {"entities_added": 0, "entities_updated": 0, "relations_added": 0}
+
+        for entity in other.get_all_entities():
+            if self.has_entity(entity.name):
+                stats["entities_updated"] += 1
+            else:
+                stats["entities_added"] += 1
+            self.add_entity(entity)
+
+        for relation in other.get_all_relations():
+            if not (self.has_entity(relation.source) and self.has_entity(relation.target)):
+                continue
+            existing = self.get_relations(relation.source, relation.target)
+            if any(rel.relation_type == relation.relation_type for rel in existing):
+                continue
+            self.add_relation(relation)
+            stats["relations_added"] += 1
+
+        return stats
+
     def get_relations(self, source: str, target: str) -> list[RelationModel]:
         """두 엔티티 간의 모든 관계 조회.
 
