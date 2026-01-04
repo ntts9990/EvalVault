@@ -1,21 +1,12 @@
 # Domain Services
 
-This module contains the core business logic services that orchestrate domain operations.
+Core domain services that orchestrate evaluation, analysis, and domain learning.
 
-## Evaluator
+## RagasEvaluator
 
-Base evaluator service for running RAG evaluations.
+Primary evaluation service using the Ragas framework.
 
-::: evalvault.domain.services.evaluator.Evaluator
-    options:
-      show_root_heading: true
-      show_source: true
-
-## BatchExecutor
-
-Service for executing evaluations in batches with parallel processing.
-
-::: evalvault.domain.services.batch_executor.BatchExecutor
+::: evalvault.domain.services.evaluator.RagasEvaluator
     options:
       show_root_heading: true
       show_source: true
@@ -29,65 +20,56 @@ Evaluator with memory tracking and optimization capabilities.
       show_root_heading: true
       show_source: true
 
-## RagasEvaluator
+## AnalysisService
 
-Concrete implementation using Ragas framework for evaluation.
+Service for query analysis and intent-based processing.
 
-::: evalvault.domain.services.ragas_evaluator.RagasEvaluator
+::: evalvault.domain.services.analysis_service.AnalysisService
     options:
       show_root_heading: true
       show_source: true
 
-## TestsetGenerator
+## MemoryBasedAnalysis
 
-Service for generating synthetic test cases.
+Generates trend and recommendation summaries from domain memory.
 
-::: evalvault.domain.services.testset_generator.TestsetGenerator
+::: evalvault.domain.services.memory_based_analysis.MemoryBasedAnalysis
     options:
       show_root_heading: true
       show_source: true
 
-## KGGenerator
+## DomainLearningHook
 
-Service for generating knowledge graphs from documents.
+Hooks for storing learning artifacts from evaluation runs.
 
-::: evalvault.domain.services.kg_generator.KGGenerator
+::: evalvault.domain.services.domain_learning_hook.DomainLearningHook
     options:
       show_root_heading: true
       show_source: true
 
-## ExperimentManager
+## ImprovementGuideService
 
-Service for managing A/B testing experiments.
+Builds actionable improvement guidance based on evaluation outcomes.
 
-::: evalvault.domain.services.experiment_manager.ExperimentManager
+::: evalvault.domain.services.improvement_guide_service.ImprovementGuideService
     options:
       show_root_heading: true
       show_source: true
 
-## QueryAnalyzer
+## KoreanRAGBenchmarkRunner
 
-Service for analyzing and classifying queries.
+Runs the curated Korean RAG benchmark suite.
 
-::: evalvault.domain.services.query_analyzer.QueryAnalyzer
+::: evalvault.domain.services.benchmark_runner.KoreanRAGBenchmarkRunner
     options:
       show_root_heading: true
       show_source: true
 
-## AnalysisPipeline
+## KnowledgeGraphGenerator
 
-DAG-based pipeline for multi-stage query analysis.
+Builds knowledge graphs for GraphRAG workflows.
 
-::: evalvault.domain.services.analysis_pipeline.AnalysisPipeline
-    options:
-      show_root_heading: true
-      show_source: true
-
-## IntentClassifier
-
-Service for classifying user intent from queries.
-
-::: evalvault.domain.services.intent_classifier.IntentClassifier
+::: evalvault.domain.services.kg_generator.KnowledgeGraphGenerator
     options:
       show_root_heading: true
       show_source: true

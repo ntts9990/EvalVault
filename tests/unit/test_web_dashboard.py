@@ -8,9 +8,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from evalvault.ports.inbound.web_port import RunSummary
+from tests.optional_deps import skip_if_missing_web
 
 if TYPE_CHECKING:
     pass
+
+skip_if_missing_web()
 
 
 class TestPassRateChart:

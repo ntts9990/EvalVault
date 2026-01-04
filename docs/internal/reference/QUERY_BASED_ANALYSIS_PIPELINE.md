@@ -453,7 +453,7 @@ MVP 범위:
 
 ## 9. 참고 자료
 
-- [scratch/ragrefine/agent/graph.py](/scratch/ragrefine/agent/graph.py) - LangGraph 상태 머신 구현
-- [scratch/ragrefine/analysis/report_graph.py](/scratch/ragrefine/analysis/report_graph.py) - 보고서 DAG 구현
-- [scratch/ragrefine/agent/tools/analysis_tools.py](/scratch/ragrefine/agent/tools/analysis_tools.py) - 12개 분석 도구
+- `scratch/ragrefine/agent/graph.py` - LangGraph 상태 머신 구현
+- `scratch/ragrefine/analysis/report_graph.py` - 보고서 DAG 구현
+- `scratch/ragrefine/agent/tools/analysis_tools.py` - 12개 분석 도구
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) - 공식 문서

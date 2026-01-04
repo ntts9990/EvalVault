@@ -21,11 +21,19 @@ from pathlib import Path
 class CodeBlock:
     """Represents a code block extracted from markdown."""
 
-    def __init__(self, content: str, language: str, line_number: int, file_path: Path):
+    def __init__(
+        self,
+        content: str,
+        language: str,
+        line_number: int,
+        file_path: Path,
+        info: str,
+    ):
         self.content = content
         self.language = language
         self.line_number = line_number
         self.file_path = file_path
+        self.info = info
 
     def __repr__(self):
         return (
@@ -47,11 +55,12 @@ class TutorialValidator:
         code_blocks = []
         content = md_file.read_text(encoding="utf-8")
 
-        # Pattern to match fenced code blocks with optional language
-        pattern = r"```(\w+)?\n(.*?)```"
+        # Pattern to match fenced code blocks with optional info string
+        pattern = r"```([^\n]*)\n(.*?)```"
 
         for match in re.finditer(pattern, content, re.DOTALL):
-            language = match.group(1) or "text"
+            info = (match.group(1) or "").strip()
+            language = info.split()[0] if info else "text"
             code_content = match.group(2)
             line_number = content[: match.start()].count("\n") + 1
 
@@ -61,13 +70,20 @@ class TutorialValidator:
                     language=language,
                     line_number=line_number,
                     file_path=md_file,
+                    info=info,
                 )
             )
 
         return code_blocks
 
+    def _should_skip(self, block: CodeBlock) -> bool:
+        tokens = {token.lower() for token in block.info.split()}
+        return "skip" in tokens or "no-validate" in tokens or "no-check" in tokens
+
     def validate_python_syntax(self, block: CodeBlock) -> bool:
         """Validate Python code syntax."""
+        if self._should_skip(block):
+            return True
         if block.language not in ["python", "py"]:
             return True
 
@@ -88,6 +104,8 @@ class TutorialValidator:
 
     def check_imports(self, block: CodeBlock) -> bool:
         """Check if imports reference actual modules."""
+        if self._should_skip(block):
+            return True
         if block.language not in ["python", "py"]:
             return True
 
@@ -142,6 +160,8 @@ class TutorialValidator:
 
     def check_deprecated_apis(self, block: CodeBlock) -> bool:
         """Check for usage of deprecated APIs or patterns."""
+        if self._should_skip(block):
+            return True
         if block.language not in ["python", "py"]:
             return True
 
@@ -168,6 +188,8 @@ class TutorialValidator:
 
     def check_bash_commands(self, block: CodeBlock) -> bool:
         """Validate bash commands for common issues."""
+        if self._should_skip(block):
+            return True
         if block.language not in ["bash", "sh", "shell"]:
             return True
 
@@ -180,9 +202,7 @@ class TutorialValidator:
                 continue
 
             # Check if using uv run for Python commands
-            if (
-                "evalvault" in line or "pytest" in line or "python" in line
-            ) and "uv run" not in line:
+            if re.search(r"(^|\\s)(evalvault|pytest|python)\\b", line) and "uv run" not in line:
                 self.warnings.append(
                     {
                         "file": str(block.file_path.relative_to(self.docs_dir)),

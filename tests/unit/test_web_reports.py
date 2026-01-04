@@ -5,6 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from evalvault.ports.inbound.web_port import RunSummary
+from tests.optional_deps import skip_if_missing_web
+
+skip_if_missing_web()
 
 PROMPT_SAMPLE = [
     {

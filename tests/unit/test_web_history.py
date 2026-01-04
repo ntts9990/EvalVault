@@ -6,9 +6,12 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from evalvault.ports.inbound.web_port import RunFilters, RunSummary
+from tests.optional_deps import skip_if_missing_web
 
 if TYPE_CHECKING:
     pass
+
+skip_if_missing_web()
 
 
 PROMPT_SAMPLE = [

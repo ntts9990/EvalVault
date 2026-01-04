@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from tests.optional_deps import skip_if_missing_web
+
 if TYPE_CHECKING:
     pass
+
+skip_if_missing_web()
 
 
 class TestFileUploadHandler:

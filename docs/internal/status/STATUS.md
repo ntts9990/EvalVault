@@ -14,7 +14,7 @@
 
 ---
 
-## R1~R4/D1 상태 요약
+## R1~R4/D1/P3 상태 요약
 
 | ID | 상태 | 핵심 산출물 | 다음 액션 |
 |----|------|------------|-----------|
@@ -23,6 +23,7 @@
 | R3 | ✅ 완료 | kg build CLI + perf extras + ParallelKGBuilder | - |
 | R4 | ✅ 완료 | precision_at_k benchmark metric | - |
 | D1 | ✅ 완료 | DebugReportService + R1/R2/R3 리포트 | - |
+| P3 | ✅ 완료 | 적응형 배치 처리 + 캐시 통계 API + 스트리밍 로더 확인 | - |
 
 ---
 
@@ -168,6 +169,17 @@
 ```
 
 참고 문서: `docs/internal/plans/DEBUG_TOOL_PLAN.md`
+
+---
+
+### P3 (성능 최적화)
+
+- 상태: ✅ 완료
+- 구현/정비
+  - 적응형 배치 처리 (`batch_executor.py`, `async_batch_executor.py`)
+  - 캐시 hit/miss 통계 + 스냅샷/윈도우 유틸 (`hybrid_cache.py`, `memory_cache.py`, `cache_metrics.py`)
+  - 스트리밍 로더 구현 확인 (`adapters/outbound/dataset/streaming_loader.py`)
+- 참고 문서: `docs/internal/plans/PARALLEL_WORK_PLAN.md`
 
 ---
 

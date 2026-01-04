@@ -146,7 +146,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 |------|--------|
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
-| 3. 평가 실행 | `uv run evalvault run <data.json> --metrics faithfulness` |
+| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness` |
 
 소요 시간: 약 5분
 

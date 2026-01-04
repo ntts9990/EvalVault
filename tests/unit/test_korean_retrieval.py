@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests.optional_deps import kiwi_ready, rank_bm25_ready
+
 # Check if kiwipiepy is available
 try:
     from evalvault.adapters.outbound.nlp.korean import (
@@ -21,12 +23,21 @@ try:
         RetrievalResult,
     )
 
-    HAS_KIWI = True
+    HAS_KIWI, KIWI_SKIP_REASON = kiwi_ready()
+    HAS_BM25, BM25_SKIP_REASON = rank_bm25_ready()
+    KOREAN_READY = HAS_KIWI and HAS_BM25
+    if not HAS_KIWI:
+        KOREAN_SKIP_REASON = KIWI_SKIP_REASON or "kiwipiepy unavailable"
+    else:
+        KOREAN_SKIP_REASON = BM25_SKIP_REASON or "rank_bm25 unavailable"
 except ImportError:
     HAS_KIWI = False
+    HAS_BM25 = False
+    KOREAN_READY = False
+    KOREAN_SKIP_REASON = "korean deps not installed"
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestKoreanBM25Retriever:
     """KoreanBM25Retriever 테스트."""
 
@@ -136,7 +147,7 @@ class TestKoreanBM25Retriever:
         assert retriever.document_count == 0
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestKoreanDocumentChunker:
     """KoreanDocumentChunker 테스트."""
 
@@ -233,7 +244,7 @@ class TestKoreanDocumentChunker:
         assert len(sentences) == 3
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestParagraphChunker:
     """ParagraphChunker 테스트."""
 
@@ -274,7 +285,7 @@ class TestParagraphChunker:
         assert len(chunks) > 0
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestKoreanHybridRetriever:
     """KoreanHybridRetriever 테스트."""
 
@@ -390,7 +401,7 @@ class TestKoreanHybridRetriever:
         assert not retriever.has_embeddings
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not KOREAN_READY, reason=KOREAN_SKIP_REASON)
 class TestKoreanRetrievalIntegration:
     """통합 테스트: 청킹 + 검색."""
 

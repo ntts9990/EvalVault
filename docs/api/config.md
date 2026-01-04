@@ -1,6 +1,6 @@
 # Configuration
 
-Configuration management using pydantic-settings for type-safe environment variable handling.
+Pydantic Settings 기반의 환경 변수 설정 레퍼런스입니다.
 
 ## Settings
 
@@ -31,7 +31,12 @@ See `src/evalvault/config/playbooks/` for available playbook configurations.
 Create a `.env` file in your project root:
 
 ```bash
-# OpenAI Configuration (Required)
+# Profile / Provider (Optional)
+EVALVAULT_PROFILE=dev
+LLM_PROVIDER=openai
+TRACKER_PROVIDER=langfuse
+
+# OpenAI Configuration (Required when provider=openai)
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5-nano
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
@@ -44,11 +49,16 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 # Phoenix Configuration (Optional)
 PHOENIX_ENABLED=true
-PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
+PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
+PHOENIX_SAMPLE_RATE=1.0
 
-# Database Configuration (Optional)
-DATABASE_URL=sqlite:///./evalvault.db
-# DATABASE_URL=postgresql://user:pass@localhost:5432/evalvault
+# PostgreSQL Configuration (Optional)
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=evalvault
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=secret
+# POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost:5432/evalvault
 
 # MLflow Configuration (Optional)
 MLFLOW_TRACKING_URI=http://localhost:5000
@@ -66,7 +76,8 @@ settings = Settings()
 # Access configuration
 print(settings.openai_api_key)
 print(settings.openai_model)
-print(settings.langfuse_enabled)
+print(settings.phoenix_enabled)
+print(settings.tracker_provider)
 ```
 
 ## Playbook Usage

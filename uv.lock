@@ -939,6 +939,7 @@ version = "1.38.0"
 source = { editable = "." }
 dependencies = [
     { name = "chardet" },
+    { name = "fastapi" },
     { name = "instructor" },
     { name = "langchain-openai" },
     { name = "langfuse" },
@@ -952,6 +953,7 @@ dependencies = [
     { name = "rich" },
     { name = "truststore" },
     { name = "typer" },
+    { name = "uvicorn" },
     { name = "xlrd" },
 ]
 
@@ -1013,6 +1015,7 @@ requires-dist = [
     { name = "arize-phoenix", marker = "extra == 'phoenix'", specifier = ">=8.0.0" },
     { name = "chardet" },
     { name = "faiss-cpu", marker = "extra == 'perf'", specifier = ">=1.8.0" },
+    { name = "fastapi", specifier = ">=0.128.0" },
     { name = "ijson", marker = "extra == 'perf'", specifier = ">=3.3.0" },
     { name = "instructor" },
     { name = "kiwipiepy", marker = "extra == 'korean'", specifier = ">=0.18.0" },
@@ -1052,6 +1055,7 @@ requires-dist = [
     { name = "streamlit", marker = "extra == 'web'", specifier = ">=1.40.0" },
     { name = "truststore", specifier = ">=0.10.4" },
     { name = "typer" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
     { name = "watchdog", marker = "extra == 'web'", specifier = ">=3.0.0" },
     { name = "xlrd" },
 ]

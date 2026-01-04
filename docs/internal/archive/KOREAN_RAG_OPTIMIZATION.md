@@ -487,7 +487,7 @@ uv run python examples/benchmarks/run_korean_benchmark.py
 uv run python examples/benchmarks/run_korean_benchmark.py --compare
 ```
 
-자세한 사용법은 [examples/benchmarks/README.md](../../../examples/benchmarks/README.md) 참조.
+자세한 사용법은 [examples/benchmarks/README.md](https://github.com/ntts9990/EvalVault/blob/main/examples/benchmarks/README.md) 참조.
 
 ---
 

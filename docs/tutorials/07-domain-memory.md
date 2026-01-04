@@ -64,7 +64,8 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 기본적으로 `evalvault_memory.db`를 사용하지만, 커스텀 경로를 지정할 수 있습니다:
 
 ```bash
-uv run evalvault run dataset.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --use-domain-memory \
   --memory-db /path/to/custom_memory.db \
   --memory-domain insurance
@@ -75,7 +76,8 @@ uv run evalvault run dataset.json \
 `--memory-domain` 옵션을 생략하면 데이터셋의 메타데이터에서 도메인을 자동으로 추출합니다:
 
 ```bash
-uv run evalvault run dataset.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --use-domain-memory \
   --memory-language ko
 ```
@@ -89,7 +91,8 @@ uv run evalvault run dataset.json \
 ### 기본 사용법
 
 ```bash
-uv run evalvault run dataset.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --metrics faithfulness \
   --use-domain-memory \
   --augment-context \
@@ -332,7 +335,8 @@ print(f"보강된 테스트 케이스: {enriched_count}개")
 
 1. **초기 평가 실행** (메모리 없음):
 ```bash
-uv run evalvault run insurance_dataset.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --metrics faithfulness,answer_relevancy
 ```
 
@@ -342,7 +346,8 @@ uv run evalvault run insurance_dataset.json \
 
 3. **메모리 활용 평가**:
 ```bash
-uv run evalvault run insurance_dataset.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --metrics faithfulness,answer_relevancy \
   --use-domain-memory \
   --augment-context \

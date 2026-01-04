@@ -126,20 +126,23 @@ PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
 
 ```bash
 # --tracker phoenix로 Phoenix 추적 활성화 (--phoenix-max-traces로 per-case 제한 조정)
-uv run evalvault run data.json --metrics faithfulness --tracker phoenix --phoenix-max-traces 200
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness --tracker phoenix --phoenix-max-traces 200
 ```
 
 또는 환경 변수로 기본 활성화:
 
 ```bash
 export PHOENIX_ENABLED=true
-uv run evalvault run data.json --metrics faithfulness
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness
 ```
 
 ### Step 4: Dataset/Experiment 동기화
 
 ```bash
-uv run evalvault run data.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --metrics faithfulness,answer_relevancy \
   --tracker phoenix \
   --phoenix-dataset insurance-qa-ko \
@@ -317,7 +320,8 @@ uv run evalvault phoenix prompt-diff \
 3. 평가 실행에 Prompt 상태 주입
 
 ```bash
-uv run evalvault run data.json --metrics faithfulness \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness \
   --tracker phoenix \
   --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
   --prompt-manifest agent/prompts/prompt_manifest.json

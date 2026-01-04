@@ -43,14 +43,16 @@ PHOENIX_ENDPOINT=http://phoenix-prod:6006/v1/traces
 ```bash
 # 환경별 .env 파일 로드
 cp .env.production .env
-uv run evalvault run data.json --metrics faithfulness
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness
 ```
 
 또는:
 
 ```bash
 # 환경 변수 직접 지정
-EVALVAULT_PROFILE=prod uv run evalvault run data.json --metrics faithfulness
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+EVALVAULT_PROFILE=prod uv run evalvault run "$DATASET" --metrics faithfulness
 ```
 
 ### 시크릿 관리
@@ -111,10 +113,11 @@ os.environ['OPENAI_API_KEY'] = secret['SecretString']
 
 ```bash
 # 병렬 평가 활성화
-uv run evalvault run large_data.json --metrics faithfulness --parallel
+LARGE_DATASET="scripts/perf/r3_evalvault_run_dataset.json"
+uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel
 
 # 배치 크기 조정
-uv run evalvault run large_data.json --metrics faithfulness --parallel --batch-size 20
+uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel --batch-size 20
 ```
 
 ### 배치 크기 가이드
@@ -147,7 +150,6 @@ for chunk in chunked(test_cases, chunk_size=100):
 ```bash
 # 환경 변수로 타임아웃 설정
 OLLAMA_TIMEOUT=300  # 5분
-OPENAI_TIMEOUT=120  # 2분
 ```
 
 ### 재시도 로직
@@ -181,7 +183,8 @@ PHOENIX_ENDPOINT=http://phoenix:6006/v1/traces
 - Experiment를 생성해 모델/프롬프트 릴리즈마다 비교 가능한 Run을 고정합니다.
 
 ```bash
-uv run evalvault run data.json \
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" \
   --metrics faithfulness,answer_relevancy \
   --tracker phoenix \
   --phoenix-dataset prod-insurance-qa \
@@ -210,7 +213,8 @@ logging.basicConfig(
 
 ```bash
 # 상세 로그 출력
-uv run evalvault run data.json --metrics faithfulness --verbose
+DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+uv run evalvault run "$DATASET" --metrics faithfulness --verbose
 ```
 
 ### 메트릭 수집

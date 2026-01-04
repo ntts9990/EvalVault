@@ -85,7 +85,7 @@ EvalVault는 Hexagonal Architecture를 채택해 도메인 로직을 외부 시�
 - docs/status/ROADMAP.md
 - docs/status/STATUS.md
 - docs/internal/status/STATUS.md
-- docs/DOCS_HUB.md
+- docs/INDEX.md
 
 ---
 

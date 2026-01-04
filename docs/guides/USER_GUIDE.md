@@ -29,7 +29,7 @@
    - [임베딩 분석 & 내보내기](#임베딩-분석--내보내기)
    - [Prompt Manifest 루프](#prompt-manifest-루프)
    - [드리프트 감시 & 릴리스 노트](#드리프트-감시--릴리스-노트)
-6. [Domain Memory & 분석 기능](#domain-memory--분석-기능)
+6. [Domain Memory & 분석 기능](#도메인-메모리-활용)
 7. [한국어 NLP & 데이터 스트리밍](#한국어-nlp--데이터-스트리밍)
 8. [자동화 & 에이전트](#자동화--에이전트)
 9. [문제 해결](#문제-해결)
@@ -169,6 +169,12 @@ uv run evalvault run tests/fixtures/sample_dataset.json \
 - `--db path/to.sqlite` : SQLite 저장소 지정
 - `--use-domain-memory` : Domain Memory 기반 threshold/컨텍스트 보강 활성화
 
+### 메트릭 가이드 {#metrics}
+
+- `uv run evalvault metrics`로 사용 가능한 메트릭을 확인합니다.
+- 기본 추천: `faithfulness` → `answer_relevancy` → `context_precision/context_recall`.
+- `semantic_similarity`, `factual_correctness`는 ground truth가 있는 데이터셋에서만 사용하세요.
+
 프리셋 예시:
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset production
@@ -210,8 +216,8 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --profile dev \
   --db evalvault.db
 ```
-- 평가 실행 후 `evalvault history --limit 1 --db evalvault.db`로 `run_id`를 확인합니다.
-- 동일한 `run_id`로 stage 이벤트를 기록하면 `evalvault analyze <run_id> --playbook`에서
+- 평가 실행 후 `uv run evalvault history --limit 1 --db evalvault.db`로 `run_id`를 확인합니다.
+- 동일한 `run_id`로 stage 이벤트를 기록하면 `uv run evalvault analyze <run_id> --playbook`에서
   단계별 개선 가이드까지 확인할 수 있습니다.
 
 ---
@@ -220,7 +226,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 
 ### SQLite/PostgreSQL
 - 기본값은 `evalvault.db` (SQLite)
-- PostgreSQL 사용 시 `.env`에 `DATABASE_URL=postgresql+psycopg://...` 를 설정하고 `uv sync --extra postgres` 를 실행합니다.
+- PostgreSQL 사용 시 `.env`에 `POSTGRES_CONNECTION_STRING=postgresql://...` 또는 `POSTGRES_HOST/PORT/USER/PASSWORD`를 설정하고 `uv sync --extra postgres` 를 실행합니다.
 
 ### Langfuse
 1. `docker compose -f docker-compose.langfuse.yml up -d`
@@ -284,7 +290,8 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
    ```
 3. **평가 실행에 Prompt 정보 주입**
    ```bash
-   uv run evalvault run data.json --metrics faithfulness \
+   DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
+   uv run evalvault run "$DATASET" --metrics faithfulness \
      --profile prod \
      --tracker phoenix \
      --prompt-files agent/prompts/baseline.txt,agent/prompts/system.txt \
@@ -296,7 +303,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 > **Tip**: Prompt Playground 연동 시에는 Phoenix tool-calling을 지원하는 `prod` 프로필(`gpt-oss-safeguard:20b`)을 사용하면 "does not support tools" 오류 없이 메타데이터가 기록됩니다.
 
 ### 드리프트 감시 & 릴리스 노트
-- `scripts/ops/phoenix_watch.py` : Phoenix Dataset을 주기적으로 조회하여 `embedding_drift_score` 초과 시 Slack 알림 또는 `evalvault gate`/회귀 테스트 실행
+- `scripts/ops/phoenix_watch.py` : Phoenix Dataset을 주기적으로 조회하여 `embedding_drift_score` 초과 시 Slack 알림 또는 `uv run evalvault gate <run_id>`/회귀 테스트 실행
   ```bash
   uv run python scripts/ops/phoenix_watch.py \
     --endpoint http://localhost:6006 \
@@ -304,20 +311,20 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
     --drift-key embedding_drift_score \
     --drift-threshold 0.18 \
     --slack-webhook https://hooks.slack.com/services/... \
-    --gate-command "uv run evalvault gate configs/gate.yaml" \
+    --gate-command "uv run evalvault gate RUN_ID --format github-actions --db evalvault.db" \
     --run-regressions threshold \
     --regression-config config/regressions/default.json
   ```
-- `scripts/reports/generate_release_notes.py` : `evalvault run --output run.json` 결과를 Markdown/Slack 형식 릴리스 노트로 변환하고 Phoenix 링크를 삽입합니다.
+- `scripts/reports/generate_release_notes.py` : `uv run evalvault run --output run.json` 결과를 Markdown/Slack 형식 릴리스 노트로 변환하고 Phoenix 링크를 삽입합니다.
 
 ---
 
-## Domain Memory & 분석 기능
+## Domain Memory & 분석 기능 {#도메인-메모리-활용}
 - `--use-domain-memory` : 평가 전 Domain Memory의 신뢰도로 메트릭 임계값을 자동 조정하고 관련 사실을 컨텍스트에 보강합니다.
-- `MemoryBasedAnalysis` : `evalvault analyze`에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다. (Web UI 미노출)
+- `MemoryBasedAnalysis` : `uv run evalvault analyze`에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다. (Web UI 미노출)
 - **Web UI 인사이트**: Domain Memory/MemoryBasedAnalysis 인사이트는 CLI 출력 기준으로만 제공됩니다.
 - `ImprovementGuideService` : 규칙 기반 패턴 탐지 + LLM 인사이트를 결합해 우선순위가 매겨진 개선 액션을 제공합니다.
-- `Analysis Pipeline` : `evalvault pipeline run --query "요약해줘"` 형태로 12가지 의도를 분류하고 DAG 모듈을 실행합니다.
+- `Analysis Pipeline` : `uv run evalvault pipeline analyze "요약해줘"` 형태로 12가지 의도를 분류하고 DAG 모듈을 실행합니다.
 
 ---
 
@@ -329,7 +336,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 
 ## 자동화 & 에이전트
 - `scripts/regression_runner.py` : JSON (`config/regressions/*.json`) 으로 정의된 회귀 스위트를 순차 실행하고 stdout/stderr를 캡처합니다.
-- `evalvault agent ...` : `agent/` 폴더의 claude-agent-sdk 기반 개발/운영 에이전트를 실행하여 아키텍처/관측성/테스트/문서 등을 자동 개선합니다. 에이전트 상태와 로그는 `agent/memory/` 하위에 저장되며, `AgentConfig` 는 `src/evalvault/config/agent_types.py` 에 정의되어 있습니다.
+- `uv run evalvault agent ...` : `agent/` 폴더의 claude-agent-sdk 기반 개발/운영 에이전트를 실행하여 아키텍처/관측성/테스트/문서 등을 자동 개선합니다. 에이전트 상태와 로그는 `agent/memory/` 하위에 저장되며, `AgentConfig` 는 `src/evalvault/config/agent_types.py` 에 정의되어 있습니다.
 
 ---
 
@@ -344,19 +351,19 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 | Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
 | Streamlit ImportError | `uv sync --extra web` 실행 |
 
-추가 이슈는 GitHub Issues 또는 `evalvault config` 출력을 참고하세요.
+추가 이슈는 GitHub Issues 또는 `uv run evalvault config` 출력을 참고하세요.
 
 ---
 
 ## 참고 자료
 
 ### EvalVault 문서
-- [README.md](../../README.md) / [README.ko.md](../../README.ko.md) - 프로젝트 개요
+- [README.md](https://github.com/ntts9990/EvalVault/blob/main/README.md) / [README.ko.md](../README.ko.md) - 프로젝트 개요
 - [INDEX.md](../INDEX.md) - 전체 문서 인덱스
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - 아키텍처 가이드
 - [CLI_GUIDE.md](CLI_GUIDE.md) - CLI 참조
 - [ROADMAP.md](../status/ROADMAP.md) - 개발 로드맵
-- [CHANGELOG.md](../../CHANGELOG.md) - 변경 이력
+- [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md) - 변경 이력
 
 ### 튜토리얼
 - [tutorials/01-quickstart.md](../tutorials/01-quickstart.md) - 5분 빠른 시작

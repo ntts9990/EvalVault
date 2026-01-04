@@ -23,7 +23,7 @@
 - 패키지 메타데이터와 실행 스크립트는 `pyproject.toml`에 정의되어 CLI와 웹 엔트리포인트를 제공한다.
 
 근거
-- docs/DOCS_HUB.md
+- docs/INDEX.md
 - docs/internal/reference/CLASS_CATALOG.md
 - src/evalvault/config/__init__.py
 - tests/fixtures/README.md

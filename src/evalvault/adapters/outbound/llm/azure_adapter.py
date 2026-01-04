@@ -1,6 +1,6 @@
 """Azure OpenAI LLM adapter for Ragas evaluation."""
 
-from ragas.embeddings.base import embedding_factory
+from ragas.embeddings.base import BaseRagasEmbeddings, embedding_factory
 
 from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
@@ -62,7 +62,7 @@ class AzureOpenAIAdapter(BaseLLMAdapter):
             )
             self._set_ragas_embeddings(embeddings)
 
-    def as_ragas_embeddings(self):
+    def as_ragas_embeddings(self) -> BaseRagasEmbeddings:
         """Return the Ragas embeddings instance.
 
         Returns the Ragas-native embeddings for Azure OpenAI

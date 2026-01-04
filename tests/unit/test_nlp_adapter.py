@@ -12,14 +12,21 @@ from evalvault.domain.entities.analysis import (
     QuestionTypeStats,
     TextStats,
 )
+from tests.optional_deps import kiwi_ready, sklearn_ready
 
 # Check if kiwipiepy is available
 try:
     from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
 
-    HAS_KIWI = True
+    HAS_KIWI, KIWI_SKIP_REASON = kiwi_ready()
+    KIWI_SKIP_REASON = KIWI_SKIP_REASON or "kiwipiepy unavailable"
 except ImportError:
     HAS_KIWI = False
+    KIWI_SKIP_REASON = "kiwipiepy not installed"
+
+HAS_SKLEARN, SKLEARN_SKIP_REASON = sklearn_ready()
+SKLEARN_SKIP_REASON = SKLEARN_SKIP_REASON or "scikit-learn unavailable"
+SKLEARN_REQUIRED = pytest.mark.skipif(not HAS_SKLEARN, reason=SKLEARN_SKIP_REASON)
 
 
 class TestNLPAnalysisAdapterTextStats:
@@ -280,6 +287,7 @@ class TestNLPAnalysisAdapterQuestionTypes:
                 assert isinstance(stats.avg_scores, dict)
 
 
+@SKLEARN_REQUIRED
 class TestNLPAnalysisAdapterKeywords:
     """키워드 추출 테스트."""
 
@@ -372,6 +380,7 @@ class TestNLPAnalysisAdapterKeywords:
         assert result == []
 
 
+@SKLEARN_REQUIRED
 class TestNLPAnalysisAdapterIntegration:
     """통합 분석 테스트."""
 
@@ -455,6 +464,7 @@ class TestNLPAnalysisAdapterIntegration:
         assert isinstance(result.insights, list)
 
 
+@SKLEARN_REQUIRED
 class TestNLPAnalysisAdapterHybrid:
     """하이브리드 NLP 분석 테스트 (LLM/임베딩 통합)."""
 
@@ -604,6 +614,7 @@ class TestNLPAnalysisAdapterHybrid:
         assert result.has_keyword_analysis is True
 
 
+@SKLEARN_REQUIRED
 class TestTopicClustering:
     """토픽 클러스터링 테스트."""
 
@@ -782,7 +793,7 @@ class TestTopicClustering:
         assert result == []
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not HAS_KIWI, reason=KIWI_SKIP_REASON)
 class TestNLPAnalysisAdapterKorean:
     """한국어 형태소 분석 통합 테스트."""
 
@@ -932,7 +943,7 @@ class TestNLPAnalysisAdapterKorean:
         )
 
 
-@pytest.mark.skipif(not HAS_KIWI, reason="kiwipiepy not installed")
+@pytest.mark.skipif(not HAS_KIWI, reason=KIWI_SKIP_REASON)
 class TestNLPAnalysisAdapterKoreanFallback:
     """한국어 분석 폴백 테스트."""
 

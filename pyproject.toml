@@ -56,6 +56,8 @@ dependencies = [
     "xlrd", # For reading .xls files (Excel 97-2003)
     "chardet", # For automatic encoding detection in CSV files
     "truststore>=0.10.4",
+    "fastapi>=0.128.0",
+    "uvicorn>=0.40.0",
 ]
 
 [project.urls]

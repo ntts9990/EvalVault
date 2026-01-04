@@ -14,9 +14,14 @@ from evalvault.ports.inbound.web_port import (
     RunFilters,
     RunSummary,
 )
+from tests.optional_deps import web_ready
 
 if TYPE_CHECKING:
     pass
+
+HAS_WEB, WEB_SKIP_REASON = web_ready()
+WEB_SKIP_REASON = WEB_SKIP_REASON or "web deps missing"
+WEB_REQUIRED = pytest.mark.skipif(not HAS_WEB, reason=WEB_SKIP_REASON)
 
 
 class TestEvalRequest:
@@ -175,6 +180,7 @@ class TestRunFilters:
         assert filters.run_mode == "simple"
 
 
+@WEB_REQUIRED
 class TestWebUIAdapter:
     """WebUIAdapter 테스트."""
 
@@ -239,6 +245,7 @@ class TestWebUIAdapter:
         assert len(descriptions["faithfulness"]) > 0
 
 
+@WEB_REQUIRED
 class TestWebSession:
     """WebSession 테스트."""
 
@@ -297,6 +304,7 @@ class TestWebSession:
         assert "answer_relevancy" in metrics
 
 
+@WEB_REQUIRED
 class TestStreamlitApp:
     """Streamlit 앱 테스트."""
 
@@ -315,6 +323,7 @@ class TestStreamlitApp:
         assert callable(create_app)
 
 
+@WEB_REQUIRED
 class TestWebComponents:
     """웹 컴포넌트 테스트."""
 
@@ -325,6 +334,7 @@ class TestWebComponents:
         assert components is not None
 
 
+@WEB_REQUIRED
 class TestTheme:
     """테마 설정 테스트."""
 
@@ -377,6 +387,7 @@ class TestTheme:
         assert get_metric_color("unknown_metric") == COLORS["primary"]
 
 
+@WEB_REQUIRED
 class TestWebUIAdapterRunEvaluation:
     """WebUIAdapter.run_evaluation() 테스트."""
 
@@ -582,6 +593,7 @@ class TestWebUIAdapterRunEvaluation:
         mock_storage.save_run.assert_called_once()
 
 
+@WEB_REQUIRED
 class TestWebUIAdapterImprovementGuide:
     """WebUIAdapter.get_improvement_guide() 테스트."""
 
@@ -645,6 +657,7 @@ class TestWebUIAdapterImprovementGuide:
             adapter.get_improvement_guide("nonexistent-run")
 
 
+@WEB_REQUIRED
 class TestWebUIAdapterQualityGate:
     """WebUIAdapter.check_quality_gate() 테스트."""
 

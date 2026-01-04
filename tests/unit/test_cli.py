@@ -23,6 +23,7 @@ from evalvault.domain.entities import (
     TestCase,
     TestCaseResult,
 )
+from tests.optional_deps import sklearn_ready
 from tests.unit.conftest import get_test_model
 
 
@@ -38,6 +39,9 @@ HISTORY_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.history"
 ANALYZE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.analyze"
 PIPELINE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.pipeline"
 GATE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.gate"
+
+HAS_SKLEARN, SKLEARN_SKIP_REASON = sklearn_ready()
+SKLEARN_SKIP_REASON = SKLEARN_SKIP_REASON or "scikit-learn unavailable"
 GENERATE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.generate"
 EXPERIMENT_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.experiment"
 KG_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.kg"
@@ -3329,6 +3333,7 @@ class TestCLIPhoenixUtilities:
 
         return FakeDataset()
 
+    @pytest.mark.skipif(not HAS_SKLEARN, reason=SKLEARN_SKIP_REASON)
     @pytest.mark.requires_openai
     @patch("evalvault.adapters.inbound.cli.commands.phoenix._import_phoenix_client")
     def test_phoenix_export_embeddings_csv(self, mock_client_factory, fake_dataset, tmp_path):

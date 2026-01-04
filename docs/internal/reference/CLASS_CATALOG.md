@@ -407,7 +407,7 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 
 비즈니스 규칙을 포함하는 핵심 엔티티들입니다.
 
-**해당 클래스**: [2.1.1 Domain Entities](#211-domain-entities-domain-엔티티) 참조
+**해당 클래스**: [2.1.1 Domain Entities](#211-domain-entities-도메인-엔티티) 참조
 
 ### 3.2 Use Cases (유스 케이스 계층)
 

@@ -90,9 +90,11 @@ markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 3
+      slugify: !!python/name:evalvault.mkdocs_helpers.unicode_slugify
+      separator: "-"
 
 nav:
-  - Home: README.md
+  - Home: INDEX.md
   - Getting Started:
     - Installation: getting-started/INSTALLATION.md
     - Quickstart: tutorials/01-quickstart.md
