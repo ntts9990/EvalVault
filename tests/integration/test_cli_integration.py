@@ -7,6 +7,7 @@
 """
 
 import json
+from importlib.metadata import version as get_version
 from pathlib import Path
 
 import pytest
@@ -68,7 +69,8 @@ class TestCLIProfileIntegration:
         result = runner.invoke(app, ["--version"])
 
         assert result.exit_code == 0
-        assert "0.1.0" in result.stdout
+        expected_version = get_version("evalvault")
+        assert expected_version in result.stdout
 
     def test_run_with_retriever_populates_contexts(self, tmp_path: Path):
         dataset_path = tmp_path / "dataset.json"
