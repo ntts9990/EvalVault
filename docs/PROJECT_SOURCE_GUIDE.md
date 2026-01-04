@@ -123,13 +123,15 @@
 
 ---
 
-## 7) 검증 필요
+## 7) 검증 완료
 
-- Query 기반 파이프라인 설계 문서의 의도/노드 정의가 `PipelineTemplateRegistry` 기본 템플릿과 일치하는지 확인이 필요하다. 불일치가 있으면 문서·코드 중 기준을 먼저 확정해야 한다.
-- `PipelineOrchestrator`가 템플릿이 없는 의도에서 빈 파이프라인을 생성하는 정책이 설계 문서의 기대와 부합하는지 확인이 필요하다. 빈 파이프라인이 허용되는지, 혹은 최소 노드를 강제할지 판단해야 한다.
-- 모듈이 등록되지 않았을 때 노드 실행이 `FAILED`로 처리되는 동작이 운영 시나리오에 맞는지 확인이 필요하다. 실패 전파 방식과 사용자 메시지 수준도 함께 점검해야 한다.
+다음 항목들은 2026-01-04 검증되어 설계 문서에 정책이 명시되었다:
+
+- ✅ Query 기반 파이프라인 설계 문서의 의도/노드 정의가 `PipelineTemplateRegistry` 기본 템플릿과 일치함을 확인했다. 12개 `AnalysisIntent` 모두 문서와 코드가 동일하다.
+- ✅ `PipelineOrchestrator`의 빈 파이프라인 정책이 설계 문서 섹션 3.5에 명시되었다. 빈 파이프라인은 허용되며, 점진적 구현과 테스트 용도로 사용된다.
+- ✅ 모듈 미등록 시 `FAILED` 처리 동작이 설계 문서 섹션 3.5에 명시되었다. 실패 전파 방식(후속 노드 SKIPPED)과 에러 메시지 형식이 문서화되었다.
 
 근거
-- docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md
+- docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md (섹션 3.5 파이프라인 정책)
 - src/evalvault/domain/services/pipeline_template_registry.py
 - src/evalvault/domain/services/pipeline_orchestrator.py

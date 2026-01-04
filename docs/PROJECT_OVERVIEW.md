@@ -89,9 +89,18 @@ EvalVault는 Hexagonal Architecture를 채택해 도메인 로직을 외부 시�
 
 ---
 
-## 7) 검증 필요
+## 7) 검증 현황
 
-Phoenix 플레이북에 표기된 Phoenix/EvalVault 버전이 최신 릴리스 태그와 일치하는지 확인이 필요하다. ROADMAP에 표시된 커버리지/LOC 재측정 값이 최신 테스트 기준으로 업데이트됐는지 검증해야 한다. ROADMAP의 요구사항 커버리지 수치가 최근 실행 결과와 부합하는지 점검이 필요하다. 내부 상태 문서에 적힌 run_id와 보고서 경로가 실제로 접근 가능하고 재현 가능한지 확인이 필요하다. Web UI 보고서/Domain Memory 인사이트의 제공 범위가 사용자 가이드·STATUS 문서의 제한 사항과 실제 동작이 일치하는지 검증이 필요하다.
+### 검증 완료 (2026-01-04)
+
+- ✅ Phoenix 플레이북 버전 표기 확인: `Phoenix 12.27.0 · EvalVault 3.2` (OBSERVABILITY_PLAYBOOK.md:3)
+
+### 검증 필요
+
+- ROADMAP에 표시된 커버리지/LOC 재측정 값이 최신 테스트 기준으로 업데이트됐는지 검증해야 한다.
+- ROADMAP의 요구사항 커버리지 수치가 최근 실행 결과와 부합하는지 점검이 필요하다.
+- 내부 상태 문서에 적힌 run_id와 보고서 경로가 실제로 접근 가능하고 재현 가능한지 확인이 필요하다.
+- Web UI 보고서/Domain Memory 인사이트의 제공 범위가 사용자 가이드·STATUS 문서의 제한 사항과 실제 동작이 일치하는지 검증이 필요하다.
 
 근거
 - docs/guides/OBSERVABILITY_PLAYBOOK.md
