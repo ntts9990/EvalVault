@@ -9,6 +9,200 @@
 
 5개 작업을 병렬로 진행하며, 파일 충돌을 최소화하기 위해 각 작업의 수정 범위를 명확히 정의합니다.
 
+---
+
+## RAG 성능 확장 (R1-R4) 병렬 계획
+
+### 작업 요약
+
+| ID | 작업 | 의존성 | 병렬화 |
+|----|------|--------|--------|
+| R1 | 하이브리드 서치 평가 파이프라인 통합 | 없음 | ✅ 독립 |
+| R2 | GraphRAG 스타일 검색 최적화 | 없음 | ✅ 독립 |
+| R3 | 1000건 대규모 문서 처리 최적화 | R2 이후 | ⚠️ 순차 |
+| R4 | 하이브리드 서치 벤치마크 도구 | 없음 | ✅ 독립 |
+
+### 병렬 트랙 배치
+
+| Track | 범위 | 작업 |
+|-------|------|------|
+| A | 파이프라인/포트 | R1 (RetrieverPort, evaluator 연결) |
+| B | GraphRAG 검색기 | R2 (GraphRAGRetriever 구현) |
+| C | 벤치마크 | R4 (benchmark CLI + runner) |
+| D | 대용량 최적화 | R3 (R2 완료 후 착수) |
+
+**상태 메모**
+- R1 완료 보고서: `docs/internal/R1_COMPLETION_REPORT.md`
+
+### 수정 범위 가이드 (충돌 최소화)
+
+| Track | 수정 가능 | 수정 금지 |
+|-------|-----------|----------|
+| A | `domain/services/`, `ports/outbound/`, `adapters/inbound/cli/` | `adapters/outbound/kg/` |
+| B | `adapters/outbound/kg/`, `ports/outbound/` | `adapters/inbound/cli/` |
+| C | `adapters/inbound/cli/`, `domain/services/benchmark/` | `adapters/outbound/kg/` |
+| D | `adapters/outbound/kg/`, `adapters/outbound/nlp/` | `adapters/inbound/cli/` |
+
+### 공통 원칙 (아키텍처/TDD/YAGNI)
+
+- **Hexagonal/클린**: Retriever 인터페이스는 `ports`에 정의하고, 구현은 `adapters`에 위치.
+- **TDD**: 신규 서비스/러너는 단위 테스트부터 추가하고 CLI는 통합 테스트로 검증.
+- **YAGNI**: 고급 옵션은 플래그로 감싸고 기본 경로가 먼저 동작하도록 구현.
+
+---
+
+## Track별 사전 준비 (Codex CLI 가이드)
+
+### 공통 준비
+
+- 최신 `docs/ROADMAP.md`, `docs/internal/DEVELOPMENT_GUIDE.md`, `docs/internal/PARALLEL_WORK_PLAN.md` 확인
+- 충돌 방지 매트릭스의 **수정 금지 영역** 확인
+- 테스트용 최소 fixture(1~2개 케이스) 마련 위치 결정 (`tests/fixtures/` 우선)
+
+### Track A (R1: 파이프라인/포트)
+
+**필수 확인**
+- `src/evalvault/domain/services/evaluator.py` (평가 플로우)
+- `src/evalvault/ports/outbound/` (새 `RetrieverPort` 위치)
+- `src/evalvault/adapters/inbound/cli/commands/run.py` (옵션 추가 위치)
+- `src/evalvault/adapters/outbound/nlp/korean/*` (기존 retriever 구현)
+
+**사전 결정**
+- `RetrieverPort` 최소 시그니처 (search/top_k/metadata)
+- contexts 자동 생성 기준 (contexts 비어있을 때만 적용)
+- StageEvent 기록 필드 (`doc_ids`, `scores`, `top_k` 필수)
+
+**준비 테스트**
+- 단위 테스트: retriever 주입 경로 + contexts 채움 확인
+- 통합 테스트: CLI 옵션 동작 및 기존 동작 회귀 없음
+
+### Track B (R2: GraphRAG 검색기)
+
+**필수 확인**
+- `src/evalvault/adapters/outbound/kg/` (KG 저장/조회)
+- `src/evalvault/domain/services/entity_extractor.py` (엔티티 추출)
+- `src/evalvault/domain/services/query_strategies.py` (쿼리 확장 패턴)
+- `src/evalvault/adapters/outbound/nlp/korean/dense_retriever.py`
+
+**사전 결정**
+- GraphRAG Retriever 최소 기능 (KG + Dense + BM25 RRF)
+- 서브그래프 추출 방식 (depth, hop 제한)
+- 신규 의존성 추가 여부 (python-louvain 등은 optional)
+
+**준비 테스트**
+- 단위 테스트: GraphRAGRetriever.search() 결과 스키마
+- 최소 KG fixture 준비 (소규모 그래프 JSON)
+
+### Track C (R4: 벤치마크 도구)
+
+**필수 확인**
+- `src/evalvault/adapters/inbound/cli/commands/benchmark.py`
+- `src/evalvault/domain/services/benchmark_runner.py` (유사 패턴 재사용)
+- `tests/unit/test_benchmark_runner.py` (출력 포맷 참고)
+
+**사전 결정**
+- ground_truth 스키마 (query → relevant_doc_ids)
+- 출력 JSON/CSV 포맷 고정 (methods_compared/results/overall)
+- 메트릭 계산 대상 (Recall@K, MRR, nDCG@K)
+
+**준비 테스트**
+- 단위 테스트: 메트릭 계산 정확성 (작은 fixture)
+- CLI 테스트: 출력 파일 생성 및 스키마 검증
+
+### Track D (R3: 대용량 최적화, R2 이후)
+
+**필수 확인**
+- `src/evalvault/adapters/outbound/kg/graph_rag_retriever.py` (R2 산출물)
+- `src/evalvault/adapters/outbound/nlp/korean/dense_retriever.py`
+- `src/evalvault/adapters/outbound/dataset/streaming_loader.py`
+
+**사전 결정**
+- 배치 처리/캐싱 적용 위치
+- 성능 측정 기준 (1000건 문서, p95 latency)
+- FAISS optional 사용 여부 및 미설치 fallback
+
+**준비 테스트**
+- 성능 스모크 테스트 스크립트 (로컬 기준, 단발성)
+- 메모리 사용량 지표 수집 방법 (간단 로그)
+
+---
+
+## 워크트리 운영 가이드 (병렬 Codex CLI)
+
+### 기본 규칙
+
+- 작업별 **브랜치 1개 + 워크트리 1개** 원칙 유지
+- 공용 문서(`docs/`, `README.md`, `pyproject.toml`) 수정은 사전 공유
+- worktree는 **커밋 기준**으로 생성됨 (로컬 변경사항은 자동 반영되지 않음)
+
+### 로컬 변경사항 처리 옵션
+
+- **옵션 A (권장)**: 현재 변경사항을 임시 브랜치로 커밋 → 모든 worktree의 베이스로 사용
+- **옵션 B**: 변경사항을 유지한 채 worktree 생성 후, 필요한 작업에만 cherry-pick
+
+### 권장 워크트리 구성 (예시)
+
+```bash
+# 현재 변경사항을 베이스로 만들고 싶을 때
+git switch -c wip/parallel-base
+git add docs/ && git commit -m "docs: update roadmap priorities"
+
+# worktree 생성
+git worktree add ../evalvault-r1 -b feat/r1-retriever wip/parallel-base
+git worktree add ../evalvault-r2 -b feat/r2-graphrag wip/parallel-base
+git worktree add ../evalvault-r4 -b feat/r4-benchmark wip/parallel-base
+# R3는 R2 완료 후
+```
+
+### Track별 첫 커밋 범위 (충돌 최소화)
+
+- **R1 (Track A)**: `ports/outbound/`, `domain/services/evaluator.py`, `adapters/inbound/cli/commands/run.py`, 테스트
+- **R2 (Track B)**: `adapters/outbound/kg/`, `ports/outbound/`, 단위 테스트
+- **R4 (Track C)**: `adapters/inbound/cli/`, `domain/services/benchmark/`, 단위 테스트
+- **R3 (Track D)**: `adapters/outbound/kg/`, `adapters/outbound/nlp/`, 성능 스모크 스크립트
+
+---
+
+## 병렬 작업 운영 규칙 (요약)
+
+목표: 충돌 최소화 + Hex/Clean/TDD/YAGNI/SOLID 정책 유지
+
+1) 사전 체크
+   - 수정 금지 영역 확인 (본 문서 "수정 범위 가이드" 기준)
+   - 상태/샘플 경로는 `docs/internal/STATUS.md`만 최신화
+
+2) 워크트리/브랜치
+   - 에이전트 1명당 브랜치 1개 + worktree 1개 원칙
+   - 공용 파일(`pyproject.toml`, `src/evalvault/__init__.py`, `src/evalvault/config/settings.py`, `README.md`) 수정은 사전 공유
+
+3) 수정 범위 고정
+   - 각 트랙의 수정 가능 영역만 변경
+   - CLI 변경은 P4.1 이후로 이관 (조율 필요)
+
+4) TDD/검증
+   - 신규 로직은 단위 테스트부터 추가
+   - 스모크/통합 테스트는 최소 fixture로 확인
+
+5) 산출물 관리
+   - run_id, DB, stage_events, stage_report 확보 후 경로만 문서화
+   - 리포트/DB 파일은 gitignore 대상이므로 경로 관리에 집중
+
+6) 핸드오프
+   - D1 요청 템플릿 그대로 전달
+   - O1은 `STATUS.md` 기준으로만 상태 갱신
+
+7) 충돌 대응
+   - 병합 전 `git status`로 작업 범위 점검
+   - 충돌 예상 시 오케스트레이터 조율 후 통합
+
+### 동시 가동 가능한 에이전트 (권장)
+
+| Phase | 동시 가동 | 비고 |
+| --- | --- | --- |
+| 1 | O1 + R1 + R2 + R4 | R3는 R2 완료 후 착수 |
+| 2 | O1 + R3 (+ R1/R2 회귀 대응) | R3 성능/대용량 경로 중심 |
+| 3 | O1 + D1 | R1~R3 샘플 확보 후 디버그 리포트 집중 |
+
 ### 작업 요약
 
 | ID | 작업 | 담당 영역 | 예상 규모 |
