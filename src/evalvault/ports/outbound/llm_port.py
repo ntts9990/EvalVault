@@ -51,7 +51,7 @@ class LLMPort(ABC):
         pass
 
     @abstractmethod
-    def as_ragas_llm(self):
+    def as_ragas_llm(self) -> Any:
         """Return the LLM instance compatible with Ragas.
 
         Ragas expects langchain LLM instances. This method should
