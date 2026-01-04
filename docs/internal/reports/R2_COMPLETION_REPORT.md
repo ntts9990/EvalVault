@@ -43,6 +43,19 @@
   - retriever docs: `tests/fixtures/e2e/graphrag_retriever_docs.json`
   - KG fixture: `tests/fixtures/kg/minimal_graph.json`
   - 참고: 영어 쿼리에서 Kiwi 토큰이 비어 BM25 경고가 발생했으며, regex fallback으로 해소
+  - StageEvent 확장 attributes 예시 (graphrag-smoke / test_case_id: graphrag-001)
+    ```json
+    {
+      "doc_ids": ["doc-001", "doc-002"],
+      "top_k": 5,
+      "scores": [0.016353781068217874, 0.01616869381279746],
+      "retrieval_time_ms": 1415.9693329129368,
+      "graph_nodes": 2,
+      "graph_edges": 1,
+      "subgraph_size": 3,
+      "community_id": null
+    }
+    ```
 - 비교 샘플(openai 프로필):
   - run_id: `fd810155-d69f-4c2c-944a-be960a32aa62`
   - DB: `reports/r2_graphrag_openai.db`
