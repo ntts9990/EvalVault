@@ -25,7 +25,7 @@ uv sync --extra dev
 pip을 사용하는 경우:
 
 ```bash
-python -m venv .venv
+uv venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```

@@ -1781,6 +1781,6 @@ EvalVault는 21주간의 개발을 통해 Phase 1-14를 모두 완료하고, 안
 ### 다음 단계
 
 - 📋 [IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md): 코드 품질 개선 계획
-- 🚀 [ROADMAP.md](./ROADMAP.md): 향후 개발 계획
+- 🚀 [ROADMAP.md](../../status/ROADMAP.md): 향후 개발 계획
 
 EvalVault를 사용해주셔서 감사합니다!

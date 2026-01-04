@@ -116,7 +116,7 @@ print(tokens)  # ['보험료', '얼마']
 토크나이저에 사전을 적용합니다:
 
 ```python
-from evalvault.domain.services.korean import KiwiTokenizer
+from evalvault.adapters.outbound.nlp.korean import KiwiTokenizer
 
 tokenizer = KiwiTokenizer(user_dict_path="user_dict.txt")
 ```

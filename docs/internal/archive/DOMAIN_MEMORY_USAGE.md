@@ -9,10 +9,10 @@
 | 문서 | 역할 | 설명 |
 |------|------|------|
 | **[DOMAIN_MEMORY_USAGE.md](./DOMAIN_MEMORY_USAGE.md)** (이 문서) | 현황 리포트 | 구현 상태, 사용법, 향후 개선 항목 정리 |
-| [USER_GUIDE.md](./USER_GUIDE.md#도메인-메모리-활용) | 사용자 가이드 | CLI/Python 관점에서 Domain Memory를 사용하는 절차 |
-| [tutorials/07-domain-memory.md](./tutorials/07-domain-memory.md) | 튜토리얼 | 단계별 실습 및 고급 활용법 |
-| [ARCHITECTURE.md](./ARCHITECTURE.md#46-도메인-메모리-활용-흐름-domain-memory-usage-flow) | 아키텍처 | Domain Memory 형성·활용 플로우 |
-| [CLI_GUIDE.md](./CLI_GUIDE.md#4-domain-memory-서브커맨드) | CLI 참조 | `evalvault domain memory` 하위 명령 모음 |
+| [USER_GUIDE.md](../../guides/USER_GUIDE.md#도메인-메모리-활용) | 사용자 가이드 | CLI/Python 관점에서 Domain Memory를 사용하는 절차 |
+| [tutorials/07-domain-memory.md](../../tutorials/07-domain-memory.md) | 튜토리얼 | 단계별 실습 및 고급 활용법 |
+| [ARCHITECTURE.md](../../architecture/ARCHITECTURE.md#46-도메인-메모리-활용-흐름-domain-memory-usage-flow) | 아키텍처 | Domain Memory 형성·활용 플로우 |
+| [CLI_GUIDE.md](../../guides/CLI_GUIDE.md#4-domain-memory-서브커맨드) | CLI 참조 | `evalvault domain memory` 하위 명령 모음 |
 
 ---
 

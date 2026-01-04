@@ -14,7 +14,7 @@
   1. `uv run pytest tests/unit/domain/services/test_improvement_guide_service.py tests/unit/test_evaluator.py tests/integration/test_full_workflow.py -v`
   2. `uv run pytest tests/unit/test_sqlite_storage.py tests/unit/test_postgres_storage.py -v`
   → 총 91개 케이스 green, P0/P1.2 안전망 확보.
-- **문서/템플릿 점검**: `docs/ARCHITECTURE.md`, `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`, `scripts/pipeline_template_inspect.py`의 최신성 확인.
+- **문서/템플릿 점검**: `docs/architecture/ARCHITECTURE.md`, `docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md`, `scripts/pipeline_template_inspect.py`의 최신성 확인.
 
 ---
 
@@ -40,7 +40,7 @@
   - `tests/unit/test_sqlite_storage.py`와 `tests/unit/test_postgres_storage.py`가 양쪽 동작을 보증.
 - **PostgreSQL 분석 저장 지원 (신규)**: `postgres_schema.sql`에 `analysis_results`/`analysis_reports` 스키마를 추가하고, PostgreSQL 어댑터에 `save_analysis`, `get_analysis`, `save_nlp_analysis` 등 SQLite와 동일한 API를 구현해 모든 분석 타입을 DB 간 일관되게 보존.
 - **파이프라인 모듈 ↔ 분석 어댑터 연동 (신규)**: `DataLoaderModule`이 StoragePort를 주입받아 `run_id` 기준으로 `EvaluationRun`을 로드하고, `StatisticalAnalyzerModule`이 `StatisticalAnalysisAdapter.analyze()`를 직접 호출해 통계 요약을 생성. CLI 파이프라인 명령은 SQLiteStorageAdapter를 전달하여 실제 평가 실행을 기반으로 DAG를 실행함.
-- **분석 파이프라인 경계**: `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`와 `scripts/pipeline_template_inspect.py`가 `Intent → ModuleCatalog → DAG` 순서를 텍스트/코드 양측에서 명문화하여 AI/휴먼이 동일한 플로우를 따를 수 있음.
+- **분석 파이프라인 경계**: `docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md`와 `scripts/pipeline_template_inspect.py`가 `Intent → ModuleCatalog → DAG` 순서를 텍스트/코드 양측에서 명문화하여 AI/휴먼이 동일한 플로우를 따를 수 있음.
 
 ### 2.4 의존성 방향 & 검증
 
@@ -79,7 +79,7 @@
 | **P1.3 분석 어댑터 통합** | ⏳ 미착수 | NLP/통계/인과 분석 어댑터는 여전히 중복 직렬화 로직을 포함. `AnalysisDataProcessor` 기반의 공용 계층 필요. |
 | **Postgres 분석 저장** | ⚠️ Gap | PostgreSQL 어댑터(`src/evalvault/adapters/outbound/storage/postgres_adapter.py`)는 아직 `analysis_results` 테이블/메서드가 없다. 향후 분석/리포트도 동일한 베이스 클래스로 이동 필요. |
 | **CLI 모듈화 (P2)** | ⚠️ Gap | `src/evalvault/adapters/inbound/cli.py`가 3k LOC. 구조 분할(명령/유틸/검증) 작업을 P2에서 시급히 진행해야 함. |
-| **Langfuse/Web 통합** | 🙂 우수 | `docs/QUERY_BASED_ANALYSIS_PIPELINE.md` + `Streamlit` 어댑터가 Hexagonal 패턴을 유지하며 Langfuse/웹 UI 기능과 독립적인 테스트 가능 구조를 유지. |
+| **Langfuse/Web 통합** | 🙂 우수 | `docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md` + `Streamlit` 어댑터가 Hexagonal 패턴을 유지하며 Langfuse/웹 UI 기능과 독립적인 테스트 가능 구조를 유지. |
 
 ---
 
@@ -95,6 +95,6 @@
    - Typer 앱을 `adapters/inbound/cli/app.py` + `commands/*.py` 구조로 나누고, 공통 포맷터/검증기를 `cli/utils`에 배치.
    - `tests/unit/test_cli.py`를 서브커맨드 단위로 재구성하여 회귀를 즉시 감지.
 4. **분석 Pipeline 문서 → 실행 스크립트 싱크 유지**
-   - `scripts/pipeline_template_inspect.py` 실행 결과를 `docs/QUERY_BASED_ANALYSIS_PIPELINE.md`와 연동하는 자동 체크(예: pre-commit script) 도입을 고려.
+   - `scripts/pipeline_template_inspect.py` 실행 결과를 `docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md`와 연동하는 자동 체크(예: pre-commit script) 도입을 고려.
 
 이상의 점검 결과를 기반으로, 추가 리팩토링·신규 기능을 Hexagonal + Clean 규율 안에서 안전하게 확장할 수 있습니다. P1.3 이후에는 P2 모듈 분리, P3 성능 최적화 순서대로 `docs/IMPROVEMENT_PLAN.md` 로드맵을 따라가면 됩니다.

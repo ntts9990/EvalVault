@@ -83,7 +83,7 @@ docker compose -f docker-compose.phoenix.yaml up -d
 pip install arize-phoenix
 
 # 로컬 서버 실행
-python -m phoenix.server.main serve
+uv run python -m phoenix.server.main serve
 ```
 
 ### 설치 확인

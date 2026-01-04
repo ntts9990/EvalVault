@@ -279,7 +279,8 @@ class MyCustomMetric:
 # src/evalvault/domain/metrics/__init__.py
 
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
-from evalvault.domain.metrics.my_metric import MyCustomMetric
+# MyCustomMetric 파일을 생성한 뒤 아래 라인을 추가하세요.
+# from evalvault.domain.metrics.my_metric import MyCustomMetric
 
 __all__ = ["InsuranceTermAccuracy", "MyCustomMetric"]
 ```

@@ -182,8 +182,8 @@ Use GitHub Flavored Markdown tables:
 Use relative paths for internal documentation:
 
 ```markdown
-See the [Architecture Guide](../ARCHITECTURE.md) for details.
-See the [Quickstart Tutorial](tutorials/01-quickstart.md).
+See the [Architecture Guide](../../architecture/ARCHITECTURE.md) for details.
+See the [Quickstart Tutorial](../../tutorials/01-quickstart.md).
 ```
 
 #### External Links
@@ -265,8 +265,8 @@ Example:
 
 ## Next Steps
 
-- Learn about [Custom Metrics](03-custom-metrics.md)
-- Explore [Phoenix Integration](04-phoenix-integration.md)
+- Learn about [Custom Metrics](../../tutorials/03-custom-metrics.md)
+- Explore [Phoenix Integration](../../tutorials/04-phoenix-integration.md)
 ```
 
 ### API Documentation
@@ -478,8 +478,8 @@ Loaded 10 test cases
 
 Now that you've run your first evaluation, try:
 
-- [Adding Custom Metrics](03-custom-metrics.md)
-- [Enabling Phoenix Tracing](04-phoenix-integration.md)
+- [Adding Custom Metrics](../../tutorials/03-custom-metrics.md)
+- [Enabling Phoenix Tracing](../../tutorials/04-phoenix-integration.md)
 ```
 
 ### Bad Documentation Example

@@ -5,7 +5,7 @@
 > **산출물**:
 > - A 문서: `docs/PROJECT_OVERVIEW.md` (목표/추상화/큰 그림)
 > - B 문서: `docs/PROJECT_SOURCE_GUIDE.md` (소스 레벨/구성/확장 지점)
-> **SSoT**: `docs/internal/STATUS.md` (내부 상태), `docs/README.md` (Docs Hub 인덱스)
+> **SSoT**: `docs/internal/status/STATUS.md` (내부 상태), `docs/README.md` (Docs Hub 인덱스)
 
 ---
 
@@ -27,16 +27,16 @@
 
 **필수 입력 (우선순위)**
 - `docs/README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/ROADMAP.md`
-- `docs/STATUS.md`
-- `docs/USER_GUIDE.md`
-- `docs/DEV_GUIDE.md`
-- `docs/OBSERVABILITY_PLAYBOOK.md`
-- `docs/internal/DEVELOPMENT_GUIDE.md`
-- `docs/internal/FEATURE_SPECS.md`
-- `docs/internal/ARCHITECTURE_C4.md`
-- `docs/internal/STATUS.md`
+- `docs/architecture/ARCHITECTURE.md`
+- `docs/status/ROADMAP.md`
+- `docs/status/STATUS.md`
+- `docs/guides/USER_GUIDE.md`
+- `docs/guides/DEV_GUIDE.md`
+- `docs/guides/OBSERVABILITY_PLAYBOOK.md`
+- `docs/internal/reference/DEVELOPMENT_GUIDE.md`
+- `docs/internal/reference/FEATURE_SPECS.md`
+- `docs/internal/reference/ARCHITECTURE_C4.md`
+- `docs/internal/status/STATUS.md`
 
 **산출물 구성 (A 문서)**
 1. 프로젝트 미션/문제정의
@@ -62,10 +62,10 @@
 - `src/evalvault/config/`
 - `config/models.yaml`
 - `pyproject.toml`
-- `docs/CLI_GUIDE.md`
+- `docs/guides/CLI_GUIDE.md`
 - `docs/tutorials/`
-- `docs/internal/CLASS_CATALOG.md`
-- `docs/internal/QUERY_BASED_ANALYSIS_PIPELINE.md`
+- `docs/internal/reference/CLASS_CATALOG.md`
+- `docs/internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md`
 
 **산출물 구성 (B 문서)**
 1. 레포 구조 요약 (핵심 디렉터리 역할)
@@ -90,7 +90,7 @@
 ## 4) 검색/확인 체크리스트
 
 - docs 허브 최신화 확인: `docs/README.md`
-- 최신 상태 문서 확인: `docs/internal/STATUS.md`
+- 최신 상태 문서 확인: `docs/internal/status/STATUS.md`
 - 주요 진입점:
   - CLI: `src/evalvault/adapters/inbound/cli/`
   - 평가/서비스: `src/evalvault/domain/services/`

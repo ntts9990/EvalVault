@@ -8,7 +8,7 @@ EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있
 
 | 영역 | 설명 | 엔트리 포인트 |
 |------|------|---------------|
-| 루트 명령 | `run`, `gate`, `generate`, `pipeline`, `analyze`, `experiment`, `agent`, `config`, `web`, `langfuse`, `stage` | `register_all_commands()` |
+| 루트 명령 | `init`, `run`, `gate`, `generate`, `pipeline`, `analyze`, `experiment`, `agent`, `config`, `web`, `langfuse`, `stage` | `register_all_commands()` |
 | 서브앱 | `domain`, `kg`, `benchmark` | `attach_sub_apps()` |
 | 공통 옵션 | `--profile/-p`, `--db/-D`, `--memory-db/-M` | `cli/utils/options.py` |
 
@@ -33,6 +33,16 @@ $ evalvault kg stats ./docs --use-llm --profile dev
 ---
 
 ## 3. 대표 명령 요약
+
+### 3.0 `init` (프로젝트 초기화)
+```bash
+uv run evalvault init
+uv run evalvault init --output-dir ./my-project
+uv run evalvault init --skip-env --skip-sample
+```
+- `.env` 템플릿과 `sample_dataset.json`을 생성해 빠르게 시작할 수 있게 합니다.
+- `--output-dir`로 생성 위치를 지정할 수 있습니다.
+- `--skip-env` 또는 `--skip-sample`로 단계별 생성을 끌 수 있습니다.
 
 ### 3.1 `run`
 ```bash
@@ -67,6 +77,18 @@ evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   - `--kg`: GraphRAG용 Knowledge Graph JSON 파일을 지정합니다.
   - `--stream` 모드에서는 retriever 적용을 건너뜁니다.
 - `run-simple`/`run-full`에서도 동일한 retriever 옵션을 사용할 수 있습니다.
+
+#### Evaluation Presets
+
+| 프리셋 | 설명 | 기본 메트릭 |
+|--------|------|-------------|
+| `quick` | 빠른 반복 평가 | `faithfulness` |
+| `production` | 프로덕션 밸런스 | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall` |
+| `comprehensive` | 전체 메트릭 평가 | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity` |
+
+- `--preset`을 지정하면 메트릭/병렬 처리 설정을 기본값으로 적용합니다.
+- `--metrics`를 명시하면 프리셋 메트릭을 덮어씁니다.
+- `--batch-size`는 `-b` 단축 옵션을 지원합니다.
 
 예시:
 

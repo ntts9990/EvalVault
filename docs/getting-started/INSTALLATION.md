@@ -28,6 +28,7 @@ uv sync --extra dev
 | `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
+| `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 추적/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
 

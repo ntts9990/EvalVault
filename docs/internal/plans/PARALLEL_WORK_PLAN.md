@@ -357,9 +357,9 @@ cli/utils/
 ### 산출물
 
 - [ ] 짧은 옵션 별칭 전체 적용
-- [ ] `--preset` 옵션 (production, quick, comprehensive)
+- [x] `--preset` 옵션 (production, quick, comprehensive)
 - [ ] 사용자 친화적 에러 메시지
-- [ ] `evalvault init` 명령어
+- [x] `evalvault init` 명령어
 
 ---
 

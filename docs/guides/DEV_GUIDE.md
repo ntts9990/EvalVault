@@ -21,6 +21,7 @@ uv sync --extra dev
 - `--extra analysis`: 통계/NLP 분석 보조
 - `--extra postgres`: PostgreSQL 저장소
 - `--extra mlflow`: MLflow tracker
+- `--extra docs`: MkDocs 문서 빌드
 
 ---
 
@@ -53,7 +54,8 @@ uv run evalvault web
 
 - "내부 상태"는 [internal/status/STATUS.md](../internal/status/STATUS.md)가 단일 출처(SSoT)입니다.
 - 사용자 문서는 `README.ko.md`(루트)/`docs/guides/USER_GUIDE.md`/`docs/tutorials/`에, 내부 설계/운영은 `docs/internal/`에 둡니다.
-- 새 문서를 추가하면 [INDEX.md](../INDEX.md)에 링크를 반드시 추가합니다.
+ - 새 문서를 추가하면 [README.md](../README.md)와 `mkdocs.yml` 네비게이션을 함께 갱신합니다.
+ - [INDEX.md](../INDEX.md)는 README 안내용으로 유지합니다.
 
 ---
 

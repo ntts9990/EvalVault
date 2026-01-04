@@ -10,14 +10,14 @@
 
 | 문서 | 역할 | 설명 |
 |------|------|------|
-| [ROADMAP.md](./ROADMAP.md) | 전체 로드맵 | 현재 상태 요약 + 향후 개발 계획 |
+| [ROADMAP.md](../../status/ROADMAP.md) | 전체 로드맵 | 현재 상태 요약 + 향후 개발 계획 |
 | **[IMPROVEMENT_PLAN.md](./IMPROVEMENT_PLAN.md)** (이 문서) | 개선 계획 | 코드 품질 개선 계획 (병렬 AI 에이전트 기반) |
 | [COMPLETED.md](./COMPLETED.md) | 완료 기록 | Phase 1-14 달성 기록 (상세) |
-| [AGENT_STRATEGY.md](./AGENT_STRATEGY.md) | 에이전트 전략 | 전체 에이전트 활용 전략 (개발+운영) |
-| [agent/README.md](../agent/README.md) | 에이전트 사용법 | 에이전트 시스템 사용법 |
+| [AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md) | 에이전트 전략 | 전체 에이전트 활용 전략 (개발+운영) |
+| [agent/README.md](../../../agent/README.md) | 에이전트 사용법 | 에이전트 시스템 사용법 |
 | [PARALLEL_WORK_PLAN.md](./PARALLEL_WORK_PLAN.md) | 병렬 작업 계획 | 병렬 개발 작업 추적 (임시 문서) |
 | [PARALLEL_STATUS.md](./PARALLEL_STATUS.md) | 병렬 작업 상태 | 병렬 작업 진행 상황 (임시 문서) |
-| [OBSERVABILITY_PLAYBOOK.md](./OBSERVABILITY_PLAYBOOK.md) | 옵저버빌리티 가이드 | Phoenix Drift Watcher, 릴리즈 노트, Domain Memory 오버레이 절차 |
+| [OBSERVABILITY_PLAYBOOK.md](../../guides/OBSERVABILITY_PLAYBOOK.md) | 옵저버빌리티 가이드 | Phoenix Drift Watcher, 릴리즈 노트, Domain Memory 오버레이 절차 |
 
 > **참고**: `PARALLEL_WORK_PLAN.md`와 `PARALLEL_STATUS.md`는 병렬 작업 완료 후 정리 또는 삭제 예정입니다.
 
@@ -72,7 +72,7 @@ EvalVault는 현재 Phase 1-14가 완료되어 안정적인 기반을 갖추었�
 
 ## 에이전트 시스템 개요
 
-> 📌 **상세 전략**: [AGENT_STRATEGY.md](./AGENT_STRATEGY.md) 참조
+> 📌 **상세 전략**: [AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md) 참조
 
 ### 두 가지 운영 모드
 
@@ -108,7 +108,7 @@ EvalVault 에이전트 시스템은 **두 가지 모드**로 활용됩니다:
 | 모드 | 목적 | 대상 | 상태 | 문서 |
 |------|------|------|------|------|
 | **Development** | EvalVault 코드 개선 | 개발자 | ✅ 구현됨 | 이 문서 |
-| **Operation** | RAG 평가 워크플로우 자동화 | 평가 담당자 | 📋 제안 | [AGENT_STRATEGY.md](./AGENT_STRATEGY.md) |
+| **Operation** | RAG 평가 워크플로우 자동화 | 평가 담당자 | 📋 제안 | [AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md) |
 
 ### 에이전트 시스템 상태
 
@@ -445,7 +445,7 @@ CLI 명령어: 17개
   - `uv run pytest tests/unit/test_cli.py -k "generate or gate" -v` (15 passed)
   - `uv run pytest tests/unit/test_cli.py -k "experiment or benchmark or kg" -v` (16 passed)
   - `uv run pytest tests/unit/test_cli.py -v` (82 passed)
-- 다음 단계: Typer 콜백/전체 앱 구성을 패키지 수준에서 더 세분화해 서브커맨드 자동 등록, 공통 옵션 그룹 프리셋(--profile, --db 등)을 문서화하고, CLI 도움말 예제/사용법을 docs/CLI_GUIDE.md 형태로 제공
+- 다음 단계: Typer 콜백/전체 앱 구성을 패키지 수준에서 더 세분화해 서브커맨드 자동 등록, 공통 옵션 그룹 프리셋(--profile, --db 등)을 문서화하고, CLI 도움말 예제/사용법을 docs/guides/CLI_GUIDE.md 형태로 제공
 
 **목표 구조**:
 ```
@@ -566,8 +566,8 @@ evalvault run data.csv \
 
 | 단계 | 설명 | 산출물 | 담당 |
 |------|------|--------|------|
-| **Step 0: 선행 조건 정리** | P2.1 잔여 과제(공통 옵션 팩토리, Typer 서브커맨드 등록 자동화, CLI 가이드 초안)를 완료해 모든 명령이 동일한 옵션 세트를 재사용하도록 만든다. | `cli/utils/options.py` 보강, `docs/CLI_GUIDE.md` 초안 | `architecture`, `documentation` |
-| **Step 1: 모드 스펙 정의** | 심플/전체 모드가 각각 포함할 플래그, 기본값, Tracker/Domain Memory 연계 범위를 문서화한다. 심플 모드는 `evalvault run --mode simple` (또는 별칭 커맨드) 형태로 기본 metrics·Phoenix 추적·Domain Memory 비활성 프리셋을 제공하고, 전체 모드는 `evalvault run --mode full` 로 호출하며 기존 고급 옵션을 한 번에 노출한다. | `docs/IMPROVEMENT_PLAN.md`(본 섹션), `docs/CLI_GUIDE.md` 모드 테이블 | `architecture`, `documentation` |
+| **Step 0: 선행 조건 정리** | P2.1 잔여 과제(공통 옵션 팩토리, Typer 서브커맨드 등록 자동화, CLI 가이드 초안)를 완료해 모든 명령이 동일한 옵션 세트를 재사용하도록 만든다. | `cli/utils/options.py` 보강, `docs/guides/CLI_GUIDE.md` 초안 | `architecture`, `documentation` |
+| **Step 1: 모드 스펙 정의** | 심플/전체 모드가 각각 포함할 플래그, 기본값, Tracker/Domain Memory 연계 범위를 문서화한다. 심플 모드는 `evalvault run --mode simple` (또는 별칭 커맨드) 형태로 기본 metrics·Phoenix 추적·Domain Memory 비활성 프리셋을 제공하고, 전체 모드는 `evalvault run --mode full` 로 호출하며 기존 고급 옵션을 한 번에 노출한다. | `docs/IMPROVEMENT_PLAN.md`(본 섹션), `docs/guides/CLI_GUIDE.md` 모드 테이블 | `architecture`, `documentation` |
 | **Step 2: CLI 구현** | ✅ (2026-01-07) Typer `run --mode` 프리셋, Phoenix/Domain Memory 옵션 자동화, 경고 배너 제공. | `commands/run.py`, `cli/utils/options.py`, 테스트(`tests/unit/test_cli.py::TestCLIRunModes`) | `architecture` |
 | **Step 3: UX 개선과 연동** | ✅ (2026-01-07) 심플 모드 전용 메시지/경고, Tracker·Prompt 메타데이터 제약, `history` 명령 & Streamlit History/Reports에 “Mode” 컬럼 노출. | `commands/history.py`, `adapters/inbound/web/**` | `documentation`, `architecture` |
 | **Step 4: 검증 & 문서화** | ✅ (2026-01-07) `tests/unit/test_cli.py -k history`, `tests/unit/test_web_history.py`, `tests/unit/test_web_ui.py` 회귀 추가. README/CLI 가이드 TODO(별도 PR)이나 UI/CLI 출력은 이미 모드 정보를 포함. | 테스트 케이스, History UI, CSV/JSON Export | `testing`, `documentation` |
@@ -606,7 +606,7 @@ evalvault run data.csv \
 
 | ID | 범주 | 해야 할 일 | 산출물 | 담당 | 상태 |
 |----|------|-----------|--------|------|------|
-| UX-1 | CLI 문서 | `README.md`, `README.ko.md`, `docs/CLI_GUIDE.md`에 `--mode`, `history --mode`, Streamlit Mode 표시 캡처를 추가하고, 심플/전체 모드 비교표와 FAQ를 배치한다. | 갱신된 문서 + 캡처 3종 | `documentation` | ✅ (2026-01-07) |
+| UX-1 | CLI 문서 | `README.md`, `README.ko.md`, `docs/guides/CLI_GUIDE.md`에 `--mode`, `history --mode`, Streamlit Mode 표시 캡처를 추가하고, 심플/전체 모드 비교표와 FAQ를 배치한다. | 갱신된 문서 + 캡처 3종 | `documentation` | ✅ (2026-01-07) |
 | UX-2 | Typer UX | `evalvault run` 도움말을 `Simple mode / Full mode` 섹션으로 그룹화하고, `evalvault run simple/full` 별칭을 `app.py`에 추가해 초보자 온보딩 명령을 단축한다. | Typer 도움말, `--help` 스냅샷, `tests/unit/test_cli.py::TestCLIRunModes` 보강 | `architecture` | ✅ (2026-01-07) |
 | UX-3 | 에러/Progress | P4.2~P4.3 요구사항을 기반으로 `src/evalvault/adapters/inbound/cli/console.py`(예시) 에 공통 경고/에러 템플릿 + Rich Progress를 이식하고, 모드별 메시지 샘플을 정의한다. | 공통 템플릿 모듈, CLI 캡처, 회귀 테스트 | `architecture`, `documentation` | ✅ (2026-01-07) |
 | UX-4 | Web UI 연동 | Streamlit Run/Reports 페이지에 `mode` 선택 토글 + 서머리 Pill을 추가하고, 세션 상태에 모드를 저장해 향후 재실행/서버 랭킹에 활용한다. | `web/components/run.py`, `web/pages/history.py` 업데이트, `tests/unit/test_web_ui.py` 추가 케이스 | `web`, `architecture` | ✅ (2026-01-07) |
@@ -849,7 +849,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 2. **Sprint 2**: 우선순위 3~5 (데이터 커버리지, 복잡 쿼리 전략, 드리프트 감시)
 3. **Sprint 3**: 우선순위 6~9 (리포트/비용/프롬프트/회귀 자동화)
 
-각 스프린트 종료 시 Phoenix 대시보드에 전용 뷰(클러스터 태그, 비교 결과, 드리프트 경보)를 추가하고 `docs/OBSERVABILITY_PLAYBOOK.md`를 동기화합니다.
+각 스프린트 종료 시 Phoenix 대시보드에 전용 뷰(클러스터 태그, 비교 결과, 드리프트 경보)를 추가하고 `docs/guides/OBSERVABILITY_PLAYBOOK.md`를 동기화합니다.
 
 #### 7.8 요구되는 보조 기능
 
@@ -900,7 +900,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 4. **Sprint D (P4)**: Dataset 이벤트 기반 회귀 파이프라인 → Phoenix가 회귀 트리거를 제공, EvalVault가 실행.
 5. **Sprint E (P5)**: Phoenix 메타데이터 ↔ EvalVault Insight 통합 → Web UI/리포트에 Phoenix 지표 탑재.
 
-각 스프린트 종료 시 Phoenix README/Docs 기준 기능이 EvalVault 내 어디에 연결됐는지 ADR을 작성하고, `docs/OBSERVABILITY_PLAYBOOK.md`에 운영 절차를 업데이트합니다.
+각 스프린트 종료 시 Phoenix README/Docs 기준 기능이 EvalVault 내 어디에 연결됐는지 ADR을 작성하고, `docs/guides/OBSERVABILITY_PLAYBOOK.md`에 운영 절차를 업데이트합니다.
 
 ##### P1 세부 범위 (엔드-투-엔드 트레이싱 확장)
 
@@ -954,7 +954,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
   1. `src/evalvault/domain/services/prompt_manifest.py`: Prompt 경로 정규화, checksum 저장, diff 요약, manifest load/save 유틸.
   2. `uv run evalvault phoenix prompt-link` / `prompt-diff`: Prompt ↔ Phoenix ID 매핑, diff 요약(table/json), manifest 관리.
   3. `evalvault run --prompt-manifest/--prompt-files`: Prompt 파일 상태를 읽어 `result.tracker_metadata["phoenix"]["prompts"]`에 status/checksum/diff를 저장.
-  4. README(en/ko), `docs/OBSERVABILITY_PLAYBOOK.md`(섹션 6), `docs/tutorials/04-phoenix-integration.md`가 동일 워크플로를 문서화.
+  4. README(en/ko), `docs/guides/OBSERVABILITY_PLAYBOOK.md`(섹션 6), `docs/tutorials/04-phoenix-integration.md`가 동일 워크플로를 문서화.
 - **운영 절차**
   1. Prompt 파일을 편집한 뒤 `phoenix prompt-link`로 Prompt ID/Experiment ID/메모를 manifest에 저장.
   2. 릴리즈 전 `phoenix prompt-diff agent/prompts/*.txt --manifest ... --format table`로 diff와 미동기화 파일을 점검.
@@ -966,7 +966,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 ##### Phoenix Automation 업데이트 (2026-01-05)
 
 - **Trace Link Helper + Release Notes**: `evalvault.config.phoenix_support.extract_phoenix_links`/`format_phoenix_links`가 Langfuse 메타데이터, Slack 템플릿, 릴리즈 노트 스크립트(`scripts/reports/generate_release_notes.py`)에서 동일한 Trace/Dataset/Experiment 링크를 재활용하도록 표준화했습니다.
-- **Drift Watcher 확장**: `scripts/ops/phoenix_watch.py`가 `--drift-key`/`--drift-threshold`/`--gate-command`를 지원해 Embedding Drift 초과 시 Slack 경보와 `evalvault gate` 자동 실행을 보장합니다. 운영 절차는 `docs/OBSERVABILITY_PLAYBOOK.md`에 정리했습니다.
+- **Drift Watcher 확장**: `scripts/ops/phoenix_watch.py`가 `--drift-key`/`--drift-threshold`/`--gate-command`를 지원해 Embedding Drift 초과 시 Slack 경보와 `evalvault gate` 자동 실행을 보장합니다. 운영 절차는 `docs/guides/OBSERVABILITY_PLAYBOOK.md`에 정리했습니다.
 - **Domain Memory Overlay CLI**: `evalvault domain memory ingest-embeddings`는 `phoenix export-embeddings` 출력(CSV/Parquet)을 읽어 클러스터별 사실을 Domain Memory에 저장합니다. Dry-run으로 요약을 확인한 뒤 선택 도메인/언어로 주입할 수 있습니다.
 - **History/Web Surfacing**: `uv run evalvault history`와 Streamlit 대시보드(Home/History/Reports)가 Phoenix precision@k/Drift 지표와 Experiment 링크를 직접 노출해 CLI·웹 어디서든 Phoenix Embeddings 뷰로 전환할 수 있습니다.
 
@@ -994,7 +994,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 2. ✅ **P1 — Embedding Drift Watcher 확장**: `phoenix_watch.py`가 Threshold + Gate 자동화를 지원하고 OBSERVABILITY_PLAYBOOK에 문서화됨.
 3. ✅ **P2 — Domain Memory Overlay 파이프라인**: `evalvault domain memory ingest-embeddings`를 통해 Phoenix Cluster를 Domain Memory로 역주입.
 4. ✅ **P2 — Phoenix Experiment Sync Dashboard**: Streamlit Web UI와 `evalvault history` 명령이 Phoenix Experiment 메타데이터(precision@k, drift score)를 표 형태로 렌더링.
-5. ✅ **P3 — Phoenix Prompt Playground Loop**: Prompt manifest 서비스 + `evalvault phoenix prompt-link/prompt-diff` + `run --prompt-files` 옵션으로 Phoenix Prompt diff를 자동 기록하고 릴리즈 노트·Streamlit에 노출 (`README.*`, `docs/OBSERVABILITY_PLAYBOOK.md` 6장 참조).
+5. ✅ **P3 — Phoenix Prompt Playground Loop**: Prompt manifest 서비스 + `evalvault phoenix prompt-link/prompt-diff` + `run --prompt-files` 옵션으로 Phoenix Prompt diff를 자동 기록하고 릴리즈 노트·Streamlit에 노출 (`README.*`, `docs/guides/OBSERVABILITY_PLAYBOOK.md` 6장 참조).
 6. ✅ **P3 — Phoenix-triggered Regression Runner**: `scripts/tests/run_regressions.py` + `config/regressions/default.json`으로 회귀 스위트를 정의하고, Drift Watcher의 `--run-regressions` 플래그로 Phoenix 이벤트 발생 시 자동 실행되도록 연동함. Slack/Issue 로그에 회귀 결과가 함께 첨부되어 온콜이 단일 로그에서 이벤트 → 회귀 상태를 추적할 수 있음.
 
 ---
@@ -1003,7 +1003,7 @@ Context Precision: 0.45 → 0.78 (73% 개선)
 
 > **Priority**: 🟡 Medium
 > **담당 에이전트**: `architecture`, `rag-data`, `documentation`
-> **참조**: [DOMAIN_MEMORY_USAGE.md](./DOMAIN_MEMORY_USAGE.md), [tutorials/07-domain-memory.md](./tutorials/07-domain-memory.md), `commands/run.py`, `commands/domain.py`
+> **참조**: [DOMAIN_MEMORY_USAGE.md](./DOMAIN_MEMORY_USAGE.md), [tutorials/07-domain-memory.md](../../tutorials/07-domain-memory.md), `commands/run.py`, `commands/domain.py`
 
 #### 8.1 최신 구현 상태
 
@@ -1420,17 +1420,17 @@ def run(
 
 | 문서 | 설명 |
 |------|------|
-| **[AGENT_STRATEGY.md](./AGENT_STRATEGY.md)** | 🔑 **에이전트 종합 활용 전략** (개발+운영 모드) |
+| **[AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md)** | 🔑 **에이전트 종합 활용 전략** (개발+운영 모드) |
 | `docs/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md` | RAG 성능 데이터 수집 전략 |
 | `docs/OBSERVABILITY_PLATFORM_COMPARISON.md` | Phoenix vs LangFuse vs MLflow |
-| **[agent/README.md](../agent/README.md)** | 에이전트 시스템 사용법 |
+| **[agent/README.md](../../../agent/README.md)** | 에이전트 시스템 사용법 |
 | `agent/memory/README.md` | 에이전트 메모리 시스템 가이드 |
 | `agent/memory/shared/decisions.md` | 주요 결정 기록 |
 | `agent/memory/shared/dependencies.md` | 작업 의존성 |
 
 ### D. 운영 자동화 에이전트 (향후 구현)
 
-> 📌 상세 내용: [AGENT_STRATEGY.md](./AGENT_STRATEGY.md) 참조
+> 📌 상세 내용: [AGENT_STRATEGY.md](../reference/AGENT_STRATEGY.md) 참조
 
 개발 자동화가 완료되면, 다음 운영 자동화 에이전트를 추가할 수 있습니다:
 

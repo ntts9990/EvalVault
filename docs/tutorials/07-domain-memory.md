@@ -374,9 +374,9 @@ insights = analysis.generate_insights(
 
 ## 다음 단계
 
-- [USER_GUIDE.md](../USER_GUIDE.md)에서 더 자세한 사용법 확인
-- [DOMAIN_MEMORY_USAGE.md](../DOMAIN_MEMORY_USAGE.md)에서 구현 상세 확인
-- [ARCHITECTURE.md](../ARCHITECTURE.md)에서 아키텍처 이해
+- [USER_GUIDE.md](../guides/USER_GUIDE.md)에서 더 자세한 사용법 확인
+- [DOMAIN_MEMORY_USAGE.md](../internal/archive/DOMAIN_MEMORY_USAGE.md)에서 구현 상세 확인
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)에서 아키텍처 이해
 
 ---
 

@@ -402,10 +402,10 @@ volumes:
 docker compose up -d
 
 # 평가 실행
-docker compose run evalvault run /app/data/test.json --metrics faithfulness
+docker compose run evalvault uv run evalvault run /app/data/test.json --metrics faithfulness
 
 # 로그 확인
-docker compose logs -f evalvault
+docker compose logs -f
 ```
 
 ---
@@ -576,9 +576,9 @@ jobs:
 
 모든 튜토리얼을 완료하셨습니다. 추가 정보가 필요하시면:
 
-- [사용자 가이드](../USER_GUIDE.md) - 상세 기능 설명
-- [아키텍처 가이드](../ARCHITECTURE.md) - 시스템 구조 이해
-- [로드맵](../ROADMAP.md) - 향후 계획
+- [사용자 가이드](../guides/USER_GUIDE.md) - 상세 기능 설명
+- [아키텍처 가이드](../architecture/ARCHITECTURE.md) - 시스템 구조 이해
+- [로드맵](../status/ROADMAP.md) - 향후 계획
 
 ---
 

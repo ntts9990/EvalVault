@@ -11,7 +11,7 @@
 - **수행 범위**:
   - `src/evalvault/adapters/inbound/web/components/history.py` / `reports.py` UI 확장.
   - Prompt metadata 직렬화(`tracker_metadata["phoenix"]["prompts"]`)에 `content_preview` 또는 diff 문자열 포함.
-  - 문서 업데이트: `docs/OBSERVABILITY_PLAYBOOK.md` Prompt 루프 챕터에 새 UI 스크린샷/설명 추가.
+  - 문서 업데이트: `docs/guides/OBSERVABILITY_PLAYBOOK.md` Prompt 루프 챕터에 새 UI 스크린샷/설명 추가.
 - **완료 기준**:
   - Prompt 파일을 수정한 뒤 Streamlit에서 행 클릭 → 모달에서 diff와 본문이 즉시 노출.
   - Slack/릴리즈 노트가 동일 정보를 제공하고, Prompt drift 대응 시간이 단축되었다는 QA 확인.
