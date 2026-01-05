@@ -19,6 +19,7 @@ def get_config():
             "openai_api_key",
             "anthropic_api_key",
             "azure_api_key",
+            "vllm_api_key",
             "langfuse_secret_key",
             "phoenix_api_token",
             "postgres_password",

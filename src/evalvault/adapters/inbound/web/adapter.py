@@ -1120,12 +1120,15 @@ class WebUIAdapter:
             return self._list_openai_models()
         if provider_key == "ollama":
             return self._list_ollama_models(settings)
+        if provider_key == "vllm":
+            return self._list_vllm_models(settings)
         if provider_key:
             return self._list_other_models(provider_key)
 
         models: list[dict[str, str]] = []
         models.extend(self._list_ollama_models(settings))
         models.extend(self._list_openai_models())
+        models.extend(self._list_vllm_models(settings))
         models.extend(self._list_other_models())
         return models
 
@@ -1136,7 +1139,26 @@ class WebUIAdapter:
         return any(marker in lowered for marker in markers)
 
     def _list_openai_models(self) -> list[dict[str, str | bool]]:
-        return [{"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True}]
+        return [
+            {"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True},
+            {
+                "id": "openai/gpt-oss:120b",
+                "name": "OpenAI-compatible gpt-oss:120b",
+                "supports_tools": False,
+            },
+        ]
+
+    def _list_vllm_models(self, settings: Settings) -> list[dict[str, str | bool]]:
+        model_name = settings.vllm_model
+        if not model_name:
+            return []
+        return [
+            {
+                "id": f"vllm/{model_name}",
+                "name": f"vLLM {model_name}",
+                "supports_tools": False,
+            }
+        ]
 
     def _list_ollama_models(self, settings: Settings) -> list[dict[str, str | bool]]:
         allowlist = self._get_ollama_tool_allowlist(settings)
