@@ -521,6 +521,8 @@ def register_run_commands(
                 )
             elif settings.llm_provider == "ollama":
                 settings.ollama_model = model
+            elif settings.llm_provider == "vllm":
+                settings.vllm_model = model
             else:
                 settings.openai_model = model
 
@@ -535,11 +537,12 @@ def register_run_commands(
             )
             raise typer.Exit(1)
 
-        display_model = (
-            f"ollama/{settings.ollama_model}"
-            if settings.llm_provider == "ollama"
-            else settings.openai_model
-        )
+        if settings.llm_provider == "ollama":
+            display_model = f"ollama/{settings.ollama_model}"
+        elif settings.llm_provider == "vllm":
+            display_model = f"vllm/{settings.vllm_model}"
+        else:
+            display_model = settings.openai_model
 
         console.print("\n[bold]EvalVault[/bold] - RAG Evaluation")
         console.print(f"Dataset: [cyan]{dataset}[/cyan]")
