@@ -21,18 +21,18 @@ The CLI provides various commands for evaluation, analysis, and management:
 
 For detailed CLI usage, see the [CLI Guide](../../guides/CLI_GUIDE.md).
 
-## Web UI Adapter
+## Web API Adapter + React Frontend
 
-Streamlit-based web interface for interactive evaluation.
+FastAPI endpoints power the React UI for interactive evaluation and analysis.
 
-The web UI consists of several pages:
+The web UI provides:
 
-- **Evaluate**: Run evaluations with real-time progress
+- **Evaluation Studio**: Run evaluations with real-time progress
 - **History**: View past evaluation runs
-- **Reports**: Generate and download reports
+- **Analysis Lab**: Save and reload analysis results
 - **Settings**: Configure LLM providers and trackers
 
-The web UI is located in `src/evalvault/adapters/inbound/web/` and includes reusable components for metrics display, dataset uploading, and visualization.
+The FastAPI routes live in `src/evalvault/adapters/inbound/api/`, and the web adapter implementation is in `src/evalvault/adapters/inbound/web/adapter.py`. The React frontend is under `frontend/`.
 
 ## Usage Examples
 
@@ -49,14 +49,16 @@ uv run evalvault metrics
 uv run evalvault compare RUN_ID_A RUN_ID_B
 ```
 
-### Web UI
+### Web UI (React + FastAPI)
 
 ```bash
-# Launch web interface
-uv run evalvault web
+# Start the API
+uv run evalvault serve-api --reload
 
-# Or directly
-uv run evalvault-web
+# Start the frontend
+cd frontend
+npm install
+npm run dev
 ```
 
 For detailed CLI usage, see the [CLI Guide](../../guides/CLI_GUIDE.md).

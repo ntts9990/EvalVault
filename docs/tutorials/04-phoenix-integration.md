@@ -327,7 +327,7 @@ uv run evalvault run "$DATASET" --metrics faithfulness \
   --prompt-manifest agent/prompts/prompt_manifest.json
 ```
 
-이렇게 실행하면 `result.tracker_metadata["phoenix"]["prompts"]`에 파일별 status/checksum/diff가 저장되어 Release Notes, History CLI, Streamlit UI에서 Prompt 변화와 Phoenix Trace/Dataset/Experiment 링크를 함께 확인할 수 있습니다.
+이렇게 실행하면 `result.tracker_metadata["phoenix"]["prompts"]`에 파일별 status/checksum/diff가 저장되어 Release Notes, History CLI, Web UI에서 Prompt 변화와 Phoenix Trace/Dataset/Experiment 링크를 함께 확인할 수 있습니다.
 
 ### 커스텀 속성 추가
 

@@ -62,7 +62,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 | Full | `uv run evalvault run --mode full DATASET.json`<br>`uv run evalvault run-full DATASET.json` | 모든 Typer 옵션(프로파일, Prompt manifest, Phoenix dataset/experiment, Domain Memory, streaming)을 노출 |
 
 - `uv run evalvault history --mode simple/full`로 CLI 결과를 필터링할 수 있습니다.
-- Streamlit Evaluate/Reports 페이지 역시 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
+- Web UI(Evaluation Studio/Reports)도 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
 
 - `--thresholds`, `--db`, `--profile`, `--tracker`를 조합해 CI나 실험용 러너를 구성합니다.
 - Domain Memory 연동:

@@ -94,7 +94,7 @@ uv run evalvault domain memory ingest-embeddings /tmp/phoenix.csv \
 ## 4. History & Web Dashboards
 
 - `uv run evalvault history` 명령은 Phoenix Experiment가 연결된 실행에 대해 `Phoenix P@K`, `Drift` 컬럼을 자동으로 채웁니다. `.env`의 `PHOENIX_ENDPOINT`/`PHOENIX_API_TOKEN`을 이용해 Phoenix REST API에서 precision@k·drift 지표를 가져오며, 테이블에서 바로 이상치를 확인할 수 있습니다.
-- Streamlit Home/History/Reports 페이지에서도 동일한 지표가 표시되고 Phoenix Experiment 링크가 함께 제공되므로 EvalVault 통계 → Phoenix Embeddings 탭으로 원클릭 전환이 가능합니다.
+- Web UI Home/History/Reports 페이지에서도 동일한 지표가 표시되고 Phoenix Experiment 링크가 함께 제공되므로 EvalVault 통계 → Phoenix Embeddings 탭으로 원클릭 전환이 가능합니다.
 
 ---
 
@@ -140,4 +140,4 @@ uv run evalvault run "$DATASET" --metrics faithfulness \
 
 > 💡 **Prompt Loop 전용 모델**: Phoenix Prompt Playground → EvalVault 검증 루프에서는 `prod` 프로필(LLM=`gpt-oss-safeguard:20b`, OpenAI OSS)로 실행하세요. 이 모델은 Phoenix tool-calling을 지원하므로 `gemma3:1b`에서 발생하던 “does not support tools” 오류 없이 Prompt diff/Trace 데이터를 수집할 수 있습니다. (실행 시간은 길어지지만 Prompt 회귀 검증 품질을 위해 권장됩니다.)
 
-CLI는 `result.tracker_metadata["phoenix"]["prompts"]`에 각 파일의 상태(동기화/수정/미추적), 체크섬, diff를 저장합니다. Release Notes 스크립트, History CLI, Streamlit UI가 이 필드를 이용해 Prompt 변화를 Trace/Dataset/Experiment 링크 옆에 표시하므로, Prompt 회귀 여부를 Phoenix Embeddings·Prompt Playground와 동시에 추적할 수 있습니다.
+CLI는 `result.tracker_metadata["phoenix"]["prompts"]`에 각 파일의 상태(동기화/수정/미추적), 체크섬, diff를 저장합니다. Release Notes 스크립트, History CLI, Web UI가 이 필드를 이용해 Prompt 변화를 Trace/Dataset/Experiment 링크 옆에 표시하므로, Prompt 회귀 여부를 Phoenix Embeddings·Prompt Playground와 동시에 추적할 수 있습니다.

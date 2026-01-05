@@ -60,7 +60,7 @@ uv pip install evalvault
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
 uv sync --extra dev        # 기본 개발 환경
-uv sync --extra dev --extra analysis --extra korean --extra web   # 전체 기능
+uv sync --extra dev --extra analysis --extra korean               # 전체 기능
 ```
 
 Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12를 고정하므로 추가 설치가 필요 없습니다.
@@ -289,18 +289,7 @@ uv run evalvault compare <run_a> <run_b> --db evalvault.db
 uv run evalvault export <run_id> -o run.json --db evalvault.db
 ```
 
-### Web UI
-
-#### Streamlit Web UI
-```bash
-uv run evalvault web --db evalvault.db
-```
-Tip: Streamlit UI를 쓰려면 `uv sync --extra web`이 필요합니다.
-Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
-현재 Web UI 보고서는 기본/상세 템플릿과 LLM 보고서가 중심이며, 비교 템플릿과 Domain Memory 인사이트 패널은 준비 중입니다.
-Dataset 선택 화면에서 JSON/CSV/XLSX 템플릿을 내려받아 바로 입력할 수 있습니다.
-
-#### React Frontend (Vite)
+### Web UI (React + FastAPI)
 ```bash
 # 1) API 서버 실행
 uv run evalvault serve-api --reload
@@ -362,7 +351,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 2. http://localhost:3000 접속 후 프로젝트를 만들고 API 키를 발급
 3. `.env` 에 키/호스트를 설정 후 `--tracker langfuse` 옵션 사용
 
-Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며, Streamlit/CLI 히스토리에도 trace URL이 나타납니다.
+Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며, Web UI/CLI 히스토리에도 trace URL이 나타납니다.
 
 ---
 
@@ -478,7 +467,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 | Ollama connection refused | `ollama serve` 실행 여부, `OLLAMA_BASE_URL` 확인 |
 | Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 |
 | Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
-| Streamlit ImportError | `uv sync --extra web` 실행 |
+| Web UI 접속 불가 | API 서버(`evalvault serve-api`)와 프론트(`npm run dev`)가 켜져 있는지 확인 |
 | React 프론트 CORS 에러 | `CORS_ORIGINS`에 `http://localhost:5173` 추가 또는 Vite 프록시 사용, `VITE_API_BASE_URL` 확인 |
 
 추가 이슈는 GitHub Issues 또는 `uv run evalvault config` 출력을 참고하세요.

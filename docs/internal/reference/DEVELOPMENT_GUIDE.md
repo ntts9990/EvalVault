@@ -37,7 +37,7 @@
 uv sync --extra dev
 
 # 전체 기능 포함
-uv sync --extra dev --extra analysis --extra korean --extra web --extra phoenix --extra docs
+uv sync --extra dev --extra analysis --extra korean --extra phoenix --extra docs
 ```
 
 ### 1.3 Optional Dependencies
@@ -47,7 +47,6 @@ uv sync --extra dev --extra analysis --extra korean --extra web --extra phoenix 
 | `dev` | pytest, ruff, mypy | 개발 도구 |
 | `analysis` | scikit-learn | 통계/NLP 분석 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 NLP |
-| `web` | streamlit, plotly | Web UI |
 | `postgres` | psycopg | PostgreSQL 지원 |
 | `mlflow` | mlflow | MLflow 트래커 |
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
@@ -372,7 +371,7 @@ uv run pytest -m "not slow" tests/
 | Version | Date | Description |
 |---------|------|-------------|
 | 1.5.0 | 2025-12-30 | Phase 14 - DAG Analysis Pipeline |
-| 1.4.0 | 2025-12-30 | Phase 10-13 - Streamlit Web UI |
+| 1.4.0 | 2025-12-30 | Phase 10-13 - React + FastAPI Web UI |
 | 1.3.0 | 2025-12-30 | Phase 9 - Korean RAG Optimization |
 | 1.2.0 | 2025-12-29 | Phase 8 - Domain Memory |
 | 1.1.0 | 2025-12-29 | Phase 2 NLP + Phase 3 Causal |

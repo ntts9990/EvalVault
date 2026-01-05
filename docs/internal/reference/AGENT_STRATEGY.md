@@ -92,7 +92,7 @@
 | **Analysis** | Statistical, NLP, Causal | 분석 파이프라인 자동화 |
 | **Cache** | MemoryCache (LRU+TTL) | 성능 모니터링 |
 | **Dataset** | CSV, Excel, JSON Loaders | 데이터 검증 자동화 |
-| **Web** | Streamlit Components | UI 테스트 자동화 |
+| **Web** | React Components | UI 테스트 자동화 |
 
 ### 2.4 도메인 엔티티 (9개)
 

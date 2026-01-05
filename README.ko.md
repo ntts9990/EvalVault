@@ -13,12 +13,11 @@ English version? See the [root README](README.md).
 
 ## 개요
 
-EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 Streamlit Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
+EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
 
 **주요 특징**
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
 - OpenAI/Ollama/폐쇄망을 아우르는 프로필 기반 모델 구성
-- Streamlit Web UI에서 평가, 히스토리, 보고서 생성
 - FastAPI + React UI에서 Evaluation Studio/Analysis Lab 결과 저장 및 재조회
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
@@ -48,7 +47,6 @@ uv sync --extra dev
 |-------|--------|------|
 | `analysis` | scikit-learn | 통계/NLP 분석 모듈 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 형태소·검색 |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
@@ -113,6 +111,7 @@ uv sync --extra dev
    npm install
    npm run dev
    ```
+   브라우저에서 `http://localhost:5173`를 열어 확인합니다.
 
 3. **평가 실행**
    ```bash
@@ -128,12 +127,6 @@ uv sync --extra dev
    ```bash
    uv run evalvault history --db evalvault.db
    ```
-
-5. **Web UI 실행**
-   ```bash
-   uv run evalvault web --db evalvault.db
-   ```
-   Tip: Streamlit UI를 쓰려면 `uv sync --extra web`이 필요합니다.
 
 Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [USER_GUIDE.md](docs/guides/USER_GUIDE.md)에 정리되어 있습니다.
 
@@ -160,7 +153,7 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ```
 
 - `uv run evalvault history --mode simple/full`로 CLI 히스토리를 즉시 필터링할 수 있습니다.
-- Streamlit **📊 Evaluate** 페이지에도 동일한 모드 토글이 추가되었고, **📄 Reports** 카드에 Mode Pill이 표시되어 어떤 프리셋으로 실행했는지 한눈에 알 수 있습니다.
+- Web UI에서도 동일한 모드 토글과 Mode Pill이 표시됩니다.
 
 ---
 

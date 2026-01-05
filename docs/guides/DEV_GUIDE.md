@@ -15,8 +15,6 @@ uv sync --extra dev
 ```
 
 기능별 extras(선택):
-
-- `--extra web`: Streamlit Web UI
 - `--extra korean`: 한국어 NLP
 - `--extra analysis`: 통계/NLP 분석 보조
 - `--extra postgres`: PostgreSQL 저장소
@@ -42,13 +40,7 @@ uv run ruff format src/ tests/
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
 ```
 
-Web UI:
-
-```bash
-uv run evalvault web
-```
-
-React Frontend (Vite):
+Web UI (React + FastAPI):
 
 ```bash
 # FastAPI 서버

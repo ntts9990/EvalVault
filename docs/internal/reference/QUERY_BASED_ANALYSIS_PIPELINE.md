@@ -52,7 +52,7 @@
 |-----|-------------------|-------------------|
 | LLM | Ollama (gpt-oss:20b) | LLMPort 추상화 (OpenAI, Anthropic 등) |
 | 아키텍처 | 단일 모듈 | Hexagonal Architecture (Port/Adapter) |
-| UI | CLI + Flask API | Streamlit 웹 UI |
+| UI | CLI + FastAPI | React 웹 UI |
 | 상태 관리 | LangGraph MemorySaver | EvalVault Session + LangGraph |
 | 확장성 | 하드코딩된 분석 도구 | 플러그인 기반 분석 모듈 |
 
@@ -68,9 +68,12 @@ ports/outbound/
 ├── analysis_module_port.py        # 분석 모듈 포트 (플러그인)
 
 adapters/inbound/
-├── web/
-│   └── pages/
-│       └── analysis_assistant.py  # Streamlit 분석 어시스턴트 페이지
+├── api/
+│   └── routers/
+│       └── pipeline.py            # FastAPI 분석 API
+
+frontend/
+└── src/pages/AnalysisLab.tsx      # React Analysis Lab
 
 adapters/outbound/
 ├── analysis/
@@ -386,7 +389,7 @@ MVP 범위:
 
 ### Phase 14.6: 웹 UI 통합 (2-3주차)
 
-**목표**: Streamlit 분석 어시스턴트 페이지
+**목표**: React Analysis Lab 페이지
 
 - [ ] 쿼리 입력 UI
 - [ ] 파이프라인 시각화 (노드 그래프)
@@ -431,7 +434,7 @@ MVP 범위:
 | DAG 실행 | LangGraph | 상태 관리, 조건부 라우팅, 체크포인팅 |
 | 형태소 분석 | kiwipiepy | 한국어 최적화, 순수 Python |
 | BM25 검색 | rank-bm25 | 가벼운 키워드 검색 |
-| 웹 UI | Streamlit | 빠른 프로토타이핑, Python 네이티브 |
+| 웹 UI | React + FastAPI | 빠른 프로토타이핑, 분리된 프론트/백엔드 |
 | 시각화 | Plotly | 인터랙티브 차트 |
 | 보고서 | Jinja2 + WeasyPrint | HTML/PDF 생성 |
 

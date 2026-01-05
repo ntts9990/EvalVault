@@ -13,13 +13,12 @@ Prefer Korean docs? Read the [한국어 README](docs/README.ko.md).
 
 ## Overview
 
-EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and Streamlit Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air‑gapped profiles without wiring new scripts for each dataset.
+EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air‑gapped profiles without wiring new scripts for each dataset.
 
 **Highlights**
 - One CLI for running, comparing, exporting, and storing evaluation runs
 - Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
-- Streamlit Web UI for evaluation, history, and report generation
-- FastAPI + React UI for Evaluation Studio and Analysis Lab (save & reload analysis results)
+- FastAPI + React Web UI for Evaluation Studio and Analysis Lab (save & reload analysis results)
 - Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
 - DAG-based analysis pipeline with statistical/NLP/causal modules
@@ -52,7 +51,6 @@ Add extras as needed:
 |-------|----------|---------|
 | `analysis` | scikit-learn | Statistical/NLP analysis modules |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | Korean tokenization & retrieval |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL storage |
 | `mlflow` | mlflow | MLflow tracker |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix tracing, dataset/experiment sync |
@@ -131,6 +129,7 @@ Add extras as needed:
    npm install
    npm run dev
    ```
+   Open `http://localhost:5173`.
 
 3. **Run an evaluation**
    ```bash
@@ -146,12 +145,6 @@ Add extras as needed:
    ```bash
    uv run evalvault history --db evalvault.db
    ```
-
-5. **Launch the Web UI**
-   ```bash
-   uv run evalvault web --db evalvault.db
-   ```
-   Tip: Streamlit UI requires `uv sync --extra web`.
 
 More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).
 
@@ -180,7 +173,7 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ```
 
 - `uv run evalvault history --mode simple` (또는 `full`) keeps CLI reports focused.
-- Streamlit **📊 Evaluate** now includes the same mode toggle and surfaces a “Mode” pill on **📄 Reports** to make comparisons obvious.
+- The Web UI includes the same mode toggle and surfaces a “Mode” pill on Reports to make comparisons obvious.
 
 ---
 

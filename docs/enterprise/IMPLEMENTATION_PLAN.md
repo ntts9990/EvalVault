@@ -1146,7 +1146,7 @@ class DomainFact:
 
 ### Phase 2: 차별화 (P2) - 선택적
 
-- Streamlit → 관리자 전용, 일반 사용자용 별도 Portal
+- Web UI(React + FastAPI) → 관리자 전용, 일반 사용자용 별도 Portal
 - Airflow/Dagster 연동 (스케줄 평가)
 - 멀티리전 DR
 
@@ -1158,7 +1158,7 @@ class DomainFact:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CLIENT LAYER                                   │
 ├─────────────────────────────────────────────────────────────────────────┤
-│   CLI (Typer)    │    Web UI (Streamlit)    │    Python SDK    │  API  │
+│   CLI (Typer)    │  Web UI (React+FastAPI)  │    Python SDK    │  API  │
 │   --endpoint     │                          │                  │       │
 │   --auth-profile │                          │                  │       │
 └────────┬─────────┴───────────┬──────────────┴─────────┬────────┴───┬───┘
@@ -1265,7 +1265,7 @@ class DomainFact:
 
 ```
 Phase 0 (호환 유지)
-├── 기존 CLI/Streamlit 그대로 동작 (--local 옵션)
+├── 기존 CLI/Web UI 그대로 동작 (--local 옵션)
 ├── 새 API 서버 병행 운영
 └── 테넌트 ID = "default" 로 기존 데이터 처리
 

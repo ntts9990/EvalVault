@@ -63,7 +63,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 | Phase 3 Causal | Causal Analysis | ✅ Complete | +27 |
 | Phase 8 | Domain Memory Layering | ✅ Complete | +113 |
 | Phase 9 | Korean RAG Optimization | ✅ Complete | +24 |
-| Phase 10-13 | Streamlit Web UI | ✅ Complete | +138 |
+| Phase 10-13 | React + FastAPI Web UI | ✅ Complete | +138 |
 | Phase 14 | Query-Based DAG Analysis Pipeline | ✅ Complete | +153 |
 | **Total** | | **✅ 100%** | **legacy 기준** |
 
@@ -80,7 +80,7 @@ EvalVault는 RAG (Retrieval-Augmented Generation) 평가 시스템으로, Phase 
 - ✅ Multi-Tracker (Langfuse, MLflow)
 - ✅ 6 Ragas Metrics + 1 Custom Metric
 - ✅ Korean NLP (형태소 분석, BM25, Dense, Hybrid)
-- ✅ Web UI (Streamlit 기반)
+- ✅ Web UI (React + FastAPI 기반)
 - ✅ DAG Analysis Pipeline
 
 #### 개발 인프라
@@ -502,7 +502,7 @@ evalvault benchmark retrieval insurance_docs/ \
 ### 단기 작업 목록 (NEXT_TASKS 통합)
 
 1. **P2.2 Web UI 컴포넌트 재구조화**
-   - Streamlit 컴포넌트 구조 정리, 공통 컴포넌트 분리
+   - React 컴포넌트 구조 정리, 공통 컴포넌트 분리
 2. **P3 성능 최적화 (완료)**
    - 배치 평가 + 병렬화 ✅
    - 스트리밍 로더 구현 ✅

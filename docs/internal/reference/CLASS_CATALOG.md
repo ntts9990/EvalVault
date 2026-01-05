@@ -240,7 +240,7 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 
 | 클래스명 | 파일 | 역할 |
 |---------|------|------|
-| `WebUIAdapter` | `web/adapter.py` | Streamlit 기반 웹 UI 어댑터 |
+| `WebUIAdapter` | `web/adapter.py` | FastAPI 기반 Web API 어댑터 |
 | `GateResult` | `web/adapter.py` | 게이트 결과 데이터 모델 |
 | `GateReport` | `web/adapter.py` | 게이트 보고서 데이터 모델 |
 | `WebSession` | `web/session.py` | 웹 세션 데이터 모델 |
@@ -428,7 +428,7 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 **해당 클래스**:
 - LLM API 클라이언트 (`OpenAI`, `Anthropic`, `Ollama`)
 - 데이터베이스 드라이버 (`sqlite3`, `psycopg`)
-- 웹 프레임워크 (`Streamlit`, `Typer`)
+- 웹 프레임워크 (`FastAPI`) / CLI (`Typer`) / 프론트엔드 (`React`)
 
 ---
 
@@ -714,7 +714,7 @@ DDD는 **Entities**, **Value Objects**, **Aggregates**, **Domain Services**, **R
 | 클래스명 | 패키지 | 책임 | 의존성 |
 |---------|--------|------|--------|
 | CLI 명령어들 | `adapters.inbound.cli.commands` | CLI 명령어 구현 | `EvaluatorPort`, `AnalysisPipelinePort` 등 |
-| `WebUIAdapter` | `adapters.inbound.web.adapter` | Streamlit 웹 UI | `WebUIPort` |
+| `WebUIAdapter` | `adapters.inbound.web.adapter` | FastAPI Web API | `WebUIPort` |
 
 #### 7.4.2 Outbound Adapters (출력 어댑터)
 
