@@ -1141,11 +1141,6 @@ class WebUIAdapter:
     def _list_openai_models(self) -> list[dict[str, str | bool]]:
         return [
             {"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True},
-            {
-                "id": "openai/gpt-oss:120b",
-                "name": "OpenAI-compatible gpt-oss:120b",
-                "supports_tools": False,
-            },
         ]
 
     def _list_vllm_models(self, settings: Settings) -> list[dict[str, str | bool]]:
