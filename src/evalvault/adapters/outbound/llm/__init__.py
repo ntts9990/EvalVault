@@ -52,7 +52,8 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
         return AnthropicAdapter(settings)
     else:
         raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, azure, anthropic"
+            "Unsupported LLM provider: "
+            f"'{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
         )
 
 
@@ -67,7 +68,7 @@ def create_llm_adapter_for_model(
     but overrides the provider and model name.
 
     Args:
-        provider: LLM provider (openai, ollama, azure, anthropic)
+        provider: LLM provider (openai, ollama, vllm, azure, anthropic)
         model_name: Model name (e.g., "gpt-5-nano", "gemma3:1b")
         base_settings: Base settings with API keys and infrastructure config
 
@@ -107,7 +108,8 @@ def create_llm_adapter_for_model(
         return AnthropicAdapter(base_settings)
     else:
         raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, azure, anthropic"
+            "Unsupported LLM provider: "
+            f"'{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
         )
 
 
