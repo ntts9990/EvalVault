@@ -127,6 +127,9 @@ class PipelineResultPayload(BaseModel):
     query: str | None = None
     run_id: str | None = None
     pipeline_id: str | None = None
+    profile: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
     is_complete: bool = True
     duration_ms: float | None = None
     final_output: dict[str, Any] | None = None
@@ -141,6 +144,8 @@ class PipelineResultSummary(BaseModel):
     label: str
     query: str | None = None
     run_id: str | None = None
+    profile: str | None = None
+    tags: list[str] | None = None
     duration_ms: float | None = None
     is_complete: bool
     created_at: str
@@ -150,6 +155,7 @@ class PipelineResultSummary(BaseModel):
 
 class PipelineResultResponse(PipelineResultSummary):
     pipeline_id: str | None = None
+    metadata: dict[str, Any] | None = None
     node_results: dict[str, Any] | None = None
     final_output: dict[str, Any] | None = None
 
@@ -358,6 +364,8 @@ async def save_pipeline_result(payload: PipelineResultPayload):
             label=_intent_label(payload.intent),
             query=payload.query,
             run_id=payload.run_id,
+            profile=payload.profile,
+            tags=payload.tags,
             duration_ms=payload.duration_ms,
             is_complete=payload.is_complete,
             created_at=created_at,
@@ -382,6 +390,8 @@ async def list_pipeline_results(limit: int = 50):
                 label=_intent_label(item["intent"]),
                 query=item.get("query"),
                 run_id=item.get("run_id"),
+                profile=item.get("profile"),
+                tags=item.get("tags"),
                 duration_ms=item.get("duration_ms"),
                 is_complete=item.get("is_complete", False),
                 created_at=item.get("created_at"),
@@ -407,6 +417,8 @@ async def get_pipeline_result(result_id: str):
             query=item.get("query"),
             run_id=item.get("run_id"),
             pipeline_id=item.get("pipeline_id"),
+            profile=item.get("profile"),
+            tags=item.get("tags"),
             duration_ms=item.get("duration_ms"),
             is_complete=item.get("is_complete", False),
             created_at=item.get("created_at"),
@@ -414,6 +426,7 @@ async def get_pipeline_result(result_id: str):
             finished_at=item.get("finished_at"),
             node_results=item.get("node_results"),
             final_output=item.get("final_output"),
+            metadata=item.get("metadata"),
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -339,6 +339,9 @@ export interface SaveAnalysisResultRequest {
     query?: string | null;
     run_id?: string | null;
     pipeline_id?: string | null;
+    profile?: string | null;
+    tags?: string[] | null;
+    metadata?: Record<string, any> | null;
     is_complete: boolean;
     duration_ms?: number | null;
     final_output?: Record<string, any> | null;
@@ -353,6 +356,8 @@ export interface AnalysisHistoryItem {
     label: string;
     query: string | null;
     run_id: string | null;
+    profile?: string | null;
+    tags?: string[] | null;
     duration_ms: number | null;
     is_complete: boolean;
     created_at: string;
@@ -364,6 +369,7 @@ export interface SavedAnalysisResult extends AnalysisHistoryItem {
     pipeline_id: string | null;
     final_output: Record<string, any> | null;
     node_results: Record<string, any> | null;
+    metadata?: Record<string, any> | null;
 }
 
 export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {

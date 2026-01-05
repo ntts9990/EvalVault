@@ -138,6 +138,9 @@ CREATE TABLE IF NOT EXISTS pipeline_results (
     query TEXT,
     run_id TEXT,
     pipeline_id TEXT,
+    profile TEXT,
+    tags TEXT,  -- JSON array of tag strings
+    metadata TEXT,  -- JSON metadata for trace/profile/user info
     is_complete INTEGER NOT NULL DEFAULT 1,
     duration_ms REAL,
     final_output TEXT,  -- JSON serialized pipeline output

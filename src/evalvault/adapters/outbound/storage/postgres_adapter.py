@@ -111,6 +111,23 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         if "retrieval_metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata JSONB")
 
+        pipeline_cursor = conn.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'pipeline_results'
+              AND column_name IN ('profile', 'tags', 'metadata')
+            """
+        )
+        pipeline_columns = {row[0] for row in pipeline_cursor.fetchall()}
+        if pipeline_columns:
+            if "profile" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN profile VARCHAR(50)")
+            if "tags" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN tags JSONB")
+            if "metadata" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata JSONB")
+
     # Experiment 관련 메서드
 
     def save_experiment(self, experiment: Experiment) -> str:
@@ -493,14 +510,18 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
                 """
                 INSERT INTO pipeline_results (
                     result_id, intent, query, run_id, pipeline_id,
+                    profile, tags, metadata,
                     is_complete, duration_ms, final_output, node_results,
                     started_at, finished_at, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (result_id) DO UPDATE SET
                     intent = EXCLUDED.intent,
                     query = EXCLUDED.query,
                     run_id = EXCLUDED.run_id,
                     pipeline_id = EXCLUDED.pipeline_id,
+                    profile = EXCLUDED.profile,
+                    tags = EXCLUDED.tags,
+                    metadata = EXCLUDED.metadata,
                     is_complete = EXCLUDED.is_complete,
                     duration_ms = EXCLUDED.duration_ms,
                     final_output = EXCLUDED.final_output,
@@ -515,6 +536,9 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
                     record.get("query"),
                     record.get("run_id"),
                     record.get("pipeline_id"),
+                    record.get("profile"),
+                    self._serialize_pipeline_json(record.get("tags")),
+                    self._serialize_pipeline_json(record.get("metadata")),
                     is_complete,
                     record.get("duration_ms"),
                     self._serialize_pipeline_json(record.get("final_output")),
@@ -530,6 +554,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """
             SELECT result_id, intent, query, run_id, pipeline_id,
+                   profile, tags,
                    is_complete, duration_ms, created_at, started_at, finished_at
             FROM pipeline_results
             ORDER BY created_at DESC
@@ -545,6 +570,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             row = conn.execute(
                 """
                 SELECT result_id, intent, query, run_id, pipeline_id,
+                       profile, tags, metadata,
                        is_complete, duration_ms, created_at,
                        started_at, finished_at, final_output, node_results
                 FROM pipeline_results
@@ -696,6 +722,8 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             "query": row.get("query"),
             "run_id": row.get("run_id"),
             "pipeline_id": row.get("pipeline_id"),
+            "profile": row.get("profile"),
+            "tags": self._ensure_json(row.get("tags")),
             "is_complete": bool(row.get("is_complete")),
             "duration_ms": self._maybe_float(row.get("duration_ms")),
             "created_at": self._normalize_timestamp(row.get("created_at")),
@@ -705,6 +733,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         if include_payload:
             item["final_output"] = self._ensure_json(row.get("final_output"))
             item["node_results"] = self._ensure_json(row.get("node_results"))
+            item["metadata"] = self._ensure_json(row.get("metadata"))
         return item
 
     def _normalize_timestamp(self, value: Any) -> str | None:
@@ -714,10 +743,12 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             return value.isoformat()
         return str(value)
 
-    def _ensure_json(self, value: Any) -> dict[str, Any]:
-        """JSONB 값을 dict로 변환."""
-        if isinstance(value, dict):
+    def _ensure_json(self, value: Any) -> Any:
+        """JSONB 값을 파이썬 타입으로 변환."""
+        if value is None:
+            return None
+        if isinstance(value, (dict, list)):
             return value
         if isinstance(value, str):
             return json.loads(value)
-        return dict(value or {})
+        return value

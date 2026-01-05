@@ -70,6 +70,16 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         if "retrieval_metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata TEXT")
 
+        pipeline_cursor = conn.execute("PRAGMA table_info(pipeline_results)")
+        pipeline_columns = {row[1] for row in pipeline_cursor.fetchall()}
+        if pipeline_columns:
+            if "profile" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN profile TEXT")
+            if "tags" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN tags TEXT")
+            if "metadata" not in pipeline_columns:
+                conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata TEXT")
+
     # Experiment 관련 메서드
 
     def save_experiment(self, experiment: Experiment) -> str:
@@ -617,9 +627,10 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                 """
                 INSERT OR REPLACE INTO pipeline_results (
                     result_id, intent, query, run_id, pipeline_id,
+                    profile, tags, metadata,
                     is_complete, duration_ms, final_output, node_results,
                     started_at, finished_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.get("result_id"),
@@ -627,6 +638,9 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                     record.get("query"),
                     record.get("run_id"),
                     record.get("pipeline_id"),
+                    record.get("profile"),
+                    self._serialize_json(record.get("tags")),
+                    self._serialize_json(record.get("metadata")),
                     is_complete,
                     record.get("duration_ms"),
                     self._serialize_json(record.get("final_output")),
@@ -642,6 +656,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """
             SELECT result_id, intent, query, run_id, pipeline_id,
+                   profile, tags,
                    is_complete, duration_ms, created_at, started_at, finished_at
             FROM pipeline_results
             ORDER BY created_at DESC
@@ -656,12 +671,13 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         with self._get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT result_id, intent, query, run_id, pipeline_id,
-                       is_complete, duration_ms, created_at,
-                       started_at, finished_at, final_output, node_results
-                FROM pipeline_results
-                WHERE result_id = ?
-                """,
+            SELECT result_id, intent, query, run_id, pipeline_id,
+                   profile, tags, metadata,
+                   is_complete, duration_ms, created_at,
+                   started_at, finished_at, final_output, node_results
+            FROM pipeline_results
+            WHERE result_id = ?
+            """,
                 (result_id,),
             ).fetchone()
         if not row:
@@ -680,6 +696,8 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             "query": row["query"],
             "run_id": row["run_id"],
             "pipeline_id": row["pipeline_id"],
+            "profile": row["profile"],
+            "tags": self._deserialize_json(row["tags"]),
             "is_complete": bool(row["is_complete"]),
             "duration_ms": self._maybe_float(row["duration_ms"]),
             "created_at": row["created_at"],
@@ -689,6 +707,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         if include_payload:
             item["final_output"] = self._deserialize_json(row["final_output"])
             item["node_results"] = self._deserialize_json(row["node_results"])
+            item["metadata"] = self._deserialize_json(row["metadata"])
         return item
 
     # Stage event/metric 관련 메서드
