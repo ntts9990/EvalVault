@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
 import {
@@ -50,7 +50,6 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 };
 
 export function AnalysisLab() {
-    const navigate = useNavigate();
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
     const [catalogError, setCatalogError] = useState<string | null>(null);
     const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -264,11 +263,10 @@ export function AnalysisLab() {
                             ) : (
                                 <div className="space-y-2">
                                     {history.map(item => (
-                                        <button
+                                        <Link
                                             key={item.result_id}
-                                            type="button"
-                                            onClick={() => navigate(`/analysis/results/${item.result_id}`)}
-                                            className="w-full text-left border border-border rounded-lg p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                                            to={`/analysis/results/${item.result_id}`}
+                                            className="block border border-border rounded-lg p-3 hover:border-primary/40 hover:shadow-sm transition-all"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <p className="text-sm font-medium">{item.label}</p>
@@ -282,7 +280,7 @@ export function AnalysisLab() {
                                             <p className="text-[11px] text-muted-foreground mt-1">
                                                 {item.run_id ? `Run ${item.run_id.slice(0, 8)}` : "샘플 데이터"}
                                             </p>
-                                        </button>
+                                        </Link>
                                     ))}
                                 </div>
                             )}

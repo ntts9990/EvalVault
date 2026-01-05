@@ -2,12 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
-import {
-    fetchAnalysisResult,
-    type SavedAnalysisResult,
-} from "../services/api";
+import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
-import { Activity, AlertCircle, ArrowLeft, Download } from "lucide-react";
+import { Activity, AlertCircle, ArrowLeft, Download, Link2 } from "lucide-react";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
     completed: { label: "완료", color: "text-emerald-600" },
@@ -33,6 +30,7 @@ export function AnalysisResultView() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showRaw, setShowRaw] = useState(false);
+    const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
     useEffect(() => {
         async function loadResult() {
@@ -85,6 +83,30 @@ export function AnalysisResultView() {
         downloadText(`analysis-${result.result_id}.md`, reportText, "text/markdown");
     };
 
+    const handleCopyLink = async () => {
+        if (typeof window === "undefined") return;
+        const url = window.location.href;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textarea = document.createElement("textarea");
+                textarea.value = url;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            }
+            setCopyStatus("success");
+        } catch (err) {
+            setCopyStatus("error");
+        }
+        setTimeout(() => setCopyStatus("idle"), 1500);
+    };
+
     return (
         <Layout>
             <div className="max-w-5xl mx-auto pb-20">
@@ -129,6 +151,13 @@ export function AnalysisResultView() {
                                 </button>
                                 <button
                                     type="button"
+                                    onClick={handleCopyLink}
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                >
+                                    <Link2 className="w-3 h-3" /> 링크 복사
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={handleDownloadJson}
                                     className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
                                 >
@@ -142,6 +171,12 @@ export function AnalysisResultView() {
                                 >
                                     <Download className="w-3 h-3" /> 리포트 다운로드
                                 </button>
+                                {copyStatus === "success" && (
+                                    <span className="text-xs text-emerald-600">링크 복사됨</span>
+                                )}
+                                {copyStatus === "error" && (
+                                    <span className="text-xs text-rose-600">복사 실패</span>
+                                )}
                             </div>
                         </div>
 
