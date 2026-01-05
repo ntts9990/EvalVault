@@ -5,6 +5,7 @@ import { EvaluationStudio } from './pages/EvaluationStudio';
 import { DomainMemory } from './pages/DomainMemory';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { AnalysisLab } from './pages/AnalysisLab';
+import { AnalysisCompareView } from './pages/AnalysisCompareView';
 import { AnalysisResultView } from './pages/AnalysisResultView';
 import { CompareRuns } from './pages/CompareRuns';
 import { Settings } from './pages/Settings';
@@ -20,6 +21,7 @@ function App() {
         <Route path="/domain" element={<DomainMemory />} />
         <Route path="/knowledge" element={<KnowledgeBase />} />
         <Route path="/analysis" element={<AnalysisLab />} />
+        <Route path="/analysis/compare" element={<AnalysisCompareView />} />
         <Route path="/analysis/results/:id" element={<AnalysisResultView />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>

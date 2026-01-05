@@ -2,9 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
+import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
-import { Activity, AlertCircle, ArrowLeft, Download, Link2 } from "lucide-react";
+import {
+    Activity,
+    AlertCircle,
+    ArrowLeft,
+    Download,
+    ExternalLink,
+    Link2,
+} from "lucide-react";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
     completed: { label: "완료", color: "text-emerald-600" },
@@ -31,6 +39,7 @@ export function AnalysisResultView() {
     const [error, setError] = useState<string | null>(null);
     const [showRaw, setShowRaw] = useState(false);
     const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
+    const [renderMarkdown, setRenderMarkdown] = useState(true);
 
     useEffect(() => {
         async function loadResult() {
@@ -63,10 +72,29 @@ export function AnalysisResultView() {
         return null;
     }, [result]);
 
+    const reportIsLarge = (reportText?.length ?? 0) > 5000;
+
+    useEffect(() => {
+        if (!reportIsLarge) {
+            setRenderMarkdown(true);
+        } else {
+            setRenderMarkdown(false);
+        }
+    }, [reportIsLarge, reportText]);
+
     const rawOutput = useMemo(() => {
         if (!result?.final_output) return null;
         try {
             return JSON.stringify(result.final_output, null, 2);
+        } catch {
+            return null;
+        }
+    }, [result]);
+
+    const metadataText = useMemo(() => {
+        if (!result?.metadata) return null;
+        try {
+            return JSON.stringify(result.metadata, null, 2);
         } catch {
             return null;
         }
@@ -105,6 +133,11 @@ export function AnalysisResultView() {
             setCopyStatus("error");
         }
         setTimeout(() => setCopyStatus("idle"), 1500);
+    };
+
+    const handleOpenNewTab = () => {
+        if (typeof window === "undefined") return;
+        window.open(window.location.href, "_blank", "noopener,noreferrer");
     };
 
     return (
@@ -149,12 +182,28 @@ export function AnalysisResultView() {
                                 >
                                     {showRaw ? "리포트 보기" : "RAW JSON"}
                                 </button>
+                                {!showRaw && reportIsLarge && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setRenderMarkdown(prev => !prev)}
+                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        {renderMarkdown ? "경량 보기" : "마크다운 렌더링"}
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={handleCopyLink}
                                     className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
                                 >
                                     <Link2 className="w-3 h-3" /> 링크 복사
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenNewTab}
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                >
+                                    <ExternalLink className="w-3 h-3" /> 새 창 열기
                                 </button>
                                 <button
                                     type="button"
@@ -213,6 +262,24 @@ export function AnalysisResultView() {
                                 </p>
                             </div>
                         </div>
+                        {(result.profile || (result.tags && result.tags.length > 0)) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {result.profile && (
+                                    <div className="border border-border rounded-lg p-3">
+                                        <p className="text-xs text-muted-foreground">Profile</p>
+                                        <p className="text-sm font-medium mt-1">{result.profile}</p>
+                                    </div>
+                                )}
+                                {result.tags && result.tags.length > 0 && (
+                                    <div className="border border-border rounded-lg p-3">
+                                        <p className="text-xs text-muted-foreground">Tags</p>
+                                        <p className="text-sm font-medium mt-1">
+                                            {result.tags.join(", ")}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {result.node_results && (
                             <div>
@@ -244,22 +311,45 @@ export function AnalysisResultView() {
                             </div>
                         )}
 
+                        {metadataText && (
+                            <div>
+                                <h2 className="text-sm font-semibold mb-3">메타데이터</h2>
+                                <VirtualizedText
+                                    text={metadataText}
+                                    height="16rem"
+                                    className="bg-background border border-border rounded-lg p-4 text-xs"
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <h2 className="text-sm font-semibold mb-3">결과 출력</h2>
                             {showRaw ? (
-                                <pre className="bg-background border border-border rounded-lg p-4 text-xs overflow-auto max-h-[60vh]">
-                                    {rawOutput || "{}"}
-                                </pre>
+                                <VirtualizedText
+                                    text={rawOutput || "{}"}
+                                    height="60vh"
+                                    className="bg-background border border-border rounded-lg p-4 text-xs"
+                                />
                             ) : reportText ? (
-                                <div className="bg-background border border-border rounded-lg p-6 text-sm max-h-[60vh] overflow-auto">
-                                    <div className="prose prose-sm max-w-none">
-                                        <ReactMarkdown>{reportText}</ReactMarkdown>
+                                renderMarkdown ? (
+                                    <div className="bg-background border border-border rounded-lg p-6 text-sm max-h-[60vh] overflow-auto">
+                                        <div className="prose prose-sm max-w-none">
+                                            <ReactMarkdown>{reportText}</ReactMarkdown>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <VirtualizedText
+                                        text={reportText}
+                                        height="60vh"
+                                        className="bg-background border border-border rounded-lg p-4 text-xs"
+                                    />
+                                )
                             ) : (
-                                <pre className="bg-background border border-border rounded-lg p-4 text-xs overflow-auto max-h-[60vh]">
-                                    {rawOutput || "{}"}
-                                </pre>
+                                <VirtualizedText
+                                    text={rawOutput || "{}"}
+                                    height="60vh"
+                                    className="bg-background border border-border rounded-lg p-4 text-xs"
+                                />
                             )}
                         </div>
                     </div>
