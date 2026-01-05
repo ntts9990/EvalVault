@@ -655,9 +655,10 @@ class TestPerformanceE2E(TestE2EFixturePaths):
 
     def test_storage_performance_multiple_runs(self, tmp_path):
         """다중 실행 저장 성능 테스트."""
-        storage = SQLiteStorageAdapter(str(tmp_path / "perf_test.db"))
-
+        import sys
         import time
+
+        storage = SQLiteStorageAdapter(str(tmp_path / "perf_test.db"))
 
         start = time.time()
 
@@ -681,4 +682,6 @@ class TestPerformanceE2E(TestE2EFixturePaths):
         # Verify all saved
         runs = storage.list_runs(limit=100)
         assert len(runs) == 50
-        assert elapsed < 10.0  # Should complete in under 10 seconds
+        # Windows is slower due to filesystem differences
+        timeout = 30.0 if sys.platform == "win32" else 10.0
+        assert elapsed < timeout
