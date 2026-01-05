@@ -1,6 +1,6 @@
 # EvalVault (한국어)
 
-> RAG(Retrieval-Augmented Generation) 시스템 평가 자동화를 위한 CLI · Web UI 도구
+> RAG(Retrieval-Augmented Generation) 시스템 평가 자동화를 위한 CLI + Web UI 도구
 
 [![PyPI](https://img.shields.io/pypi/v/evalvault.svg)](https://pypi.org/project/evalvault/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -13,15 +13,19 @@ English version? See the [root README](README.md).
 
 ## 개요
 
-EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
+EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 **FastAPI + React Web UI**를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
 
 **주요 특징**
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
-- OpenAI/Ollama/폐쇄망을 아우르는 프로필 기반 모델 구성
-- FastAPI + React UI에서 Evaluation Studio/Analysis Lab 결과 저장 및 재조회
+- OpenAI/Ollama/vLLM/폐쇄망을 아우르는 프로필 기반 모델 구성
+- **FastAPI + React Web UI**에서 Evaluation Studio/Analysis Lab 결과 저장 및 재조회
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
 - 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
+
+**현재 상태**
+- Web UI 보고서는 기본/상세 템플릿과 LLM 분석에 집중하며, 비교 템플릿은 개발 중입니다.
+- Domain Memory 인사이트는 CLI 우선이며, Web UI 패널은 예정되어 있습니다.
 
 상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](docs/guides/USER_GUIDE.md)를 참고하세요.
 
@@ -101,12 +105,12 @@ uv sync --extra dev
    ```
    Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
 
-2. **API + React 프론트 실행 (dev)**
+2. **Web UI 실행 (FastAPI + React)**
    ```bash
-   # API
+   # 터미널 1: API 서버
    uv run evalvault serve-api --reload
 
-   # Frontend
+   # 터미널 2: React 프론트엔드
    cd frontend
    npm install
    npm run dev
@@ -129,6 +133,8 @@ uv sync --extra dev
    ```
 
 Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [USER_GUIDE.md](docs/guides/USER_GUIDE.md)에 정리되어 있습니다.
+
+---
 
 ## 실행 모드 (Simple / Full)
 
@@ -154,6 +160,19 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 - `uv run evalvault history --mode simple/full`로 CLI 히스토리를 즉시 필터링할 수 있습니다.
 - Web UI에서도 동일한 모드 토글과 Mode Pill이 표시됩니다.
+
+---
+
+## 지원 메트릭 (Ragas 0.4.x)
+
+| 메트릭 | 설명 |
+|--------|------|
+| `faithfulness` | 답변이 제공된 컨텍스트에 충실한 정도 |
+| `answer_relevancy` | 답변이 질문과 관련있는 정도 |
+| `context_precision` | 검색된 컨텍스트의 정밀도 |
+| `context_recall` | 필요한 정보가 검색되었는지 여부 |
+| `factual_correctness` | ground_truth 대비 사실적 정확성 |
+| `semantic_similarity` | 답변과 ground_truth 간 의미적 유사도 |
 
 ---
 
