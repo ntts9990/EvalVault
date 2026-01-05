@@ -52,6 +52,7 @@ docs/
 | [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 평가 담당자 | 설치, 환경설정, CLI, Web UI, 트러블슈팅 |
 | [guides/CLI_GUIDE.md](guides/CLI_GUIDE.md) | CLI 사용자 | 명령어 참조, 옵션, 예시 |
 | [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
+| [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
 | [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
 
 ### 튜토리얼

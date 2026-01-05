@@ -45,6 +45,20 @@ cp .env.example .env
 
 ---
 
+## API + React 프론트 실행 (dev)
+
+```bash
+# API
+uv run evalvault serve-api --reload
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
 ## 다음 단계
 
 - 5분 빠른 시작: [tutorials/01-quickstart.md](../tutorials/01-quickstart.md)

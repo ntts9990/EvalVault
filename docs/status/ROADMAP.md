@@ -760,6 +760,26 @@ P2.2는 병렬 작업으로 선행 진행 중이며 P3는 완료되었고 상세
 - [ ] 단일 책임 원칙 적용
 - [ ] 서비스 클래스 분리
 
+**2.4 React Lite 평가 모드 (최소 모델/의존성)**
+
+**목표**: React 프론트에서 최소 모델 + 최소 의존성으로 Ragas 평가/결과 조회를 선택 옵션으로 제공
+
+**핵심 요구사항**:
+- 최소 의존성 설치 경로(`uv sync --extra lite` 또는 core-only) 정의
+- 최소 모델 프로필(`lite`) 및 기본 메트릭 프리셋(예: `faithfulness`) 제공
+- API/Frontend에 Lite 모드 토글 + 기능 제한(트래커/리트리버/메모리 비활성)
+- 문서/환경 변수/샘플 데이터셋 정리
+
+**작업 항목**:
+- [ ] `pyproject.toml`에 `lite` extra 설계 및 optional deps 분리
+- [ ] `config/models.yaml`에 lite 프로필 추가 (최소 모델)
+- [ ] `settings.py`에 `EVALVAULT_MODE=lite` 도입
+- [ ] `/runs/options/*` 및 `/runs/start`에서 lite 모드 제한 적용
+- [ ] React `Evaluation Studio`에 Lite 토글 + 안내 추가
+- [ ] README/Quickstart/User Guide에 lite 설치/실행 경로 추가
+
+**예상 기간**: 1~2주
+
 ---
 
 ### 2026 Q3 (7-9월): RAGAS 래퍼 탈피 - 고유 가치 강화

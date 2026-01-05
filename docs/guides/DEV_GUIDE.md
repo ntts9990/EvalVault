@@ -48,6 +48,23 @@ Web UI:
 uv run evalvault web
 ```
 
+React Frontend (Vite):
+
+```bash
+# FastAPI 서버
+uv run evalvault serve-api --reload
+
+# 프론트엔드
+cd frontend
+npm install
+npm run dev
+```
+
+환경 변수:
+- `VITE_API_PROXY_TARGET`: Vite 프록시 대상 (기본: `http://localhost:8000`)
+- `VITE_API_BASE_URL`: 프록시 없이 직접 호출할 때 API 주소
+- `CORS_ORIGINS`: API 서버 허용 오리진 (예: `http://localhost:5173`)
+
 ---
 
 ## 문서 작업 규칙 (Docs)

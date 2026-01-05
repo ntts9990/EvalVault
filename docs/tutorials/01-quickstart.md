@@ -59,7 +59,21 @@ Langfuse: Not configured
 
 ---
 
-## Step 3: 첫 평가 실행
+## Step 3: API + React 프론트 실행 (dev)
+
+```bash
+# API
+uv run evalvault serve-api --reload
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## Step 4: 첫 평가 실행
 
 샘플 데이터셋으로 평가를 실행합니다:
 
@@ -146,7 +160,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 |------|--------|
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
-| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness` |
+| 3. API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
+| 4. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness` |
 
 소요 시간: 약 5분
 
