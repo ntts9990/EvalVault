@@ -1,0 +1,11 @@
+RAG Systems and Evaluation
+Retrieval-Augmented Generation (RAG) combines the power of large language models (LLMs) with external knowledge retrieval.
+RAG systems consist of a retriever (to find relevant documents) and a generator (to produce an answer).
+Evaluation of RAG systems is critical to ensure accuracy and reduce hallucinations.
+Common metrics for RAG evaluation include Faithfulness, Answer Relevancy, and Context Precision.
+EvalVault is a system designed to streamline RAG evaluation using advanced techniques like Knowledge Graphs.
+In 2024, RAG became the standard architecture for enterprise LLM applications.
+Knowledge Graphs enhance RAG by providing structured context and reducing reasoning errors.
+GraphRAG is a technique that uses knowledge graphs to improve the retrieval step in RAG.
+EvalVault supports multiple retrievers including BM25 and Hybrid search (BM25 + Dense).
+Domain Memory in EvalVault allows the system to learn from past evaluations to improve future performance.

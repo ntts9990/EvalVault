@@ -1,0 +1,83 @@
+{
+  "name": "e2e-edge-cases",
+  "version": "1.0.0",
+  "description": "Edge cases dataset for E2E testing - special characters, empty contexts, long texts",
+  "test_cases": [
+    {
+      "id": "edge-001",
+      "question": "What about special characters like &, <, >, \"quotes\", and 'apostrophes'?",
+      "answer": "Special characters & symbols are handled: <tags>, \"quotes\", 'apostrophes', 100% coverage.",
+      "contexts": [
+        "The policy covers 100% of claims with special handling for &, <, > symbols.",
+        "Documentation with \"quoted text\" and 'apostrophes' is accepted."
+      ],
+      "ground_truth": "Special characters are properly handled"
+    },
+    {
+      "id": "edge-002",
+      "question": "What if the context is minimal?",
+      "answer": "The answer is based on minimal context.",
+      "contexts": [
+        "Minimal context."
+      ],
+      "ground_truth": "Minimal context response"
+    },
+    {
+      "id": "edge-003",
+      "question": "How does the system handle Unicode characters like emoji and non-Latin scripts?",
+      "answer": "Unicode is fully supported including Japanese and Chinese characters.",
+      "contexts": [
+        "Full Unicode support including: Japanese, Chinese, Korean characters.",
+        "Special symbols are also supported."
+      ],
+      "ground_truth": "Full Unicode support"
+    },
+    {
+      "id": "edge-004",
+      "question": "What about very long context passages that might exceed typical length limits and require special handling for truncation or chunking purposes in the evaluation pipeline?",
+      "answer": "Long contexts are handled with proper chunking and truncation as needed for the evaluation process.",
+      "contexts": [
+        "This is a long context passage designed to test the system's ability to handle extended text content. The insurance policy provides comprehensive coverage including death benefits, illness coverage, hospitalization benefits, and surgical expense coverage. In addition to these core benefits, the policy also includes optional riders for critical illness, disability income, and long-term care. The policyholder may choose to add or remove these riders at any time during the policy term, subject to underwriting approval. Premium payments can be made monthly, quarterly, semi-annually, or annually, with discounts available for annual payment modes.",
+        "Furthermore, the policy includes a waiver of premium benefit in case of total disability, meaning that if the insured becomes totally disabled and unable to work, the insurance company will waive all future premium payments while keeping the coverage in force. This benefit typically requires proof of disability from a licensed physician and may be subject to a waiting period of 90 to 180 days depending on the specific policy terms and conditions."
+      ],
+      "ground_truth": "Long contexts are properly handled with chunking"
+    },
+    {
+      "id": "edge-005",
+      "question": "Numbers and currency test: $1,234.56, 50%, 1/2?",
+      "answer": "The coverage amount is $1,234.56 with 50% co-pay and 1/2 deductible.",
+      "contexts": [
+        "Coverage limits: $1,234.56 per incident.",
+        "Co-pay rate: 50% of eligible expenses.",
+        "Deductible: 1/2 of the annual premium."
+      ],
+      "ground_truth": "$1,234.56 with 50% co-pay"
+    },
+    {
+      "id": "edge-006",
+      "question": "What if there is no ground truth available?",
+      "answer": "This test case has no ground truth for metrics that don't require it.",
+      "contexts": [
+        "Some evaluation metrics like faithfulness do not require ground truth.",
+        "This allows testing of such metrics independently."
+      ],
+      "ground_truth": null
+    },
+    {
+      "id": "edge-007",
+      "question": "Multiple context test with many passages?",
+      "answer": "The system handles multiple context passages effectively.",
+      "contexts": [
+        "Context passage 1: Basic policy information.",
+        "Context passage 2: Coverage details.",
+        "Context passage 3: Exclusions and limitations.",
+        "Context passage 4: Claim procedures.",
+        "Context passage 5: Contact information.",
+        "Context passage 6: Additional riders.",
+        "Context passage 7: Premium payment options.",
+        "Context passage 8: Policy renewal terms."
+      ],
+      "ground_truth": "Handles multiple contexts effectively"
+    }
+  ]
+}

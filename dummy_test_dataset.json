@@ -1,0 +1,15 @@
+{
+    "name": "Dummy Dataset",
+    "version": "1.0.0",
+    "test_cases": [
+        {
+            "id": "tc-001",
+            "question": "What is RAG?",
+            "answer": "Retrieval Augmented Generation.",
+            "ground_truth": "Retrieval Augmented Generation is a technique.",
+            "contexts": [
+                "RAG combines retrieval and generation."
+            ]
+        }
+    ]
+}
