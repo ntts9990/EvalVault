@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         default="http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated list of allowed CORS origins.",
     )
+    evalvault_db_path: str = Field(
+        default="evalvault.db",
+        description="SQLite database path for API/CLI storage.",
+    )
 
     # LLM Provider Selection
     llm_provider: str = Field(

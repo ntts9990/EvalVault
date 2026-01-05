@@ -6,6 +6,8 @@ from pathlib import Path
 
 import typer
 
+from evalvault.config.settings import Settings
+
 
 def profile_option(
     *,
@@ -24,12 +26,13 @@ def profile_option(
 
 def db_option(
     *,
-    default: str | Path | None = Path("evalvault.db"),
+    default: str | Path | None = None,
     help_text: str = "Path to SQLite database file.",
 ) -> Path | None:
     """Shared --db / -D option definition."""
 
-    normalized_default = _normalize_path(default)
+    resolved_default = default if default is not None else Settings().evalvault_db_path
+    normalized_default = _normalize_path(resolved_default)
     return typer.Option(
         normalized_default,
         "--db",

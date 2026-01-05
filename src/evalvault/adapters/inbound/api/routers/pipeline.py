@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.config.settings import Settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
@@ -171,8 +172,8 @@ def _intent_label(intent_value: str) -> str:
 
 def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAdapter]:
     service = AnalysisPipelineService()
-    db_path = "evalvault.db"
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    settings = Settings()
+    storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
 
     from evalvault.adapters.outbound.analysis import (
         AnalysisReportModule,
