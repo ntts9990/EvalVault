@@ -77,7 +77,7 @@ class Settings(BaseSettings):
         description="vLLM API key (optional, depends on server setup)",
     )
     vllm_model: str = Field(
-        default="gpt-oss-120b",
+        default="gpt-oss:120b",
         description="vLLM model name for evaluation",
     )
     vllm_embedding_model: str = Field(

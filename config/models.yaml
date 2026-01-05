@@ -59,7 +59,7 @@ profiles:
     description: "vLLM(OpenAI-compatible) 서버 사용"
     llm:
       provider: vllm
-      model: gpt-oss-120b
+      model: gpt-oss:120b
     embedding:
       provider: vllm
       model: qwen3-embedding:0.6b
