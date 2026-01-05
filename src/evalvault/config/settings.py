@@ -20,6 +20,11 @@ class Settings(BaseSettings):
         description="Model profile name (dev, prod, openai). Overrides individual settings.",
     )
 
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173",
+        description="Comma-separated list of allowed CORS origins.",
+    )
+
     # LLM Provider Selection
     llm_provider: str = Field(
         default="openai",
@@ -31,9 +36,7 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(
         default=None, description="Custom OpenAI API base URL (optional)"
     )
-    openai_model: str = Field(
-        default="gpt-5-nano", description="OpenAI model to use for evaluation"
-    )
+    openai_model: str = Field(default="gpt-4o", description="OpenAI model to use for evaluation")
     openai_embedding_model: str = Field(
         default="text-embedding-3-small", description="OpenAI embedding model"
     )
@@ -58,6 +61,10 @@ class Settings(BaseSettings):
     ollama_think_level: str | None = Field(
         default=None,
         description="Thinking level for models that support it (e.g., 'medium')",
+    )
+    ollama_tool_models: str | None = Field(
+        default=None,
+        description="Comma-separated list of Ollama models that support tool/function calling.",
     )
 
     # Azure OpenAI Configuration (optional)

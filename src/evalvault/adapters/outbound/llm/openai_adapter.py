@@ -43,7 +43,10 @@ class OpenAIAdapter(BaseLLMAdapter):
             **client_kwargs,
         )
 
-        ragas_llm = create_instructor_llm("openai", self._model_name, self._client)
+        # Ragas requires high token limit for reasoning models
+        ragas_llm = create_instructor_llm(
+            "openai", self._model_name, self._client, max_completion_tokens=16384
+        )
         self._set_ragas_llm(ragas_llm)
 
         embeddings = create_openai_embeddings_with_legacy(
