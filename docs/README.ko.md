@@ -86,7 +86,7 @@ uv sync --extra dev
    # .env
    EVALVAULT_PROFILE=vllm
    VLLM_BASE_URL=http://localhost:8001/v1
-   VLLM_MODEL=gpt-oss:120b
+   VLLM_MODEL=gpt-oss-120b
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
@@ -107,9 +107,10 @@ uv sync --extra dev
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --tracker phoenix \
      --db evalvault.db
    ```
+   Tip: 결과를 history/export/Web UI에서 보려면 `--db` 경로를 동일하게 유지하세요.
+   Phoenix 추적이 필요하면 `--tracker phoenix`를 추가하고 `uv sync --extra phoenix`로 설치합니다.
 
 4. **히스토리 확인**
    ```bash

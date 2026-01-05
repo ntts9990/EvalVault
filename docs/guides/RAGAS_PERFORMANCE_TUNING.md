@@ -130,6 +130,19 @@ uv run evalvault run data.json \
 현재 `run_in_batches()`는 고정 배치 크기만 제공합니다.
 동적 배치/세마포어 기반 제한으로 **API 레이트리밋/리소스 사용을 최적화**할 수 있습니다.
 
+### 2.6 AsyncBatchExecutor 도입 (적응형 배치)
+
+코드베이스에 `AsyncBatchExecutor`가 이미 존재합니다.
+`Evaluator._evaluate_with_ragas()`가 사용하는 고정 배치 대신
+`src/evalvault/domain/services/async_batch_executor.py`를 연결하면
+성공률/429 비율에 따라 배치 크기를 자동 조정할 수 있습니다.
+
+### 2.7 LLM 응답 토큰 상한 조정
+
+현재 어댑터는 `max_completion_tokens` 기본값이 큽니다.
+`BaseLLMAdapter`/`*_adapter.py`에 **프로필별 상한**을 두면
+짧은 답변 기준 평가에서 체감 속도를 줄일 수 있습니다.
+
 ---
 
 ## 3) 성능 측정 체크리스트
@@ -145,4 +158,5 @@ uv run evalvault run data.json \
 ## 참고
 
 - 병렬 실행 로직: `src/evalvault/domain/services/batch_executor.py`
+- 적응형 배치 실행기: `src/evalvault/domain/services/async_batch_executor.py`
 - 평가 핵심 루프: `src/evalvault/domain/services/evaluator.py`

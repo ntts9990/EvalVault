@@ -47,7 +47,7 @@ vLLM(OpenAI-compatible)로 시작하려면 아래처럼 설정합니다:
 ```bash
 EVALVAULT_PROFILE=vllm
 VLLM_BASE_URL=http://localhost:8001/v1
-VLLM_MODEL=gpt-oss:120b
+VLLM_MODEL=gpt-oss-120b
 VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
 ```
 
@@ -68,27 +68,17 @@ Langfuse: Not configured
 
 ---
 
-## Step 3: API + React 프론트 실행 (dev)
+## Step 3: 첫 Ragas 평가 실행
+
+샘플 데이터셋으로 Ragas 평가를 실행하고 결과를 DB에 저장합니다:
 
 ```bash
-# API
-uv run evalvault serve-api --reload
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
 ```
 
----
-
-## Step 4: 첫 평가 실행
-
-샘플 데이터셋으로 평가를 실행합니다:
-
-```bash
-uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
-```
+Tip: `--db`를 빼면 결과가 콘솔에만 출력되고 history/export/Web UI에는 저장되지 않습니다.
 
 출력 예시:
 ```
@@ -104,7 +94,37 @@ Results:
 faithfulness: 0.92
 Pass Rate: 100% (5/5 passed)
 
+Results saved to database: evalvault.db
 Run ID: abc123-def456-...
+```
+
+---
+
+## Step 4: 결과 확인 (CLI/Web UI)
+
+```bash
+# 평가 히스토리 조회 (동일한 DB 경로)
+uv run evalvault history --db evalvault.db
+
+# 상세 결과 내보내기
+uv run evalvault export <run_id> -o result.json --db evalvault.db
+
+# Web UI에서 결과 보기 (Streamlit)
+uv run evalvault web --browser --db evalvault.db
+```
+
+---
+
+## Step 5: API + React 프론트 실행 (선택)
+
+```bash
+# API
+uv run evalvault serve-api --reload
+
+# Frontend
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
@@ -112,16 +132,6 @@ Run ID: abc123-def456-...
 ## 다음 단계
 
 축하합니다! 첫 RAG 평가를 성공적으로 완료했습니다.
-
-### 결과 확인
-
-```bash
-# 평가 히스토리 조회
-uv run evalvault history
-
-# 상세 결과 내보내기
-uv run evalvault export <run_id> -o result.json
-```
 
 ### 더 알아보기
 
@@ -169,8 +179,9 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 |------|--------|
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
-| 3. API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
-| 4. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness` |
+| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness --db evalvault.db` |
+| 4. 결과 확인 | `uv run evalvault history --db evalvault.db` 또는 `uv run evalvault web --browser` |
+| 5. (선택) API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
 
 소요 시간: 약 5분
 

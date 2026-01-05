@@ -105,7 +105,7 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 # vLLM(OpenAI-compatible) 사용 예
 EVALVAULT_PROFILE=vllm
 VLLM_BASE_URL=http://localhost:8001/v1
-VLLM_MODEL=gpt-oss:120b
+VLLM_MODEL=gpt-oss-120b
 VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
 # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
 ```
@@ -165,7 +165,7 @@ profiles:
   vllm:
     llm:
       provider: vllm
-      model: gpt-oss:120b
+      model: gpt-oss-120b
     embedding:
       provider: vllm
       model: qwen3-embedding:0.6b
@@ -275,6 +275,8 @@ npm run dev
   - 프록시 유지: `VITE_API_PROXY_TARGET=http://localhost:8000`
   - 직접 호출: `VITE_API_BASE_URL=http://localhost:8000/api/v1`
 - 직접 호출 시에는 API 서버 `.env`에 `CORS_ORIGINS`로 프론트 오리진을 추가합니다.
+- Analysis Lab에서 “결과 저장”을 누르면 SQLite/PostgreSQL의 `pipeline_results`에 저장되며,
+  저장된 결과는 좌측 목록에서 즉시 불러옵니다 (`/api/v1/pipeline/results`).
 
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
@@ -309,6 +311,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 ### SQLite/PostgreSQL
 - 기본값은 `evalvault.db` (SQLite)
 - PostgreSQL 사용 시 `.env`에 `POSTGRES_CONNECTION_STRING=postgresql://...` 또는 `POSTGRES_HOST/PORT/USER/PASSWORD`를 설정하고 `uv sync --extra postgres` 를 실행합니다.
+- 분석 파이프라인 저장 결과는 `pipeline_results` 테이블에 기록됩니다.
 
 ### Langfuse
 1. `docker compose -f docker-compose.langfuse.yml up -d`

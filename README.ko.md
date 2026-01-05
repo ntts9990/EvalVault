@@ -19,6 +19,7 @@ EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 Streamlit Web UI�
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
 - OpenAI/Ollama/폐쇄망을 아우르는 프로필 기반 모델 구성
 - Streamlit Web UI에서 평가, 히스토리, 보고서 생성
+- FastAPI + React UI에서 Evaluation Studio/Analysis Lab 결과 저장 및 재조회
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
 - 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
@@ -72,7 +73,7 @@ uv sync --extra dev
    # .env
    EVALVAULT_PROFILE=vllm
    VLLM_BASE_URL=http://localhost:8001/v1
-   VLLM_MODEL=gpt-oss:120b
+   VLLM_MODEL=gpt-oss-120b
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
@@ -93,9 +94,10 @@ uv sync --extra dev
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --tracker phoenix \
      --db evalvault.db
    ```
+   Tip: 결과를 history/export/Web UI에서 보려면 `--db` 경로를 동일하게 유지하세요.
+   Phoenix 추적이 필요하면 `--tracker phoenix`를 추가하고 `uv sync --extra phoenix`로 설치합니다.
 
 4. **히스토리 확인**
    ```bash

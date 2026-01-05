@@ -19,6 +19,7 @@ EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and
 - One CLI for running, comparing, exporting, and storing evaluation runs
 - Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
 - Streamlit Web UI for evaluation, history, and report generation
+- FastAPI + React UI for Evaluation Studio and Analysis Lab (save & reload analysis results)
 - Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
 - DAG-based analysis pipeline with statistical/NLP/causal modules
@@ -73,7 +74,7 @@ Add extras as needed:
    # .env
    EVALVAULT_PROFILE=vllm
    VLLM_BASE_URL=http://localhost:8001/v1
-   VLLM_MODEL=gpt-oss:120b
+   VLLM_MODEL=gpt-oss-120b
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # optional: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
@@ -111,9 +112,10 @@ Add extras as needed:
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --tracker phoenix \
      --db evalvault.db
    ```
+   Tip: `--db` stores results for `history/export/web`. Add `--tracker phoenix` only if
+   Phoenix is configured (and `uv sync --extra phoenix` is installed).
 
 4. **Inspect history**
    ```bash
