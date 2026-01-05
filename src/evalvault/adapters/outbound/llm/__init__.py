@@ -10,6 +10,7 @@ from evalvault.adapters.outbound.llm.base import (
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
+from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
 
@@ -43,6 +44,8 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
         return OpenAIAdapter(settings)
     elif provider == "ollama":
         return OllamaAdapter(settings)
+    elif provider == "vllm":
+        return VLLMAdapter(settings)
     elif provider == "azure":
         return AzureOpenAIAdapter(settings)
     elif provider == "anthropic":
@@ -90,6 +93,10 @@ def create_llm_adapter_for_model(
         base_settings.llm_provider = "ollama"
         base_settings.ollama_model = model_name
         return OllamaAdapter(base_settings)
+    elif provider == "vllm":
+        base_settings.llm_provider = "vllm"
+        base_settings.vllm_model = model_name
+        return VLLMAdapter(base_settings)
     elif provider == "azure":
         base_settings.llm_provider = "azure"
         base_settings.azure_deployment = model_name
@@ -113,6 +120,7 @@ __all__ = [
     "AnthropicAdapter",
     "LLMRelationAugmenter",
     "OllamaAdapter",
+    "VLLMAdapter",
     "get_llm_adapter",
     "create_llm_adapter_for_model",
 ]

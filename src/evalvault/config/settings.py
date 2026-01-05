@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # LLM Provider Selection
     llm_provider: str = Field(
         default="openai",
-        description="LLM provider: 'openai' or 'ollama'",
+        description="LLM provider: 'openai', 'ollama', or 'vllm'",
     )
 
     # OpenAI Configuration
@@ -65,6 +65,32 @@ class Settings(BaseSettings):
     ollama_tool_models: str | None = Field(
         default=None,
         description="Comma-separated list of Ollama models that support tool/function calling.",
+    )
+
+    # vLLM Configuration (OpenAI-compatible server)
+    vllm_base_url: str = Field(
+        default="http://localhost:8001/v1",
+        description="vLLM OpenAI-compatible base URL",
+    )
+    vllm_api_key: str | None = Field(
+        default=None,
+        description="vLLM API key (optional, depends on server setup)",
+    )
+    vllm_model: str = Field(
+        default="gpt-oss:120b",
+        description="vLLM model name for evaluation",
+    )
+    vllm_embedding_model: str = Field(
+        default="qwen3-embedding:0.6b",
+        description="vLLM embedding model name",
+    )
+    vllm_embedding_base_url: str | None = Field(
+        default=None,
+        description="Optional base URL for vLLM embeddings (defaults to vllm_base_url)",
+    )
+    vllm_timeout: int = Field(
+        default=120,
+        description="vLLM request timeout in seconds",
     )
 
     # Azure OpenAI Configuration (optional)
@@ -168,12 +194,16 @@ def apply_profile(settings: Settings, profile_name: str) -> Settings:
             # 인프라 설정(ollama_base_url, ollama_timeout)은 .env에서 가져옴
         elif profile.llm.provider == "openai":
             settings.openai_model = profile.llm.model
+        elif profile.llm.provider == "vllm":
+            settings.vllm_model = profile.llm.model
 
         # 임베딩 설정 적용 (모델명만)
         if profile.embedding.provider == "ollama":
             settings.ollama_embedding_model = profile.embedding.model
         elif profile.embedding.provider == "openai":
             settings.openai_embedding_model = profile.embedding.model
+        elif profile.embedding.provider == "vllm":
+            settings.vllm_embedding_model = profile.embedding.model
 
     except FileNotFoundError:
         # 설정 파일이 없으면 프로필 무시

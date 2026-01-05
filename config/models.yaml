@@ -52,6 +52,18 @@ profiles:
       provider: openai
       model: text-embedding-3-small
 
+  # ──────────────────────────────────────────────────────────────
+  # vLLM OpenAI-compatible 서버 사용
+  # ──────────────────────────────────────────────────────────────
+  vllm:
+    description: "vLLM(OpenAI-compatible) 서버 사용"
+    llm:
+      provider: vllm
+      model: gpt-oss:120b
+    embedding:
+      provider: vllm
+      model: qwen3-embedding:0.6b
+
 # ──────────────────────────────────────────────────────────────
 # 참고: 인프라 설정
 # ──────────────────────────────────────────────────────────────
