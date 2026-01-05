@@ -42,6 +42,7 @@ from evalvault.adapters.outbound.analysis.hybrid_rrf_module import HybridRRFModu
 from evalvault.adapters.outbound.analysis.hybrid_weighted_module import (
     HybridWeightedModule,
 )
+from evalvault.adapters.outbound.analysis.llm_report_module import LLMReportModule
 from evalvault.adapters.outbound.analysis.low_performer_extractor_module import (
     LowPerformerExtractorModule,
 )
@@ -119,6 +120,7 @@ __all__ = [
     "HybridRRFModule",
     "HybridWeightedModule",
     "LowPerformerExtractorModule",
+    "LLMReportModule",
     "ModelAnalyzerModule",
     "MorphemeAnalyzerModule",
     "MorphemeQualityCheckerModule",

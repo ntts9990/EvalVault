@@ -23,6 +23,7 @@ const METRIC_EXCLUDE_KEYS = new Set([
     "queries",
     "raw",
     "report",
+    "evidence",
 ]);
 
 function extractNumericMetrics(output: Record<string, any> | null) {

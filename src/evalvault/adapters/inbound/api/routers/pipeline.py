@@ -1,16 +1,20 @@
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
+from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.settings import Settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
 router = APIRouter(tags=["pipeline"])
+logger = logging.getLogger(__name__)
 
 INTENT_CATALOG = {
     AnalysisIntent.VERIFY_MORPHEME: {
@@ -92,6 +96,7 @@ class AnalyzeRequest(BaseModel):
     query: str
     run_id: str | None = None
     intent: str | None = None
+    params: dict[str, Any] | None = None
 
 
 class AnalysisResponse(BaseModel):
@@ -161,6 +166,25 @@ class PipelineResultResponse(PipelineResultSummary):
     final_output: dict[str, Any] | None = None
 
 
+def _serialize_payload(value: Any) -> Any:
+    try:
+        return jsonable_encoder(value)
+    except Exception:
+        return {"_error": "serialization_failed", "repr": repr(value)}
+
+
+def _serialize_node_result(node_res: Any) -> dict[str, Any]:
+    status = getattr(node_res, "status", None)
+    if hasattr(status, "value"):
+        status = status.value
+    return {
+        "status": status,
+        "error": getattr(node_res, "error", None),
+        "duration_ms": getattr(node_res, "duration_ms", None),
+        "output": _serialize_payload(getattr(node_res, "output", None)),
+    }
+
+
 def _intent_label(intent_value: str) -> str:
     try:
         intent = AnalysisIntent(intent_value)
@@ -174,6 +198,11 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
     service = AnalysisPipelineService()
     settings = Settings()
     storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
+    llm_adapter = None
+    try:
+        llm_adapter = get_llm_adapter(settings)
+    except Exception as exc:
+        logger.warning("LLM adapter initialization failed for pipeline: %s", exc)
 
     from evalvault.adapters.outbound.analysis import (
         AnalysisReportModule,
@@ -188,6 +217,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
         EmbeddingSearcherModule,
         HybridRRFModule,
         HybridWeightedModule,
+        LLMReportModule,
         LowPerformerExtractorModule,
         ModelAnalyzerModule,
         MorphemeAnalyzerModule,
@@ -220,6 +250,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
     service.register_module(AnalysisReportModule())
     service.register_module(VerificationReportModule())
     service.register_module(ComparisonReportModule())
+    service.register_module(LLMReportModule(llm_adapter=llm_adapter))
 
     service.register_module(MorphemeAnalyzerModule())
     service.register_module(MorphemeQualityCheckerModule())
@@ -236,7 +267,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
     service.register_module(RunAnalyzerModule())
     service.register_module(StatisticalComparatorModule())
     service.register_module(RunComparatorModule())
-    service.register_module(RagasEvaluatorModule())
+    service.register_module(RagasEvaluatorModule(llm_adapter=llm_adapter))
     service.register_module(LowPerformerExtractorModule())
     service.register_module(DiagnosticPlaybookModule())
     service.register_module(RootCauseAnalyzerModule())
@@ -252,6 +283,11 @@ async def analyze_query(request: AnalyzeRequest):
     """Run natural language analysis on evaluation results."""
     try:
         service, _storage = _build_pipeline_service()
+        extra_params = {
+            key: value
+            for key, value in (request.params or {}).items()
+            if key not in {"query", "run_id", "intent"}
+        }
 
         if request.intent:
             try:
@@ -260,21 +296,23 @@ async def analyze_query(request: AnalyzeRequest):
                 raise HTTPException(
                     status_code=400, detail=f"Unknown intent: {request.intent}"
                 ) from exc
-            result = service.analyze_intent(
+            result = await service.analyze_intent_async(
                 intent,
                 query=request.query,
                 run_id=request.run_id,
+                **extra_params,
             )
         else:
-            result = service.analyze(request.query, run_id=request.run_id)
+            result = await service.analyze_async(
+                request.query,
+                run_id=request.run_id,
+                **extra_params,
+            )
 
-        node_results_summary = {}
-        for node_id, node_res in result.node_results.items():
-            node_results_summary[node_id] = {
-                "status": node_res.status,
-                "error": node_res.error,
-                "duration_ms": node_res.duration_ms,
-            }
+        node_results_summary = {
+            node_id: _serialize_node_result(node_res)
+            for node_id, node_res in result.node_results.items()
+        }
 
         return AnalysisResponse(
             intent=result.intent.value if result.intent else "unknown",
@@ -283,7 +321,7 @@ async def analyze_query(request: AnalyzeRequest):
             pipeline_id=result.pipeline_id,
             started_at=result.started_at.isoformat() if result.started_at else None,
             finished_at=result.finished_at.isoformat() if result.finished_at else None,
-            final_output=result.final_output,
+            final_output=_serialize_payload(result.final_output),
             node_results=node_results_summary,
         )
 

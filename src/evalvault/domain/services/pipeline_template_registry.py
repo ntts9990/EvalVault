@@ -349,9 +349,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="분석 보고서",
-                module="analysis_report",
-                depends_on=["root_cause"],
+                name="LLM 분석 보고서",
+                module="llm_report",
+                params={"report_type": "analysis"},
+                depends_on=["load_data", "root_cause"],
             ),
         ]
         return AnalysisPipeline(
@@ -381,9 +382,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="분석 보고서",
-                module="analysis_report",
-                depends_on=["pattern_detection"],
+                name="LLM 분석 보고서",
+                module="llm_report",
+                params={"report_type": "analysis"},
+                depends_on=["load_data", "pattern_detection"],
             ),
         ]
         return AnalysisPipeline(
@@ -413,9 +415,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="분석 보고서",
-                module="analysis_report",
-                depends_on=["trend_detection"],
+                name="LLM 분석 보고서",
+                module="llm_report",
+                params={"report_type": "trend"},
+                depends_on=["load_runs", "trend_detection"],
             ),
         ]
         return AnalysisPipeline(
@@ -443,9 +446,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="요약 보고서",
-                module="summary_report",
-                depends_on=["statistics"],
+                name="LLM 요약 보고서",
+                module="llm_report",
+                params={"report_type": "summary"},
+                depends_on=["load_data", "statistics"],
             ),
         ]
         return AnalysisPipeline(
@@ -481,9 +485,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="상세 보고서",
-                module="detailed_report",
-                depends_on=["statistics", "nlp_analysis", "causal_analysis"],
+                name="LLM 상세 보고서",
+                module="llm_report",
+                params={"report_type": "detailed"},
+                depends_on=["load_data", "statistics", "nlp_analysis", "causal_analysis"],
             ),
         ]
         return AnalysisPipeline(
@@ -507,9 +512,10 @@ class PipelineTemplateRegistry:
             ),
             AnalysisNode(
                 id="report",
-                name="비교 보고서",
-                module="comparison_report",
-                depends_on=["run_comparison"],
+                name="LLM 비교 보고서",
+                module="llm_report",
+                params={"report_type": "comparison"},
+                depends_on=["load_runs", "run_comparison"],
             ),
         ]
         return AnalysisPipeline(

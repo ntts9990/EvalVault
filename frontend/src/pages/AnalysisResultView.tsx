@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
+import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
@@ -352,6 +353,11 @@ export function AnalysisResultView() {
                                 />
                             )}
                         </div>
+
+                        <AnalysisNodeOutputs
+                            nodeResults={result.node_results || undefined}
+                            title="노드 상세 출력"
+                        />
                     </div>
                 )}
             </div>

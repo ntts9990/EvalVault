@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
+import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
     fetchAnalysisIntents,
@@ -74,6 +75,8 @@ export function AnalysisLab() {
     const [saveTags, setSaveTags] = useState("");
     const [saveMetadataText, setSaveMetadataText] = useState("");
     const [metadataError, setMetadataError] = useState<string | null>(null);
+    const [useLlmReport, setUseLlmReport] = useState(true);
+    const [recomputeRagas, setRecomputeRagas] = useState(false);
     const [historySearch, setHistorySearch] = useState("");
     const [intentFilter, setIntentFilter] = useState("all");
     const [runFilter, setRunFilter] = useState("all");
@@ -118,6 +121,12 @@ export function AnalysisLab() {
         }
         loadHistory();
     }, []);
+
+    useEffect(() => {
+        if (!selectedRunId && recomputeRagas) {
+            setRecomputeRagas(false);
+        }
+    }, [selectedRunId, recomputeRagas]);
 
     const groupedCatalog = useMemo(() => {
         const grouped: Record<string, AnalysisIntentInfo[]> = {};
@@ -239,7 +248,18 @@ export function AnalysisLab() {
         setLastQuery(intent.sample_query);
         setLoading(true);
         try {
-            const analysis = await runAnalysis(intent.sample_query, selectedRunId || undefined, intent.intent);
+            const params: Record<string, any> = {
+                use_llm_report: useLlmReport,
+            };
+            if (recomputeRagas && selectedRunId) {
+                params.recompute_ragas = true;
+            }
+            const analysis = await runAnalysis(
+                intent.sample_query,
+                selectedRunId || undefined,
+                intent.intent,
+                params
+            );
             setResult(analysis);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Analysis failed");
@@ -373,6 +393,8 @@ export function AnalysisLab() {
         || result?.intent
         || "분석";
 
+    const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
+
     return (
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
@@ -417,6 +439,32 @@ export function AnalysisLab() {
                                     Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.
                                 </p>
                             )}
+                            <div className="mt-4 space-y-2 text-xs">
+                                <label className="flex items-center gap-2 text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        className="accent-primary"
+                                        checked={useLlmReport}
+                                        onChange={(e) => setUseLlmReport(e.target.checked)}
+                                    />
+                                    LLM 보고서 사용 (증거 인용 포함)
+                                </label>
+                                <label className="flex items-center gap-2 text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        className="accent-primary"
+                                        checked={recomputeRagas}
+                                        disabled={!selectedRunId}
+                                        onChange={(e) => setRecomputeRagas(e.target.checked)}
+                                    />
+                                    RAGAS 재평가 실행 (오래 걸릴 수 있음)
+                                </label>
+                                {!selectedRunId && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        RAGAS 재평가는 Run 선택 시 활성화됩니다.
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
@@ -884,6 +932,12 @@ export function AnalysisLab() {
                                             />
                                         )}
                                     </div>
+
+                                    <AnalysisNodeOutputs
+                                        nodeResults={result.node_results}
+                                        nodeDefinitions={intentDefinition?.nodes}
+                                        title="노드 상세 출력"
+                                    />
 
                                     {result.node_results && Object.values(result.node_results).some((node: any) => node?.error) && (
                                         <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs">

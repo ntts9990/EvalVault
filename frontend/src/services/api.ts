@@ -381,12 +381,13 @@ export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
 export async function runAnalysis(
     query: string,
     runId?: string,
-    intent?: string
+    intent?: string,
+    params?: Record<string, any>
 ): Promise<AnalysisResult> {
     const response = await fetch(`${API_BASE_URL}/pipeline/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, run_id: runId, intent }),
+        body: JSON.stringify({ query, run_id: runId, intent, params }),
     });
     if (!response.ok) throw new Error("Analysis failed");
     return response.json();
