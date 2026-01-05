@@ -29,7 +29,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Install semantic-release
         run: uv pip install python-semantic-release
@@ -74,9 +74,17 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.next_version }}"
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
-          git add pyproject.toml
-          git commit -m "chore(release): ${VERSION} [skip ci]"
-          git push origin HEAD:main
+          # Regenerate lockfile with new version
+          uv lock
+          # Stage both files
+          git add pyproject.toml uv.lock
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit (version already up to date)"
+          fi
 
       - name: Create release tag
         if: steps.version.outputs.should_release == 'true'
