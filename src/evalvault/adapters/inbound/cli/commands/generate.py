@@ -14,6 +14,7 @@ from evalvault.domain.services.testset_generator import (
     GenerationConfig,
 )
 
+from ..utils.progress import multi_stage_progress
 from ..utils.validators import validate_choice
 
 
@@ -38,7 +39,7 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
             "basic",
             "--method",
             "-m",
-            help="Generation method: 'basic' or 'knowledge_graph'.",
+            help="Generation method: 'basic' (random chunks) or 'knowledge_graph' (KG-based).",
         ),
         output: Path = typer.Option(
             "generated_testset.json",
@@ -50,16 +51,56 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
             500,
             "--chunk-size",
             "-c",
-            help="Chunk size for document splitting.",
+            help="Chunk size (in characters) for document splitting.",
         ),
         name: str = typer.Option(
             "generated-testset",
             "--name",
             "-N",
-            help="Dataset name.",
+            help="Name for the generated dataset.",
         ),
     ) -> None:
-        """Generate a synthetic test dataset from documents."""
+        """Generate a synthetic test dataset from documents.
+
+        Create test cases with questions, answers, and contexts from your
+        document corpus for RAG evaluation.
+
+        \b
+        Methods:
+          • basic          — Random chunk sampling with simple Q&A generation.
+          • knowledge_graph — Extract entities/relations for structured Q&A.
+
+        \b
+        Examples:
+          # Generate 10 questions from a single document
+          evalvault generate doc.txt -n 10 -o testset.json
+
+          # Generate from multiple documents
+          evalvault generate doc1.txt doc2.txt doc3.txt -n 50
+
+          # Use knowledge graph method for better quality
+          evalvault generate docs/*.txt -m knowledge_graph -n 20
+
+          # Custom chunk size for longer contexts
+          evalvault generate doc.txt -c 1000 -n 10
+
+          # Name your dataset
+          evalvault generate doc.txt -N "insurance-qa-v1"
+
+        \b
+        Output Format (JSON):
+          {
+            "name": "...",
+            "test_cases": [
+              {"id": "tc-001", "question": "...", "answer": "...", "contexts": [...]}
+            ]
+          }
+
+        \b
+        See also:
+          evalvault run       — Evaluate generated testsets
+          evalvault kg build  — Build knowledge graphs from documents
+        """
 
         allowed_methods = ("basic", "knowledge_graph")
         validate_choice(method, allowed_methods, console, value_label="method")
@@ -69,14 +110,20 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
         console.print(f"Target questions: [cyan]{num_questions}[/cyan]")
         console.print(f"Method: [cyan]{method}[/cyan]\n")
 
-        with console.status("[bold green]Reading documents..."):
+        stages = [
+            ("Reading documents", len(documents)),
+            ("Generating testset", num_questions),
+            ("Saving results", 1),
+        ]
+
+        with multi_stage_progress(console, stages) as update_stage:
             doc_texts = []
-            for doc_path in documents:
+            for idx, doc_path in enumerate(documents, start=1):
                 with open(doc_path, encoding="utf-8") as file:
                     doc_texts.append(file.read())
+                update_stage(0, idx)
             console.print(f"[green]Loaded {len(doc_texts)} documents[/green]")
 
-        with console.status("[bold green]Generating testset..."):
             if method == "knowledge_graph":
                 generator = KnowledgeGraphGenerator()
                 generator.build_graph(doc_texts)
@@ -98,10 +145,9 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
                     dataset_name=name,
                 )
                 dataset = generator.generate(doc_texts, config)
+            update_stage(1, len(dataset.test_cases))
 
             console.print(f"[green]Generated {len(dataset.test_cases)} test cases[/green]")
-
-        with console.status(f"[bold green]Saving to {output}..."):
             data = {
                 "name": dataset.name,
                 "version": dataset.version,
@@ -121,8 +167,9 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
 
             with open(output, "w", encoding="utf-8") as file:
                 json.dump(data, file, indent=2, ensure_ascii=False)
+            update_stage(2, 1)
 
-            console.print(f"[green]Testset saved to {output}[/green]\n")
+        console.print(f"[green]Testset saved to {output}[/green]\n")
 
 
 __all__ = ["register_generate_commands"]

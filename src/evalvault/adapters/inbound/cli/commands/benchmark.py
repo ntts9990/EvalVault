@@ -19,6 +19,7 @@ from evalvault.domain.services.retrieval_metrics import (
 )
 
 from ..utils.formatters import format_score, format_status
+from ..utils.progress import evaluation_progress
 
 
 def create_benchmark_app(console: Console) -> typer.Typer:
@@ -32,7 +33,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             "korean-rag",
             "--name",
             "-n",
-            help="Benchmark name to run.",
+            help="Benchmark name to run. Use 'evalvault benchmark list' to see available benchmarks.",
         ),
         output: Path | None = typer.Option(
             None,
@@ -47,7 +48,21 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             help="Show detailed output.",
         ),
     ) -> None:
-        """Run a benchmark suite."""
+        """Run a benchmark suite.
+
+        \b
+        Examples:
+          # Run the Korean RAG benchmark
+          evalvault benchmark run -n korean-rag
+
+          # Save results to a file
+          evalvault benchmark run -n korean-rag -o results.json
+
+        \b
+        See also:
+          evalvault benchmark list       — List available benchmarks
+          evalvault benchmark retrieval  — Run retrieval-specific benchmarks
+        """
 
         console.print(f"\n[bold]Running Benchmark: {name}[/bold]\n")
         try:
@@ -127,44 +142,77 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             "bm25,dense,hybrid",
             "--methods",
             "-m",
-            help="Comma-separated retrieval methods (bm25,dense,hybrid,graphrag).",
+            help="Comma-separated retrieval methods: bm25, dense, hybrid, graphrag.",
         ),
         top_k: int = typer.Option(
             5,
             "--top-k",
             "-k",
             min=1,
-            help="Top-K cutoff for Recall@K and MRR.",
+            help="Top-K cutoff for Recall@K, Precision@K, and MRR.",
         ),
         ndcg_k: int | None = typer.Option(
             None,
             "--ndcg-k",
             min=1,
-            help="Top-K cutoff for nDCG (defaults to top-k).",
+            help="Top-K cutoff for nDCG (defaults to --top-k).",
         ),
         embedding_profile: str | None = typer.Option(
             None,
             "--embedding-profile",
-            help="Embedding profile for dense/hybrid (dev/prod, Ollama).",
+            help="Embedding profile for dense/hybrid: 'dev' or 'prod' (Ollama).",
         ),
         embedding_model: str | None = typer.Option(
             None,
             "--embedding-model",
-            help="Embedding model override for dense/hybrid.",
+            help="Embedding model override for dense/hybrid retrieval.",
         ),
         kg: Path | None = typer.Option(
             None,
             "--kg",
-            help="Knowledge graph JSON for GraphRAG.",
+            help="Knowledge graph JSON file (required for GraphRAG method).",
         ),
         output: Path | None = typer.Option(
             None,
             "--output",
             "-o",
-            help="Output file for results (.json or .csv).",
+            help="Output file for results (.json or .csv format).",
         ),
     ) -> None:
-        """Run retrieval benchmark across multiple methods."""
+        """Run retrieval benchmark across multiple methods.
+
+        Compare BM25, Dense, Hybrid, and GraphRAG retrieval methods on your
+        dataset with standard metrics: Recall@K, Precision@K, MRR, and nDCG@K.
+
+        \b
+        Examples:
+          # Compare all retrieval methods
+          evalvault benchmark retrieval testset.json -m bm25,dense,hybrid
+
+          # Use GraphRAG with knowledge graph
+          evalvault benchmark retrieval testset.json -m graphrag --kg graph.json
+
+          # Save results as CSV
+          evalvault benchmark retrieval testset.json -o results.csv
+
+          # Custom top-K cutoff
+          evalvault benchmark retrieval testset.json -k 10 --ndcg-k 20
+
+          # Use Ollama embeddings for dense retrieval
+          evalvault benchmark retrieval testset.json -m dense --embedding-profile dev
+
+        \b
+        Testset Format (JSON):
+          {
+            "documents": [{"doc_id": "d1", "content": "..."}],
+            "test_cases": [{"query": "...", "relevant_doc_ids": ["d1"]}]
+          }
+
+        \b
+        See also:
+          evalvault benchmark run   — Run benchmark suites
+          evalvault run             — Evaluate with retrievers
+        """
 
         data = _load_retrieval_testset(testset)
         documents = data.get("documents", [])
@@ -193,33 +241,40 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             console=console,
         )
 
-        for method in method_list:
-            search_fn, backend = _build_search_fn(
-                method,
-                doc_contents,
-                doc_ids,
-                console=console,
-                kg_path=kg,
-                embedding_profile=normalized_profile,
-                embedding_model=embedding_model,
-                ollama_adapter=ollama_adapter,
-            )
-            case_metrics = []
-            for tc in test_cases:
-                retrieved = search_fn(tc["query"], top_k)
-                metrics = compute_retrieval_metrics(
-                    retrieved,
-                    tc["relevant_doc_ids"],
-                    recall_k=top_k,
-                    ndcg_k=ndcg_k,
+        total_operations = len(method_list) * len(test_cases)
+        with evaluation_progress(
+            console, total_operations, description="Running retrieval benchmark"
+        ) as update_progress:
+            completed = 0
+            for method in method_list:
+                search_fn, backend = _build_search_fn(
+                    method,
+                    doc_contents,
+                    doc_ids,
+                    console=console,
+                    kg_path=kg,
+                    embedding_profile=normalized_profile,
+                    embedding_model=embedding_model,
+                    ollama_adapter=ollama_adapter,
                 )
-                case_metrics.append(metrics)
+                case_metrics = []
+                for tc in test_cases:
+                    retrieved = search_fn(tc["query"], top_k)
+                    metrics = compute_retrieval_metrics(
+                        retrieved,
+                        tc["relevant_doc_ids"],
+                        recall_k=top_k,
+                        ndcg_k=ndcg_k,
+                    )
+                    case_metrics.append(metrics)
+                    completed += 1
+                    update_progress(completed)
 
-            summary = average_retrieval_metrics(case_metrics)
-            summary["test_cases"] = len(case_metrics)
-            if backend != method:
-                summary["backend"] = backend
-            results[method] = summary
+                summary = average_retrieval_metrics(case_metrics)
+                summary["test_cases"] = len(case_metrics)
+                if backend != method:
+                    summary["backend"] = backend
+                results[method] = summary
 
         _print_retrieval_table(
             console,
@@ -252,7 +307,17 @@ def create_benchmark_app(console: Console) -> typer.Typer:
 
     @benchmark_app.command("list")
     def benchmark_list() -> None:
-        """List available benchmarks."""
+        """List available benchmarks.
+
+        \b
+        Examples:
+          evalvault benchmark list
+
+        \b
+        See also:
+          evalvault benchmark run        — Run a benchmark suite
+          evalvault benchmark retrieval  — Run retrieval benchmarks
+        """
 
         console.print("\n[bold]Available Benchmarks[/bold]\n")
 

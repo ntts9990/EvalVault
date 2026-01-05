@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +95,25 @@ def _build_dense_retriever(
     dense_retriever = KoreanDenseRetriever()
     dense_retriever.index(documents)
     return dense_retriever
+
+
+def _log_timestamp(console: Console, verbose: bool, message: str) -> None:
+    if not verbose:
+        return
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    console.print(f"[dim]{timestamp} {message}[/dim]")
+
+
+def _log_duration(
+    console: Console,
+    verbose: bool,
+    message: str,
+    started_at: datetime,
+) -> None:
+    if not verbose:
+        return
+    elapsed = (datetime.now() - started_at).total_seconds()
+    _log_timestamp(console, verbose, f"{message} ({elapsed:.2f}s)")
 
 
 def register_run_commands(
@@ -298,27 +318,46 @@ def register_run_commands(
     ) -> None:
         """Run RAG evaluation on a dataset.
 
+        \b
         Run Modes:
-          • Simple — 안전한 기본값(2개 메트릭 + Phoenix 트래커 + Domain Memory 비활성)을 강제합니다.
-          • Full — 모든 프롬프트/Domain Memory/스트리밍 옵션을 그대로 노출합니다.
+          • Simple — Safe defaults (2 metrics + Phoenix tracker + no Domain Memory).
+          • Full — Expose all prompt/Domain Memory/streaming options.
 
+        \b
         Presets:
-          • quick — Fast iteration with faithfulness metric only
-          • production — Balanced evaluation with 4 core metrics
-          • comprehensive — Complete evaluation with all 6 metrics
+          • quick — Fast iteration with faithfulness metric only.
+          • production — Balanced evaluation with 4 core metrics.
+          • comprehensive — Complete evaluation with all 6 metrics.
 
-        예시:
-          # Using mode shortcuts
-          uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json
-          uv run evalvault run-simple tests/fixtures/e2e/insurance_qa_korean.json
+        \b
+        Examples:
+          # Basic evaluation with default metrics
+          evalvault run data.json -m faithfulness
 
-          # Using presets
-          uv run evalvault run --preset quick dataset.json
-          uv run evalvault run --preset production dataset.json -o results.json
-          uv run evalvault run --preset comprehensive dataset.json
+          # Use preset for quick iteration
+          evalvault run --preset quick dataset.json
 
-          # Override preset metrics
-          uv run evalvault run --preset quick -m faithfulness,answer_relevancy dataset.json
+          # Production run with JSON output
+          evalvault run --preset production dataset.json -o results.json
+
+          # With retriever (auto-fill contexts)
+          evalvault run questions.json -r hybrid --retriever-docs docs.json
+
+          # Full mode with Domain Memory
+          evalvault run --mode full data.json --use-domain-memory
+
+          # Parallel evaluation for faster processing
+          evalvault run data.json -m faithfulness -P -b 10
+
+          # Streaming for large datasets
+          evalvault run large.json -m faithfulness --stream
+
+        \b
+        See also:
+          evalvault metrics     — List available metrics
+          evalvault history     — View past evaluation runs
+          evalvault analyze     — Analyze run results
+          evalvault benchmark   — Run retrieval benchmarks
         """
         try:
             ctx = click.get_current_context()
@@ -510,6 +549,7 @@ def register_run_commands(
         if profile_name:
             console.print(f"Profile: [cyan]{profile_name}[/cyan]")
         console.print()
+        _log_timestamp(console, verbose, f"실행 시작 (mode={preset.name})")
 
         phoenix_trace_metadata: dict[str, Any] = {
             "dataset.path": str(dataset),
@@ -519,23 +559,34 @@ def register_run_commands(
 
         # Load dataset or configure streaming metadata
         if stream:
+            stream_started_at = datetime.now()
+            _log_timestamp(
+                console,
+                verbose,
+                f"스트리밍 템플릿 생성 시작 (chunk_size={stream_chunk_size})",
+            )
             ds = _build_streaming_dataset_template(dataset)
+            _log_duration(console, verbose, "스트리밍 템플릿 생성 완료", stream_started_at)
             console.print(
                 f"[dim]Streaming evaluation enabled (chunk size={stream_chunk_size}).[/dim]"
             )
             phoenix_trace_metadata["dataset.stream"] = True
             phoenix_trace_metadata["dataset.template_version"] = ds.version
         else:
+            dataset_load_started_at = datetime.now()
+            _log_timestamp(console, verbose, f"데이터셋 로딩 시작: {dataset}")
             with progress_spinner(console, "📂 데이터셋 로딩 중...") as update_progress:
                 try:
                     loader = get_loader(dataset)
                     ds = loader.load(dataset)
                     update_progress(f"✅ {len(ds)}개 테스트 케이스 로드 완료")
+                    _log_duration(console, verbose, "데이터셋 로딩 완료", dataset_load_started_at)
                     phoenix_trace_metadata["dataset.test_cases"] = len(ds)
                     if ds.metadata:
                         for key, value in ds.metadata.items():
                             phoenix_trace_metadata[f"dataset.meta.{key}"] = str(value)
                 except Exception as exc:  # pragma: no cover - user feedback path
+                    _log_duration(console, verbose, "데이터셋 로딩 실패", dataset_load_started_at)
                     print_cli_error(
                         console,
                         "데이터셋을 불러오지 못했습니다.",
@@ -550,6 +601,7 @@ def register_run_commands(
         retriever_instance: RetrieverPort | None = None
         retriever_doc_ids: list[str] | None = None
         if retriever:
+            _log_timestamp(console, verbose, f"Retriever 준비 시작 (mode={retriever})")
             validate_choice(
                 retriever,
                 ("bm25", "dense", "hybrid", "graphrag"),
@@ -575,10 +627,23 @@ def register_run_commands(
                     tips=["--kg <knowledge_graph.json> 옵션을 함께 지정하세요."],
                 )
             else:
+                retriever_docs_started_at = datetime.now()
                 try:
                     documents, doc_ids = load_retriever_documents(retriever_docs)
                     retriever_doc_ids = doc_ids
+                    _log_duration(
+                        console,
+                        verbose,
+                        f"Retriever 문서 로드 완료 (count={len(documents)})",
+                        retriever_docs_started_at,
+                    )
                 except Exception as exc:
+                    _log_duration(
+                        console,
+                        verbose,
+                        "Retriever 문서 로드 실패",
+                        retriever_docs_started_at,
+                    )
                     print_cli_error(
                         console,
                         "Retriever 문서를 불러오지 못했습니다.",
@@ -587,6 +652,7 @@ def register_run_commands(
                     )
                     raise typer.Exit(1) from exc
 
+                retriever_init_started_at = datetime.now()
                 try:
                     if retriever == "graphrag":
                         from evalvault.adapters.outbound.kg.graph_rag_retriever import (
@@ -673,7 +739,27 @@ def register_run_commands(
                             use_hybrid=retriever == "hybrid",
                             verbose=verbose,
                         )
+                    if retriever_instance:
+                        _log_duration(
+                            console,
+                            verbose,
+                            "Retriever 초기화 완료",
+                            retriever_init_started_at,
+                        )
+                    else:
+                        _log_duration(
+                            console,
+                            verbose,
+                            "Retriever 초기화 실패",
+                            retriever_init_started_at,
+                        )
                 except Exception as exc:  # pragma: no cover - dependency/IO issues
+                    _log_duration(
+                        console,
+                        verbose,
+                        "Retriever 초기화 실패",
+                        retriever_init_started_at,
+                    )
                     print_cli_warning(
                         console,
                         "Retriever 초기화에 실패했습니다.",
@@ -750,6 +836,12 @@ def register_run_commands(
             phoenix_trace_metadata["domain_memory.enabled"] = False
 
         if memory_required:
+            memory_started_at = datetime.now()
+            _log_timestamp(
+                console,
+                verbose,
+                f"Domain Memory 초기화 시작 (domain={memory_domain_name}, lang={memory_language})",
+            )
             try:
                 memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
                 memory_evaluator = MemoryAwareEvaluator(
@@ -773,7 +865,9 @@ def register_run_commands(
                             + ", ".join(f"{k}={v:.2f}" for k, v in reliability.items())
                         )
                         phoenix_trace_metadata["domain_memory.reliability"] = reliability
+                _log_duration(console, verbose, "Domain Memory 초기화 완료", memory_started_at)
             except Exception as exc:  # pragma: no cover - best-effort memory hookup
+                _log_duration(console, verbose, "Domain Memory 초기화 실패", memory_started_at)
                 print_cli_warning(
                     console,
                     "Domain Memory 초기화에 실패했습니다.",
@@ -783,11 +877,20 @@ def register_run_commands(
                 memory_adapter = None
 
         if memory_evaluator and memory_augment_context:
+            memory_enrich_started_at = datetime.now()
+            _log_timestamp(console, verbose, "Domain Memory 컨텍스트 보강 시작")
             enriched = enrich_dataset_with_memory(
                 dataset=ds,
                 memory_evaluator=memory_evaluator,
                 domain=memory_domain_name,
                 language=memory_language,
+            )
+            enriched_count = enriched or 0
+            _log_duration(
+                console,
+                verbose,
+                f"Domain Memory 컨텍스트 보강 완료 (count={enriched_count})",
+                memory_enrich_started_at,
             )
             if enriched:
                 console.print(
@@ -824,6 +927,24 @@ def register_run_commands(
             status_msg = f"⚡ Parallel evaluation (batch_size={final_batch_size})"
         else:
             status_msg = "🤖 Evaluation in progress"
+        evaluation_started_at = datetime.now()
+        if stream:
+            eval_mode_label = f"stream(chunk_size={stream_chunk_size})"
+            _log_timestamp(
+                console,
+                verbose,
+                f"평가 시작 (mode={eval_mode_label}, metrics={', '.join(metric_list)})",
+            )
+        else:
+            eval_mode_label = (
+                f"parallel(batch_size={final_batch_size})" if final_parallel else "sequential"
+            )
+            _log_timestamp(
+                console,
+                verbose,
+                "평가 시작 "
+                f"(mode={eval_mode_label}, cases={len(ds)}, metrics={', '.join(metric_list)})",
+            )
         with progress_spinner(console, status_msg) as update_progress:
             try:
                 if stream:
@@ -871,8 +992,10 @@ def register_run_commands(
                             retriever_doc_ids=retriever_doc_ids,
                         )
                     )
+                _log_duration(console, verbose, "평가 완료", evaluation_started_at)
                 update_progress("📊 결과 집계 중...")
             except Exception as exc:  # pragma: no cover - surfaced to CLI
+                _log_duration(console, verbose, "평가 실패", evaluation_started_at)
                 print_cli_error(
                     console,
                     "평가 실행 중 오류가 발생했습니다.",
@@ -1027,6 +1150,12 @@ def register_run_commands(
                     "max_traces": phoenix_max_traces,
                     "metadata": phoenix_trace_metadata or None,
                 }
+            tracker_started_at = datetime.now()
+            _log_timestamp(
+                console,
+                verbose,
+                f"Tracker 로깅 시작 ({effective_tracker})",
+            )
             _log_to_tracker(
                 settings,
                 result,
@@ -1035,10 +1164,17 @@ def register_run_commands(
                 phoenix_options=phoenix_opts,
                 log_phoenix_traces_fn=log_phoenix_traces,
             )
+            _log_duration(console, verbose, "Tracker 로깅 완료", tracker_started_at)
         if db_path:
+            db_started_at = datetime.now()
+            _log_timestamp(console, verbose, f"DB 저장 시작 ({db_path})")
             _save_to_db(db_path, result, console, storage_cls=SQLiteStorageAdapter)
+            _log_duration(console, verbose, "DB 저장 완료", db_started_at)
         if output:
+            output_started_at = datetime.now()
+            _log_timestamp(console, verbose, f"결과 저장 시작 ({output})")
             _save_results(output, result, console)
+            _log_duration(console, verbose, "결과 저장 완료", output_started_at)
 
     @app.command(
         name="run-simple",

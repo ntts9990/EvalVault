@@ -44,11 +44,41 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         mode: str | None = typer.Option(
             None,
             "--mode",
-            help="Filter by run mode (simple/full).",
+            help="Filter by run mode: 'simple' or 'full'.",
         ),
         db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
-        """Show evaluation run history."""
+        """Show evaluation run history.
+
+        Display past evaluation runs with pass rates, test case counts, and
+        optional Phoenix experiment metrics.
+
+        \b
+        Examples:
+          # Show last 10 runs
+          evalvault history
+
+          # Show last 20 runs
+          evalvault history -n 20
+
+          # Filter by dataset name
+          evalvault history -d insurance-qa
+
+          # Filter by model
+          evalvault history -m gpt-4
+
+          # Filter by run mode
+          evalvault history --mode simple
+
+          # Use a custom database
+          evalvault history --db custom.db
+
+        \b
+        See also:
+          evalvault compare  — Compare two runs side by side
+          evalvault export   — Export run details to JSON
+          evalvault run      — Create new evaluation runs
+        """
         console.print("\n[bold]Evaluation History[/bold]\n")
         normalized_mode: str | None = None
         if mode:
@@ -133,7 +163,25 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         run_id2: str = typer.Argument(..., help="Second run ID to compare."),
         db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
-        """Compare two evaluation runs."""
+        """Compare two evaluation runs.
+
+        Show a side-by-side comparison of metrics, pass rates, and scores
+        between two evaluation runs.
+
+        \b
+        Examples:
+          # Compare two runs by ID
+          evalvault compare abc12345 def67890
+
+          # Compare runs from a custom database
+          evalvault compare abc12345 def67890 --db custom.db
+
+        \b
+        See also:
+          evalvault history  — List runs to find IDs
+          evalvault export   — Export run details to JSON
+          evalvault analyze  — Deep analysis of a single run
+        """
         console.print("\n[bold]Comparing Evaluation Runs[/bold]\n")
 
         storage = SQLiteStorageAdapter(db_path=db_path)
@@ -200,7 +248,31 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         ),
         db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
-        """Export evaluation run to JSON file."""
+        """Export evaluation run to JSON file.
+
+        Export complete run details including all test case results, metrics,
+        and scores to a JSON file for external analysis.
+
+        \b
+        Examples:
+          # Export a run to JSON
+          evalvault export abc12345 -o run_details.json
+
+          # Export from a custom database
+          evalvault export abc12345 -o results.json --db custom.db
+
+        \b
+        Output includes:
+          • Run metadata (dataset, model, timestamps)
+          • All test case results with metrics
+          • Token usage and latency statistics
+
+        \b
+        See also:
+          evalvault history  — List runs to find IDs
+          evalvault compare  — Compare two runs
+          evalvault analyze  — Interactive analysis
+        """
         console.print(f"\n[bold]Exporting Run {run_id}[/bold]\n")
 
         storage = SQLiteStorageAdapter(db_path=db_path)
