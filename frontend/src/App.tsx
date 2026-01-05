@@ -1,0 +1,28 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Dashboard } from './pages/Dashboard';
+import { RunDetails } from './pages/RunDetails';
+import { EvaluationStudio } from './pages/EvaluationStudio';
+import { DomainMemory } from './pages/DomainMemory';
+import { KnowledgeBase } from './pages/KnowledgeBase';
+import { AnalysisLab } from './pages/AnalysisLab';
+import { CompareRuns } from './pages/CompareRuns';
+import { Settings } from './pages/Settings';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/runs/:id" element={<RunDetails />} />
+        <Route path="/compare" element={<CompareRuns />} />
+        <Route path="/studio" element={<EvaluationStudio />} />
+        <Route path="/domain" element={<DomainMemory />} />
+        <Route path="/knowledge" element={<KnowledgeBase />} />
+        <Route path="/analysis" element={<AnalysisLab />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
