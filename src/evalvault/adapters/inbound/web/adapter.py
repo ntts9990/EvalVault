@@ -1116,6 +1116,24 @@ class WebUIAdapter:
 
         return str(file_path.absolute())
 
+    def save_retriever_docs_file(self, filename: str, content: bytes) -> str:
+        """리트리버 문서 파일 저장.
+
+        Args:
+            filename: 파일명
+            content: 파일 내용
+
+        Returns:
+            저장된 파일 경로
+        """
+        save_dir = Path("data/retriever_docs")
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = save_dir / filename
+        file_path.write_bytes(content)
+
+        return str(file_path.absolute())
+
     def list_models(self, provider: str | None = None) -> list[dict[str, str]]:
         """사용 가능한 모델 목록 조회."""
         settings = self._settings or Settings()

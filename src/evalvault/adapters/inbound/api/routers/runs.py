@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -111,6 +112,28 @@ async def upload_dataset(adapter: AdapterDep, file: UploadFile = File(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save dataset: {e}")
+
+
+@router.post("/options/retriever-docs")
+async def upload_retriever_docs(adapter: AdapterDep, file: UploadFile = File(...)):
+    """Upload retriever documents file."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename.")
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in {".json", ".jsonl", ".txt"}:
+        raise HTTPException(status_code=400, detail="Unsupported retriever docs format.")
+
+    try:
+        content = await file.read()
+        saved_path = adapter.save_retriever_docs_file(file.filename, content)
+        return {
+            "message": "Retriever docs uploaded successfully",
+            "path": saved_path,
+            "filename": file.filename,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save retriever docs: {e}")
 
 
 @router.get("/options/models", response_model=list[ModelItemResponse])
