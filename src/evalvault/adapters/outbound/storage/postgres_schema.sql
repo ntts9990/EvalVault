@@ -109,3 +109,26 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
+
+-- Analysis pipeline results table
+CREATE TABLE IF NOT EXISTS pipeline_results (
+    result_id UUID PRIMARY KEY,
+    intent VARCHAR(100) NOT NULL,
+    query TEXT,
+    run_id UUID,
+    pipeline_id UUID,
+    is_complete BOOLEAN NOT NULL DEFAULT TRUE,
+    duration_ms DOUBLE PRECISION,
+    final_output JSONB,
+    node_results JSONB,
+    started_at TIMESTAMP WITH TIME ZONE,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_created_at
+    ON pipeline_results(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_intent
+    ON pipeline_results(intent);
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_run_id
+    ON pipeline_results(run_id);

@@ -481,6 +481,81 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
 
             return self._deserialize_nlp_analysis(run_id, self._ensure_json(row["result_data"]))
 
+    # Pipeline result history 관련 메서드
+
+    def save_pipeline_result(self, record: dict[str, Any]) -> None:
+        """파이프라인 분석 결과 히스토리를 저장합니다."""
+        created_at = record.get("created_at") or datetime.now(UTC)
+        is_complete = bool(record.get("is_complete", False))
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO pipeline_results (
+                    result_id, intent, query, run_id, pipeline_id,
+                    is_complete, duration_ms, final_output, node_results,
+                    started_at, finished_at, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (result_id) DO UPDATE SET
+                    intent = EXCLUDED.intent,
+                    query = EXCLUDED.query,
+                    run_id = EXCLUDED.run_id,
+                    pipeline_id = EXCLUDED.pipeline_id,
+                    is_complete = EXCLUDED.is_complete,
+                    duration_ms = EXCLUDED.duration_ms,
+                    final_output = EXCLUDED.final_output,
+                    node_results = EXCLUDED.node_results,
+                    started_at = EXCLUDED.started_at,
+                    finished_at = EXCLUDED.finished_at,
+                    created_at = EXCLUDED.created_at
+                """,
+                (
+                    record.get("result_id"),
+                    record.get("intent"),
+                    record.get("query"),
+                    record.get("run_id"),
+                    record.get("pipeline_id"),
+                    is_complete,
+                    record.get("duration_ms"),
+                    self._serialize_pipeline_json(record.get("final_output")),
+                    self._serialize_pipeline_json(record.get("node_results")),
+                    record.get("started_at"),
+                    record.get("finished_at"),
+                    created_at,
+                ),
+            )
+            conn.commit()
+
+    def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        """파이프라인 분석 결과 목록을 조회합니다."""
+        query = """
+            SELECT result_id, intent, query, run_id, pipeline_id,
+                   is_complete, duration_ms, created_at, started_at, finished_at
+            FROM pipeline_results
+            ORDER BY created_at DESC
+            LIMIT %s
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(query, (limit,)).fetchall()
+        return [self._deserialize_pipeline_result(row, include_payload=False) for row in rows]
+
+    def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
+        """저장된 파이프라인 분석 결과를 조회합니다."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT result_id, intent, query, run_id, pipeline_id,
+                       is_complete, duration_ms, created_at,
+                       started_at, finished_at, final_output, node_results
+                FROM pipeline_results
+                WHERE result_id = %s
+                """,
+                (result_id,),
+            ).fetchone()
+        if not row:
+            raise KeyError(f"Pipeline result not found: {result_id}")
+        return self._deserialize_pipeline_result(row, include_payload=True)
+
     def _serialize_analysis(self, analysis: StatisticalAnalysis) -> dict[str, Any]:
         """분석 결과를 JSON 직렬화 가능한 형태로 변환합니다."""
         return {
@@ -603,6 +678,41 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             topic_clusters=topic_clusters,
             insights=result_data.get("insights", []),
         )
+
+    def _serialize_pipeline_json(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=False)
+
+    def _deserialize_pipeline_result(
+        self,
+        row: dict[str, Any],
+        *,
+        include_payload: bool,
+    ) -> dict[str, Any]:
+        item = {
+            "result_id": row.get("result_id"),
+            "intent": row.get("intent"),
+            "query": row.get("query"),
+            "run_id": row.get("run_id"),
+            "pipeline_id": row.get("pipeline_id"),
+            "is_complete": bool(row.get("is_complete")),
+            "duration_ms": self._maybe_float(row.get("duration_ms")),
+            "created_at": self._normalize_timestamp(row.get("created_at")),
+            "started_at": self._normalize_timestamp(row.get("started_at")),
+            "finished_at": self._normalize_timestamp(row.get("finished_at")),
+        }
+        if include_payload:
+            item["final_output"] = self._ensure_json(row.get("final_output"))
+            item["node_results"] = self._ensure_json(row.get("node_results"))
+        return item
+
+    def _normalize_timestamp(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return str(value)
 
     def _ensure_json(self, value: Any) -> dict[str, Any]:
         """JSONB 값을 dict로 변환."""

@@ -1,6 +1,6 @@
 """결과 저장 인터페이스."""
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.experiment import Experiment
@@ -104,4 +104,18 @@ class StoragePort(Protocol):
         Args:
             experiment: 업데이트할 실험
         """
+        ...
+
+    # Pipeline result history 메서드
+
+    def save_pipeline_result(self, record: dict[str, Any]) -> None:
+        """파이프라인 분석 결과 히스토리를 저장합니다."""
+        ...
+
+    def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        """파이프라인 분석 결과 목록을 조회합니다."""
+        ...
+
+    def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
+        """저장된 파이프라인 분석 결과를 조회합니다."""
         ...

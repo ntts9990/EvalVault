@@ -605,6 +605,92 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             insights=result_data.get("insights", []),
         )
 
+    # Pipeline result history 관련 메서드
+
+    def save_pipeline_result(self, record: dict[str, Any]) -> None:
+        """파이프라인 분석 결과 히스토리를 저장합니다."""
+        created_at = record.get("created_at") or datetime.now().isoformat()
+        is_complete = 1 if record.get("is_complete", False) else 0
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO pipeline_results (
+                    result_id, intent, query, run_id, pipeline_id,
+                    is_complete, duration_ms, final_output, node_results,
+                    started_at, finished_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.get("result_id"),
+                    record.get("intent"),
+                    record.get("query"),
+                    record.get("run_id"),
+                    record.get("pipeline_id"),
+                    is_complete,
+                    record.get("duration_ms"),
+                    self._serialize_json(record.get("final_output")),
+                    self._serialize_json(record.get("node_results")),
+                    record.get("started_at"),
+                    record.get("finished_at"),
+                    created_at,
+                ),
+            )
+            conn.commit()
+
+    def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        """파이프라인 분석 결과 목록을 조회합니다."""
+        query = """
+            SELECT result_id, intent, query, run_id, pipeline_id,
+                   is_complete, duration_ms, created_at, started_at, finished_at
+            FROM pipeline_results
+            ORDER BY created_at DESC
+            LIMIT ?
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(query, (limit,)).fetchall()
+        return [self._deserialize_pipeline_result(row, include_payload=False) for row in rows]
+
+    def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
+        """저장된 파이프라인 분석 결과를 조회합니다."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT result_id, intent, query, run_id, pipeline_id,
+                       is_complete, duration_ms, created_at,
+                       started_at, finished_at, final_output, node_results
+                FROM pipeline_results
+                WHERE result_id = ?
+                """,
+                (result_id,),
+            ).fetchone()
+        if not row:
+            raise KeyError(f"Pipeline result not found: {result_id}")
+        return self._deserialize_pipeline_result(row, include_payload=True)
+
+    def _deserialize_pipeline_result(
+        self,
+        row: sqlite3.Row,
+        *,
+        include_payload: bool,
+    ) -> dict[str, Any]:
+        item = {
+            "result_id": row["result_id"],
+            "intent": row["intent"],
+            "query": row["query"],
+            "run_id": row["run_id"],
+            "pipeline_id": row["pipeline_id"],
+            "is_complete": bool(row["is_complete"]),
+            "duration_ms": self._maybe_float(row["duration_ms"]),
+            "created_at": row["created_at"],
+            "started_at": row["started_at"],
+            "finished_at": row["finished_at"],
+        }
+        if include_payload:
+            item["final_output"] = self._deserialize_json(row["final_output"])
+            item["node_results"] = self._deserialize_json(row["node_results"])
+        return item
+
     # Stage event/metric 관련 메서드
 
     def save_stage_event(self, event: StageEvent) -> str:
