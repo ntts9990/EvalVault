@@ -17,7 +17,7 @@ EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and
 
 **Highlights**
 - One CLI for running, comparing, exporting, and storing evaluation runs
-- Profile-driven LLM wiring (OpenAI, Ollama, Azure, Anthropic)
+- Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
 - Streamlit Web UI for evaluation, history, and report generation
 - Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
@@ -68,6 +68,15 @@ Add extras as needed:
    cp .env.example .env
    # set OPENAI_API_KEY or OLLAMA settings, LANGFUSE/PHOENIX keys, etc.
    ```
+   vLLM (OpenAI-compatible) usage:
+   ```bash
+   # .env
+   EVALVAULT_PROFILE=vllm
+   VLLM_BASE_URL=http://localhost:8001/v1
+   VLLM_MODEL=gpt-oss:120b
+   VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+   # optional: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
+   ```
    If you use Ollama models that support tool/function calling, list them in
    `OLLAMA_TOOL_MODELS` (comma-separated). Check support via
    `ollama show <model>` and look for `Capabilities: tools`.
@@ -81,6 +90,10 @@ Add extras as needed:
    show up automatically. Suggested models to pre-load:
    `gpt-oss:120b`, `gpt-oss-safeguard:120b`, `gpt-oss-safeguard:20b`.
    Update `config/models.yaml` if you want a default profile model.
+   For vLLM (OpenAI-compatible server), set `EVALVAULT_PROFILE=vllm` and
+   fill `VLLM_BASE_URL`/`VLLM_MODEL` in `.env`.
+   Need empty dataset templates? Run `uv run evalvault init` to generate
+   `dataset_templates/` (JSON/CSV/XLSX) or download from the Web UI.
 
 2. **Run the API + React frontend (dev)**
    ```bash

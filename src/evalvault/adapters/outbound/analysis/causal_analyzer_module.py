@@ -13,6 +13,7 @@ from evalvault.adapters.outbound.analysis.common import (
     AnalysisDataProcessor,
     BaseAnalysisAdapter,
 )
+from evalvault.adapters.outbound.analysis.pipeline_helpers import get_upstream_output
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.analysis import CausalAnalysis, FactorImpact
 
@@ -42,7 +43,7 @@ class CausalAnalyzerModule(BaseAnalysisModule):
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """인과 분석 실행."""
-        loader_output = inputs.get("data_loader", {})
+        loader_output = get_upstream_output(inputs, "load_data", "data_loader") or {}
         run = loader_output.get("run")
 
         if not isinstance(run, EvaluationRun):

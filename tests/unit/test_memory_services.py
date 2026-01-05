@@ -46,6 +46,7 @@ class DummyEvaluator(RagasEvaluator):
         retriever: RetrieverPort | None = None,
         retriever_top_k: int = 5,
         retriever_doc_ids: Sequence[str] | None = None,
+        on_progress: object = None,
     ) -> EvaluationRun:
         self.captured_thresholds = dict(thresholds or {})
         run = EvaluationRun(dataset_name=dataset.name, dataset_version=dataset.version)

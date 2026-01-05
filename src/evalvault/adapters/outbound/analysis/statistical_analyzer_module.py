@@ -12,6 +12,7 @@ from evalvault.adapters.outbound.analysis.common import (
     AnalysisDataProcessor,
     BaseAnalysisAdapter,
 )
+from evalvault.adapters.outbound.analysis.pipeline_helpers import get_upstream_output
 from evalvault.adapters.outbound.analysis.statistical_adapter import (
     StatisticalAnalysisAdapter,
 )
@@ -52,7 +53,7 @@ class StatisticalAnalyzerModule(BaseAnalysisModule):
         Returns:
             통계 분석 결과
         """
-        data_loader_output = inputs.get("data_loader", {})
+        data_loader_output = get_upstream_output(inputs, "load_data", "data_loader") or {}
         run = data_loader_output.get("run")
         metrics = data_loader_output.get("metrics", {})
 

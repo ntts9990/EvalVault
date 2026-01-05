@@ -18,9 +18,9 @@ def create_instructor_llm(
     """Create an InstructorLLM for the given provider using a patched client."""
     provider_name = provider.lower()
 
-    if provider_name in {"openai", "azure", "ollama"}:
+    if provider_name in {"openai", "azure", "ollama", "vllm"}:
         resolved_mode = mode or (
-            instructor.Mode.JSON if provider_name == "ollama" else instructor.Mode.TOOLS
+            instructor.Mode.JSON if provider_name in {"ollama", "vllm"} else instructor.Mode.TOOLS
         )
         patched_client = instructor.from_openai(client, mode=resolved_mode)
         provider_id = "openai"

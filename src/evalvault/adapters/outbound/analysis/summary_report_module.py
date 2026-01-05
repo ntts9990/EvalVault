@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
+from evalvault.adapters.outbound.analysis.pipeline_helpers import get_upstream_output
 from evalvault.domain.entities.analysis import StatisticalAnalysis
 
 
@@ -39,7 +40,7 @@ class SummaryReportModule(BaseAnalysisModule):
         Returns:
             보고서 결과
         """
-        stats_output = inputs.get("statistical_analyzer", {})
+        stats_output = get_upstream_output(inputs, "statistical_analyzer", "statistics") or {}
         statistics = stats_output.get("statistics", {})
         summary = stats_output.get("summary", {}) or {}
         analysis_id = stats_output.get("analysis_id")

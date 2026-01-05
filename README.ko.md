@@ -67,6 +67,15 @@ uv sync --extra dev
    Ollama에서 tool/function calling 지원 모델을 쓰려면 `OLLAMA_TOOL_MODELS`에
    콤마로 모델명을 추가하세요. 확인은 `ollama show <model>`로 하고
    `Capabilities`에 `tools`가 표시되는 모델만 넣으면 됩니다.
+   vLLM(OpenAI-compatible) 사용 예:
+   ```bash
+   # .env
+   EVALVAULT_PROFILE=vllm
+   VLLM_BASE_URL=http://localhost:8001/v1
+   VLLM_MODEL=gpt-oss:120b
+   VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+   # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
+   ```
 
 2. **API + React 프론트 실행 (dev)**
    ```bash

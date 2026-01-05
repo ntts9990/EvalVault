@@ -38,8 +38,13 @@ class AnalysisReportModule(BaseAnalysisModule):
             보고서 결과
         """
         root_cause = inputs.get("root_cause", {})
+        pattern_detection = inputs.get("pattern_detection", {})
+        trend_detection = inputs.get("trend_detection", {})
+
         causes = root_cause.get("causes", [])
         recommendations = root_cause.get("recommendations", [])
+        patterns = pattern_detection.get("patterns", [])
+        trend_items = trend_detection.get("trends", [])
 
         # Markdown 보고서 생성
         report_lines = [
@@ -71,11 +76,44 @@ class AnalysisReportModule(BaseAnalysisModule):
         else:
             report_lines.append("- 권장 사항이 없습니다.")
 
+        if patterns:
+            report_lines.extend(
+                [
+                    "",
+                    "## 패턴 탐지",
+                    "",
+                ]
+            )
+            for pattern in patterns[:5]:
+                label = pattern.get("label", "Pattern")
+                detail = pattern.get("detail", "")
+                report_lines.append(f"- {label}: {detail}")
+        elif pattern_detection:
+            report_lines.extend(["", "## 패턴 탐지", "", "- 탐지된 패턴이 없습니다."])
+
+        if trend_items:
+            report_lines.extend(
+                [
+                    "",
+                    "## 추세 분석",
+                    "",
+                ]
+            )
+            for trend in trend_items:
+                metric = trend.get("metric", "metric")
+                direction = trend.get("direction", "flat")
+                delta = trend.get("delta", 0)
+                report_lines.append(f"- {metric}: {direction} ({delta:+.2f})")
+        elif trend_detection:
+            report_lines.extend(["", "## 추세 분석", "", "- 탐지된 추세가 없습니다."])
+
         report = "\n".join(report_lines)
 
         analysis_summary = {
             "cause_count": len(causes),
             "recommendation_count": len(recommendations),
+            "pattern_count": len(patterns),
+            "trend_count": len(trend_items),
         }
 
         return {
@@ -83,4 +121,6 @@ class AnalysisReportModule(BaseAnalysisModule):
             "analysis_summary": analysis_summary,
             "causes": causes,
             "recommendations": recommendations,
+            "patterns": patterns,
+            "trends": trend_items,
         }

@@ -42,6 +42,15 @@ cp .env.example .env
 echo "OPENAI_API_KEY=sk-your-api-key" >> .env
 ```
 
+vLLM(OpenAI-compatible)로 시작하려면 아래처럼 설정합니다:
+
+```bash
+EVALVAULT_PROFILE=vllm
+VLLM_BASE_URL=http://localhost:8001/v1
+VLLM_MODEL=gpt-oss:120b
+VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+```
+
 설정 확인:
 
 ```bash
