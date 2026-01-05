@@ -25,7 +25,7 @@ export function EvaluationStudio() {
     // Selections
     const [selectedDataset, setSelectedDataset] = useState<string>("");
     const [selectedModel, setSelectedModel] = useState<string>("");
-    const [selectedProvider, setSelectedProvider] = useState<"ollama" | "openai">("ollama");
+    const [selectedProvider, setSelectedProvider] = useState<"ollama" | "openai" | "vllm">("ollama");
     const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set(["faithfulness", "answer_relevancy"]));
 
     // Advanced Options State
@@ -101,8 +101,8 @@ export function EvaluationStudio() {
 
                 if (d.length > 0) setSelectedDataset(d[0].path);
 
-                let provider: "ollama" | "openai" = "ollama";
-                if (cfg && (cfg.llm_provider === "ollama" || cfg.llm_provider === "openai")) {
+                let provider: "ollama" | "openai" | "vllm" = "ollama";
+                if (cfg && (cfg.llm_provider === "ollama" || cfg.llm_provider === "openai" || cfg.llm_provider === "vllm")) {
                     provider = cfg.llm_provider;
                 }
 
@@ -129,7 +129,7 @@ export function EvaluationStudio() {
         loadOptions();
     }, []);
 
-    const handleProviderChange = async (provider: "ollama" | "openai") => {
+    const handleProviderChange = async (provider: "ollama" | "openai" | "vllm") => {
         if (provider === selectedProvider) return;
         setSelectedProvider(provider);
         setModels([]);
@@ -143,7 +143,11 @@ export function EvaluationStudio() {
             if (modelList.length > 0) {
                 setSelectedModel(modelList[0].id);
             } else {
-                const hint = provider === "ollama" ? "Run 'ollama list' to verify local models." : "Check provider configuration.";
+                const hint = provider === "ollama"
+                    ? "Run 'ollama list' to verify local models."
+                    : provider === "vllm"
+                        ? "Check VLLM_BASE_URL and model settings."
+                        : "Check provider configuration.";
                 setError(`No ${provider.toUpperCase()} models found. ${hint}`);
             }
         } catch (err) {
@@ -297,7 +301,7 @@ export function EvaluationStudio() {
                             Select Model
                         </h2>
                         <div className="flex flex-wrap gap-2 mb-4">
-                            {(["ollama", "openai"] as const).map((provider) => (
+                            {(["ollama", "openai", "vllm"] as const).map((provider) => (
                                 <button
                                     key={provider}
                                     onClick={() => handleProviderChange(provider)}

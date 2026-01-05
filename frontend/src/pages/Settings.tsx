@@ -70,6 +70,17 @@ export function Settings() {
             ],
         },
         {
+            title: "vLLM",
+            icon: Globe,
+            rows: [
+                { label: "Model", value: config.vllm_model },
+                { label: "Embedding", value: config.vllm_embedding_model },
+                { label: "Base URL", value: config.vllm_base_url },
+                { label: "Embedding Base URL", value: config.vllm_embedding_base_url },
+                { label: "Timeout (s)", value: config.vllm_timeout },
+            ],
+        },
+        {
             title: "Ollama",
             icon: Activity,
             rows: [
