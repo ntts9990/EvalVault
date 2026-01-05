@@ -1,0 +1,4 @@
+method,recall_at_5,precision_at_5,mrr,ndcg_at_5,test_cases,backend
+bm25,1.0,0.3333333333333333,1.0,1.0,2,
+dense,1.0,0.3333333333333333,1.0,1.0,2,
+hybrid,1.0,0.3333333333333333,1.0,1.0,2,
