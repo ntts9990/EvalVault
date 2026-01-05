@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from evalvault.adapters.outbound.dataset.base import BaseDatasetLoader
+from evalvault.adapters.outbound.dataset.thresholds import extract_thresholds_from_rows
 from evalvault.domain.entities.dataset import Dataset, TestCase
 
 
@@ -51,6 +52,7 @@ class ExcelDatasetLoader(BaseDatasetLoader):
         - answer: Answer text
         - contexts: Context strings (JSON array or pipe-separated)
         - ground_truth: Ground truth answer (optional)
+        - threshold_*: Dataset-level metric thresholds (optional, first non-empty row wins)
 
         Args:
             file_path: Path to Excel file
@@ -82,6 +84,8 @@ class ExcelDatasetLoader(BaseDatasetLoader):
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
 
+        thresholds = extract_thresholds_from_rows(df.head(50).to_dict(orient="records"))
+
         # Parse test cases
         test_cases = []
         for _, row in df.iterrows():
@@ -107,6 +111,7 @@ class ExcelDatasetLoader(BaseDatasetLoader):
             version=self._get_default_version(),
             test_cases=test_cases,
             source_file=str(path),
+            thresholds=thresholds,
         )
 
         return dataset

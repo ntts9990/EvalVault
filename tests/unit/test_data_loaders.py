@@ -84,6 +84,14 @@ class TestCSVDatasetLoader:
         assert dataset.name == "sample_dataset"
         assert dataset.version == "1.0.0"
 
+    def test_csv_loader_reads_thresholds(self, csv_file):
+        """Test that CSV loader reads dataset-level thresholds."""
+        loader = CSVDatasetLoader()
+        dataset = loader.load(csv_file)
+
+        assert dataset.thresholds["faithfulness"] == pytest.approx(0.7)
+        assert dataset.thresholds["answer_relevancy"] == pytest.approx(0.7)
+
 
 class TestExcelDatasetLoader:
     """Tests for Excel dataset loader."""
@@ -116,6 +124,14 @@ class TestExcelDatasetLoader:
 
         assert dataset.name == "sample_dataset"
         assert dataset.version == "1.0.0"
+
+    def test_excel_loader_reads_thresholds(self, excel_file):
+        """Test that Excel loader reads dataset-level thresholds."""
+        loader = ExcelDatasetLoader()
+        dataset = loader.load(excel_file)
+
+        assert dataset.thresholds["faithfulness"] == pytest.approx(0.7)
+        assert dataset.thresholds["answer_relevancy"] == pytest.approx(0.7)
 
 
 class TestJSONDatasetLoader:

@@ -20,7 +20,8 @@ EvalVault는 세 가지 데이터 형식을 지원합니다.
 
 ### JSON 형식 (권장)
 
-JSON은 메타데이터와 임계값(thresholds)을 포함할 수 있어 가장 권장됩니다.
+JSON은 메타데이터와 임계값(thresholds)을 직관적으로 포함할 수 있어 가장 권장됩니다. CSV/Excel도
+`threshold_*` 컬럼으로 임계값을 추가할 수 있습니다.
 
 ```json
 {
@@ -80,20 +81,23 @@ JSON은 메타데이터와 임계값(thresholds)을 포함할 수 있어 가장 
 스프레드시트에서 간편하게 편집할 수 있습니다.
 
 ```csv
-id,question,answer,contexts,ground_truth
-tc-001,"보장금액은?","1억원입니다.","[""사망 보장금액은 1억원""]","1억원"
-tc-002,"납입기간은?","20년입니다.","[""납입기간은 20년""]","20년"
+id,question,answer,contexts,ground_truth,threshold_faithfulness,threshold_answer_relevancy,threshold_context_precision,threshold_context_recall,threshold_factual_correctness,threshold_semantic_similarity
+tc-001,"보장금액은?","1억원입니다.","[""사망 보장금액은 1억원""]","1억원",0.8,0.7,,,,
+tc-002,"납입기간은?","20년입니다.","[""납입기간은 20년""]","20년",,,,,,
 ```
 
-**주의**: `contexts` 필드는 JSON 배열 문자열로 작성합니다.
+**주의**: `contexts` 필드는 JSON 배열 문자열로 작성합니다. `threshold_*`는 첫 번째로 채워진
+행을 데이터셋 임계값으로 사용합니다.
 
 ### Excel 형식
 
 `.xlsx` 파일을 직접 사용할 수 있습니다.
 
-| id | question | answer | contexts | ground_truth |
-|----|----------|--------|----------|--------------|
-| tc-001 | 보장금액은? | 1억원입니다. | ["사망 보장금액은 1억원"] | 1억원 |
+| id | question | answer | contexts | ground_truth | threshold_faithfulness | threshold_answer_relevancy |
+|----|----------|--------|----------|--------------|------------------------|----------------------------|
+| tc-001 | 보장금액은? | 1억원입니다. | ["사망 보장금액은 1억원"] | 1억원 | 0.8 | 0.7 |
+
+`threshold_*` 값은 첫 번째로 채워진 행 기준으로 데이터셋 임계값으로 사용합니다.
 
 ---
 

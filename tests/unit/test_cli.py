@@ -3663,12 +3663,15 @@ class TestRunHelperFunctions:
 
     def test_build_streaming_dataset_template_for_csv(self, tmp_path):
         dataset_file = tmp_path / "dataset.csv"
-        dataset_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
+        dataset_file.write_text(
+            "id,question,answer,contexts,threshold_faithfulness\ntc-001,hi,ok,[],0.85\n",
+            encoding="utf-8",
+        )
 
         ds = run_command_module._build_streaming_dataset_template(dataset_file)
         assert ds.name == dataset_file.stem
         assert ds.version == "stream"
-        assert ds.thresholds == {}
+        assert ds.thresholds["faithfulness"] == 0.85
 
     def test_is_oss_open_model(self):
         assert run_command_module._is_oss_open_model("gpt-oss-safeguard:20b")

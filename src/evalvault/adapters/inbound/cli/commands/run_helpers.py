@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from evalvault.adapters.outbound.dataset import StreamingConfig, StreamingDatasetLoader
+from evalvault.adapters.outbound.dataset.thresholds import extract_thresholds_from_rows
 from evalvault.adapters.outbound.kg.networkx_adapter import NetworkXKnowledgeGraph
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.phoenix_support import (
@@ -609,6 +610,10 @@ def _build_streaming_dataset_template(dataset_path: Path) -> Dataset:
         ) = _load_json_metadata_for_stream(path)
         metadata.update(metadata_from_file)
         thresholds.update(thresholds_from_file)
+    elif suffix == ".csv":
+        thresholds.update(_load_csv_thresholds_for_stream(path))
+    elif suffix in {".xlsx", ".xls"}:
+        thresholds.update(_load_excel_thresholds_for_stream(path))
 
     return Dataset(
         name=name,
@@ -646,6 +651,38 @@ def _load_json_metadata_for_stream(path: Path) -> tuple[str, str, dict[str, Any]
             continue
 
     return (name, version, metadata, thresholds)
+
+
+def _load_csv_thresholds_for_stream(path: Path) -> dict[str, float]:
+    """Read thresholds from CSV rows without loading the full dataset."""
+    import csv
+
+    encodings = ["utf-8-sig", "utf-8", "cp949", "euc-kr", "latin-1"]
+    for encoding in encodings:
+        try:
+            with open(path, encoding=encoding, newline="") as handle:
+                reader = csv.DictReader(handle)
+                if reader.fieldnames is None:
+                    return {}
+                return extract_thresholds_from_rows(reader)
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            return {}
+    return {}
+
+
+def _load_excel_thresholds_for_stream(path: Path) -> dict[str, float]:
+    """Read thresholds from Excel rows without loading the full dataset."""
+    try:
+        import pandas as pd
+
+        engine = "xlrd" if path.suffix.lower() == ".xls" else "openpyxl"
+        df = pd.read_excel(path, engine=engine, nrows=50)
+    except Exception:
+        return {}
+
+    return extract_thresholds_from_rows(df.to_dict(orient="records"))
 
 
 def _resolve_thresholds(metrics: list[str], dataset: Dataset) -> dict[str, float]:

@@ -238,7 +238,7 @@ EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습�
 }
 ```
 
-CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고 `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
+CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고, 선택적으로 `threshold_*` 컬럼을 넣을 수 있습니다. `threshold_*` 값은 첫 번째로 채워진 행 기준으로 데이터셋 전체 임계값으로 사용됩니다. `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
 
 #### 데이터셋 템플릿
 빈 템플릿은 아래 위치에서 사용할 수 있습니다. 필요한 값만 채워 바로 사용할 수 있습니다.
@@ -248,7 +248,7 @@ CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함�
 - 문서 저장소: `docs/templates/dataset_template.csv`
 - 문서 저장소: `docs/templates/dataset_template.xlsx`
 
-JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요.
+JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요. CSV/Excel은 `threshold_*` 컬럼에 값을 채우면 동일하게 적용됩니다.
 
 ---
 
