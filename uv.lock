@@ -949,6 +949,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-multipart" },
     { name = "ragas" },
     { name = "rich" },
     { name = "truststore" },
@@ -973,6 +974,7 @@ dev = [
     { name = "pytest-mock" },
     { name = "pytest-rerunfailures" },
     { name = "pytest-xdist" },
+    { name = "python-multipart" },
     { name = "ruff" },
 ]
 docs = [
@@ -1005,6 +1007,7 @@ postgres = [
 ]
 web = [
     { name = "plotly" },
+    { name = "python-multipart" },
     { name = "streamlit" },
     { name = "watchdog" },
 ]
@@ -1046,6 +1049,9 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'dev'" },
     { name = "pytest-rerunfailures", marker = "extra == 'dev'" },
     { name = "pytest-xdist", marker = "extra == 'dev'" },
+    { name = "python-multipart" },
+    { name = "python-multipart", marker = "extra == 'dev'" },
+    { name = "python-multipart", marker = "extra == 'web'" },
     { name = "ragas" },
     { name = "rank-bm25", marker = "extra == 'korean'", specifier = ">=0.2.2" },
     { name = "rich" },
@@ -1498,7 +1504,7 @@ name = "gunicorn"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging" },
+    { name = "packaging", marker = "sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/34/72/9614c465dc206155d93eff0ca20d42e1e35afc533971379482de953521a4/gunicorn-23.0.0.tar.gz", hash = "sha256:f014447a0101dc57e294f6c18ca6b40227a4c90e9bdb586042628030cba004ec", size = 375031 }
 wheels = [
