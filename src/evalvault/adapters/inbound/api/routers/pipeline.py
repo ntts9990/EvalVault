@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -94,8 +96,11 @@ class AnalyzeRequest(BaseModel):
 class AnalysisResponse(BaseModel):
     intent: str
     is_complete: bool
-    duration_ms: float
-    final_output: dict[str, Any]
+    duration_ms: float | None
+    pipeline_id: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    final_output: dict[str, Any] | None
     node_results: dict[str, Any]
 
 
@@ -117,39 +122,130 @@ class IntentCatalogResponse(BaseModel):
     nodes: list[PipelineNodeInfo]
 
 
+class PipelineResultPayload(BaseModel):
+    intent: str
+    query: str | None = None
+    run_id: str | None = None
+    pipeline_id: str | None = None
+    is_complete: bool = True
+    duration_ms: float | None = None
+    final_output: dict[str, Any] | None = None
+    node_results: dict[str, Any] | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class PipelineResultSummary(BaseModel):
+    result_id: str
+    intent: str
+    label: str
+    query: str | None = None
+    run_id: str | None = None
+    duration_ms: float | None = None
+    is_complete: bool
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class PipelineResultResponse(PipelineResultSummary):
+    pipeline_id: str | None = None
+    node_results: dict[str, Any] | None = None
+    final_output: dict[str, Any] | None = None
+
+
+def _intent_label(intent_value: str) -> str:
+    try:
+        intent = AnalysisIntent(intent_value)
+    except ValueError:
+        return intent_value
+    meta = INTENT_CATALOG.get(intent)
+    return meta["label"] if meta else intent.value
+
+
+def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAdapter]:
+    service = AnalysisPipelineService()
+    db_path = "evalvault.db"
+    storage = SQLiteStorageAdapter(db_path=db_path)
+
+    from evalvault.adapters.outbound.analysis import (
+        AnalysisReportModule,
+        BM25SearcherModule,
+        CausalAnalyzerModule,
+        ComparisonReportModule,
+        DataLoaderModule,
+        DetailedReportModule,
+        DiagnosticPlaybookModule,
+        EmbeddingAnalyzerModule,
+        EmbeddingDistributionModule,
+        EmbeddingSearcherModule,
+        HybridRRFModule,
+        HybridWeightedModule,
+        LowPerformerExtractorModule,
+        ModelAnalyzerModule,
+        MorphemeAnalyzerModule,
+        MorphemeQualityCheckerModule,
+        NLPAnalyzerModule,
+        PatternDetectorModule,
+        RagasEvaluatorModule,
+        RetrievalAnalyzerModule,
+        RetrievalQualityCheckerModule,
+        RootCauseAnalyzerModule,
+        RunAnalyzerModule,
+        RunComparatorModule,
+        RunLoaderModule,
+        SearchComparatorModule,
+        StatisticalAnalyzerModule,
+        StatisticalComparatorModule,
+        SummaryReportModule,
+        TimeSeriesAnalyzerModule,
+        TrendDetectorModule,
+        VerificationReportModule,
+    )
+
+    service.register_module(DataLoaderModule(storage=storage))
+    service.register_module(RunLoaderModule(storage=storage))
+    service.register_module(StatisticalAnalyzerModule())
+    service.register_module(NLPAnalyzerModule())
+    service.register_module(CausalAnalyzerModule())
+    service.register_module(SummaryReportModule())
+    service.register_module(DetailedReportModule())
+    service.register_module(AnalysisReportModule())
+    service.register_module(VerificationReportModule())
+    service.register_module(ComparisonReportModule())
+
+    service.register_module(MorphemeAnalyzerModule())
+    service.register_module(MorphemeQualityCheckerModule())
+    service.register_module(EmbeddingAnalyzerModule())
+    service.register_module(EmbeddingDistributionModule())
+    service.register_module(RetrievalAnalyzerModule())
+    service.register_module(RetrievalQualityCheckerModule())
+    service.register_module(BM25SearcherModule())
+    service.register_module(EmbeddingSearcherModule())
+    service.register_module(HybridRRFModule())
+    service.register_module(HybridWeightedModule())
+    service.register_module(SearchComparatorModule())
+    service.register_module(ModelAnalyzerModule())
+    service.register_module(RunAnalyzerModule())
+    service.register_module(StatisticalComparatorModule())
+    service.register_module(RunComparatorModule())
+    service.register_module(RagasEvaluatorModule())
+    service.register_module(LowPerformerExtractorModule())
+    service.register_module(DiagnosticPlaybookModule())
+    service.register_module(RootCauseAnalyzerModule())
+    service.register_module(PatternDetectorModule())
+    service.register_module(TimeSeriesAnalyzerModule())
+    service.register_module(TrendDetectorModule())
+
+    return service, storage
+
+
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_query(request: AnalyzeRequest):
     """Run natural language analysis on evaluation results."""
     try:
-        # Initialize service (in a real app, use dependency injection)
-        service = AnalysisPipelineService()
+        service, _storage = _build_pipeline_service()
 
-        # Register default modules
-        from evalvault.adapters.outbound.analysis import (
-            AnalysisReportModule,
-            CausalAnalyzerModule,
-            ComparisonReportModule,
-            DataLoaderModule,
-            NLPAnalyzerModule,
-            StatisticalAnalyzerModule,
-            SummaryReportModule,
-            VerificationReportModule,
-        )
-
-        # We need a proper DB path. Using default for now or env var.
-        db_path = "evalvault.db"
-        storage = SQLiteStorageAdapter(db_path=db_path)
-
-        service.register_module(DataLoaderModule(storage=storage))
-        service.register_module(StatisticalAnalyzerModule())
-        service.register_module(NLPAnalyzerModule())
-        service.register_module(CausalAnalyzerModule())
-        service.register_module(SummaryReportModule())
-        service.register_module(AnalysisReportModule())
-        service.register_module(VerificationReportModule())
-        service.register_module(ComparisonReportModule())
-
-        # Execute pipeline
         if request.intent:
             try:
                 intent = AnalysisIntent(request.intent)
@@ -165,19 +261,21 @@ async def analyze_query(request: AnalyzeRequest):
         else:
             result = service.analyze(request.query, run_id=request.run_id)
 
-        # Format response
         node_results_summary = {}
         for node_id, node_res in result.node_results.items():
             node_results_summary[node_id] = {
                 "status": node_res.status,
                 "error": node_res.error,
-                # We omit full output to keep response light, unless needed
+                "duration_ms": node_res.duration_ms,
             }
 
         return AnalysisResponse(
             intent=result.intent.value if result.intent else "unknown",
             is_complete=result.is_complete,
             duration_ms=result.total_duration_ms,
+            pipeline_id=result.pipeline_id,
+            started_at=result.started_at.isoformat() if result.started_at else None,
+            finished_at=result.finished_at.isoformat() if result.finished_at else None,
             final_output=result.final_output,
             node_results=node_results_summary,
         )
@@ -191,31 +289,7 @@ async def analyze_query(request: AnalyzeRequest):
 async def list_intents():
     """List available analysis intents and templates."""
     try:
-        service = AnalysisPipelineService()
-
-        from evalvault.adapters.outbound.analysis import (
-            AnalysisReportModule,
-            CausalAnalyzerModule,
-            ComparisonReportModule,
-            DataLoaderModule,
-            NLPAnalyzerModule,
-            StatisticalAnalyzerModule,
-            SummaryReportModule,
-            VerificationReportModule,
-        )
-
-        db_path = "evalvault.db"
-        storage = SQLiteStorageAdapter(db_path=db_path)
-
-        service.register_module(DataLoaderModule(storage=storage))
-        service.register_module(StatisticalAnalyzerModule())
-        service.register_module(NLPAnalyzerModule())
-        service.register_module(CausalAnalyzerModule())
-        service.register_module(SummaryReportModule())
-        service.register_module(AnalysisReportModule())
-        service.register_module(VerificationReportModule())
-        service.register_module(ComparisonReportModule())
-
+        service, _storage = _build_pipeline_service()
         registered_modules = set(service.get_registered_modules())
 
         responses: list[IntentCatalogResponse] = []
@@ -257,5 +331,91 @@ async def list_intents():
             )
 
         return responses
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/results", response_model=PipelineResultSummary)
+async def save_pipeline_result(payload: PipelineResultPayload):
+    """Save a pipeline analysis result for history."""
+    try:
+        _service, storage = _build_pipeline_service()
+        result_id = str(uuid4())
+        created_at = datetime.now().isoformat()
+
+        record = payload.model_dump()
+        record.update(
+            {
+                "result_id": result_id,
+                "created_at": created_at,
+            }
+        )
+        storage.save_pipeline_result(record)
+
+        return PipelineResultSummary(
+            result_id=result_id,
+            intent=payload.intent,
+            label=_intent_label(payload.intent),
+            query=payload.query,
+            run_id=payload.run_id,
+            duration_ms=payload.duration_ms,
+            is_complete=payload.is_complete,
+            created_at=created_at,
+            started_at=payload.started_at,
+            finished_at=payload.finished_at,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/results", response_model=list[PipelineResultSummary])
+async def list_pipeline_results(limit: int = 50):
+    """List saved pipeline analysis results."""
+    try:
+        _service, storage = _build_pipeline_service()
+        results = storage.list_pipeline_results(limit=limit)
+
+        return [
+            PipelineResultSummary(
+                result_id=item["result_id"],
+                intent=item["intent"],
+                label=_intent_label(item["intent"]),
+                query=item.get("query"),
+                run_id=item.get("run_id"),
+                duration_ms=item.get("duration_ms"),
+                is_complete=item.get("is_complete", False),
+                created_at=item.get("created_at"),
+                started_at=item.get("started_at"),
+                finished_at=item.get("finished_at"),
+            )
+            for item in results
+        ]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/results/{result_id}", response_model=PipelineResultResponse)
+async def get_pipeline_result(result_id: str):
+    """Get a saved pipeline analysis result."""
+    try:
+        _service, storage = _build_pipeline_service()
+        item = storage.get_pipeline_result(result_id)
+        return PipelineResultResponse(
+            result_id=item["result_id"],
+            intent=item["intent"],
+            label=_intent_label(item["intent"]),
+            query=item.get("query"),
+            run_id=item.get("run_id"),
+            pipeline_id=item.get("pipeline_id"),
+            duration_ms=item.get("duration_ms"),
+            is_complete=item.get("is_complete", False),
+            created_at=item.get("created_at"),
+            started_at=item.get("started_at"),
+            finished_at=item.get("finished_at"),
+            node_results=item.get("node_results"),
+            final_output=item.get("final_output"),
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

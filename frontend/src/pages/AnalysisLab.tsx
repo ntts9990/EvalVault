@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
 import {
     fetchAnalysisIntents,
+    fetchAnalysisHistory,
     fetchRuns,
     runAnalysis,
+    saveAnalysisResult,
+    type AnalysisHistoryItem,
     type AnalysisIntentInfo,
     type AnalysisResult,
     type RunSummary,
 } from "../services/api";
-import { formatDurationMs } from "../utils/format";
+import { formatDateTime, formatDurationMs } from "../utils/format";
 import {
     Activity,
     AlertCircle,
+    ExternalLink,
     Play,
+    Save,
 } from "lucide-react";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
@@ -44,6 +50,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 };
 
 export function AnalysisLab() {
+    const navigate = useNavigate();
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
     const [catalogError, setCatalogError] = useState<string | null>(null);
     const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -54,6 +61,12 @@ export function AnalysisLab() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showRaw, setShowRaw] = useState(false);
+    const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [lastQuery, setLastQuery] = useState<string | null>(null);
+    const [savedResultId, setSavedResultId] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadCatalog() {
@@ -79,6 +92,18 @@ export function AnalysisLab() {
         loadRuns();
     }, []);
 
+    useEffect(() => {
+        async function loadHistory() {
+            try {
+                const data = await fetchAnalysisHistory(20);
+                setHistory(data);
+            } catch (err) {
+                setHistoryError(err instanceof Error ? err.message : "Failed to load history");
+            }
+        }
+        loadHistory();
+    }, []);
+
     const groupedCatalog = useMemo(() => {
         const grouped: Record<string, AnalysisIntentInfo[]> = {};
         for (const item of catalog) {
@@ -93,7 +118,10 @@ export function AnalysisLab() {
         if (!intent.available || loading) return;
         setSelectedIntent(intent);
         setError(null);
+        setSaveError(null);
         setResult(null);
+        setSavedResultId(null);
+        setLastQuery(intent.sample_query);
         setLoading(true);
         try {
             const analysis = await runAnalysis(intent.sample_query, selectedRunId || undefined, intent.intent);
@@ -102,6 +130,33 @@ export function AnalysisLab() {
             setError(err instanceof Error ? err.message : "Analysis failed");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!result || saving) return;
+        setSaving(true);
+        setSaveError(null);
+        try {
+            const payload = {
+                intent: result.intent,
+                query: lastQuery || selectedIntent?.sample_query || result.intent,
+                run_id: selectedRunId || null,
+                pipeline_id: result.pipeline_id || null,
+                is_complete: result.is_complete,
+                duration_ms: result.duration_ms,
+                final_output: result.final_output,
+                node_results: result.node_results,
+                started_at: result.started_at || null,
+                finished_at: result.finished_at || null,
+            };
+            const saved = await saveAnalysisResult(payload);
+            setSavedResultId(saved.result_id);
+            setHistory(prev => [saved, ...prev.filter(item => item.result_id !== saved.result_id)]);
+        } catch (err) {
+            setSaveError(err instanceof Error ? err.message : "Failed to save analysis result");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -192,6 +247,44 @@ export function AnalysisLab() {
                                 <p className="text-xs text-muted-foreground mt-3">
                                     Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.
                                 </p>
+                            )}
+                        </div>
+
+                        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                            <h3 className="font-semibold mb-3 flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-primary" /> 저장된 결과
+                            </h3>
+                            {historyError && (
+                                <p className="text-xs text-destructive mb-2">{historyError}</p>
+                            )}
+                            {history.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    아직 저장된 분석 결과가 없습니다.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {history.map(item => (
+                                        <button
+                                            key={item.result_id}
+                                            type="button"
+                                            onClick={() => navigate(`/analysis/results/${item.result_id}`)}
+                                            className="w-full text-left border border-border rounded-lg p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium">{item.label}</p>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {formatDurationMs(item.duration_ms)}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {formatDateTime(item.created_at)}
+                                            </p>
+                                            <p className="text-[11px] text-muted-foreground mt-1">
+                                                {item.run_id ? `Run ${item.run_id.slice(0, 8)}` : "샘플 데이터"}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
@@ -307,6 +400,30 @@ export function AnalysisLab() {
                                             <p className="text-xs text-muted-foreground">Status</p>
                                             <p className="text-sm font-semibold mt-1">{result.is_complete ? "Complete" : "Partial"}</p>
                                         </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleSave}
+                                            disabled={saving}
+                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40 disabled:opacity-60"
+                                        >
+                                            <Save className="w-3 h-3" />
+                                            {saving ? "저장 중..." : "결과 저장"}
+                                        </button>
+                                        {savedResultId && (
+                                            <Link
+                                                to={`/analysis/results/${savedResultId}`}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                            >
+                                                <ExternalLink className="w-3 h-3" />
+                                                결과 보기
+                                            </Link>
+                                        )}
+                                        {saveError && (
+                                            <span className="text-xs text-destructive">{saveError}</span>
+                                        )}
                                     </div>
 
                                     {resultSummary && (

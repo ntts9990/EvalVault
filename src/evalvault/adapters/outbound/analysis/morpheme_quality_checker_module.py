@@ -36,29 +36,28 @@ class MorphemeQualityCheckerModule(BaseAnalysisModule):
                 "checks": [build_check("data_presence", False, "No morpheme stats")],
             }
 
-        min_question_tokens = params.get("min_avg_question_tokens", 2)
-        min_context_tokens = params.get("min_avg_context_tokens", 4)
-        min_vocab_size = params.get("min_vocab_size", 10)
+        min_avg_tokens = params.get("min_avg_tokens", 4)
+        min_vocab_size = params.get("min_vocab_size", 30)
 
-        avg_question_tokens = summary.get("avg_question_tokens", 0)
-        avg_context_tokens = summary.get("avg_context_tokens", 0)
+        avg_tokens = summary.get("avg_tokens", 0)
         vocab_size = summary.get("vocab_size", 0)
+        backend = summary.get("backend", "unknown")
 
         checks = [
             build_check(
-                "avg_question_tokens",
-                avg_question_tokens >= min_question_tokens,
-                f"avg={avg_question_tokens}, min={min_question_tokens}",
-            ),
-            build_check(
-                "avg_context_tokens",
-                avg_context_tokens >= min_context_tokens,
-                f"avg={avg_context_tokens}, min={min_context_tokens}",
+                "avg_tokens",
+                avg_tokens >= min_avg_tokens,
+                f"avg={avg_tokens}, min={min_avg_tokens}",
             ),
             build_check(
                 "vocab_size",
                 vocab_size >= min_vocab_size,
                 f"vocab={vocab_size}, min={min_vocab_size}",
+            ),
+            build_check(
+                "tokenizer_backend",
+                backend == "kiwi",
+                f"backend={backend}",
             ),
         ]
 

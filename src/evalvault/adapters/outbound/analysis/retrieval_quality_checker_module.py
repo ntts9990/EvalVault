@@ -36,13 +36,17 @@ class RetrievalQualityCheckerModule(BaseAnalysisModule):
                 "checks": [build_check("data_presence", False, "No retrieval stats")],
             }
 
-        min_avg_contexts = params.get("min_avg_contexts", 1)
-        max_empty_rate = params.get("max_empty_context_rate", 0.2)
-        min_context_tokens = params.get("min_avg_context_tokens", 4)
+        min_avg_contexts = float(params.get("min_avg_contexts", 1.0))
+        max_empty_rate = float(params.get("max_empty_context_rate", 0.2))
+        min_context_tokens = float(params.get("min_avg_context_tokens", 4.0))
+        min_keyword_overlap = float(params.get("min_keyword_overlap", 0.3))
+        min_ground_truth_hit = float(params.get("min_ground_truth_hit_rate", 0.2))
 
         avg_contexts = summary.get("avg_contexts", 0)
         empty_rate = summary.get("empty_context_rate", 0)
         avg_context_tokens = summary.get("avg_context_tokens", 0)
+        keyword_overlap = summary.get("avg_keyword_overlap", 0)
+        ground_truth_hit = summary.get("ground_truth_hit_rate", 0)
 
         checks = [
             build_check(
@@ -59,6 +63,16 @@ class RetrievalQualityCheckerModule(BaseAnalysisModule):
                 "avg_context_tokens",
                 avg_context_tokens >= min_context_tokens,
                 f"avg={avg_context_tokens}, min={min_context_tokens}",
+            ),
+            build_check(
+                "keyword_overlap",
+                keyword_overlap >= min_keyword_overlap,
+                f"overlap={keyword_overlap}, min={min_keyword_overlap}",
+            ),
+            build_check(
+                "ground_truth_hit_rate",
+                ground_truth_hit >= min_ground_truth_hit,
+                f"hit={ground_truth_hit}, min={min_ground_truth_hit}",
             ),
         ]
 

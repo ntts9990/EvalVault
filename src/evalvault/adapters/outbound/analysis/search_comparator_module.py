@@ -27,13 +27,20 @@ class SearchComparatorModule(BaseAnalysisModule):
         rrf_output = get_upstream_output(inputs, "rrf_hybrid", "hybrid_rrf") or {}
         weighted_output = get_upstream_output(inputs, "weighted_hybrid", "hybrid_weighted") or {}
 
+        rrf_available = rrf_output.get("available", True)
+        weighted_available = weighted_output.get("available", True)
         rrf_score = rrf_output.get("score", 0.0)
         weighted_score = weighted_output.get("score", 0.0)
 
-        winner = "rrf_hybrid" if rrf_score >= weighted_score else "weighted_hybrid"
+        if rrf_available and not weighted_available:
+            winner = "rrf_hybrid"
+        elif weighted_available and not rrf_available:
+            winner = "weighted_hybrid"
+        else:
+            winner = "rrf_hybrid" if rrf_score >= weighted_score else "weighted_hybrid"
 
         return {
             "winner": winner,
-            "rrf_hybrid": {"score": rrf_score},
-            "weighted_hybrid": {"score": weighted_score},
+            "rrf_hybrid": {"score": rrf_score, "available": rrf_available},
+            "weighted_hybrid": {"score": weighted_score, "available": weighted_available},
         }

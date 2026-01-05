@@ -311,6 +311,9 @@ export interface AnalysisResult {
     intent: string;
     is_complete: boolean;
     duration_ms: number | null;
+    pipeline_id?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
     final_output: Record<string, any> | null;
     node_results: Record<string, any>;
 }
@@ -331,6 +334,38 @@ export interface AnalysisIntentInfo {
     }[];
 }
 
+export interface SaveAnalysisResultRequest {
+    intent: string;
+    query?: string | null;
+    run_id?: string | null;
+    pipeline_id?: string | null;
+    is_complete: boolean;
+    duration_ms?: number | null;
+    final_output?: Record<string, any> | null;
+    node_results?: Record<string, any> | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+}
+
+export interface AnalysisHistoryItem {
+    result_id: string;
+    intent: string;
+    label: string;
+    query: string | null;
+    run_id: string | null;
+    duration_ms: number | null;
+    is_complete: boolean;
+    created_at: string;
+    started_at?: string | null;
+    finished_at?: string | null;
+}
+
+export interface SavedAnalysisResult extends AnalysisHistoryItem {
+    pipeline_id: string | null;
+    final_output: Record<string, any> | null;
+    node_results: Record<string, any> | null;
+}
+
 export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
     const response = await fetch(`${API_BASE_URL}/pipeline/intents`);
     if (!response.ok) throw new Error("Failed to fetch analysis intents");
@@ -348,6 +383,30 @@ export async function runAnalysis(
         body: JSON.stringify({ query, run_id: runId, intent }),
     });
     if (!response.ok) throw new Error("Analysis failed");
+    return response.json();
+}
+
+export async function saveAnalysisResult(
+    payload: SaveAnalysisResultRequest
+): Promise<AnalysisHistoryItem> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Failed to save analysis result");
+    return response.json();
+}
+
+export async function fetchAnalysisHistory(limit: number = 20): Promise<AnalysisHistoryItem[]> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results?limit=${limit}`);
+    if (!response.ok) throw new Error("Failed to fetch analysis history");
+    return response.json();
+}
+
+export async function fetchAnalysisResult(resultId: string): Promise<SavedAnalysisResult> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results/${resultId}`);
+    if (!response.ok) throw new Error("Failed to fetch analysis result");
     return response.json();
 }
 

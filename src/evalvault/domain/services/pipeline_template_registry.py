@@ -202,7 +202,7 @@ class PipelineTemplateRegistry:
                 id="bm25_search",
                 name="BM25 검색",
                 module="bm25_searcher",
-                depends_on=["morpheme_analysis"],
+                depends_on=["load_data", "morpheme_analysis"],
             ),
             AnalysisNode(
                 id="embedding_search",
