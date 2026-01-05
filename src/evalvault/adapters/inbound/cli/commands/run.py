@@ -513,7 +513,7 @@ def register_run_commands(
 
         # Override model if specified
         if model:
-            if _is_oss_open_model(model):
+            if _is_oss_open_model(model) and settings.llm_provider != "vllm":
                 settings.llm_provider = "ollama"
                 settings.ollama_model = model
                 console.print(
