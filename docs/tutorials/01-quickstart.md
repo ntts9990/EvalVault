@@ -7,7 +7,7 @@
 ## 전제 조건
 
 - Python 3.12+
-- OpenAI API 키
+- OpenAI API 키 또는 로컬 모델(Ollama/vLLM)
 
 ---
 
@@ -38,20 +38,38 @@ pip install -e ".[dev]"
 # .env 파일 생성
 cp .env.example .env
 
-# OpenAI API 키 설정 (필수)
+# OpenAI API 키 설정 (OpenAI 사용 시)
 echo "OPENAI_API_KEY=sk-your-api-key" >> .env
 ```
 
-vLLM(OpenAI-compatible)로 시작하려면 아래처럼 설정합니다:
+OpenAI를 쓰지 않는다면 위 키 설정은 생략해도 됩니다.
+
+### 초간단 시작 (Ollama 3줄)
 
 ```bash
-EVALVAULT_PROFILE=vllm
-VLLM_BASE_URL=http://localhost:8001/v1
-VLLM_MODEL=gpt-oss:120b
-VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+cp .env.example .env
+ollama pull gemma3:1b
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db \
+  --profile dev
 ```
 
-설정 확인:
+Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+### 초간단 시작 (vLLM 3줄)
+
+```bash
+cp .env.example .env
+printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
+```
+
+Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
+
+설정 확인(선택):
 
 ```bash
 uv run evalvault config
@@ -68,27 +86,17 @@ Langfuse: Not configured
 
 ---
 
-## Step 3: API + React 프론트 실행 (dev)
+## Step 3: 첫 Ragas 평가 실행
+
+샘플 데이터셋으로 Ragas 평가를 실행하고 결과를 DB에 저장합니다:
 
 ```bash
-# API
-uv run evalvault serve-api --reload
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
 ```
 
----
-
-## Step 4: 첫 평가 실행
-
-샘플 데이터셋으로 평가를 실행합니다:
-
-```bash
-uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
-```
+Tip: `--db`를 빼면 결과가 콘솔에만 출력되고 history/export/Web UI에는 저장되지 않습니다.
 
 출력 예시:
 ```
@@ -104,24 +112,45 @@ Results:
 faithfulness: 0.92
 Pass Rate: 100% (5/5 passed)
 
+Results saved to database: evalvault.db
 Run ID: abc123-def456-...
 ```
+
+---
+
+## Step 4: 결과 확인 (CLI)
+
+```bash
+# 평가 히스토리 조회 (동일한 DB 경로)
+uv run evalvault history --db evalvault.db
+
+# 상세 결과 내보내기
+uv run evalvault export <run_id> -o result.json --db evalvault.db
+
+```
+Web UI로 보려면 Step 5에서 API + React 프론트를 실행한 뒤
+`http://localhost:5173`로 접속하세요.
+
+---
+
+## Step 5: API + React 프론트 실행 (선택)
+
+```bash
+# API
+uv run evalvault serve-api --reload
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+브라우저에서 `http://localhost:5173`를 열어 확인합니다.
 
 ---
 
 ## 다음 단계
 
 축하합니다! 첫 RAG 평가를 성공적으로 완료했습니다.
-
-### 결과 확인
-
-```bash
-# 평가 히스토리 조회
-uv run evalvault history
-
-# 상세 결과 내보내기
-uv run evalvault export <run_id> -o result.json
-```
 
 ### 더 알아보기
 
@@ -169,8 +198,9 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 |------|--------|
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
-| 3. API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
-| 4. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness` |
+| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness --db evalvault.db` |
+| 4. 결과 확인 | `uv run evalvault history --db evalvault.db` 또는 Web UI(`http://localhost:5173`) |
+| 5. (선택) API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
 
 소요 시간: 약 5분
 

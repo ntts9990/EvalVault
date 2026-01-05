@@ -149,6 +149,20 @@ export async function uploadDataset(file: File): Promise<{ message: string; path
     return response.json();
 }
 
+export async function uploadRetrieverDocs(
+    file: File
+): Promise<{ message: string; path: string; filename: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}/runs/options/retriever-docs`, {
+        method: "POST",
+        body: formData,
+    });
+    if (!response.ok) throw new Error("Failed to upload retriever docs");
+    return response.json();
+}
+
 export async function fetchModels(provider?: string): Promise<ModelItem[]> {
     const params = new URLSearchParams();
     if (provider) params.append("provider", provider);
@@ -311,6 +325,9 @@ export interface AnalysisResult {
     intent: string;
     is_complete: boolean;
     duration_ms: number | null;
+    pipeline_id?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
     final_output: Record<string, any> | null;
     node_results: Record<string, any>;
 }
@@ -331,6 +348,44 @@ export interface AnalysisIntentInfo {
     }[];
 }
 
+export interface SaveAnalysisResultRequest {
+    intent: string;
+    query?: string | null;
+    run_id?: string | null;
+    pipeline_id?: string | null;
+    profile?: string | null;
+    tags?: string[] | null;
+    metadata?: Record<string, any> | null;
+    is_complete: boolean;
+    duration_ms?: number | null;
+    final_output?: Record<string, any> | null;
+    node_results?: Record<string, any> | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+}
+
+export interface AnalysisHistoryItem {
+    result_id: string;
+    intent: string;
+    label: string;
+    query: string | null;
+    run_id: string | null;
+    profile?: string | null;
+    tags?: string[] | null;
+    duration_ms: number | null;
+    is_complete: boolean;
+    created_at: string;
+    started_at?: string | null;
+    finished_at?: string | null;
+}
+
+export interface SavedAnalysisResult extends AnalysisHistoryItem {
+    pipeline_id: string | null;
+    final_output: Record<string, any> | null;
+    node_results: Record<string, any> | null;
+    metadata?: Record<string, any> | null;
+}
+
 export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
     const response = await fetch(`${API_BASE_URL}/pipeline/intents`);
     if (!response.ok) throw new Error("Failed to fetch analysis intents");
@@ -340,14 +395,39 @@ export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
 export async function runAnalysis(
     query: string,
     runId?: string,
-    intent?: string
+    intent?: string,
+    params?: Record<string, any>
 ): Promise<AnalysisResult> {
     const response = await fetch(`${API_BASE_URL}/pipeline/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, run_id: runId, intent }),
+        body: JSON.stringify({ query, run_id: runId, intent, params }),
     });
     if (!response.ok) throw new Error("Analysis failed");
+    return response.json();
+}
+
+export async function saveAnalysisResult(
+    payload: SaveAnalysisResultRequest
+): Promise<AnalysisHistoryItem> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Failed to save analysis result");
+    return response.json();
+}
+
+export async function fetchAnalysisHistory(limit: number = 20): Promise<AnalysisHistoryItem[]> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results?limit=${limit}`);
+    if (!response.ok) throw new Error("Failed to fetch analysis history");
+    return response.json();
+}
+
+export async function fetchAnalysisResult(resultId: string): Promise<SavedAnalysisResult> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/results/${resultId}`);
+    if (!response.ok) throw new Error("Failed to fetch analysis result");
     return response.json();
 }
 

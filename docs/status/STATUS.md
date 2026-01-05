@@ -23,7 +23,7 @@ uv run pytest tests --collect-only -q
 ## 지금 “활발히 쓰는” 핵심 기능
 
 - **평가 실행/저장/비교**: Typer CLI + SQLite/PostgreSQL 저장소
-- **Web UI**: Streamlit 기반 Evaluate/History/Reports
+- **Web UI**: FastAPI + React 기반 Evaluation/History/Reports
 - **관측성(Observability)**: Phoenix(OpenTelemetry/OpenInference) 중심, 필요 시 Langfuse/MLflow 병행
 - **Domain Memory**: 평가 결과 학습 → threshold 보정/컨텍스트 보강/트렌드 분석
 - **분석 파이프라인**: Query → Intent 분류 → DAG 모듈 실행(요약/검증/비교/분석)

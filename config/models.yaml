@@ -47,7 +47,7 @@ profiles:
     description: "OpenAI API 사용 (외부망)"
     llm:
       provider: openai
-      model: gpt-4o
+      model: gpt-5-nano
     embedding:
       provider: openai
       model: text-embedding-3-small
@@ -59,7 +59,7 @@ profiles:
     description: "vLLM(OpenAI-compatible) 서버 사용"
     llm:
       provider: vllm
-      model: gpt-oss:120b
+      model: gpt-oss-120b
     embedding:
       provider: vllm
       model: qwen3-embedding:0.6b

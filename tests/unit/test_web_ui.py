@@ -453,7 +453,7 @@ class TestWebUIAdapterRunEvaluation:
         loader.load.return_value = mock_dataset
         return loader
 
-    def test_run_evaluation_returns_evaluation_run(
+    async def test_run_evaluation_returns_evaluation_run(
         self, mock_storage, mock_evaluator, mock_llm, mock_data_loader
     ):
         """평가 실행이 EvaluationRun을 반환하는지 확인."""
@@ -472,7 +472,7 @@ class TestWebUIAdapterRunEvaluation:
             metrics=["faithfulness", "answer_relevancy"],
         )
 
-        result = adapter.run_evaluation(request)
+        result = await adapter.run_evaluation(request)
 
         assert result is not None
         assert hasattr(result, "run_id")
@@ -568,7 +568,7 @@ class TestWebUIAdapterRunEvaluation:
 
         assert result.tracker_metadata["run_mode"] == "simple"
 
-    def test_run_evaluation_saves_to_storage(
+    async def test_run_evaluation_saves_to_storage(
         self, mock_storage, mock_evaluator, mock_llm, mock_data_loader
     ):
         """평가 결과가 저장소에 저장되는지 확인."""
@@ -587,7 +587,7 @@ class TestWebUIAdapterRunEvaluation:
             metrics=["faithfulness"],
         )
 
-        adapter.run_evaluation(request)
+        await adapter.run_evaluation(request)
 
         # 저장소에 저장 호출 확인
         mock_storage.save_run.assert_called_once()

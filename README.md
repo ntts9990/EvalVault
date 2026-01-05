@@ -13,12 +13,12 @@ Prefer Korean docs? Read the [한국어 README](docs/README.ko.md).
 
 ## Overview
 
-EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and Streamlit Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air‑gapped profiles without wiring new scripts for each dataset.
+EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air‑gapped profiles without wiring new scripts for each dataset.
 
 **Highlights**
 - One CLI for running, comparing, exporting, and storing evaluation runs
 - Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
-- Streamlit Web UI for evaluation, history, and report generation
+- FastAPI + React Web UI for Evaluation Studio and Analysis Lab (save & reload analysis results)
 - Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
 - DAG-based analysis pipeline with statistical/NLP/causal modules
@@ -51,7 +51,6 @@ Add extras as needed:
 |-------|----------|---------|
 | `analysis` | scikit-learn | Statistical/NLP analysis modules |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | Korean tokenization & retrieval |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL storage |
 | `mlflow` | mlflow | MLflow tracker |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix tracing, dataset/experiment sync |
@@ -68,15 +67,40 @@ Add extras as needed:
    cp .env.example .env
    # set OPENAI_API_KEY or OLLAMA settings, LANGFUSE/PHOENIX keys, etc.
    ```
+   Optional SQLite path override:
+   ```bash
+   # .env
+   EVALVAULT_DB_PATH=/path/to/evalvault.db
+   ```
    vLLM (OpenAI-compatible) usage:
    ```bash
    # .env
    EVALVAULT_PROFILE=vllm
    VLLM_BASE_URL=http://localhost:8001/v1
-   VLLM_MODEL=gpt-oss:120b
+   VLLM_MODEL=gpt-oss-120b
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # optional: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
+   Fast path (Ollama, 3 lines):
+   ```bash
+   cp .env.example .env
+   ollama pull gemma3:1b
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db \
+     --profile dev
+   ```
+   Tip: embedding metrics like `answer_relevancy` also need `qwen3-embedding:0.6b`.
+
+   Fast path (vLLM, 3 lines):
+   ```bash
+   cp .env.example .env
+   printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db
+   ```
+   Tip: embedding metrics require `VLLM_EMBEDDING_MODEL` and a `/v1/embeddings` endpoint.
    If you use Ollama models that support tool/function calling, list them in
    `OLLAMA_TOOL_MODELS` (comma-separated). Check support via
    `ollama show <model>` and look for `Capabilities: tools`.
@@ -105,24 +129,21 @@ Add extras as needed:
    npm install
    npm run dev
    ```
+   Open `http://localhost:5173`.
 
 3. **Run an evaluation**
    ```bash
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --tracker phoenix \
      --db evalvault.db
    ```
+   Tip: `--db` stores results for `history/export/web`. Add `--tracker phoenix` only if
+   Phoenix is configured (and `uv sync --extra phoenix` is installed).
 
 4. **Inspect history**
    ```bash
    uv run evalvault history --db evalvault.db
-   ```
-
-5. **Launch the Web UI**
-   ```bash
-   uv run evalvault web --browser
    ```
 
 More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).
@@ -152,7 +173,7 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ```
 
 - `uv run evalvault history --mode simple` (또는 `full`) keeps CLI reports focused.
-- Streamlit **📊 Evaluate** now includes the same mode toggle and surfaces a “Mode” pill on **📄 Reports** to make comparisons obvious.
+- The Web UI includes the same mode toggle and surfaces a “Mode” pill on Reports to make comparisons obvious.
 
 ---
 

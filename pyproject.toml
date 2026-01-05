@@ -57,6 +57,7 @@ dependencies = [
     "chardet", # For automatic encoding detection in CSV files
     "truststore>=0.10.4",
     "fastapi>=0.128.0",
+    "python-multipart",
     "uvicorn>=0.40.0",
 ]
 
@@ -77,6 +78,7 @@ dev = [
     "pytest-rerunfailures",
     "pytest-html",      # HTML test reports
     "ruff",
+    "python-multipart",
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -113,6 +115,7 @@ web = [
     "streamlit>=1.40.0",
     "plotly>=5.18.0",
     "watchdog>=3.0.0",                # Hot reload for Streamlit
+    "python-multipart",
 ]
 perf = [
     "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)

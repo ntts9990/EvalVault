@@ -135,7 +135,7 @@
 ┌──────────────────────┐              ┌──────────────────────┐
 │                      │              │                      │
 │   CLI Application    │              │    Web UI            │
-│   (Typer)            │              │    (Streamlit)       │
+│   (Typer)            │              │ (React + FastAPI)    │
 │                      │              │                      │
 │  - run 명령          │              │  - 평가 실행         │
 │  - generate 명령     │              │  - 결과 시각화       │
@@ -213,10 +213,10 @@
    - **책임**: 명령줄 인터페이스 제공
    - **포트**: 표준 입출력
 
-2. **Web UI (Streamlit)**
-   - **기술**: Streamlit
+2. **Web UI (React + FastAPI)**
+   - **기술**: React(Vite) + FastAPI
    - **책임**: 웹 기반 사용자 인터페이스
-   - **포트**: HTTP (기본 8501)
+   - **포트**: HTTP (기본 5173/8000)
 
 3. **EvalVault Core Application**
    - **기술**: Python 3.12+
@@ -1202,7 +1202,7 @@ Adapters → Ports → Domain
 |------|------|
 | **언어** | Python 3.12+ |
 | **CLI 프레임워크** | Typer |
-| **Web UI** | Streamlit |
+| **Web UI** | React + FastAPI |
 | **평가 프레임워크** | Ragas v1.0 |
 | **데이터베이스** | SQLite (기본), PostgreSQL (선택) |
 | **추적 시스템** | Langfuse, MLflow |

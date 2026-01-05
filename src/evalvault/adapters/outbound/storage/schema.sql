@@ -131,6 +131,32 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
 CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
 
+-- Analysis pipeline results table
+CREATE TABLE IF NOT EXISTS pipeline_results (
+    result_id TEXT PRIMARY KEY,
+    intent TEXT NOT NULL,
+    query TEXT,
+    run_id TEXT,
+    pipeline_id TEXT,
+    profile TEXT,
+    tags TEXT,  -- JSON array of tag strings
+    metadata TEXT,  -- JSON metadata for trace/profile/user info
+    is_complete INTEGER NOT NULL DEFAULT 1,
+    duration_ms REAL,
+    final_output TEXT,  -- JSON serialized pipeline output
+    node_results TEXT,  -- JSON serialized node outputs
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_created_at
+    ON pipeline_results(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_intent
+    ON pipeline_results(intent);
+CREATE INDEX IF NOT EXISTS idx_pipeline_results_run_id
+    ON pipeline_results(run_id);
+
 -- Stage events for pipeline-level observability
 CREATE TABLE IF NOT EXISTS stage_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

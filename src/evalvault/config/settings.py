@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         default="http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated list of allowed CORS origins.",
     )
+    evalvault_db_path: str = Field(
+        default="evalvault.db",
+        description="SQLite database path for API/CLI storage.",
+    )
 
     # LLM Provider Selection
     llm_provider: str = Field(
@@ -77,7 +81,7 @@ class Settings(BaseSettings):
         description="vLLM API key (optional, depends on server setup)",
     )
     vllm_model: str = Field(
-        default="gpt-oss:120b",
+        default="gpt-oss-120b",
         description="vLLM model name for evaluation",
     )
     vllm_embedding_model: str = Field(

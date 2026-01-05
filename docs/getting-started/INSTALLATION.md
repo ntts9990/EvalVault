@@ -25,7 +25,6 @@ uv sync --extra dev
 |-------|--------|------|
 | `analysis` | scikit-learn | 통계/NLP 분석 모듈 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 형태소·검색 |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
@@ -56,6 +55,7 @@ cd frontend
 npm install
 npm run dev
 ```
+브라우저에서 `http://localhost:5173`를 열어 확인합니다.
 
 ---
 

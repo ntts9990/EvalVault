@@ -1,0 +1,24 @@
+{
+  "name": "",
+  "version": "",
+  "description": "",
+  "thresholds": {
+    "faithfulness": null,
+    "answer_relevancy": null,
+    "context_precision": null,
+    "context_recall": null,
+    "factual_correctness": null,
+    "semantic_similarity": null
+  },
+  "metadata": {},
+  "test_cases": [
+    {
+      "id": "",
+      "question": "",
+      "answer": "",
+      "contexts": [],
+      "ground_truth": "",
+      "metadata": {}
+    }
+  ]
+}

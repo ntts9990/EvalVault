@@ -9,7 +9,8 @@ import {
     fetchMetrics,
     fetchConfig,
     startEvaluation,
-    uploadDataset
+    uploadDataset,
+    uploadRetrieverDocs
 } from "../services/api";
 import { Play, Database, Brain, Target, CheckCircle2, AlertCircle, Settings, Upload, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +32,8 @@ export function EvaluationStudio() {
     // Advanced Options State
     const [retrieverMode, setRetrieverMode] = useState<"none" | "bm25" | "hybrid">("none");
     const [docsPath, setDocsPath] = useState<string>("");
+    const [retrieverFile, setRetrieverFile] = useState<File | null>(null);
+    const [retrieverUploading, setRetrieverUploading] = useState(false);
     const [enableMemory, setEnableMemory] = useState<boolean>(false);
     const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -69,6 +72,25 @@ export function EvaluationStudio() {
             setError(err instanceof Error ? err.message : "Failed to upload");
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleRetrieverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setRetrieverFile(e.target.files?.[0] || null);
+    };
+
+    const handleRetrieverUpload = async () => {
+        if (!retrieverFile) return;
+        setRetrieverUploading(true);
+        setError(null);
+        try {
+            const result = await uploadRetrieverDocs(retrieverFile);
+            setDocsPath(result.path);
+            setRetrieverFile(null);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to upload retriever docs");
+        } finally {
+            setRetrieverUploading(false);
         }
     };
 
@@ -359,11 +381,6 @@ export function EvaluationStudio() {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="font-medium">{model.name}</p>
-                                                {model.supports_tools && (
-                                                    <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 font-semibold">
-                                                        Tools
-                                                    </span>
-                                                )}
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">{model.id}</p>
                                         </div>
@@ -393,7 +410,9 @@ export function EvaluationStudio() {
                                             : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                                             }`}
                                     >
-                                        {metric}
+                                        <span className="inline-flex items-center gap-2">
+                                            {metric}
+                                        </span>
                                     </button>
                                 );
                             })}
@@ -436,13 +455,51 @@ export function EvaluationStudio() {
                                                 ))}
                                             </div>
                                             {retrieverMode !== "none" && (
-                                                <input
-                                                    type="text"
-                                                    placeholder="Absolute path to documents (json/jsonl/txt)"
-                                                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
-                                                    value={docsPath}
-                                                    onChange={(e) => setDocsPath(e.target.value)}
-                                                />
+                                                <div className="space-y-3">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Absolute path to documents (json/jsonl/txt)"
+                                                        className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                        value={docsPath}
+                                                        onChange={(e) => setDocsPath(e.target.value)}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Example: /abs/path/to/retriever_docs.json (server path).
+                                                        Supports .json, .jsonl, .txt.
+                                                    </p>
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <input
+                                                                id="retriever-docs-upload"
+                                                                type="file"
+                                                                accept=".json,.jsonl,.txt"
+                                                                className="hidden"
+                                                                onChange={handleRetrieverFileChange}
+                                                            />
+                                                            <label
+                                                                htmlFor="retriever-docs-upload"
+                                                                className="px-3 py-1.5 rounded-md text-sm border bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80"
+                                                            >
+                                                                Choose file
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleRetrieverUpload}
+                                                                disabled={!retrieverFile || retrieverUploading}
+                                                                className="px-3 py-1.5 rounded-md text-sm border bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                                            >
+                                                                {retrieverUploading ? "Uploading..." : "Upload"}
+                                                            </button>
+                                                        </div>
+                                                        {retrieverFile && (
+                                                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                                                <FileText className="w-3 h-3" />
+                                                                <span>{retrieverFile.name}</span>
+                                                                <span>{(retrieverFile.size / 1024).toFixed(1)} KB</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from evalvault.adapters.outbound.dataset.base import BaseDatasetLoader
+from evalvault.adapters.outbound.dataset.thresholds import extract_thresholds_from_rows
 from evalvault.domain.entities.dataset import Dataset, TestCase
 
 # Common encodings to try for cross-platform compatibility
@@ -85,6 +86,7 @@ class CSVDatasetLoader(BaseDatasetLoader):
         - answer: Answer text
         - contexts: Context strings (JSON array or pipe-separated)
         - ground_truth: Ground truth answer (optional)
+        - threshold_*: Dataset-level metric thresholds (optional, first non-empty row wins)
 
         Args:
             file_path: Path to CSV file
@@ -108,6 +110,8 @@ class CSVDatasetLoader(BaseDatasetLoader):
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
+
+        thresholds = extract_thresholds_from_rows(df.head(50).to_dict(orient="records"))
 
         # Parse test cases
         test_cases = []
@@ -134,6 +138,7 @@ class CSVDatasetLoader(BaseDatasetLoader):
             version=self._get_default_version(),
             test_cases=test_cases,
             source_file=str(path),
+            thresholds=thresholds,
         )
 
         return dataset

@@ -8,7 +8,9 @@ from typing import Any
 
 from openpyxl import Workbook
 
-TEMPLATE_COLUMNS = ("id", "question", "answer", "contexts", "ground_truth")
+from evalvault.adapters.outbound.dataset.thresholds import THRESHOLD_COLUMNS
+
+TEMPLATE_COLUMNS = ("id", "question", "answer", "contexts", "ground_truth", *THRESHOLD_COLUMNS)
 
 
 def build_dataset_template_payload() -> dict[str, Any]:

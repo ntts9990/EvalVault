@@ -13,12 +13,12 @@ English version? See the [root README](https://github.com/ntts9990/EvalVault/blo
 
 ## 개요
 
-EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 Streamlit Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
+EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
 
 **주요 특징**
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
 - OpenAI/Ollama/vLLM/폐쇄망을 아우르는 프로필 기반 모델 구성
-- Streamlit Web UI에서 평가, 히스토리, 보고서 생성
+- FastAPI + React Web UI에서 평가, 히스토리, 보고서 생성
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
 - 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
@@ -51,7 +51,6 @@ uv sync --extra dev
 |-------|--------|------|
 | `analysis` | scikit-learn | 통계/NLP 분석 모듈 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 형태소·검색 |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `postgres` | psycopg | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
@@ -67,6 +66,11 @@ uv sync --extra dev
    ```bash
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
+   ```
+   SQLite 경로를 바꾸려면 아래 값을 추가합니다.
+   ```bash
+   # .env
+   EVALVAULT_DB_PATH=/path/to/evalvault.db
    ```
    vLLM(OpenAI-compatible)을 쓰려면 `EVALVAULT_PROFILE=vllm`로 설정하고
    `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`을 추가합니다.
@@ -86,10 +90,30 @@ uv sync --extra dev
    # .env
    EVALVAULT_PROFILE=vllm
    VLLM_BASE_URL=http://localhost:8001/v1
-   VLLM_MODEL=gpt-oss:120b
+   VLLM_MODEL=gpt-oss-120b
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
+   초간단 시작 (Ollama 3줄):
+   ```bash
+   cp .env.example .env
+   ollama pull gemma3:1b
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db \
+     --profile dev
+   ```
+   Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+   초간단 시작 (vLLM 3줄):
+   ```bash
+   cp .env.example .env
+   printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db
+   ```
+   Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
 
 2. **API + React 프론트 실행 (dev)**
    ```bash
@@ -101,24 +125,21 @@ uv sync --extra dev
    npm install
    npm run dev
    ```
+   브라우저에서 `http://localhost:5173`를 열어 확인합니다.
 
 3. **평가 실행**
    ```bash
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --tracker phoenix \
      --db evalvault.db
    ```
+   Tip: 결과를 history/export/Web UI에서 보려면 `--db` 경로를 동일하게 유지하세요.
+   Phoenix 추적이 필요하면 `--tracker phoenix`를 추가하고 `uv sync --extra phoenix`로 설치합니다.
 
 4. **히스토리 확인**
    ```bash
    uv run evalvault history --db evalvault.db
-   ```
-
-5. **Web UI 실행**
-   ```bash
-   uv run evalvault web --browser
    ```
 
 Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
@@ -146,7 +167,7 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ```
 
 - `uv run evalvault history --mode simple/full`로 CLI 히스토리를 즉시 필터링할 수 있습니다.
-- Streamlit **📊 Evaluate** 페이지에도 동일한 모드 토글이 추가되었고, **📄 Reports** 카드에 Mode Pill이 표시되어 어떤 프리셋으로 실행했는지 한눈에 알 수 있습니다.
+- Web UI에서도 동일한 모드 토글과 Mode Pill이 표시됩니다.
 
 ---
 

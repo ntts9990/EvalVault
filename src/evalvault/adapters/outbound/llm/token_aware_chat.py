@@ -124,6 +124,19 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 inner_self._tracker = tracker
 
             async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
+                # Ensure 충분한 출력 토큰 확보 (Ollama는 max_tokens를 사용)
+                if provider_name == "ollama":
+                    if "max_tokens" not in kwargs or kwargs["max_tokens"] < 4096:
+                        kwargs["max_tokens"] = 16384
+                else:
+                    if (
+                        "max_completion_tokens" not in kwargs
+                        or kwargs["max_completion_tokens"] < 4096
+                    ):
+                        kwargs["max_completion_tokens"] = 16384
+                    if "max_tokens" in kwargs:
+                        del kwargs["max_tokens"]
+
                 if think_level is not None:
                     extra_body = kwargs.get("extra_body", {})
                     options = extra_body.get("options", {})

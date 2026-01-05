@@ -60,7 +60,7 @@ uv pip install evalvault
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
 uv sync --extra dev        # 기본 개발 환경
-uv sync --extra dev --extra analysis --extra korean --extra web   # 전체 기능
+uv sync --extra dev --extra analysis --extra korean               # 전체 기능
 ```
 
 Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12를 고정하므로 추가 설치가 필요 없습니다.
@@ -87,6 +87,7 @@ uv run evalvault init
 ```bash
 # 공통
 EVALVAULT_PROFILE=dev              # config/models.yaml에 정의된 프로필
+EVALVAULT_DB_PATH=evalvault.db     # SQLite 저장 경로 (API/CLI 공통)
 OPENAI_API_KEY=sk-...
 
 # Langfuse (선택)
@@ -105,10 +106,37 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 # vLLM(OpenAI-compatible) 사용 예
 EVALVAULT_PROFILE=vllm
 VLLM_BASE_URL=http://localhost:8001/v1
-VLLM_MODEL=gpt-oss:120b
+VLLM_MODEL=gpt-oss-120b
 VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
 # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
 ```
+
+OpenAI를 쓰지 않는다면 `OPENAI_API_KEY`는 비워둬도 됩니다.
+
+### 초간단 시작 (Ollama 3줄)
+
+```bash
+cp .env.example .env
+ollama pull gemma3:1b
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db \
+  --profile dev
+```
+
+Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+### 초간단 시작 (vLLM 3줄)
+
+```bash
+cp .env.example .env
+printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
+```
+
+Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
 
 Ollama를 사용할 경우 `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT`을 추가하고, 평가 전에 `ollama pull`로 모델을 내려받습니다.
 Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`를 콤마로 지정합니다.
@@ -120,6 +148,21 @@ Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`�
 vLLM(OpenAI-compatible)을 사용할 경우 `EVALVAULT_PROFILE=vllm`로 전환하고,
 `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_EMBEDDING_MODEL`을 채웁니다.
 임베딩 서버가 분리돼 있다면 `VLLM_EMBEDDING_BASE_URL`을 추가하세요.
+
+### 임베딩 엔드포인트 체크리스트
+
+- 임베딩이 필요한 메트릭: `answer_relevancy`, `semantic_similarity`
+- Ollama: `ollama pull qwen3-embedding:0.6b` 후 `ollama list`로 확인
+- vLLM: `/v1/embeddings` 응답 확인
+- 임베딩 서버가 분리돼 있으면 `VLLM_EMBEDDING_BASE_URL`을 설정
+
+예시:
+```bash
+curl -s http://localhost:8001/v1/embeddings \
+  -H "Authorization: Bearer local" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3-embedding:0.6b","input":"ping"}'
+```
 
 ### Ollama 모델 추가
 Ollama는 **로컬에 내려받은 모델만** 목록에 노출됩니다. 다음 순서로 추가하세요.
@@ -165,7 +208,7 @@ profiles:
   vllm:
     llm:
       provider: vllm
-      model: gpt-oss:120b
+      model: gpt-oss-120b
     embedding:
       provider: vllm
       model: qwen3-embedding:0.6b
@@ -195,7 +238,7 @@ EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습�
 }
 ```
 
-CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고 `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
+CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고, 선택적으로 `threshold_*` 컬럼을 넣을 수 있습니다. `threshold_*` 값은 첫 번째로 채워진 행 기준으로 데이터셋 전체 임계값으로 사용됩니다. `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
 
 #### 데이터셋 템플릿
 빈 템플릿은 아래 위치에서 사용할 수 있습니다. 필요한 값만 채워 바로 사용할 수 있습니다.
@@ -205,7 +248,7 @@ CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함�
 - 문서 저장소: `docs/templates/dataset_template.csv`
 - 문서 저장소: `docs/templates/dataset_template.xlsx`
 
-JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요.
+JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요. CSV/Excel은 `threshold_*` 컬럼에 값을 채우면 동일하게 적용됩니다.
 
 ---
 
@@ -242,21 +285,11 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset produc
 ### 히스토리/비교/내보내기
 ```bash
 uv run evalvault history --limit 20 --db evalvault.db
-uv run evalvault compare <run_a> <run_b>
-uv run evalvault export <run_id> -o run.json
+uv run evalvault compare <run_a> <run_b> --db evalvault.db
+uv run evalvault export <run_id> -o run.json --db evalvault.db
 ```
 
-### Web UI
-
-#### Streamlit Web UI
-```bash
-uv run evalvault web --browser
-```
-Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
-현재 Web UI 보고서는 기본/상세 템플릿과 LLM 보고서가 중심이며, 비교 템플릿과 Domain Memory 인사이트 패널은 준비 중입니다.
-Dataset 선택 화면에서 JSON/CSV/XLSX 템플릿을 내려받아 바로 입력할 수 있습니다.
-
-#### React Frontend (Vite)
+### Web UI (React + FastAPI)
 ```bash
 # 1) API 서버 실행
 uv run evalvault serve-api --reload
@@ -275,6 +308,8 @@ npm run dev
   - 프록시 유지: `VITE_API_PROXY_TARGET=http://localhost:8000`
   - 직접 호출: `VITE_API_BASE_URL=http://localhost:8000/api/v1`
 - 직접 호출 시에는 API 서버 `.env`에 `CORS_ORIGINS`로 프론트 오리진을 추가합니다.
+- Analysis Lab에서 “결과 저장”을 누르면 SQLite/PostgreSQL의 `pipeline_results`에 저장되며,
+  저장된 결과는 좌측 목록에서 즉시 불러옵니다 (`/api/v1/pipeline/results`).
 
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
@@ -309,13 +344,14 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 ### SQLite/PostgreSQL
 - 기본값은 `evalvault.db` (SQLite)
 - PostgreSQL 사용 시 `.env`에 `POSTGRES_CONNECTION_STRING=postgresql://...` 또는 `POSTGRES_HOST/PORT/USER/PASSWORD`를 설정하고 `uv sync --extra postgres` 를 실행합니다.
+- 분석 파이프라인 저장 결과는 `pipeline_results` 테이블에 기록됩니다.
 
 ### Langfuse
 1. `docker compose -f docker-compose.langfuse.yml up -d`
 2. http://localhost:3000 접속 후 프로젝트를 만들고 API 키를 발급
 3. `.env` 에 키/호스트를 설정 후 `--tracker langfuse` 옵션 사용
 
-Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며, Streamlit/CLI 히스토리에도 trace URL이 나타납니다.
+Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며, Web UI/CLI 히스토리에도 trace URL이 나타납니다.
 
 ---
 
@@ -431,7 +467,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 | Ollama connection refused | `ollama serve` 실행 여부, `OLLAMA_BASE_URL` 확인 |
 | Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 |
 | Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
-| Streamlit ImportError | `uv sync --extra web` 실행 |
+| Web UI 접속 불가 | API 서버(`evalvault serve-api`)와 프론트(`npm run dev`)가 켜져 있는지 확인 |
 | React 프론트 CORS 에러 | `CORS_ORIGINS`에 `http://localhost:5173` 추가 또는 Vite 프록시 사용, `VITE_API_BASE_URL` 확인 |
 
 추가 이슈는 GitHub Issues 또는 `uv run evalvault config` 출력을 참고하세요.

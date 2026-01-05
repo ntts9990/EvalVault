@@ -110,3 +110,67 @@ def group_scores_by_metric(run: EvaluationRun) -> dict[str, list[float]]:
         for metric in result.metrics:
             metric_map[metric.name].append(metric.score)
     return dict(metric_map)
+
+
+def build_retrieval_corpus(
+    run: EvaluationRun,
+    *,
+    max_documents: int = 1000,
+) -> tuple[list[str], dict[str, int]]:
+    """Build a unique context corpus from run results."""
+    documents: list[str] = []
+    index_map: dict[str, int] = {}
+
+    for result in run.results:
+        for context in result.contexts or []:
+            text = context.strip()
+            if not text or text in index_map:
+                continue
+            index_map[text] = len(documents)
+            documents.append(text)
+            if len(documents) >= max_documents:
+                return documents, index_map
+    return documents, index_map
+
+
+def build_query_set(
+    run: EvaluationRun,
+    *,
+    index_map: dict[str, int],
+    max_queries: int = 200,
+) -> list[dict[str, Any]]:
+    """Build query records with relevant doc ids."""
+    queries: list[dict[str, Any]] = []
+    for result in run.results:
+        if not result.question:
+            continue
+        relevant_ids = []
+        for context in result.contexts or []:
+            text = context.strip()
+            if text in index_map:
+                relevant_ids.append(index_map[text])
+        queries.append(
+            {
+                "query_id": result.test_case_id,
+                "query": result.question,
+                "relevant_doc_ids": list(dict.fromkeys(relevant_ids)),
+            }
+        )
+        if len(queries) >= max_queries:
+            break
+    return queries
+
+
+def recall_at_k(
+    retrieved_ids: Iterable[int],
+    relevant_ids: Iterable[int],
+    *,
+    k: int,
+) -> float:
+    """Compute recall@k for retrieved document ids."""
+    retrieved_list = list(retrieved_ids)[:k]
+    relevant_set = set(relevant_ids)
+    if not relevant_set:
+        return 0.0
+    hits = len(set(retrieved_list) & relevant_set)
+    return hits / len(relevant_set)

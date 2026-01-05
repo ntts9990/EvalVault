@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import typer
+
+from evalvault.config.settings import Settings
+
+# Sentinel value to detect when default is not provided
+_UNSET: Any = object()
 
 
 def profile_option(
@@ -24,12 +30,13 @@ def profile_option(
 
 def db_option(
     *,
-    default: str | Path | None = Path("evalvault.db"),
+    default: str | Path | None = _UNSET,
     help_text: str = "Path to SQLite database file.",
 ) -> Path | None:
     """Shared --db / -D option definition."""
 
-    normalized_default = _normalize_path(default)
+    resolved_default = Settings().evalvault_db_path if default is _UNSET else default
+    normalized_default = _normalize_path(resolved_default)
     return typer.Option(
         normalized_default,
         "--db",

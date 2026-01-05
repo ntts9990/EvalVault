@@ -1,19 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
+import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
+import { VirtualizedText } from "../components/VirtualizedText";
 import {
     fetchAnalysisIntents,
+    fetchAnalysisHistory,
     fetchRuns,
     runAnalysis,
+    saveAnalysisResult,
+    type AnalysisHistoryItem,
     type AnalysisIntentInfo,
     type AnalysisResult,
     type RunSummary,
 } from "../services/api";
-import { formatDurationMs } from "../utils/format";
+import { formatDateTime, formatDurationMs } from "../utils/format";
 import {
     Activity,
     AlertCircle,
+    CheckCircle2,
+    Circle,
+    ExternalLink,
     Play,
+    Save,
 } from "lucide-react";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
@@ -54,6 +64,27 @@ export function AnalysisLab() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showRaw, setShowRaw] = useState(false);
+    const [renderMarkdown, setRenderMarkdown] = useState(true);
+    const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [lastQuery, setLastQuery] = useState<string | null>(null);
+    const [savedResultId, setSavedResultId] = useState<string | null>(null);
+    const [saveProfile, setSaveProfile] = useState("");
+    const [saveTags, setSaveTags] = useState("");
+    const [saveMetadataText, setSaveMetadataText] = useState("");
+    const [metadataError, setMetadataError] = useState<string | null>(null);
+    const [useLlmReport, setUseLlmReport] = useState(true);
+    const [recomputeRagas, setRecomputeRagas] = useState(false);
+    const [historySearch, setHistorySearch] = useState("");
+    const [intentFilter, setIntentFilter] = useState("all");
+    const [runFilter, setRunFilter] = useState("all");
+    const [profileFilter, setProfileFilter] = useState("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [sortOrder, setSortOrder] = useState("newest");
+    const [compareSelection, setCompareSelection] = useState<string[]>([]);
 
     useEffect(() => {
         async function loadCatalog() {
@@ -79,6 +110,24 @@ export function AnalysisLab() {
         loadRuns();
     }, []);
 
+    useEffect(() => {
+        async function loadHistory() {
+            try {
+                const data = await fetchAnalysisHistory(20);
+                setHistory(data);
+            } catch (err) {
+                setHistoryError(err instanceof Error ? err.message : "Failed to load history");
+            }
+        }
+        loadHistory();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedRunId && recomputeRagas) {
+            setRecomputeRagas(false);
+        }
+    }, [selectedRunId, recomputeRagas]);
+
     const groupedCatalog = useMemo(() => {
         const grouped: Record<string, AnalysisIntentInfo[]> = {};
         for (const item of catalog) {
@@ -89,20 +138,205 @@ export function AnalysisLab() {
         return grouped;
     }, [catalog]);
 
+    const filteredHistory = useMemo(() => {
+        const query = historySearch.trim().toLowerCase();
+        const fromDate = dateFrom ? new Date(dateFrom) : null;
+        const toDate = dateTo ? new Date(dateTo) : null;
+        if (toDate) {
+            toDate.setHours(23, 59, 59, 999);
+        }
+
+        let items = [...history];
+
+        if (intentFilter !== "all") {
+            items = items.filter(item => item.intent === intentFilter);
+        }
+        if (runFilter !== "all") {
+            items = items.filter(item => (item.run_id || "sample") === runFilter);
+        }
+        if (profileFilter !== "all") {
+            items = items.filter(item => (item.profile || "") === profileFilter);
+        }
+        if (fromDate) {
+            items = items.filter(item => new Date(item.created_at) >= fromDate);
+        }
+        if (toDate) {
+            items = items.filter(item => new Date(item.created_at) <= toDate);
+        }
+        if (query) {
+            items = items.filter(item => {
+                const haystack = [
+                    item.label,
+                    item.intent,
+                    item.query || "",
+                    item.run_id || "",
+                    item.profile || "",
+                    item.tags?.join(" ") || "",
+                ]
+                    .join(" ")
+                    .toLowerCase();
+                return haystack.includes(query);
+            });
+        }
+
+        items.sort((a, b) => {
+            if (sortOrder === "oldest") {
+                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            }
+            if (sortOrder === "duration_desc") {
+                return (b.duration_ms ?? -1) - (a.duration_ms ?? -1);
+            }
+            if (sortOrder === "duration_asc") {
+                return (a.duration_ms ?? -1) - (b.duration_ms ?? -1);
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+        return items;
+    }, [
+        history,
+        historySearch,
+        intentFilter,
+        runFilter,
+        profileFilter,
+        dateFrom,
+        dateTo,
+        sortOrder,
+    ]);
+
+    const compareLink = useMemo(() => {
+        if (compareSelection.length !== 2) return null;
+        const [a, b] = compareSelection;
+        return `/analysis/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+    }, [compareSelection]);
+
+    const historyIntentOptions = useMemo(() => {
+        const unique = new Map<string, string>();
+        history.forEach(item => {
+            if (!unique.has(item.intent)) {
+                unique.set(item.intent, item.label);
+            }
+        });
+        return Array.from(unique.entries()).map(([intent, label]) => ({ intent, label }));
+    }, [history]);
+
+    const historyRunOptions = useMemo(() => {
+        const unique = new Set<string>();
+        history.forEach(item => {
+            unique.add(item.run_id || "sample");
+        });
+        return Array.from(unique.values());
+    }, [history]);
+
+    const historyProfileOptions = useMemo(() => {
+        const unique = new Set<string>();
+        history.forEach(item => {
+            if (item.profile) {
+                unique.add(item.profile);
+            }
+        });
+        return Array.from(unique.values());
+    }, [history]);
+
     const handleRun = async (intent: AnalysisIntentInfo) => {
         if (!intent.available || loading) return;
         setSelectedIntent(intent);
         setError(null);
+        setSaveError(null);
         setResult(null);
+        setSavedResultId(null);
+        setLastQuery(intent.sample_query);
         setLoading(true);
         try {
-            const analysis = await runAnalysis(intent.sample_query, selectedRunId || undefined, intent.intent);
+            const params: Record<string, any> = {
+                use_llm_report: useLlmReport,
+            };
+            if (recomputeRagas && selectedRunId) {
+                params.recompute_ragas = true;
+            }
+            const analysis = await runAnalysis(
+                intent.sample_query,
+                selectedRunId || undefined,
+                intent.intent,
+                params
+            );
             setResult(analysis);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Analysis failed");
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSave = async () => {
+        if (!result || saving) return;
+        setSaving(true);
+        setSaveError(null);
+        setMetadataError(null);
+        try {
+            let metadata: any = null;
+            if (saveMetadataText.trim()) {
+                try {
+                    metadata = JSON.parse(saveMetadataText);
+                } catch (err) {
+                    setMetadataError("메타데이터 JSON 형식이 올바르지 않습니다.");
+                    setSaving(false);
+                    return;
+                }
+            }
+            const tags = saveTags
+                .split(",")
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0);
+            const payload = {
+                intent: result.intent,
+                query: lastQuery || selectedIntent?.sample_query || result.intent,
+                run_id: selectedRunId || null,
+                pipeline_id: result.pipeline_id || null,
+                profile: saveProfile.trim() ? saveProfile.trim() : null,
+                tags: tags.length > 0 ? tags : null,
+                metadata: metadata,
+                is_complete: result.is_complete,
+                duration_ms: result.duration_ms,
+                final_output: result.final_output,
+                node_results: result.node_results,
+                started_at: result.started_at || null,
+                finished_at: result.finished_at || null,
+            };
+            const saved = await saveAnalysisResult(payload);
+            setSavedResultId(saved.result_id);
+            setHistory(prev => [saved, ...prev.filter(item => item.result_id !== saved.result_id)]);
+        } catch (err) {
+            setSaveError(err instanceof Error ? err.message : "Failed to save analysis result");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const toggleCompareSelection = (resultId: string) => {
+        setCompareSelection(prev => {
+            if (prev.includes(resultId)) {
+                return prev.filter(id => id !== resultId);
+            }
+            if (prev.length >= 2) {
+                return [prev[1], resultId];
+            }
+            return [...prev, resultId];
+        });
+    };
+
+    const clearCompareSelection = () => {
+        setCompareSelection([]);
+    };
+
+    const resetHistoryFilters = () => {
+        setHistorySearch("");
+        setIntentFilter("all");
+        setRunFilter("all");
+        setProfileFilter("all");
+        setDateFrom("");
+        setDateTo("");
+        setSortOrder("newest");
     };
 
     const resultSummary = useMemo(() => {
@@ -135,6 +369,16 @@ export function AnalysisLab() {
         return null;
     }, [result]);
 
+    const reportIsLarge = (reportText?.length ?? 0) > 5000;
+
+    useEffect(() => {
+        if (!reportIsLarge) {
+            setRenderMarkdown(true);
+        } else {
+            setRenderMarkdown(false);
+        }
+    }, [reportIsLarge, reportText]);
+
     const rawOutput = useMemo(() => {
         if (!result?.final_output) return null;
         try {
@@ -148,6 +392,8 @@ export function AnalysisLab() {
         || catalog.find(item => item.intent === result?.intent)?.label
         || result?.intent
         || "분석";
+
+    const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
 
     return (
         <Layout>
@@ -192,6 +438,220 @@ export function AnalysisLab() {
                                 <p className="text-xs text-muted-foreground mt-3">
                                     Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.
                                 </p>
+                            )}
+                            <div className="mt-4 space-y-2 text-xs">
+                                <label className="flex items-center gap-2 text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        className="accent-primary"
+                                        checked={useLlmReport}
+                                        onChange={(e) => setUseLlmReport(e.target.checked)}
+                                    />
+                                    LLM 보고서 사용 (증거 인용 포함)
+                                </label>
+                                <label className="flex items-center gap-2 text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        className="accent-primary"
+                                        checked={recomputeRagas}
+                                        disabled={!selectedRunId}
+                                        onChange={(e) => setRecomputeRagas(e.target.checked)}
+                                    />
+                                    RAGAS 재평가 실행 (오래 걸릴 수 있음)
+                                </label>
+                                {!selectedRunId && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        RAGAS 재평가는 Run 선택 시 활성화됩니다.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <Activity className="w-4 h-4 text-primary" /> 저장된 결과
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[11px] text-muted-foreground">
+                                        선택 {compareSelection.length}/2
+                                    </span>
+                                    {compareLink ? (
+                                        <Link
+                                            to={compareLink}
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-border hover:border-primary/40"
+                                        >
+                                            비교 보기
+                                        </Link>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-border text-muted-foreground opacity-60"
+                                        >
+                                            비교 보기
+                                        </button>
+                                    )}
+                                    {compareSelection.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={clearCompareSelection}
+                                            className="text-[11px] text-muted-foreground hover:text-foreground"
+                                        >
+                                            선택 해제
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            {historyError && (
+                                <p className="text-xs text-destructive mb-2">{historyError}</p>
+                            )}
+                            {history.length > 0 && (
+                                <div className="space-y-2 mb-4">
+                                    <input
+                                        type="text"
+                                        value={historySearch}
+                                        onChange={(event) => setHistorySearch(event.target.value)}
+                                        placeholder="검색어(라벨/쿼리/Run)"
+                                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                    />
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <select
+                                            value={intentFilter}
+                                            onChange={(event) => setIntentFilter(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        >
+                                            <option value="all">모든 Intent</option>
+                                            {historyIntentOptions.map(option => (
+                                                <option key={option.intent} value={option.intent}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={runFilter}
+                                            onChange={(event) => setRunFilter(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        >
+                                            <option value="all">모든 Run</option>
+                                            {historyRunOptions.map(runId => (
+                                                <option key={runId} value={runId}>
+                                                    {runId === "sample" ? "샘플 데이터" : `Run ${runId.slice(0, 8)}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={profileFilter}
+                                            onChange={(event) => setProfileFilter(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        >
+                                            <option value="all">모든 프로필</option>
+                                            {historyProfileOptions.map(profile => (
+                                                <option key={profile} value={profile}>
+                                                    {profile}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <input
+                                            type="date"
+                                            value={dateFrom}
+                                            onChange={(event) => setDateFrom(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        />
+                                        <input
+                                            type="date"
+                                            value={dateTo}
+                                            onChange={(event) => setDateTo(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <select
+                                            value={sortOrder}
+                                            onChange={(event) => setSortOrder(event.target.value)}
+                                            className="bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        >
+                                            <option value="newest">최신순</option>
+                                            <option value="oldest">오래된순</option>
+                                            <option value="duration_desc">소요시간 긴 순</option>
+                                            <option value="duration_asc">소요시간 짧은 순</option>
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={resetHistoryFilters}
+                                            className="text-[11px] text-muted-foreground hover:text-foreground"
+                                        >
+                                            필터 초기화
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {history.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    아직 저장된 분석 결과가 없습니다.
+                                </p>
+                            ) : filteredHistory.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    조건에 맞는 결과가 없습니다.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredHistory.map(item => {
+                                        const selected = compareSelection.includes(item.result_id);
+                                        const metaParts: string[] = [];
+                                        if (item.profile) {
+                                            metaParts.push(`Profile ${item.profile}`);
+                                        }
+                                        if (item.tags && item.tags.length > 0) {
+                                            metaParts.push(`Tags ${item.tags.join(", ")}`);
+                                        }
+                                        return (
+                                            <div
+                                                key={item.result_id}
+                                                className="flex items-start gap-2 border border-border rounded-lg p-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleCompareSelection(item.result_id)}
+                                                    className="mt-1 text-muted-foreground hover:text-foreground"
+                                                    aria-label="비교 선택"
+                                                >
+                                                    {selected ? (
+                                                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                                                    ) : (
+                                                        <Circle className="w-4 h-4" />
+                                                    )}
+                                                </button>
+                                                <Link
+                                                    to={`/analysis/results/${item.result_id}`}
+                                                    className="flex-1"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-sm font-medium">{item.label}</p>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {formatDurationMs(item.duration_ms)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {formatDateTime(item.created_at)}
+                                                    </p>
+                                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                                        {item.run_id
+                                                            ? `Run ${item.run_id.slice(0, 8)}`
+                                                            : "샘플 데이터"}
+                                                    </p>
+                                                    {metaParts.length > 0 && (
+                                                        <p className="text-[11px] text-muted-foreground mt-1">
+                                                            {metaParts.join(" · ")}
+                                                        </p>
+                                                    )}
+                                                </Link>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
 
@@ -309,6 +769,81 @@ export function AnalysisLab() {
                                         </div>
                                     </div>
 
+                                    <div className="border border-border rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-semibold">저장 메타데이터</p>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                선택 입력
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <label className="text-xs text-muted-foreground">
+                                                프로필
+                                                <input
+                                                    type="text"
+                                                    value={saveProfile}
+                                                    onChange={(event) => setSaveProfile(event.target.value)}
+                                                    placeholder="예: dev / prod"
+                                                    className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                                                />
+                                            </label>
+                                            <label className="text-xs text-muted-foreground">
+                                                태그
+                                                <input
+                                                    type="text"
+                                                    value={saveTags}
+                                                    onChange={(event) => setSaveTags(event.target.value)}
+                                                    placeholder="예: ragas, korean, baseline"
+                                                    className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                                                />
+                                                <span className="text-[11px] text-muted-foreground mt-1 block">
+                                                    쉼표로 구분합니다.
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <label className="text-xs text-muted-foreground">
+                                            메타데이터 (JSON)
+                                            <textarea
+                                                value={saveMetadataText}
+                                                onChange={(event) => {
+                                                    setSaveMetadataText(event.target.value);
+                                                    if (metadataError) {
+                                                        setMetadataError(null);
+                                                    }
+                                                }}
+                                                placeholder='예: {"dataset":"insurance","version":"v2"}'
+                                                className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs h-24"
+                                            />
+                                        </label>
+                                        {metadataError && (
+                                            <p className="text-xs text-destructive">{metadataError}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleSave}
+                                            disabled={saving}
+                                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40 disabled:opacity-60"
+                                        >
+                                            <Save className="w-3 h-3" />
+                                            {saving ? "저장 중..." : "결과 저장"}
+                                        </button>
+                                        {savedResultId && (
+                                            <Link
+                                                to={`/analysis/results/${savedResultId}`}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                            >
+                                                <ExternalLink className="w-3 h-3" />
+                                                결과 보기
+                                            </Link>
+                                        )}
+                                        {saveError && (
+                                            <span className="text-xs text-destructive">{saveError}</span>
+                                        )}
+                                    </div>
+
                                     {resultSummary && (
                                         <div className="flex flex-wrap gap-3 text-xs">
                                             {Object.entries(resultSummary).map(([status, count]) => {
@@ -350,30 +885,59 @@ export function AnalysisLab() {
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <h3 className="text-sm font-semibold">결과 출력</h3>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowRaw(prev => !prev)}
-                                                className="text-xs text-muted-foreground hover:text-foreground"
-                                            >
-                                                {showRaw ? "리포트 보기" : "RAW JSON"}
-                                            </button>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowRaw(prev => !prev)}
+                                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                                >
+                                                    {showRaw ? "리포트 보기" : "RAW JSON"}
+                                                </button>
+                                                {!showRaw && reportIsLarge && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRenderMarkdown(prev => !prev)}
+                                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                                >
+                                                    {renderMarkdown ? "경량 보기" : "마크다운 렌더링"}
+                                                </button>
+                                                )}
+                                            </div>
                                         </div>
                                         {showRaw ? (
-                                            <pre className="bg-background border border-border rounded-lg p-3 text-xs overflow-auto max-h-80">
-                                                {rawOutput || "{}"}
-                                            </pre>
+                                            <VirtualizedText
+                                                text={rawOutput || "{}"}
+                                                height="20rem"
+                                                className="bg-background border border-border rounded-lg p-3 text-xs"
+                                            />
                                         ) : reportText ? (
-                                            <div className="bg-background border border-border rounded-lg p-4 text-sm max-h-80 overflow-auto">
-                                                <div className="prose prose-sm max-w-none">
-                                                    <ReactMarkdown>{reportText}</ReactMarkdown>
+                                            renderMarkdown ? (
+                                                <div className="bg-background border border-border rounded-lg p-4 text-sm max-h-80 overflow-auto">
+                                                    <div className="prose prose-sm max-w-none">
+                                                        <ReactMarkdown>{reportText}</ReactMarkdown>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <VirtualizedText
+                                                    text={reportText}
+                                                    height="20rem"
+                                                    className="bg-background border border-border rounded-lg p-3 text-xs"
+                                                />
+                                            )
                                         ) : (
-                                            <pre className="bg-background border border-border rounded-lg p-3 text-xs overflow-auto max-h-80">
-                                                {rawOutput || "{}"}
-                                            </pre>
+                                            <VirtualizedText
+                                                text={rawOutput || "{}"}
+                                                height="20rem"
+                                                className="bg-background border border-border rounded-lg p-3 text-xs"
+                                            />
                                         )}
                                     </div>
+
+                                    <AnalysisNodeOutputs
+                                        nodeResults={result.node_results}
+                                        nodeDefinitions={intentDefinition?.nodes}
+                                        title="노드 상세 출력"
+                                    />
 
                                     {result.node_results && Object.values(result.node_results).some((node: any) => node?.error) && (
                                         <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs">

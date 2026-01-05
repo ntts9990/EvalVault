@@ -1,5 +1,5 @@
-id,question,answer,contexts,ground_truth
-test_001,What is Python?,Python is a high-level programming language.,"[""Python is a programming language"", ""Python was created by Guido van Rossum""]",Python is a high-level interpreted programming language.
-test_002,What is machine learning?,Machine learning is a subset of AI.,"[""ML is part of AI"", ""ML uses algorithms to learn from data""]",Machine learning is a method of data analysis that automates analytical model building.
-test_003,What is RAG?,RAG stands for Retrieval-Augmented Generation.,"[""RAG combines retrieval and generation"", ""RAG improves LLM responses""]",RAG is a technique that enhances LLM outputs with retrieved information.
-test_004,What is TDD?,TDD means Test-Driven Development.,Test-Driven Development|Write tests first|Red-Green-Refactor cycle,TDD is a software development approach where tests are written before code.
+id,question,answer,contexts,ground_truth,threshold_faithfulness,threshold_answer_relevancy,threshold_context_precision,threshold_context_recall,threshold_factual_correctness,threshold_semantic_similarity
+test_001,What is Python?,Python is a high-level programming language.,"[""Python is a programming language"", ""Python was created by Guido van Rossum""]",Python is a high-level interpreted programming language.,0.7,0.7,,,,
+test_002,What is machine learning?,Machine learning is a subset of AI.,"[""ML is part of AI"", ""ML uses algorithms to learn from data""]",Machine learning is a method of data analysis that automates analytical model building.,,,,,,
+test_003,What is RAG?,RAG stands for Retrieval-Augmented Generation.,"[""RAG combines retrieval and generation"", ""RAG improves LLM responses""]",RAG is a technique that enhances LLM outputs with retrieved information.,,,,,,
+test_004,What is TDD?,TDD means Test-Driven Development.,Test-Driven Development|Write tests first|Red-Green-Refactor cycle,TDD is a software development approach where tests are written before code.,,,,,,

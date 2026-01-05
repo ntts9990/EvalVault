@@ -339,10 +339,15 @@ class WebUIAdapter:
 
         # 1. 데이터셋 로드 (비동기 처리)
         logger.info(f"Loading dataset from: {request.dataset_path}")
-        from evalvault.adapters.outbound.dataset import get_loader
 
         try:
-            loader = get_loader(request.dataset_path)
+            if self._data_loader is not None:
+                # 주입된 data_loader 사용
+                loader = self._data_loader
+            else:
+                from evalvault.adapters.outbound.dataset import get_loader
+
+                loader = get_loader(request.dataset_path)
             # 파일 I/O는 스레드 풀에서 실행
             dataset = await asyncio.to_thread(loader.load, request.dataset_path)
         except Exception as e:
@@ -1111,6 +1116,24 @@ class WebUIAdapter:
 
         return str(file_path.absolute())
 
+    def save_retriever_docs_file(self, filename: str, content: bytes) -> str:
+        """리트리버 문서 파일 저장.
+
+        Args:
+            filename: 파일명
+            content: 파일 내용
+
+        Returns:
+            저장된 파일 경로
+        """
+        save_dir = Path("data/retriever_docs")
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = save_dir / filename
+        file_path.write_bytes(content)
+
+        return str(file_path.absolute())
+
     def list_models(self, provider: str | None = None) -> list[dict[str, str]]:
         """사용 가능한 모델 목록 조회."""
         settings = self._settings or Settings()
@@ -1141,11 +1164,6 @@ class WebUIAdapter:
     def _list_openai_models(self) -> list[dict[str, str | bool]]:
         return [
             {"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True},
-            {
-                "id": "openai/gpt-oss:120b",
-                "name": "OpenAI-compatible gpt-oss:120b",
-                "supports_tools": False,
-            },
         ]
 
     def _list_vllm_models(self, settings: Settings) -> list[dict[str, str | bool]]:

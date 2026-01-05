@@ -204,7 +204,7 @@ class DebugReportService:
 
 **작업**:
 - [ ] CSV/JSON export (외부 분석 도구 연계)
-- [ ] Plotly 시각화는 필요 시 `--extra web`와 함께 도입
+- [ ] Plotly 시각화는 필요 시 optional dependency로 도입
 
 ---
 

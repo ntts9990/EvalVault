@@ -36,22 +36,35 @@ class EmbeddingDistributionModule(BaseAnalysisModule):
                 "checks": [build_check("data_presence", False, "No embedding stats")],
             }
 
-        min_score = params.get("min_overall_score", 0.6)
-        min_metrics = params.get("min_metric_count", 1)
+        min_dimension = int(params.get("min_dimension", 128))
+        min_norm_std = float(params.get("min_norm_std", 0.01))
+        max_cosine_mean = float(params.get("max_cosine_mean", 0.98))
 
-        overall_score = summary.get("overall_score", 0)
-        metric_count = summary.get("metric_count", 0)
+        dimension = summary.get("dimension", 0) or 0
+        norm_std = summary.get("norm_std", 0) or 0
+        cosine_mean = summary.get("mean_cosine_to_centroid", 0) or 0
+        backend = summary.get("backend", "unknown")
 
         checks = [
             build_check(
-                "overall_score",
-                overall_score >= min_score,
-                f"score={overall_score}, min={min_score}",
+                "dimension",
+                dimension >= min_dimension,
+                f"dim={dimension}, min={min_dimension}",
             ),
             build_check(
-                "metric_count",
-                metric_count >= min_metrics,
-                f"count={metric_count}, min={min_metrics}",
+                "norm_std",
+                norm_std >= min_norm_std,
+                f"std={norm_std}, min={min_norm_std}",
+            ),
+            build_check(
+                "cosine_collapse",
+                cosine_mean <= max_cosine_mean,
+                f"mean={cosine_mean}, max={max_cosine_mean}",
+            ),
+            build_check(
+                "embedding_backend",
+                backend not in {"unavailable", ""},
+                f"backend={backend}",
             ),
         ]
 
