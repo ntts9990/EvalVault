@@ -757,7 +757,12 @@ export function AnalysisLab() {
                                             메타데이터 (JSON)
                                             <textarea
                                                 value={saveMetadataText}
-                                                onChange={(event) => setSaveMetadataText(event.target.value)}
+                                                onChange={(event) => {
+                                                    setSaveMetadataText(event.target.value);
+                                                    if (metadataError) {
+                                                        setMetadataError(null);
+                                                    }
+                                                }}
                                                 placeholder='예: {"dataset":"insurance","version":"v2"}'
                                                 className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs h-24"
                                             />
