@@ -128,8 +128,9 @@ uv run evalvault history --db evalvault.db
 uv run evalvault export <run_id> -o result.json --db evalvault.db
 
 # Web UI에서 결과 보기 (Streamlit)
-uv run evalvault web --browser --db evalvault.db
+uv run evalvault web --db evalvault.db
 ```
+Tip: Streamlit UI를 쓰려면 `uv sync --extra web`이 필요합니다.
 
 ---
 
@@ -198,7 +199,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
 | 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness --db evalvault.db` |
-| 4. 결과 확인 | `uv run evalvault history --db evalvault.db` 또는 `uv run evalvault web --browser` |
+| 4. 결과 확인 | `uv run evalvault history --db evalvault.db` 또는 `uv run evalvault web --db evalvault.db` |
 | 5. (선택) API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
 
 소요 시간: 약 5분

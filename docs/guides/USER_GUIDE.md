@@ -293,8 +293,9 @@ uv run evalvault export <run_id> -o run.json --db evalvault.db
 
 #### Streamlit Web UI
 ```bash
-uv run evalvault web --browser
+uv run evalvault web --db evalvault.db
 ```
+Tip: Streamlit UI를 쓰려면 `uv sync --extra web`이 필요합니다.
 Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
 현재 Web UI 보고서는 기본/상세 템플릿과 LLM 보고서가 중심이며, 비교 템플릿과 Domain Memory 인사이트 패널은 준비 중입니다.
 Dataset 선택 화면에서 JSON/CSV/XLSX 템플릿을 내려받아 바로 입력할 수 있습니다.

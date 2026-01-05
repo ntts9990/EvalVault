@@ -144,8 +144,9 @@ uv sync --extra dev
 
 5. **Web UI 실행**
    ```bash
-   uv run evalvault web --browser
+   uv run evalvault web --db evalvault.db
    ```
+   Tip: Streamlit UI를 쓰려면 `uv sync --extra web`이 필요합니다.
 
 Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
 

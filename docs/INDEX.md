@@ -55,6 +55,7 @@ docs/
 | [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
 | [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
 | [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
+| [guides/RELEASE_CHECKLIST.md](guides/RELEASE_CHECKLIST.md) | 운영/개발 | 배포 체크리스트, 릴리즈 노트 템플릿 |
 
 ### 튜토리얼
 

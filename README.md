@@ -149,8 +149,9 @@ Add extras as needed:
 
 5. **Launch the Web UI**
    ```bash
-   uv run evalvault web --browser
+   uv run evalvault web --db evalvault.db
    ```
+   Tip: Streamlit UI requires `uv sync --extra web`.
 
 More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).
 
