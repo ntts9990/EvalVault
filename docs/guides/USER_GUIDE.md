@@ -87,6 +87,7 @@ uv run evalvault init
 ```bash
 # 공통
 EVALVAULT_PROFILE=dev              # config/models.yaml에 정의된 프로필
+EVALVAULT_DB_PATH=evalvault.db     # SQLite 저장 경로 (API/CLI 공통)
 OPENAI_API_KEY=sk-...
 
 # Langfuse (선택)
@@ -110,6 +111,33 @@ VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
 # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
 ```
 
+OpenAI를 쓰지 않는다면 `OPENAI_API_KEY`는 비워둬도 됩니다.
+
+### 초간단 시작 (Ollama 3줄)
+
+```bash
+cp .env.example .env
+ollama pull gemma3:1b
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db \
+  --profile dev
+```
+
+Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+### 초간단 시작 (vLLM 3줄)
+
+```bash
+cp .env.example .env
+printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
+```
+
+Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
+
 Ollama를 사용할 경우 `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT`을 추가하고, 평가 전에 `ollama pull`로 모델을 내려받습니다.
 Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`를 콤마로 지정합니다.
 지원 여부는 `ollama show <model>` 출력의 `Capabilities`에 `tools`가 있는지 확인합니다.
@@ -120,6 +148,21 @@ Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`�
 vLLM(OpenAI-compatible)을 사용할 경우 `EVALVAULT_PROFILE=vllm`로 전환하고,
 `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_EMBEDDING_MODEL`을 채웁니다.
 임베딩 서버가 분리돼 있다면 `VLLM_EMBEDDING_BASE_URL`을 추가하세요.
+
+### 임베딩 엔드포인트 체크리스트
+
+- 임베딩이 필요한 메트릭: `answer_relevancy`, `semantic_similarity`
+- Ollama: `ollama pull qwen3-embedding:0.6b` 후 `ollama list`로 확인
+- vLLM: `/v1/embeddings` 응답 확인
+- 임베딩 서버가 분리돼 있으면 `VLLM_EMBEDDING_BASE_URL`을 설정
+
+예시:
+```bash
+curl -s http://localhost:8001/v1/embeddings \
+  -H "Authorization: Bearer local" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3-embedding:0.6b","input":"ping"}'
+```
 
 ### Ollama 모델 추가
 Ollama는 **로컬에 내려받은 모델만** 목록에 노출됩니다. 다음 순서로 추가하세요.
@@ -242,8 +285,8 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset produc
 ### 히스토리/비교/내보내기
 ```bash
 uv run evalvault history --limit 20 --db evalvault.db
-uv run evalvault compare <run_a> <run_b>
-uv run evalvault export <run_id> -o run.json
+uv run evalvault compare <run_a> <run_b> --db evalvault.db
+uv run evalvault export <run_id> -o run.json --db evalvault.db
 ```
 
 ### Web UI

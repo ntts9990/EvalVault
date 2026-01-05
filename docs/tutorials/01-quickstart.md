@@ -7,7 +7,7 @@
 ## 전제 조건
 
 - Python 3.12+
-- OpenAI API 키
+- OpenAI API 키 또는 로컬 모델(Ollama/vLLM)
 
 ---
 
@@ -38,20 +38,38 @@ pip install -e ".[dev]"
 # .env 파일 생성
 cp .env.example .env
 
-# OpenAI API 키 설정 (필수)
+# OpenAI API 키 설정 (OpenAI 사용 시)
 echo "OPENAI_API_KEY=sk-your-api-key" >> .env
 ```
 
-vLLM(OpenAI-compatible)로 시작하려면 아래처럼 설정합니다:
+OpenAI를 쓰지 않는다면 위 키 설정은 생략해도 됩니다.
+
+### 초간단 시작 (Ollama 3줄)
 
 ```bash
-EVALVAULT_PROFILE=vllm
-VLLM_BASE_URL=http://localhost:8001/v1
-VLLM_MODEL=gpt-oss-120b
-VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+cp .env.example .env
+ollama pull gemma3:1b
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db \
+  --profile dev
 ```
 
-설정 확인:
+Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+### 초간단 시작 (vLLM 3줄)
+
+```bash
+cp .env.example .env
+printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --db evalvault.db
+```
+
+Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
+
+설정 확인(선택):
 
 ```bash
 uv run evalvault config

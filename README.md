@@ -69,6 +69,11 @@ Add extras as needed:
    cp .env.example .env
    # set OPENAI_API_KEY or OLLAMA settings, LANGFUSE/PHOENIX keys, etc.
    ```
+   Optional SQLite path override:
+   ```bash
+   # .env
+   EVALVAULT_DB_PATH=/path/to/evalvault.db
+   ```
    vLLM (OpenAI-compatible) usage:
    ```bash
    # .env
@@ -78,6 +83,26 @@ Add extras as needed:
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # optional: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
+   Fast path (Ollama, 3 lines):
+   ```bash
+   cp .env.example .env
+   ollama pull gemma3:1b
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db \
+     --profile dev
+   ```
+   Tip: embedding metrics like `answer_relevancy` also need `qwen3-embedding:0.6b`.
+
+   Fast path (vLLM, 3 lines):
+   ```bash
+   cp .env.example .env
+   printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db
+   ```
+   Tip: embedding metrics require `VLLM_EMBEDDING_MODEL` and a `/v1/embeddings` endpoint.
    If you use Ollama models that support tool/function calling, list them in
    `OLLAMA_TOOL_MODELS` (comma-separated). Check support via
    `ollama show <model>` and look for `Capabilities: tools`.

@@ -68,6 +68,11 @@ uv sync --extra dev
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
    ```
+   SQLite 경로를 바꾸려면 아래 값을 추가합니다.
+   ```bash
+   # .env
+   EVALVAULT_DB_PATH=/path/to/evalvault.db
+   ```
    vLLM(OpenAI-compatible)을 쓰려면 `EVALVAULT_PROFILE=vllm`로 설정하고
    `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`을 추가합니다.
    빈 데이터셋 템플릿이 필요하면 `uv run evalvault init`으로
@@ -90,6 +95,26 @@ uv sync --extra dev
    VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
    # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
    ```
+   초간단 시작 (Ollama 3줄):
+   ```bash
+   cp .env.example .env
+   ollama pull gemma3:1b
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db \
+     --profile dev
+   ```
+   Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
+
+   초간단 시작 (vLLM 3줄):
+   ```bash
+   cp .env.example .env
+   printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
+   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+     --metrics faithfulness \
+     --db evalvault.db
+   ```
+   Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
 
 2. **API + React 프론트 실행 (dev)**
    ```bash
