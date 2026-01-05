@@ -101,11 +101,25 @@ PHOENIX_SAMPLE_RATE=1.0
 
 # React 프론트엔드에서 API 호출 시 (선택)
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# vLLM(OpenAI-compatible) 사용 예
+EVALVAULT_PROFILE=vllm
+VLLM_BASE_URL=http://localhost:8001/v1
+VLLM_MODEL=gpt-oss:120b
+VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+# 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
 ```
 
 Ollama를 사용할 경우 `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT`을 추가하고, 평가 전에 `ollama pull`로 모델을 내려받습니다.
 Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`를 콤마로 지정합니다.
 지원 여부는 `ollama show <model>` 출력의 `Capabilities`에 `tools`가 있는지 확인합니다.
+
+> 참고: vLLM이 임베딩 엔드포인트(`/v1/embeddings`)를 제공하지 않으면 임베딩 기반 메트릭은 실패할 수 있습니다.
+> 이 경우 `faithfulness`, `answer_relevancy` 등 LLM 기반 메트릭만 선택하거나 별도의 임베딩 서버를 지정하세요.
+
+vLLM(OpenAI-compatible)을 사용할 경우 `EVALVAULT_PROFILE=vllm`로 전환하고,
+`.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_EMBEDDING_MODEL`을 채웁니다.
+임베딩 서버가 분리돼 있다면 `VLLM_EMBEDDING_BASE_URL`을 추가하세요.
 
 ### Ollama 모델 추가
 Ollama는 **로컬에 내려받은 모델만** 목록에 노출됩니다. 다음 순서로 추가하세요.
@@ -148,11 +162,18 @@ profiles:
     embedding:
       provider: openai
       model: text-embedding-3-small
+  vllm:
+    llm:
+      provider: vllm
+      model: gpt-oss:120b
+    embedding:
+      provider: vllm
+      model: qwen3-embedding:0.6b
 ```
 
 사용법:
 - 환경 변수 `EVALVAULT_PROFILE` 설정
-- 또는 CLI `--profile openai` / `-p openai`
+- 또는 CLI `--profile <name>` / `-p <name>` (예: dev, openai, vllm)
 
 ### 데이터셋 준비
 EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습니다.
@@ -249,6 +270,7 @@ npm run dev
 - 기본 접속: http://localhost:5173
 - API 기본: http://127.0.0.1:8000
 - Vite dev 서버는 `/api`를 API로 프록시합니다.
+- vLLM을 쓰려면 `.env`에 `EVALVAULT_PROFILE=vllm`과 `VLLM_*` 값을 설정하세요.
 - API 주소를 바꾸려면 아래 중 하나를 사용하세요.
   - 프록시 유지: `VITE_API_PROXY_TARGET=http://localhost:8000`
   - 직접 호출: `VITE_API_BASE_URL=http://localhost:8000/api/v1`

@@ -13,10 +13,13 @@ EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, servic
   - `--extra mlflow`: MLflow tracker integration
 - `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness`: smoke-test the CLI; extend with `--profile dev` or `--langfuse`.
 - `uv run evalvault web`: launch Streamlit Web UI (requires `--extra web`).
+- `uv run evalvault serve-api --reload`: launch the FastAPI backend for the React UI.
+- `cd frontend && npm install && npm run dev`: launch the Vite React frontend (API must be running).
 - `uv run evalvault pipeline analyze "요약해줘"`: run query-based analysis pipeline (requires `--extra korean`).
 - `uv run pytest tests -v`: primary suite (1352 tests: 1261 unit + 91 integration); target `tests/integration/test_e2e_scenarios.py` only when external APIs are configured.
 - `uv run ruff check src/ tests/ && uv run ruff format src/ tests/`: keep style/lint errors out of CI (line length 100).
 - `docker compose -f docker-compose.langfuse.yml up`: optional Langfuse playground for tracing comparisons.
+- vLLM (optional): set `EVALVAULT_PROFILE=vllm` and configure `VLLM_BASE_URL`/`VLLM_MODEL` in `.env`.
 
 ## Coding Style & Naming Conventions
 Adhere to Ruff’s config (Py312, line length 100) and keep modules fully type-hinted. Modules/functions use snake_case, classes PascalCase (e.g., `EvaluationRunService`), and CLI commands stay terse verbs. Favor dependency injection through ports, keep adapters free of domain assumptions, and add concise docstrings whenever orchestration is non-obvious.

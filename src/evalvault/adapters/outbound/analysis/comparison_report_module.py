@@ -41,6 +41,10 @@ class ComparisonReportModule(BaseAnalysisModule):
         comparison = inputs.get("comparison", {})
         if not comparison:
             comparison = inputs.get("statistical_comparator", {})
+        if not comparison:
+            comparison = inputs.get("statistical_comparison", {})
+        if not comparison:
+            comparison = inputs.get("run_comparison", {})
 
         winner = comparison.get("winner", "N/A")
 

@@ -40,7 +40,7 @@ class VLLMAdapter(BaseLLMAdapter):
         )
 
         ragas_llm = create_instructor_llm(
-            "openai",
+            "vllm",
             self._model_name,
             self._client,
             max_completion_tokens=16384,

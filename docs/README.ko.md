@@ -17,7 +17,7 @@ EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 Streamlit Web UI�
 
 **주요 특징**
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
-- OpenAI/Ollama/폐쇄망을 아우르는 프로필 기반 모델 구성
+- OpenAI/Ollama/vLLM/폐쇄망을 아우르는 프로필 기반 모델 구성
 - Streamlit Web UI에서 평가, 히스토리, 보고서 생성
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
@@ -68,6 +68,10 @@ uv sync --extra dev
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
    ```
+   vLLM(OpenAI-compatible)을 쓰려면 `EVALVAULT_PROFILE=vllm`로 설정하고
+   `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`을 추가합니다.
+   빈 데이터셋 템플릿이 필요하면 `uv run evalvault init`으로
+   `dataset_templates/`(JSON/CSV/XLSX) 폴더를 생성하거나 Web UI에서 내려받을 수 있습니다.
    Ollama 모델을 추가하려면 아래처럼 내려받고 목록을 확인합니다.
    ```bash
    ollama pull gpt-oss:120b
@@ -77,6 +81,15 @@ uv sync --extra dev
    Web UI 모델 목록은 `ollama list` 기준으로 표시됩니다.
    미리 받아두면 좋은 모델: `gpt-oss:120b`, `gpt-oss-safeguard:120b`, `gpt-oss-safeguard:20b`.
    기본 프로필 모델을 바꾸려면 `config/models.yaml`을 수정하세요.
+   vLLM(OpenAI-compatible) 사용 예:
+   ```bash
+   # .env
+   EVALVAULT_PROFILE=vllm
+   VLLM_BASE_URL=http://localhost:8001/v1
+   VLLM_MODEL=gpt-oss:120b
+   VLLM_EMBEDDING_MODEL=qwen3-embedding:0.6b
+   # 선택: VLLM_EMBEDDING_BASE_URL=http://localhost:8002/v1
+   ```
 
 2. **API + React 프론트 실행 (dev)**
    ```bash
