@@ -47,7 +47,7 @@ profiles:
     description: "OpenAI API 사용 (외부망)"
     llm:
       provider: openai
-      model: gpt-4o
+      model: gpt-5-nano
     embedding:
       provider: openai
       model: text-embedding-3-small
