@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from evalvault.adapters.inbound.web.adapter import WebUIAdapter, create_adapter
+from evalvault.config.settings import get_settings
 
 
 @asynccontextmanager
@@ -31,19 +32,28 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    settings = get_settings()
+    cors_origins = [
+        origin.strip() for origin in (settings.cors_origins or "").split(",") if origin.strip()
+    ] or ["http://localhost:5173"]
+
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],  # Vite default port
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     # Import and include routers here (to avoid circular imports)
-    from .routers import runs
+    from .routers import config, domain, knowledge, pipeline, runs
 
     app.include_router(runs.router, prefix="/api/v1/runs", tags=["runs"])
+    app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
+    app.include_router(pipeline.router, prefix="/api/v1/pipeline", tags=["pipeline"])
+    app.include_router(domain.router, prefix="/api/v1/domain", tags=["domain"])
+    app.include_router(config.router, prefix="/api/v1/config", tags=["config"])
 
     @app.get("/health")
     def health_check():

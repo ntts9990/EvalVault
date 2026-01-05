@@ -64,8 +64,22 @@ uv sync --extra dev
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
    ```
+   Ollama에서 tool/function calling 지원 모델을 쓰려면 `OLLAMA_TOOL_MODELS`에
+   콤마로 모델명을 추가하세요. 확인은 `ollama show <model>`로 하고
+   `Capabilities`에 `tools`가 표시되는 모델만 넣으면 됩니다.
 
-2. **평가 실행**
+2. **API + React 프론트 실행 (dev)**
+   ```bash
+   # API
+   uv run evalvault serve-api --reload
+
+   # Frontend
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **평가 실행**
    ```bash
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
@@ -74,12 +88,12 @@ uv sync --extra dev
      --db evalvault.db
    ```
 
-3. **히스토리 확인**
+4. **히스토리 확인**
    ```bash
    uv run evalvault history --db evalvault.db
    ```
 
-4. **Web UI 실행**
+5. **Web UI 실행**
    ```bash
    uv run evalvault web --browser
    ```

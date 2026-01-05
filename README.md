@@ -68,8 +68,32 @@ Add extras as needed:
    cp .env.example .env
    # set OPENAI_API_KEY or OLLAMA settings, LANGFUSE/PHOENIX keys, etc.
    ```
+   If you use Ollama models that support tool/function calling, list them in
+   `OLLAMA_TOOL_MODELS` (comma-separated). Check support via
+   `ollama show <model>` and look for `Capabilities: tools`.
+   Add Ollama models (optional):
+   ```bash
+   ollama pull gpt-oss:120b
+   ollama pull gpt-oss-safeguard:120b
+   ollama list
+   ```
+   The Web UI model list is sourced from `ollama list`, so newly pulled models
+   show up automatically. Suggested models to pre-load:
+   `gpt-oss:120b`, `gpt-oss-safeguard:120b`, `gpt-oss-safeguard:20b`.
+   Update `config/models.yaml` if you want a default profile model.
 
-2. **Run an evaluation**
+2. **Run the API + React frontend (dev)**
+   ```bash
+   # API
+   uv run evalvault serve-api --reload
+
+   # Frontend
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **Run an evaluation**
    ```bash
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
@@ -78,12 +102,12 @@ Add extras as needed:
      --db evalvault.db
    ```
 
-3. **Inspect history**
+4. **Inspect history**
    ```bash
    uv run evalvault history --db evalvault.db
    ```
 
-4. **Launch the Web UI**
+5. **Launch the Web UI**
    ```bash
    uv run evalvault web --browser
    ```

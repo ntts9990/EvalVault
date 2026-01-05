@@ -14,6 +14,7 @@ PROVIDER_HELP_URLS: dict[str, str] = {
     "azure": "https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub",
     "anthropic": "https://console.anthropic.com/settings/keys",
     "ollama": "https://ollama.com/download",
+    "vllm": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html",
 }
 
 

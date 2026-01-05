@@ -66,6 +66,19 @@ class PhoenixAdapter(TrackerPort):
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+            from evalvault.config.instrumentation import (
+                get_tracer_provider,
+                is_instrumentation_enabled,
+            )
+
+            if is_instrumentation_enabled():
+                provider = get_tracer_provider()
+                if provider:
+                    self._tracer_provider = provider
+                    self._tracer = trace.get_tracer(__name__)
+                    self._initialized = True
+                    return
+
             # Create resource with service name
             resource = Resource.create({"service.name": self._service_name})
 

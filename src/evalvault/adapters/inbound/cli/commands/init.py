@@ -10,6 +10,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
+from evalvault.adapters.outbound.dataset.templates import (
+    render_dataset_template_csv,
+    render_dataset_template_json,
+    render_dataset_template_xlsx,
+)
+
 
 def register_init_command(app: typer.Typer, console: Console) -> None:
     """Register the init command for onboarding.
@@ -37,13 +43,19 @@ def register_init_command(app: typer.Typer, console: Console) -> None:
             "--skip-sample",
             help="Skip sample dataset creation",
         ),
+        skip_templates: bool = typer.Option(
+            False,
+            "--skip-templates",
+            help="Skip dataset template creation",
+        ),
     ) -> None:
         """Initialize EvalVault in a new project.
 
         This command helps you get started by:
         1. Creating a .env file with required API keys
         2. Generating a sample dataset
-        3. Providing quick start commands
+        3. Creating empty dataset templates (JSON/CSV/XLSX)
+        4. Providing quick start commands
 
         Examples:
           # Initialize in current directory
@@ -69,7 +81,11 @@ def register_init_command(app: typer.Typer, console: Console) -> None:
         if not skip_sample:
             _create_sample_dataset(console, output_dir)
 
-        # Step 3: Show quick start guide
+        # Step 3: Create dataset templates
+        if not skip_templates:
+            _create_dataset_templates(console, output_dir)
+
+        # Step 4: Show quick start guide
         _show_quick_start(console, output_dir)
 
         console.print(
@@ -163,9 +179,46 @@ def _create_sample_dataset(console: Console, output_dir: Path) -> None:
     console.print("[dim]This dataset contains 2 test cases for quick testing[/dim]\n")
 
 
+def _create_dataset_templates(console: Console, output_dir: Path) -> None:
+    """Create empty dataset templates (JSON/CSV/XLSX)."""
+    console.print("[bold]Step 3: Create Dataset Templates[/bold]\n")
+
+    templates_dir = output_dir / "dataset_templates"
+    templates_dir.mkdir(parents=True, exist_ok=True)
+
+    template_specs = [
+        ("dataset_template.json", render_dataset_template_json()),
+        ("dataset_template.csv", render_dataset_template_csv()),
+    ]
+
+    created_any = False
+    for filename, content in template_specs:
+        template_path = templates_dir / filename
+        if template_path.exists():
+            console.print(f"[yellow]Template already exists at {template_path}[/yellow]")
+            continue
+        template_path.write_text(content, encoding="utf-8")
+        created_any = True
+
+    xlsx_path = templates_dir / "dataset_template.xlsx"
+    if xlsx_path.exists():
+        console.print(f"[yellow]Template already exists at {xlsx_path}[/yellow]")
+    else:
+        try:
+            xlsx_path.write_bytes(render_dataset_template_xlsx())
+            created_any = True
+        except Exception as exc:
+            console.print(f"[yellow]Skipping XLSX template: {exc}[/yellow]")
+
+    if created_any:
+        console.print(f"[green]Created dataset templates at {templates_dir}[/green]\n")
+    else:
+        console.print("[dim]Dataset templates already exist.[/dim]\n")
+
+
 def _show_quick_start(console: Console, output_dir: Path) -> None:
     """Display quick start commands."""
-    console.print("[bold]Step 3: Quick Start Commands[/bold]\n")
+    console.print("[bold]Step 4: Quick Start Commands[/bold]\n")
 
     commands = """# Run a quick evaluation with the quick preset
 uv run evalvault run --preset quick sample_dataset.json

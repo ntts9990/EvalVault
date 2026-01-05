@@ -11,6 +11,7 @@ Ollama의 OpenAI 호환 API를 사용하여 Ragas와 통합합니다.
 from typing import Any
 
 import httpx
+import instructor
 from openai import AsyncOpenAI
 from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
 
@@ -68,7 +69,13 @@ class OllamaAdapter(BaseLLMAdapter):
             **chat_kwargs,
         )
 
-        ragas_llm = create_instructor_llm("openai", self._ollama_model, ragas_client)
+        mode = instructor.Mode.TOOLS if self._supports_tools(settings) else instructor.Mode.JSON
+        ragas_llm = create_instructor_llm(
+            "ollama",
+            self._ollama_model,
+            ragas_client,
+            mode=mode,
+        )
         self._set_ragas_llm(ragas_llm)
 
         # Create separate client for embeddings (non-tracking)
@@ -92,6 +99,14 @@ class OllamaAdapter(BaseLLMAdapter):
             Embedding model identifier (e.g., 'qwen3-embedding:0.6b')
         """
         return self._embedding_model_name
+
+    def _supports_tools(self, settings: Settings) -> bool:
+        raw = settings.ollama_tool_models or ""
+        allowlist = {item.strip().lower() for item in raw.split(",") if item.strip()}
+        if not allowlist:
+            return False
+        model = self._ollama_model.lower()
+        return any(model == entry or model.startswith(f"{entry}:") for entry in allowlist)
 
     def get_base_url(self) -> str:
         """Get the Ollama server URL.

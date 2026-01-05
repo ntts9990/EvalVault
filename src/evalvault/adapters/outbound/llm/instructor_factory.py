@@ -9,13 +9,20 @@ from ragas.llms.base import InstructorLLM
 
 
 def create_instructor_llm(
-    provider: str, model: str, client: Any, **model_args: Any
+    provider: str,
+    model: str,
+    client: Any,
+    mode: instructor.Mode | None = None,
+    **model_args: Any,
 ) -> InstructorLLM:
     """Create an InstructorLLM for the given provider using a patched client."""
     provider_name = provider.lower()
 
     if provider_name in {"openai", "azure", "ollama"}:
-        patched_client = instructor.from_openai(client)
+        resolved_mode = mode or (
+            instructor.Mode.JSON if provider_name == "ollama" else instructor.Mode.TOOLS
+        )
+        patched_client = instructor.from_openai(client, mode=resolved_mode)
         provider_id = "openai"
     elif provider_name == "anthropic":
         patched_client = instructor.from_anthropic(client)

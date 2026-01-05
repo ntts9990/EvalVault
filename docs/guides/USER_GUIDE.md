@@ -77,8 +77,9 @@ uv run evalvault init
 ```
 
 - `.env` 템플릿과 `sample_dataset.json`을 생성합니다.
+- `dataset_templates/`에 JSON/CSV/XLSX 빈 템플릿을 생성합니다.
 - `--output-dir`로 생성 위치를 바꿀 수 있습니다.
-- `--skip-env`/`--skip-sample`로 단계별 생성을 끌 수 있습니다.
+- `--skip-env`/`--skip-sample`/`--skip-templates`로 단계별 생성을 끌 수 있습니다.
 
 ### .env 작성
 `cp .env.example .env` 후 아래 값을 채웁니다.
@@ -97,9 +98,36 @@ LANGFUSE_HOST=http://localhost:3000
 PHOENIX_ENABLED=true
 PHOENIX_ENDPOINT=http://localhost:6006/v1/traces
 PHOENIX_SAMPLE_RATE=1.0
+
+# React 프론트엔드에서 API 호출 시 (선택)
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 Ollama를 사용할 경우 `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT`을 추가하고, 평가 전에 `ollama pull`로 모델을 내려받습니다.
+Tool/function calling 지원 모델을 쓰려면 `.env`에 `OLLAMA_TOOL_MODELS`를 콤마로 지정합니다.
+지원 여부는 `ollama show <model>` 출력의 `Capabilities`에 `tools`가 있는지 확인합니다.
+
+### Ollama 모델 추가
+Ollama는 **로컬에 내려받은 모델만** 목록에 노출됩니다. 다음 순서로 추가하세요.
+
+1. **모델 내려받기**
+   ```bash
+   ollama pull gpt-oss:120b
+   ollama pull gpt-oss-safeguard:120b
+   ```
+2. **목록 확인**
+   ```bash
+   ollama list
+   ```
+3. **EvalVault에서 선택**
+   - Web UI: `Provider = ollama` 선택 후 모델 카드에서 선택
+   - CLI: `config/models.yaml`의 프로필 모델을 변경하거나 `--profile`로 지정
+4. **Tool 지원 모델 등록**
+   - `ollama show <model>`로 `Capabilities: tools` 확인
+   - 지원 모델은 `.env`의 `OLLAMA_TOOL_MODELS`에 콤마로 추가
+
+미리 받아두면 좋은 모델:
+`gpt-oss:120b`, `gpt-oss-safeguard:120b`, `gpt-oss-safeguard:20b`.
 
 ### 모델 프로필 관리
 `config/models.yaml`은 프로필별 LLM/임베딩 구성을 정의합니다.
@@ -148,6 +176,16 @@ EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습�
 
 CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고 `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
 
+#### 데이터셋 템플릿
+빈 템플릿은 아래 위치에서 사용할 수 있습니다. 필요한 값만 채워 바로 사용할 수 있습니다.
+
+- 프로젝트 초기화 시: `dataset_templates/` 폴더에 JSON/CSV/XLSX 템플릿 생성
+- 문서 저장소: `docs/templates/dataset_template.json`
+- 문서 저장소: `docs/templates/dataset_template.csv`
+- 문서 저장소: `docs/templates/dataset_template.xlsx`
+
+JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요.
+
 ---
 
 ## 핵심 워크플로
@@ -188,11 +226,33 @@ uv run evalvault export <run_id> -o run.json
 ```
 
 ### Web UI
+
+#### Streamlit Web UI
 ```bash
 uv run evalvault web --browser
 ```
 Streamlit 앱에서 평가 실행, 파일 업로드, 히스토리 탐색, 보고서 생성이 가능합니다. `--profile` 및 `--tracker` 설정은 CLI와 동일하게 적용됩니다.
 현재 Web UI 보고서는 기본/상세 템플릿과 LLM 보고서가 중심이며, 비교 템플릿과 Domain Memory 인사이트 패널은 준비 중입니다.
+Dataset 선택 화면에서 JSON/CSV/XLSX 템플릿을 내려받아 바로 입력할 수 있습니다.
+
+#### React Frontend (Vite)
+```bash
+# 1) API 서버 실행
+uv run evalvault serve-api --reload
+
+# 2) 프론트엔드 실행
+cd frontend
+npm install
+npm run dev
+```
+
+- 기본 접속: http://localhost:5173
+- API 기본: http://127.0.0.1:8000
+- Vite dev 서버는 `/api`를 API로 프록시합니다.
+- API 주소를 바꾸려면 아래 중 하나를 사용하세요.
+  - 프록시 유지: `VITE_API_PROXY_TARGET=http://localhost:8000`
+  - 직접 호출: `VITE_API_BASE_URL=http://localhost:8000/api/v1`
+- 직접 호출 시에는 API 서버 `.env`에 `CORS_ORIGINS`로 프론트 오리진을 추가합니다.
 
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
@@ -350,6 +410,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 | Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 |
 | Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
 | Streamlit ImportError | `uv sync --extra web` 실행 |
+| React 프론트 CORS 에러 | `CORS_ORIGINS`에 `http://localhost:5173` 추가 또는 Vite 프록시 사용, `VITE_API_BASE_URL` 확인 |
 
 추가 이슈는 GitHub Issues 또는 `uv run evalvault config` 출력을 참고하세요.
 

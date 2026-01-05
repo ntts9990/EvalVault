@@ -10,6 +10,7 @@ from evalvault.adapters.outbound.llm.base import (
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
+from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
 
@@ -43,13 +44,16 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
         return OpenAIAdapter(settings)
     elif provider == "ollama":
         return OllamaAdapter(settings)
+    elif provider == "vllm":
+        return VLLMAdapter(settings)
     elif provider == "azure":
         return AzureOpenAIAdapter(settings)
     elif provider == "anthropic":
         return AnthropicAdapter(settings)
     else:
         raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, azure, anthropic"
+            "Unsupported LLM provider: "
+            f"'{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
         )
 
 
@@ -64,7 +68,7 @@ def create_llm_adapter_for_model(
     but overrides the provider and model name.
 
     Args:
-        provider: LLM provider (openai, ollama, azure, anthropic)
+        provider: LLM provider (openai, ollama, vllm, azure, anthropic)
         model_name: Model name (e.g., "gpt-5-nano", "gemma3:1b")
         base_settings: Base settings with API keys and infrastructure config
 
@@ -90,6 +94,10 @@ def create_llm_adapter_for_model(
         base_settings.llm_provider = "ollama"
         base_settings.ollama_model = model_name
         return OllamaAdapter(base_settings)
+    elif provider == "vllm":
+        base_settings.llm_provider = "vllm"
+        base_settings.vllm_model = model_name
+        return VLLMAdapter(base_settings)
     elif provider == "azure":
         base_settings.llm_provider = "azure"
         base_settings.azure_deployment = model_name
@@ -100,7 +108,8 @@ def create_llm_adapter_for_model(
         return AnthropicAdapter(base_settings)
     else:
         raise ValueError(
-            f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, azure, anthropic"
+            "Unsupported LLM provider: "
+            f"'{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
         )
 
 
@@ -113,6 +122,7 @@ __all__ = [
     "AnthropicAdapter",
     "LLMRelationAugmenter",
     "OllamaAdapter",
+    "VLLMAdapter",
     "get_llm_adapter",
     "create_llm_adapter_for_model",
 ]

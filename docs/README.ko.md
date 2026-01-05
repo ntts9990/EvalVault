@@ -68,8 +68,28 @@ uv sync --extra dev
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
    ```
+   Ollama 모델을 추가하려면 아래처럼 내려받고 목록을 확인합니다.
+   ```bash
+   ollama pull gpt-oss:120b
+   ollama pull gpt-oss-safeguard:120b
+   ollama list
+   ```
+   Web UI 모델 목록은 `ollama list` 기준으로 표시됩니다.
+   미리 받아두면 좋은 모델: `gpt-oss:120b`, `gpt-oss-safeguard:120b`, `gpt-oss-safeguard:20b`.
+   기본 프로필 모델을 바꾸려면 `config/models.yaml`을 수정하세요.
 
-2. **평가 실행**
+2. **API + React 프론트 실행 (dev)**
+   ```bash
+   # API
+   uv run evalvault serve-api --reload
+
+   # Frontend
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **평가 실행**
    ```bash
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
@@ -78,12 +98,12 @@ uv sync --extra dev
      --db evalvault.db
    ```
 
-3. **히스토리 확인**
+4. **히스토리 확인**
    ```bash
    uv run evalvault history --db evalvault.db
    ```
 
-4. **Web UI 실행**
+5. **Web UI 실행**
    ```bash
    uv run evalvault web --browser
    ```

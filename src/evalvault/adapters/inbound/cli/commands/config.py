@@ -87,6 +87,19 @@ def register_config_commands(app: typer.Typer, console: Console) -> None:
             table_llm.add_row("Ollama Timeout", f"{settings.ollama_timeout}s")
             if settings.ollama_think_level:
                 table_llm.add_row("Think Level", settings.ollama_think_level)
+        elif settings.llm_provider == "vllm":
+            api_key_status = (
+                "[green]Set[/green]" if settings.vllm_api_key else "[yellow]Not set[/yellow]"
+            )
+            table_llm.add_row("vLLM API Key", api_key_status)
+            table_llm.add_row("vLLM Model", settings.vllm_model)
+            table_llm.add_row("vLLM Embedding", settings.vllm_embedding_model)
+            table_llm.add_row("vLLM Base URL", settings.vllm_base_url)
+            table_llm.add_row(
+                "vLLM Embedding Base URL",
+                settings.vllm_embedding_base_url or "[dim]Same as vLLM Base URL[/dim]",
+            )
+            table_llm.add_row("vLLM Timeout", f"{settings.vllm_timeout}s")
         else:
             api_key_status = (
                 "[green]Set[/green]" if settings.openai_api_key else "[red]Not set[/red]"

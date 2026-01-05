@@ -1,0 +1,113 @@
+import React from "react";
+import {
+    LayoutDashboard,
+    Settings,
+    Menu,
+    Database,
+    PlayCircle,
+    Brain,
+    X,
+    FlaskConical
+} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+
+export function Layout({ children }: { children: React.ReactNode }) {
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+    const location = useLocation();
+
+    const navItems = [
+        { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+        { icon: PlayCircle, label: "Evaluation Studio", href: "/studio" },
+        { icon: Brain, label: "Domain Memory", href: "/domain" },
+        { icon: Database, label: "Knowledge Base", href: "/knowledge" },
+        { icon: FlaskConical, label: "Analysis Lab", href: "/analysis" },
+        { icon: Settings, label: "Settings", href: "/settings" },
+    ];
+
+    return (
+        <div className="min-h-screen bg-secondary/30 flex font-sans text-foreground">
+            {/* Sidebar */}
+            <aside
+                className={`${isSidebarOpen ? "w-64" : "w-20"
+                    } bg-card border-r border-border transition-all duration-300 flex flex-col fixed h-full z-20`}
+            >
+                <div className="h-16 flex items-center px-6 border-b border-border">
+                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-primary-foreground font-bold text-lg">E</span>
+                    </div>
+                    {isSidebarOpen && (
+                        <span className="ml-3 font-bold text-xl tracking-tight">EvalVault</span>
+                    )}
+                    <button
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="ml-auto lg:hidden p-1 hover:bg-secondary rounded-md"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <nav className="flex-1 p-4 space-y-1">
+                    <p className={`px-4 text-xs font-semibold text-muted-foreground mb-4 mt-2 ${!isSidebarOpen && "text-center"}`}>
+                        {isSidebarOpen ? "WORKSPACE" : "..."}
+                    </p>
+                    {navItems.map((item) => {
+                        const isActive = location.pathname === item.href;
+                        return (
+                            <Link
+                                key={item.label}
+                                to={item.href}
+                                className={`flex items-center px-4 py-3 rounded-lg transition-all group ${isActive
+                                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                    }`}
+                                title={item.label}
+                            >
+                                <item.icon className={`w-5 h-5 ${isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
+                                {isSidebarOpen && <span className="ml-3 font-medium">{item.label}</span>}
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                {/* Footer User Profile */}
+                <div className="p-4 border-t border-border/50">
+                    <div className={`flex items-center ${isSidebarOpen ? "gap-3" : "justify-center"}`}>
+                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground">
+                            JS
+                        </div>
+                        {isSidebarOpen && (
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-medium truncate">John Smith</p>
+                                <p className="text-xs text-muted-foreground truncate">john@example.com</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <div className={`flex-1 flex flex-col min-w-0 bg-background/50 relative transition-all duration-300 ${isSidebarOpen ? "ml-64" : "ml-20"}`}>
+                {/* Mobile Header */}
+                <header className="lg:hidden h-16 flex items-center px-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40">
+                    <button onClick={() => setIsSidebarOpen(true)}>
+                        <Menu className="w-6 h-6" />
+                    </button>
+                    <span className="ml-3 font-semibold">EvalVault</span>
+                </header>
+
+                {/* Desktop Header */}
+                <header className="hidden lg:flex h-16 items-center justify-between px-8 border-b border-border/40 bg-background/60 backdrop-blur-sm sticky top-0 z-40">
+                    <div className="flex items-center text-sm text-muted-foreground">
+                        <span className="text-foreground font-medium">Workspace</span>
+                        <span className="mx-2">/</span>
+                        <span>{navItems.find(i => i.href === location.pathname)?.label || "Page"}</span>
+                    </div>
+                </header>
+
+                <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
+}

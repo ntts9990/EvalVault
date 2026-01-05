@@ -1,0 +1,37 @@
+{
+  "type": "kg_build_result",
+  "stats": {
+    "documents_processed": 2,
+    "entities_processed": 1,
+    "entities_added": 1,
+    "relations_added": 0,
+    "chunks_processed": 1,
+    "elapsed_ms": 1990.801
+  },
+  "graph": {
+    "entities": [
+      {
+        "name": "1,234",
+        "entity_type": "money",
+        "canonical_name": "1,234",
+        "source_document_id": "doc-0",
+        "attributes": {
+          "unit": "KRW"
+        },
+        "confidence": 0.8,
+        "provenance": "regex"
+      }
+    ],
+    "relations": [],
+    "statistics": {
+      "num_entities": 1,
+      "num_relations": 0,
+      "entity_types": {
+        "money": 1
+      },
+      "relation_types": {},
+      "isolated_entities": 1,
+      "average_entity_confidence": 0.8
+    }
+  }
+}

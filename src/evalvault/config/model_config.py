@@ -17,7 +17,9 @@ from pydantic import BaseModel, Field
 class LLMConfig(BaseModel):
     """LLM 모델 설정."""
 
-    provider: Literal["openai", "ollama"] = Field(description="LLM provider: 'openai' or 'ollama'")
+    provider: Literal["openai", "ollama", "vllm"] = Field(
+        description="LLM provider: 'openai', 'ollama', or 'vllm'"
+    )
     model: str = Field(description="Model name")
     options: dict | None = Field(
         default=None, description="Provider-specific options (e.g., think_level)"
@@ -27,8 +29,8 @@ class LLMConfig(BaseModel):
 class EmbeddingConfig(BaseModel):
     """임베딩 모델 설정."""
 
-    provider: Literal["openai", "ollama"] = Field(
-        description="Embedding provider: 'openai' or 'ollama'"
+    provider: Literal["openai", "ollama", "vllm"] = Field(
+        description="Embedding provider: 'openai', 'ollama', or 'vllm'"
     )
     model: str = Field(description="Embedding model name")
 

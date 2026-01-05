@@ -68,6 +68,14 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
                 inner_self._tracker = tracker
 
             async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
+                # Force high token limit for reasoning models
+                if "max_completion_tokens" not in kwargs or kwargs["max_completion_tokens"] < 4096:
+                    kwargs["max_completion_tokens"] = 16384
+
+                # Remove max_tokens if present to avoid conflicts with reasoning models
+                if "max_tokens" in kwargs:
+                    del kwargs["max_tokens"]
+
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)

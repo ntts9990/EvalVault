@@ -41,8 +41,9 @@ uv run evalvault init --output-dir ./my-project
 uv run evalvault init --skip-env --skip-sample
 ```
 - `.env` 템플릿과 `sample_dataset.json`을 생성해 빠르게 시작할 수 있게 합니다.
+- `dataset_templates/`에 JSON/CSV/XLSX 템플릿을 생성합니다.
 - `--output-dir`로 생성 위치를 지정할 수 있습니다.
-- `--skip-env` 또는 `--skip-sample`로 단계별 생성을 끌 수 있습니다.
+- `--skip-env`/`--skip-sample`/`--skip-templates`로 단계별 생성을 끌 수 있습니다.
 
 ### 3.1 `run`
 ```bash
