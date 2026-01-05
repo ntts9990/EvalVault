@@ -339,10 +339,15 @@ class WebUIAdapter:
 
         # 1. 데이터셋 로드 (비동기 처리)
         logger.info(f"Loading dataset from: {request.dataset_path}")
-        from evalvault.adapters.outbound.dataset import get_loader
 
         try:
-            loader = get_loader(request.dataset_path)
+            if self._data_loader is not None:
+                # 주입된 data_loader 사용
+                loader = self._data_loader
+            else:
+                from evalvault.adapters.outbound.dataset import get_loader
+
+                loader = get_loader(request.dataset_path)
             # 파일 I/O는 스레드 풀에서 실행
             dataset = await asyncio.to_thread(loader.load, request.dataset_path)
         except Exception as e:
