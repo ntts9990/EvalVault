@@ -7,18 +7,18 @@
 [![CI](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntts9990/EvalVault/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.md)
 
-Prefer Korean docs? Read the [한국어 README](docs/README.ko.md).
+Prefer Korean docs? Read the [한국어 README](README.ko.md).
 
 ---
 
 ## Overview
 
-EvalVault measures RAG quality with Ragas v1.0 metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air‑gapped profiles without wiring new scripts for each dataset.
+EvalVault measures RAG quality with Ragas 0.4.x metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air-gapped profiles without wiring new scripts for each dataset.
 
 **Highlights**
 - One CLI for running, comparing, exporting, and storing evaluation runs
 - Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
-- FastAPI + React Web UI for Evaluation Studio and Analysis Lab (save & reload analysis results)
+- **FastAPI + React Web UI** for Evaluation Studio and Analysis Lab (save & reload analysis results)
 - Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
 - Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
 - DAG-based analysis pipeline with statistical/NLP/causal modules
@@ -119,17 +119,17 @@ Add extras as needed:
    Need empty dataset templates? Run `uv run evalvault init` to generate
    `dataset_templates/` (JSON/CSV/XLSX) or download from the Web UI.
 
-2. **Run the API + React frontend (dev)**
+2. **Run the Web UI (FastAPI + React)**
    ```bash
-   # API
+   # Terminal 1: API server
    uv run evalvault serve-api --reload
 
-   # Frontend
+   # Terminal 2: React frontend
    cd frontend
    npm install
    npm run dev
    ```
-   Open `http://localhost:5173`.
+   Open `http://localhost:5173` in your browser.
 
 3. **Run an evaluation**
    ```bash
@@ -172,8 +172,21 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
   --use-domain-memory --memory-domain insurance --augment-context
 ```
 
-- `uv run evalvault history --mode simple` (또는 `full`) keeps CLI reports focused.
-- The Web UI includes the same mode toggle and surfaces a “Mode” pill on Reports to make comparisons obvious.
+- `uv run evalvault history --mode simple` (or `full`) keeps CLI reports focused.
+- The Web UI includes the same mode toggle and surfaces a "Mode" pill on Reports to make comparisons obvious.
+
+---
+
+## Supported Metrics (Ragas 0.4.x)
+
+| Metric | Description |
+|--------|-------------|
+| `faithfulness` | How well the answer is grounded in the provided context |
+| `answer_relevancy` | How relevant the answer is to the question |
+| `context_precision` | Precision of the retrieved context |
+| `context_recall` | Recall of the retrieved context |
+| `factual_correctness` | Factual accuracy compared to ground truth |
+| `semantic_similarity` | Semantic similarity between answer and ground truth |
 
 ---
 
