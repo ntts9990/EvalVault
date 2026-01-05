@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 import {
     type DatasetItem,
@@ -9,12 +9,11 @@ import {
     fetchMetrics,
     fetchConfig,
     startEvaluation,
-    uploadDataset
+    uploadDataset,
+    uploadRetrieverDocs
 } from "../services/api";
 import { Play, Database, Brain, Target, CheckCircle2, AlertCircle, Settings, Upload, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const TOOL_REQUIRED_METRICS = new Set(["factual_correctness"]);
 
 export function EvaluationStudio() {
     const navigate = useNavigate();
@@ -33,6 +32,8 @@ export function EvaluationStudio() {
     // Advanced Options State
     const [retrieverMode, setRetrieverMode] = useState<"none" | "bm25" | "hybrid">("none");
     const [docsPath, setDocsPath] = useState<string>("");
+    const [retrieverFile, setRetrieverFile] = useState<File | null>(null);
+    const [retrieverUploading, setRetrieverUploading] = useState(false);
     const [enableMemory, setEnableMemory] = useState<boolean>(false);
     const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -54,17 +55,6 @@ export function EvaluationStudio() {
     const [progressMessage, setProgressMessage] = useState("Initializing...");
     const [logs, setLogs] = useState<string[]>([]);
 
-    const selectedModelInfo = useMemo(
-        () => models.find((model) => model.id === selectedModel),
-        [models, selectedModel],
-    );
-    const toolRequired = useMemo(
-        () => Array.from(selectedMetrics).some((metric) => TOOL_REQUIRED_METRICS.has(metric)),
-        [selectedMetrics],
-    );
-    const toolSupported = selectedModelInfo?.supports_tools ?? false;
-    const showToolWarning = toolRequired && !toolSupported;
-
     const handleUpload = async () => {
         if (!uploadFile) return;
         setUploading(true);
@@ -82,6 +72,25 @@ export function EvaluationStudio() {
             setError(err instanceof Error ? err.message : "Failed to upload");
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleRetrieverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setRetrieverFile(e.target.files?.[0] || null);
+    };
+
+    const handleRetrieverUpload = async () => {
+        if (!retrieverFile) return;
+        setRetrieverUploading(true);
+        setError(null);
+        try {
+            const result = await uploadRetrieverDocs(retrieverFile);
+            setDocsPath(result.path);
+            setRetrieverFile(null);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to upload retriever docs");
+        } finally {
+            setRetrieverUploading(false);
         }
     };
 
@@ -372,11 +381,6 @@ export function EvaluationStudio() {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="font-medium">{model.name}</p>
-                                                {model.supports_tools && (
-                                                    <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 font-semibold">
-                                                        Tools
-                                                    </span>
-                                                )}
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">{model.id}</p>
                                         </div>
@@ -394,18 +398,9 @@ export function EvaluationStudio() {
                             <Target className="w-5 h-5 text-primary" />
                             Select Metrics
                         </h2>
-                        {showToolWarning && (
-                            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-                                선택한 모델은 tool/function calling 미지원입니다. <span className="font-semibold">factual_correctness</span>는
-                                tool 호출이 필요할 수 있어 실패할 수 있습니다. Ollama에서는
-                                <code className="mx-1 rounded bg-amber-100 px-1 font-mono">OLLAMA_TOOL_MODELS</code>에
-                                지원 모델을 등록하거나 Tools 배지가 있는 모델로 변경하세요.
-                            </div>
-                        )}
                         <div className="flex flex-wrap gap-3">
                             {availableMetrics.map((metric) => {
                                 const isSelected = selectedMetrics.has(metric);
-                                const needsTools = TOOL_REQUIRED_METRICS.has(metric);
                                 return (
                                     <button
                                         key={metric}
@@ -417,11 +412,6 @@ export function EvaluationStudio() {
                                     >
                                         <span className="inline-flex items-center gap-2">
                                             {metric}
-                                            {needsTools && (
-                                                <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/15 text-amber-700">
-                                                    Tools
-                                                </span>
-                                            )}
                                         </span>
                                     </button>
                                 );
@@ -465,13 +455,51 @@ export function EvaluationStudio() {
                                                 ))}
                                             </div>
                                             {retrieverMode !== "none" && (
-                                                <input
-                                                    type="text"
-                                                    placeholder="Absolute path to documents (json/jsonl/txt)"
-                                                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
-                                                    value={docsPath}
-                                                    onChange={(e) => setDocsPath(e.target.value)}
-                                                />
+                                                <div className="space-y-3">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Absolute path to documents (json/jsonl/txt)"
+                                                        className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                        value={docsPath}
+                                                        onChange={(e) => setDocsPath(e.target.value)}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Example: /abs/path/to/retriever_docs.json (server path).
+                                                        Supports .json, .jsonl, .txt.
+                                                    </p>
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <input
+                                                                id="retriever-docs-upload"
+                                                                type="file"
+                                                                accept=".json,.jsonl,.txt"
+                                                                className="hidden"
+                                                                onChange={handleRetrieverFileChange}
+                                                            />
+                                                            <label
+                                                                htmlFor="retriever-docs-upload"
+                                                                className="px-3 py-1.5 rounded-md text-sm border bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80"
+                                                            >
+                                                                Choose file
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleRetrieverUpload}
+                                                                disabled={!retrieverFile || retrieverUploading}
+                                                                className="px-3 py-1.5 rounded-md text-sm border bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                                            >
+                                                                {retrieverUploading ? "Uploading..." : "Upload"}
+                                                            </button>
+                                                        </div>
+                                                        {retrieverFile && (
+                                                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                                                <FileText className="w-3 h-3" />
+                                                                <span>{retrieverFile.name}</span>
+                                                                <span>{(retrieverFile.size / 1024).toFixed(1)} KB</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

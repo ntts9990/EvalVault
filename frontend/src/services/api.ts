@@ -149,6 +149,20 @@ export async function uploadDataset(file: File): Promise<{ message: string; path
     return response.json();
 }
 
+export async function uploadRetrieverDocs(
+    file: File
+): Promise<{ message: string; path: string; filename: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}/runs/options/retriever-docs`, {
+        method: "POST",
+        body: formData,
+    });
+    if (!response.ok) throw new Error("Failed to upload retriever docs");
+    return response.json();
+}
+
 export async function fetchModels(provider?: string): Promise<ModelItem[]> {
     const params = new URLSearchParams();
     if (provider) params.append("provider", provider);

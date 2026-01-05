@@ -206,9 +206,9 @@ export function AnalysisNodeOutputs({
                                     <div className="space-y-2">
                                         <p className="text-xs font-semibold text-muted-foreground">인사이트</p>
                                         <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                                            {insights.slice(0, 8).map((item, index) => (
-                                                <li key={`${node.id}-insight-${index}`}>{item}</li>
-                                            ))}
+                                        {insights.slice(0, 8).map((item: string, index: number) => (
+                                            <li key={`${node.id}-insight-${index}`}>{String(item)}</li>
+                                        ))}
                                         </ul>
                                     </div>
                                 )}
