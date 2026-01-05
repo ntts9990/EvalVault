@@ -65,6 +65,10 @@ class PipelineOrchestrator:
         if hasattr(module, "metadata") and module.metadata:
             self.module_catalog.register(module.metadata)
 
+    def list_registered_modules(self) -> list[str]:
+        """등록된 모듈 ID 목록."""
+        return list(self._modules.keys())
+
     def get_module(self, module_id: str) -> AnalysisModulePort | None:
         """모듈 조회.
 
@@ -501,6 +505,25 @@ class AnalysisPipelineService:
         pipeline = self._orchestrator.build_pipeline_from_query(context)
         return self._orchestrator.execute(pipeline, context)
 
+    def analyze_intent(
+        self,
+        intent: AnalysisIntent,
+        *,
+        query: str | None = None,
+        run_id: str | None = None,
+        dataset: Any | None = None,
+        **kwargs: Any,
+    ) -> PipelineResult:
+        """의도를 명시하여 파이프라인을 실행."""
+        context = AnalysisContext(
+            query=query or intent.value,
+            run_id=run_id,
+            dataset=dataset,
+            additional_params=kwargs,
+        )
+        pipeline = self._orchestrator.build_pipeline(intent, context)
+        return self._orchestrator.execute(pipeline, context)
+
     async def analyze_async(
         self,
         query: str,
@@ -527,6 +550,25 @@ class AnalysisPipelineService:
         )
 
         pipeline = self._orchestrator.build_pipeline_from_query(context)
+        return await self._orchestrator.execute_async(pipeline, context)
+
+    async def analyze_intent_async(
+        self,
+        intent: AnalysisIntent,
+        *,
+        query: str | None = None,
+        run_id: str | None = None,
+        dataset: Any | None = None,
+        **kwargs: Any,
+    ) -> PipelineResult:
+        """의도를 명시하여 파이프라인을 비동기로 실행."""
+        context = AnalysisContext(
+            query=query or intent.value,
+            run_id=run_id,
+            dataset=dataset,
+            additional_params=kwargs,
+        )
+        pipeline = self._orchestrator.build_pipeline(intent, context)
         return await self._orchestrator.execute_async(pipeline, context)
 
     def get_intent(self, query: str) -> AnalysisIntent:
@@ -558,3 +600,7 @@ class AnalysisPipelineService:
             파이프라인 템플릿 또는 None
         """
         return self._orchestrator.template_registry.get_template(intent)
+
+    def get_registered_modules(self) -> list[str]:
+        """등록된 분석 모듈 ID 목록."""
+        return self._orchestrator.list_registered_modules()

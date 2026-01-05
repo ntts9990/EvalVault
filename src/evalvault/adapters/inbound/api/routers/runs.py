@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from evalvault.adapters.inbound.api.main import AdapterDep
+from evalvault.adapters.outbound.dataset.templates import (
+    render_dataset_template_csv,
+    render_dataset_template_json,
+    render_dataset_template_xlsx,
+)
+from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
 
 router = APIRouter()
 
@@ -24,9 +35,11 @@ class RunSummaryResponse(BaseModel):
     model_name: str
     pass_rate: float
     total_test_cases: int
+    passed_test_cases: int
     started_at: str  # ISO format string
     finished_at: str | None = None
     metrics_evaluated: list[str] = []
+    total_cost_usd: float | None = None
     phoenix_precision: float | None = None
     phoenix_drift: float | None = None
     phoenix_experiment_url: str | None = None
@@ -50,7 +63,203 @@ class QualityGateReportResponse(BaseModel):
     regression_amount: float | None = None
 
 
+class StartEvaluationRequest(BaseModel):
+    dataset_path: str
+    metrics: list[str]
+    model: str
+    parallel: bool = True
+    batch_size: int = 5
+    thresholds: dict[str, float] | None = None
+    retriever_config: dict[str, Any] | None = None
+    memory_config: dict[str, Any] | None = None
+    tracker_config: dict[str, Any] | None = None
+    prompt_config: dict[str, Any] | None = None
+
+
+class DatasetItemResponse(BaseModel):
+    name: str
+    path: str
+    type: str
+    size: int
+
+
+class ModelItemResponse(BaseModel):
+    id: str
+    name: str
+    supports_tools: bool | None = None
+
+
+# --- Options Endpoints ---
+
+
+@router.get("/options/datasets", response_model=list[DatasetItemResponse])
+def list_datasets(adapter: AdapterDep):
+    """Get available datasets."""
+    return adapter.list_datasets()
+
+
+@router.post("/options/datasets")
+async def upload_dataset(adapter: AdapterDep, file: UploadFile = File(...)):
+    """Upload a new dataset file."""
+    try:
+        content = await file.read()
+        saved_path = adapter.save_dataset_file(file.filename, content)
+        return {
+            "message": "Dataset uploaded successfully",
+            "path": saved_path,
+            "filename": file.filename,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save dataset: {e}")
+
+
+@router.get("/options/models", response_model=list[ModelItemResponse])
+def list_models(
+    adapter: AdapterDep,
+    provider: str | None = Query(None, description="Filter by provider (ollama, openai, etc.)"),
+):
+    """Get available models."""
+    return adapter.list_models(provider=provider)
+
+
+@router.get("/options/metrics", response_model=list[str])
+def list_metrics(adapter: AdapterDep):
+    """Get available metrics."""
+    return adapter.get_available_metrics()
+
+
+@router.get("/options/dataset-templates/{template_format}")
+def get_dataset_template(template_format: str) -> Response:
+    """Download an empty dataset template."""
+    fmt = template_format.lower()
+    if fmt == "json":
+        content = render_dataset_template_json()
+        return Response(
+            content,
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=dataset_template.json"},
+        )
+    if fmt == "csv":
+        content = render_dataset_template_csv()
+        return Response(
+            content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=dataset_template.csv"},
+        )
+    if fmt == "xlsx":
+        content = render_dataset_template_xlsx()
+        return Response(
+            content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=dataset_template.xlsx"},
+        )
+    raise HTTPException(status_code=400, detail="Unsupported template format")
+
+
 # --- Endpoints ---
+
+
+@router.post("/start", status_code=200)
+async def start_evaluation_endpoint(
+    request: StartEvaluationRequest,
+    adapter: AdapterDep,
+):
+    """Start evaluation with streaming progress."""
+    eval_req = EvalRequest(
+        dataset_path=request.dataset_path,
+        metrics=request.metrics,
+        model_name=request.model,
+        parallel=request.parallel,
+        batch_size=request.batch_size,
+        thresholds=request.thresholds or {},
+        retriever_config=request.retriever_config,
+        memory_config=request.memory_config,
+        tracker_config=request.tracker_config,
+        prompt_config=request.prompt_config,
+    )
+
+    queue = asyncio.Queue()
+
+    def progress_callback(progress: EvalProgress):
+        # 진행 상황을 큐에 추가
+        queue.put_nowait(
+            {
+                "type": "progress",
+                "data": {
+                    "current": progress.current,
+                    "total": progress.total,
+                    "percent": progress.percent,
+                    "status": progress.status,
+                    "message": progress.current_metric or progress.error_message or "",
+                },
+            }
+        )
+
+    async def event_generator():
+        # 평가 테스크 시작
+        task = asyncio.create_task(adapter.run_evaluation(eval_req, on_progress=progress_callback))
+
+        try:
+            # Task가 완료될 때까지 Queue 모니터링
+            while not task.done():
+                try:
+                    # 0.1초마다 큐 확인 또는 Task 상태 확인
+                    data = await asyncio.wait_for(queue.get(), timeout=0.1)
+                    yield json.dumps(data) + "\n"
+                    queue.task_done()
+                except TimeoutError:
+                    continue
+
+            # 남은 큐 아이템 처리
+            while not queue.empty():
+                data = await queue.get()
+                yield json.dumps(data) + "\n"
+                queue.task_done()
+
+            # 결과 및 예외 확인
+            if task.exception():
+                raise task.exception()
+
+            result = task.result()
+
+            memory_config = request.memory_config or {}
+            memory_enabled = bool(memory_config.get("enabled"))
+            if memory_enabled:
+                yield (
+                    json.dumps({"type": "info", "message": "Learning from evaluation results..."})
+                    + "\n"
+                )
+
+                try:
+                    memory_db = memory_config.get("db_path") or "evalvault_memory.db"
+                    domain = memory_config.get("domain") or "default"
+                    language = memory_config.get("language") or "ko"
+                    memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
+                    hook = DomainLearningHook(memory_adapter)
+                    await hook.on_evaluation_complete(
+                        evaluation_run=result,
+                        domain=domain,
+                        language=language,
+                    )
+                    yield json.dumps({"type": "info", "message": "Domain memory updated."}) + "\n"
+                except Exception as e:
+                    yield (
+                        json.dumps({"type": "warning", "message": f"Domain learning failed: {e}"})
+                        + "\n"
+                    )
+
+            # 최종 결과 반환
+            yield (
+                json.dumps(
+                    {"type": "result", "data": {"run_id": result.run_id, "status": "completed"}}
+                )
+                + "\n"
+            )
+
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @router.get("/", response_model=list[RunSummaryResponse])
@@ -75,9 +284,11 @@ def list_runs(
             "model_name": s.model_name,
             "pass_rate": s.pass_rate,
             "total_test_cases": s.total_test_cases,
+            "passed_test_cases": s.passed_test_cases,
             "started_at": s.started_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "metrics_evaluated": s.metrics_evaluated,
+            "total_cost_usd": s.total_cost_usd,
             "phoenix_precision": s.phoenix_precision,
             "phoenix_drift": s.phoenix_drift,
             "phoenix_experiment_url": s.phoenix_experiment_url,
@@ -128,6 +339,39 @@ def check_quality_gate(run_id: str, adapter: AdapterDep):
     """Check quality gate status for a run."""
     try:
         report = adapter.check_quality_gate(run_id)
+        return report
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/improvement")
+def get_improvement_guide(
+    run_id: str,
+    adapter: AdapterDep,
+    include_llm: bool = False,
+):
+    """Get improvement guide for a run."""
+    try:
+        report = adapter.get_improvement_guide(run_id, include_llm=include_llm)
+        # ImprovementReport is a Pydantic model (or dataclass), we need to return it.
+        return report
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/report")
+def generate_llm_report(
+    run_id: str,
+    adapter: AdapterDep,
+    model_id: str | None = None,
+):
+    """Generate LLM-based detailed report."""
+    try:
+        report = adapter.generate_llm_report(run_id, model_id=model_id)
         return report
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")

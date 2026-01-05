@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
+from urllib.request import urlopen
 
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
@@ -149,7 +151,167 @@ class WebUIAdapter:
             logger.warning(f"Failed to create LLM adapter for {model_id}: {e}, using default")
             return self._llm_adapter
 
-    def run_evaluation(
+    def _get_tracker(
+        self,
+        settings: Settings,
+        tracker_config: dict[str, Any] | None,
+    ) -> tuple[str | None, Any | None]:
+        provider = (tracker_config or {}).get("provider") or "none"
+        provider = provider.lower()
+
+        if provider in {"none", ""}:
+            return None, None
+
+        if provider == "langfuse":
+            if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+                logger.warning("Langfuse credentials missing; skipping tracker logging.")
+                return None, None
+            from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
+
+            return provider, LangfuseAdapter(
+                public_key=settings.langfuse_public_key,
+                secret_key=settings.langfuse_secret_key,
+                host=settings.langfuse_host,
+            )
+
+        if provider == "phoenix":
+            from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
+
+            ensure_phoenix_instrumentation(settings, force=True)
+            try:
+                from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
+            except ImportError as exc:
+                logger.warning("Phoenix extras not installed: %s", exc)
+                return None, None
+            return provider, PhoenixAdapter(endpoint=settings.phoenix_endpoint)
+
+        if provider == "mlflow":
+            if not settings.mlflow_tracking_uri:
+                logger.warning("MLflow tracking URI missing; skipping tracker logging.")
+                return None, None
+            try:
+                from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
+            except ImportError as exc:
+                logger.warning("MLflow adapter unavailable: %s", exc)
+                return None, None
+            return provider, MLflowAdapter(
+                tracking_uri=settings.mlflow_tracking_uri,
+                experiment_name=settings.mlflow_experiment_name,
+            )
+
+        logger.warning("Unknown tracker provider: %s", provider)
+        return None, None
+
+    @staticmethod
+    def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
+        base = endpoint.rstrip("/")
+        suffix = "/v1/traces"
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+        return f"{base.rstrip('/')}/#/traces/{trace_id}"
+
+    def _build_retriever(
+        self,
+        config: dict[str, Any],
+        settings: Settings,
+    ) -> tuple[Any, list[str], int, str, str]:
+        mode = str(config.get("mode") or "").lower()
+        if mode not in {"bm25", "hybrid"}:
+            raise ValueError(f"Unsupported retriever mode: {mode}")
+
+        docs_path = config.get("docs_path") or config.get("documents_path") or config.get("docs")
+        if not docs_path:
+            raise ValueError("Retriever docs_path is required.")
+
+        path = Path(str(docs_path))
+        if not path.exists():
+            raise ValueError(f"Retriever docs_path not found: {path}")
+
+        documents, doc_ids = self._load_retriever_documents(path)
+
+        try:
+            from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("Korean NLP dependencies not available.") from exc
+
+        toolkit = KoreanNLPToolkit()
+        retriever = toolkit.build_retriever(documents, use_hybrid=mode == "hybrid", verbose=False)
+        if retriever is None:
+            raise RuntimeError("Retriever initialization failed.")
+
+        top_k = int(config.get("top_k") or 5)
+        return retriever, doc_ids, top_k, mode, str(path)
+
+    def _load_retriever_documents(self, file_path: Path) -> tuple[list[str], list[str]]:
+        suffix = file_path.suffix.lower()
+        if suffix == ".jsonl":
+            items = self._load_retriever_jsonl(file_path)
+        elif suffix == ".json":
+            items = self._load_retriever_json(file_path)
+        else:
+            items = self._load_retriever_text(file_path)
+
+        documents: list[str] = []
+        doc_ids: list[str] = []
+
+        for idx, item in enumerate(items, start=1):
+            content, doc_id = self._normalize_document_item(item, idx)
+            if not content:
+                continue
+            documents.append(content)
+            doc_ids.append(doc_id)
+
+        if not documents:
+            raise ValueError("Retriever documents are empty.")
+
+        return documents, doc_ids
+
+    @staticmethod
+    def _load_retriever_json(file_path: Path) -> list[Any]:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and "documents" in payload:
+            items = payload["documents"]
+        else:
+            items = payload
+        if not isinstance(items, list):
+            raise ValueError("Retriever JSON must be a list or contain 'documents'.")
+        return items
+
+    @staticmethod
+    def _load_retriever_jsonl(file_path: Path) -> list[Any]:
+        items: list[Any] = []
+        with file_path.open(encoding="utf-8") as handle:
+            for idx, line in enumerate(handle, start=1):
+                raw = line.strip()
+                if not raw:
+                    continue
+                try:
+                    items.append(json.loads(raw))
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"Invalid JSONL at line {idx}.") from exc
+        return items
+
+    @staticmethod
+    def _load_retriever_text(file_path: Path) -> list[str]:
+        items: list[str] = []
+        with file_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                content = line.strip()
+                if content:
+                    items.append(content)
+        return items
+
+    @staticmethod
+    def _normalize_document_item(item: Any, index: int) -> tuple[str | None, str]:
+        if isinstance(item, str):
+            return item, f"doc_{index}"
+        if isinstance(item, dict):
+            content = item.get("content") or item.get("text") or item.get("document")
+            doc_id = item.get("doc_id") or item.get("id") or f"doc_{index}"
+            return (str(content) if isinstance(content, str) else None, str(doc_id))
+        return None, f"doc_{index}"
+
+    async def run_evaluation(
         self,
         request: EvalRequest,
         *,
@@ -158,25 +320,95 @@ class WebUIAdapter:
         """평가 실행.
 
         Args:
-            request: 평가 요청
-            on_progress: 진행률 콜백
+            request: 평가 실행 요청
+            on_progress: 진행률 콜백 함수
 
         Returns:
-            평가 결과
-
-        Raises:
-            RuntimeError: 필수 컴포넌트가 설정되지 않은 경우
+            평가 실행 결과
         """
         if self._evaluator is None:
             raise RuntimeError("Evaluator not configured")
-        if self._llm_adapter is None:
-            raise RuntimeError("LLM adapter not configured")
-        if self._data_loader is None:
-            raise RuntimeError("Data loader not configured")
 
-        # 1. 데이터셋 로드
+        # LLM Adapter Resolution
+        llm_adapter = self._get_llm_for_model(request.model_name)
+        if llm_adapter is None:
+            if self._llm_adapter is None:
+                raise RuntimeError("LLM adapter not configured")
+            llm_adapter = self._llm_adapter
+            logger.warning(f"Using default LLM adapter instead of requested {request.model_name}")
+
+        # 1. 데이터셋 로드 (비동기 처리)
         logger.info(f"Loading dataset from: {request.dataset_path}")
-        dataset = self._data_loader.load(request.dataset_path)
+        from evalvault.adapters.outbound.dataset import get_loader
+
+        try:
+            loader = get_loader(request.dataset_path)
+            # 파일 I/O는 스레드 풀에서 실행
+            dataset = await asyncio.to_thread(loader.load, request.dataset_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load dataset: {e}")
+
+        settings = self._settings or Settings()
+        tracker_provider, tracker = self._get_tracker(settings, request.tracker_config)
+
+        retriever_instance = None
+        retriever_doc_ids: list[str] | None = None
+        retriever_top_k = 5
+        retriever_mode = None
+        retriever_docs_path = None
+        if request.retriever_config:
+            try:
+                (
+                    retriever_instance,
+                    retriever_doc_ids,
+                    retriever_top_k,
+                    retriever_mode,
+                    retriever_docs_path,
+                ) = self._build_retriever(request.retriever_config, settings)
+            except Exception as exc:
+                logger.warning("Failed to initialize retriever: %s", exc)
+                raise
+
+        memory_config = request.memory_config or {}
+        memory_enabled = bool(memory_config.get("enabled"))
+        memory_domain = memory_config.get("domain") or dataset.metadata.get("domain") or "default"
+        memory_language = memory_config.get("language") or "ko"
+        memory_augment = bool(memory_config.get("augment_context"))
+        memory_db_path = memory_config.get("db_path") or "evalvault_memory.db"
+        memory_evaluator = None
+
+        memory_active = False
+        if memory_enabled:
+            try:
+                from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
+                    SQLiteDomainMemoryAdapter,
+                )
+                from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import (
+                    PhoenixTracerAdapter,
+                )
+                from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
+
+                tracer = PhoenixTracerAdapter() if tracker_provider == "phoenix" else None
+                memory_adapter = SQLiteDomainMemoryAdapter(memory_db_path)
+                memory_evaluator = MemoryAwareEvaluator(
+                    evaluator=self._evaluator,
+                    memory_port=memory_adapter,
+                    tracer=tracer,
+                )
+                memory_active = True
+                if memory_augment:
+                    for test_case in dataset.test_cases:
+                        augmented = memory_evaluator.augment_context_with_facts(
+                            question=test_case.question,
+                            original_context="",
+                            domain=memory_domain,
+                            language=memory_language,
+                        ).strip()
+                        if augmented and augmented not in test_case.contexts:
+                            test_case.contexts.append(augmented)
+            except Exception as exc:
+                logger.warning("Domain memory setup failed: %s", exc)
+                memory_evaluator = None
 
         # 2. 진행률 초기화
         if on_progress:
@@ -190,28 +422,98 @@ class WebUIAdapter:
                 )
             )
 
-        # 3. 평가 실행 (비동기 -> 동기 변환)
+        # 3. 평가 실행
         logger.info(f"Starting evaluation with metrics: {request.metrics}")
 
-        async def run_async_evaluation():
-            return await self._evaluator.evaluate(
-                dataset=dataset,
-                metrics=request.metrics,
-                llm=self._llm_adapter,
-                thresholds=request.thresholds or {},
-                parallel=True,
-                batch_size=5,
-            )
+        def adaptor_progress(current: int, total: int, message: str):
+            if on_progress:
+                on_progress(
+                    EvalProgress(
+                        current=current,
+                        total=total,
+                        current_metric=message,
+                        percent=round((current / total) * 100, 1) if total > 0 else 0,
+                        status="running",
+                    )
+                )
 
-        result = asyncio.run(run_async_evaluation())
+        try:
+            if memory_evaluator and memory_active:
+                result = await memory_evaluator.evaluate_with_memory(
+                    dataset=dataset,
+                    metrics=request.metrics,
+                    llm=llm_adapter,
+                    thresholds=request.thresholds or {},
+                    parallel=request.parallel,
+                    batch_size=request.batch_size,
+                    domain=memory_domain,
+                    language=memory_language,
+                    retriever=retriever_instance,
+                    retriever_top_k=retriever_top_k,
+                    retriever_doc_ids=retriever_doc_ids,
+                    on_progress=adaptor_progress,
+                )
+            else:
+                result = await self._evaluator.evaluate(
+                    dataset=dataset,
+                    metrics=request.metrics,
+                    llm=llm_adapter,
+                    thresholds=request.thresholds or {},
+                    parallel=request.parallel,
+                    batch_size=request.batch_size,
+                    retriever=retriever_instance,
+                    retriever_top_k=retriever_top_k,
+                    retriever_doc_ids=retriever_doc_ids,
+                    on_progress=adaptor_progress,
+                )
+
+        except Exception as e:
+            logger.error(f"Evaluation failed: {e}")
+            if on_progress:
+                on_progress(EvalProgress(0, 0, "", 0.0, "failed", str(e)))
+            raise e
+
+        result.tracker_metadata.setdefault("run_mode", "web")
+        if request.prompt_config:
+            result.tracker_metadata["prompt_config"] = request.prompt_config
+        if retriever_instance:
+            result.tracker_metadata["retriever"] = {
+                "mode": retriever_mode,
+                "docs_path": retriever_docs_path,
+                "top_k": retriever_top_k,
+            }
+        if memory_enabled:
+            result.tracker_metadata["domain_memory"] = {
+                "enabled": memory_active,
+                "domain": memory_domain,
+                "language": memory_language,
+                "augment_context": memory_augment,
+            }
+
+        if tracker and tracker_provider:
+            try:
+                trace_id = tracker.log_evaluation_run(result)
+                if tracker_provider == "phoenix":
+                    endpoint = settings.phoenix_endpoint or "http://localhost:6006/v1/traces"
+                    phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+                    phoenix_meta.update(
+                        {
+                            "trace_id": trace_id,
+                            "endpoint": endpoint,
+                            "trace_url": self._build_phoenix_trace_url(endpoint, trace_id),
+                            "schema_version": 2,
+                        }
+                    )
+            except Exception as exc:
+                logger.warning("Tracker logging failed: %s", exc)
 
         # 4. 완료 진행률 콜백
         if on_progress:
             on_progress(
                 EvalProgress(
-                    current=result.total_test_cases,
-                    total=result.total_test_cases,
-                    current_metric="",
+                    current=len(dataset.test_cases),
+                    total=len(dataset.test_cases),
+                    current_metric="all",
                     percent=100.0,
                     status="completed",
                 )
@@ -259,6 +561,7 @@ class WebUIAdapter:
                     model_name=run.model_name,
                     pass_rate=run.pass_rate,
                     total_test_cases=run.total_test_cases,
+                    passed_test_cases=run.passed_test_cases,
                     started_at=run.started_at,
                     finished_at=run.finished_at,
                     metrics_evaluated=run.metrics_evaluated,
@@ -767,6 +1070,142 @@ class WebUIAdapter:
             metrics_to_analyze=metrics_to_analyze,
             thresholds=thresholds or run.thresholds,
         )
+
+    def list_datasets(self) -> list[dict[str, str | int]]:
+        """사용 가능한 데이터셋 목록 조회."""
+        datasets = []
+        data_dirs = ["data/datasets", "data/inputs", "."]
+
+        for dir_path in data_dirs:
+            path = Path(dir_path)
+            if not path.exists():
+                continue
+
+            for file in path.iterdir():
+                if file.suffix.lower() in [".json", ".csv", ".xlsx", ".xls"]:
+                    datasets.append(
+                        {
+                            "name": file.name,
+                            "path": str(file.absolute()),
+                            "type": file.suffix[1:],
+                            "size": file.stat().st_size,
+                        }
+                    )
+        return datasets
+
+    def save_dataset_file(self, filename: str, content: bytes) -> str:
+        """데이터셋 파일 저장.
+
+        Args:
+            filename: 파일명
+            content: 파일 내용
+
+        Returns:
+            저장된 파일 경로
+        """
+        save_dir = Path("data/datasets")
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = save_dir / filename
+        file_path.write_bytes(content)
+
+        return str(file_path.absolute())
+
+    def list_models(self, provider: str | None = None) -> list[dict[str, str]]:
+        """사용 가능한 모델 목록 조회."""
+        settings = self._settings or Settings()
+        provider_key = provider.lower() if provider else None
+
+        if provider_key == "openai":
+            return self._list_openai_models()
+        if provider_key == "ollama":
+            return self._list_ollama_models(settings)
+        if provider_key:
+            return self._list_other_models(provider_key)
+
+        models: list[dict[str, str]] = []
+        models.extend(self._list_ollama_models(settings))
+        models.extend(self._list_openai_models())
+        models.extend(self._list_other_models())
+        return models
+
+    @staticmethod
+    def _is_embedding_model(model_name: str) -> bool:
+        markers = ("embedding", "embed", "bge", "e5", "gte", "instructor")
+        lowered = model_name.lower()
+        return any(marker in lowered for marker in markers)
+
+    def _list_openai_models(self) -> list[dict[str, str | bool]]:
+        return [{"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True}]
+
+    def _list_ollama_models(self, settings: Settings) -> list[dict[str, str | bool]]:
+        allowlist = self._get_ollama_tool_allowlist(settings)
+        models = self._fetch_ollama_models(settings, allowlist)
+        if models:
+            return models
+
+        fallback = settings.ollama_model
+        if fallback and not self._is_embedding_model(fallback):
+            return [
+                {
+                    "id": f"ollama/{fallback}",
+                    "name": fallback,
+                    "supports_tools": self._matches_tool_allowlist(fallback, allowlist),
+                }
+            ]
+        return []
+
+    def _fetch_ollama_models(
+        self,
+        settings: Settings,
+        allowlist: set[str],
+    ) -> list[dict[str, str | bool]]:
+        base_url = settings.ollama_base_url.rstrip("/")
+        url = f"{base_url}/api/tags"
+
+        try:
+            with urlopen(url, timeout=settings.ollama_timeout) as response:
+                payload = json.load(response)
+        except Exception as exc:
+            logger.warning("Failed to fetch Ollama models: %s", exc)
+            return []
+
+        items = payload.get("models", [])
+        names = []
+        for item in items:
+            name = item.get("name")
+            if not name or self._is_embedding_model(name):
+                continue
+            names.append(name)
+
+        unique_names = sorted(set(names))
+        return [
+            {
+                "id": f"ollama/{name}",
+                "name": name,
+                "supports_tools": self._matches_tool_allowlist(name, allowlist),
+            }
+            for name in unique_names
+        ]
+
+    @staticmethod
+    def _get_ollama_tool_allowlist(settings: Settings) -> set[str]:
+        raw = settings.ollama_tool_models or ""
+        return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+    @staticmethod
+    def _matches_tool_allowlist(model_name: str, allowlist: set[str]) -> bool:
+        if not allowlist:
+            return False
+        lowered = model_name.lower()
+        return any(lowered == entry or lowered.startswith(f"{entry}:") for entry in allowlist)
+
+    def _list_other_models(self, provider: str | None = None) -> list[dict[str, str]]:
+        if provider and provider not in {"anthropic", "azure"}:
+            return []
+        return [
+            {"id": "anthropic/claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
+        ]
 
 
 def create_adapter() -> WebUIAdapter:

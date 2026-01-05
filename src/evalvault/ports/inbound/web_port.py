@@ -17,9 +17,15 @@ class EvalRequest:
 
     dataset_path: str
     metrics: list[str]
-    model_name: str = "gpt-5-nano"
+    model_name: str = "openai/gpt-5-nano"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)
+    parallel: bool = True
+    batch_size: int = 5
+    retriever_config: dict[str, Any] | None = None
+    memory_config: dict[str, Any] | None = None
+    tracker_config: dict[str, Any] | None = None
+    prompt_config: dict[str, Any] | None = None
 
 
 @dataclass
@@ -46,6 +52,7 @@ class RunSummary:
     started_at: datetime
     finished_at: datetime | None
     metrics_evaluated: list[str]
+    passed_test_cases: int = 0
     run_mode: str | None = None
     total_tokens: int = 0
     total_cost_usd: float | None = None
@@ -76,7 +83,7 @@ class WebUIPort(Protocol):
     CLI와 마찬가지로 도메인 서비스를 호출하여 평가, 분석, 보고서 생성 등을 수행합니다.
     """
 
-    def run_evaluation(
+    async def run_evaluation(
         self,
         request: EvalRequest,
         *,

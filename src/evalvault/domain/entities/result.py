@@ -177,6 +177,7 @@ class EvaluationRun:
             "total_cost_usd": self.total_cost_usd,
             "duration_seconds": self.duration_seconds,
             "tracker_metadata": self.tracker_metadata,
+            "metrics_evaluated": list(self.metrics_evaluated),
         }
         phoenix_meta = self.tracker_metadata.get("phoenix")
         if isinstance(phoenix_meta, dict):

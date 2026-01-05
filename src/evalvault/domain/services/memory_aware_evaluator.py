@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 
 from evalvault.domain.entities import Dataset, EvaluationRun
@@ -40,6 +40,7 @@ class MemoryAwareEvaluator:
         retriever: RetrieverPort | None = None,
         retriever_top_k: int = 5,
         retriever_doc_ids: Sequence[str] | None = None,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> EvaluationRun:
         """Run evaluation after adjusting thresholds with memory reliability."""
 
@@ -63,6 +64,7 @@ class MemoryAwareEvaluator:
             retriever=retriever,
             retriever_top_k=retriever_top_k,
             retriever_doc_ids=retriever_doc_ids,
+            on_progress=on_progress,
         )
 
     def augment_context_with_facts(

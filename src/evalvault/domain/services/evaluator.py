@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+import math
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -108,6 +109,19 @@ class RagasEvaluator:
         "semantic_similarity": ["response", "reference"],
     }
 
+    # Estimated pricing (USD per 1M tokens) as of Jan 2025
+    # Format: (input_price, output_price)
+    MODEL_PRICING = {
+        "gpt-4o": (2.50, 10.00),
+        "gpt-4o-mini": (0.15, 0.60),
+        "gpt-4-turbo": (10.00, 30.00),
+        "gpt-3.5-turbo": (0.50, 1.50),
+        "openai/gpt-4o": (2.50, 10.00),
+        "openai/gpt-4o-mini": (0.15, 0.60),
+        "gpt-5-nano": (5.00, 15.00),  # Hypothetical project model
+        "openai/gpt-5-nano": (5.00, 15.00),
+    }
+
     async def evaluate(
         self,
         dataset: Dataset,
@@ -119,6 +133,7 @@ class RagasEvaluator:
         retriever: RetrieverPort | None = None,
         retriever_top_k: int = 5,
         retriever_doc_ids: Sequence[str] | None = None,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -194,6 +209,7 @@ class RagasEvaluator:
                 llm=llm,
                 parallel=parallel,
                 batch_size=batch_size,
+                on_progress=on_progress,
             )
 
         # Evaluate with custom metrics (if any custom metrics)
@@ -261,6 +277,7 @@ class RagasEvaluator:
         llm: LLMPort,
         parallel: bool = False,
         batch_size: int = 5,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> dict[str, TestCaseEvalResult]:
         """Ragas로 실제 평가 수행.
 
@@ -312,6 +329,7 @@ class RagasEvaluator:
                 ragas_metrics=ragas_metrics,
                 llm=llm,
                 batch_size=batch_size,
+                on_progress=on_progress,
             )
         else:
             return await self._evaluate_sequential(
@@ -319,6 +337,7 @@ class RagasEvaluator:
                 ragas_samples=ragas_samples,
                 ragas_metrics=ragas_metrics,
                 llm=llm,
+                on_progress=on_progress,
             )
 
     async def _evaluate_sequential(
@@ -327,9 +346,11 @@ class RagasEvaluator:
         ragas_samples: list,
         ragas_metrics: list,
         llm: LLMPort,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> dict[str, TestCaseEvalResult]:
         """순차 평가 (기존 로직)."""
         results: dict[str, TestCaseEvalResult] = {}
+        total = len(ragas_samples)
 
         for idx, sample in enumerate(ragas_samples):
             test_case_id = dataset.test_cases[idx].id
@@ -356,16 +377,24 @@ class RagasEvaluator:
                     test_case_tokens,
                 ) = llm.get_and_reset_token_usage()
 
+            # Calculate cost
+            cost_usd = self._calculate_cost(
+                llm.get_model_name(), test_case_prompt_tokens, test_case_completion_tokens
+            )
+
             results[test_case_id] = TestCaseEvalResult(
                 scores=scores,
                 tokens_used=test_case_tokens,
                 prompt_tokens=test_case_prompt_tokens,
                 completion_tokens=test_case_completion_tokens,
-                cost_usd=0.0,
+                cost_usd=cost_usd,
                 started_at=test_case_started_at,
                 finished_at=test_case_finished_at,
                 latency_ms=latency_ms,
             )
+
+            if on_progress:
+                on_progress(idx + 1, total, f"Evaluated {test_case_id}")
 
         return results
 
@@ -376,6 +405,7 @@ class RagasEvaluator:
         ragas_metrics: list,
         llm: LLMPort,
         batch_size: int = 5,
+        on_progress: Callable[[int, int, str], None] | None = None,
     ) -> dict[str, TestCaseEvalResult]:
         """병렬 평가 (배치 단위로 동시 실행).
 
@@ -392,6 +422,7 @@ class RagasEvaluator:
         results: dict[str, TestCaseEvalResult] = {}
         sample_pairs = list(zip(dataset.test_cases, ragas_samples, strict=True))
         total_samples = len(sample_pairs)
+        completed_count = 0
 
         async def worker(pair: tuple[TestCase, Any]):
             test_case, sample = pair
@@ -409,6 +440,12 @@ class RagasEvaluator:
                 error = exc
             finished_at = datetime.now()
             latency_ms = int((finished_at - started_at).total_seconds() * 1000)
+
+            nonlocal completed_count
+            completed_count += 1
+            if on_progress:
+                on_progress(completed_count, total_samples, f"Evaluated {test_case.id}")
+
             return (
                 test_case.id,
                 ParallelSampleOutcome(
@@ -461,6 +498,11 @@ class RagasEvaluator:
                     results[test_case_id].tokens_used = avg_tokens
                     results[test_case_id].prompt_tokens = avg_prompt
                     results[test_case_id].completion_tokens = avg_completion
+                    results[test_case_id].cost_usd = self._calculate_cost(
+                        llm.get_model_name(),
+                        avg_prompt,
+                        avg_completion,
+                    )
 
         return results
 
@@ -496,9 +538,16 @@ class RagasEvaluator:
                         k: v for k, v in all_args.items() if k in required_args and v is not None
                     }
                     result = await metric.ascore(**kwargs)
+                    ragas_input = kwargs
                 elif hasattr(metric, "single_turn_ascore"):
                     # Legacy Ragas <0.4 API
                     result = await metric.single_turn_ascore(sample)
+                    ragas_input = {
+                        "user_input": sample.user_input,
+                        "response": sample.response,
+                        "retrieved_contexts": sample.retrieved_contexts,
+                        "reference": sample.reference,
+                    }
                 else:
                     raise AttributeError(
                         f"{metric.__class__.__name__} does not support scoring API."
@@ -506,13 +555,35 @@ class RagasEvaluator:
 
                 # Handle MetricResult (v0.4+), score attr, or raw float
                 if hasattr(result, "value"):
-                    scores[metric.name] = result.value
+                    score_value = result.value
                 elif hasattr(result, "score"):
-                    scores[metric.name] = result.score
+                    score_value = result.score
                 else:
-                    scores[metric.name] = float(result)
-            except Exception:
-                # 개별 메트릭 실패 시 0.0으로 처리
+                    score_value = result
+
+                try:
+                    score_value = float(score_value)
+                except (TypeError, ValueError):
+                    logger.warning(
+                        "Metric %s returned non-numeric score (%r). Using 0.0.",
+                        metric.name,
+                        score_value,
+                    )
+                    score_value = 0.0
+
+                if math.isnan(score_value):
+                    logger.warning(
+                        "Metric %s returned NaN. Using 0.0. ragas_input=%s ragas_output=%r",
+                        metric.name,
+                        ragas_input,
+                        result,
+                    )
+                    score_value = 0.0
+
+                scores[metric.name] = score_value
+            except Exception as e:
+                # 개별 메트릭 실패 시 로그 출력 후 0.0으로 처리
+                logger.error(f"Failed to score metric {metric.name}: {e}", exc_info=True)
                 scores[metric.name] = 0.0
 
         return scores
@@ -570,3 +641,19 @@ class RagasEvaluator:
             )
 
         return results
+
+    def _calculate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
+        """Calculate estimated cost in USD based on model pricing."""
+        # Find matching model key (exact or substring match)
+        price_key = "openai/gpt-4o"  # Default fallback
+        for key in self.MODEL_PRICING:
+            if key in model_name or model_name in key:
+                price_key = key
+                break
+
+        input_price, output_price = self.MODEL_PRICING.get(price_key, (0.0, 0.0))
+
+        cost = (prompt_tokens / 1_000_000 * input_price) + (
+            completion_tokens / 1_000_000 * output_price
+        )
+        return cost
