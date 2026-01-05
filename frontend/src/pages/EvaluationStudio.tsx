@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import {
     type DatasetItem,
@@ -13,6 +13,8 @@ import {
 } from "../services/api";
 import { Play, Database, Brain, Target, CheckCircle2, AlertCircle, Settings, Upload, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+const TOOL_REQUIRED_METRICS = new Set(["factual_correctness"]);
 
 export function EvaluationStudio() {
     const navigate = useNavigate();
@@ -51,6 +53,17 @@ export function EvaluationStudio() {
     const [progress, setProgress] = useState(0);
     const [progressMessage, setProgressMessage] = useState("Initializing...");
     const [logs, setLogs] = useState<string[]>([]);
+
+    const selectedModelInfo = useMemo(
+        () => models.find((model) => model.id === selectedModel),
+        [models, selectedModel],
+    );
+    const toolRequired = useMemo(
+        () => Array.from(selectedMetrics).some((metric) => TOOL_REQUIRED_METRICS.has(metric)),
+        [selectedMetrics],
+    );
+    const toolSupported = selectedModelInfo?.supports_tools ?? false;
+    const showToolWarning = toolRequired && !toolSupported;
 
     const handleUpload = async () => {
         if (!uploadFile) return;
@@ -381,9 +394,18 @@ export function EvaluationStudio() {
                             <Target className="w-5 h-5 text-primary" />
                             Select Metrics
                         </h2>
+                        {showToolWarning && (
+                            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                                선택한 모델은 tool/function calling 미지원입니다. <span className="font-semibold">factual_correctness</span>는
+                                tool 호출이 필요할 수 있어 실패할 수 있습니다. Ollama에서는
+                                <code className="mx-1 rounded bg-amber-100 px-1 font-mono">OLLAMA_TOOL_MODELS</code>에
+                                지원 모델을 등록하거나 Tools 배지가 있는 모델로 변경하세요.
+                            </div>
+                        )}
                         <div className="flex flex-wrap gap-3">
                             {availableMetrics.map((metric) => {
                                 const isSelected = selectedMetrics.has(metric);
+                                const needsTools = TOOL_REQUIRED_METRICS.has(metric);
                                 return (
                                     <button
                                         key={metric}
@@ -393,7 +415,14 @@ export function EvaluationStudio() {
                                             : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
                                             }`}
                                     >
-                                        {metric}
+                                        <span className="inline-flex items-center gap-2">
+                                            {metric}
+                                            {needsTools && (
+                                                <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/15 text-amber-700">
+                                                    Tools
+                                                </span>
+                                            )}
+                                        </span>
                                     </button>
                                 );
                             })}
