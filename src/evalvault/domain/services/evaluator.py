@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
 from evalvault.domain.entities import Dataset, EvaluationRun, MetricScore, TestCase, TestCaseResult
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.services.batch_executor import run_in_batches
+from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 from evalvault.ports.outbound.llm_port import LLMPort
@@ -122,6 +123,9 @@ class RagasEvaluator:
         "openai/gpt-5-nano": (5.00, 15.00),
     }
 
+    def __init__(self, *, preprocessor: DatasetPreprocessor | None = None) -> None:
+        self._preprocessor = preprocessor or DatasetPreprocessor()
+
     async def evaluate(
         self,
         dataset: Dataset,
@@ -187,6 +191,17 @@ class RagasEvaluator:
                 doc_ids=retriever_doc_ids,
             )
         run.retrieval_metadata = retrieval_metadata
+
+        preprocess_report = self._preprocessor.apply(dataset, metrics=metrics)
+        if preprocess_report.has_findings():
+            run.tracker_metadata["dataset_preprocess"] = preprocess_report.to_dict()
+        if run.retrieval_metadata:
+            kept_ids = {test_case.id for test_case in dataset.test_cases}
+            run.retrieval_metadata = {
+                case_id: meta
+                for case_id, meta in run.retrieval_metadata.items()
+                if case_id in kept_ids
+            }
 
         # Handle empty dataset
         if len(dataset.test_cases) == 0:

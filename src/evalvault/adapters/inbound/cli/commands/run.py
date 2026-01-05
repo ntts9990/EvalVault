@@ -52,6 +52,7 @@ from .run_helpers import (
     _save_to_db,
     _write_stage_events_jsonl,
     enrich_dataset_with_memory,
+    format_dataset_preprocess_summary,
     load_knowledge_graph,
     load_retriever_documents,
     log_phoenix_traces,
@@ -1013,6 +1014,12 @@ def register_run_commands(
         phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
 
         result.tracker_metadata.setdefault("run_mode", preset.name)
+
+        preprocess_summary = format_dataset_preprocess_summary(
+            result.tracker_metadata.get("dataset_preprocess")
+        )
+        if preprocess_summary:
+            console.print(f"[dim]{preprocess_summary}[/dim]")
 
         retriever_metadata: dict[str, dict[str, Any]] | None = result.retrieval_metadata or None
         if retriever_instance and retriever_metadata:

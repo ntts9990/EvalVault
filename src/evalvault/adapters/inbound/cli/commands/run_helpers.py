@@ -34,6 +34,7 @@ from evalvault.domain.entities import (
     StageEvent,
 )
 from evalvault.domain.services import retriever_context
+from evalvault.domain.services.dataset_preprocessor import merge_preprocess_summaries
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.prompt_manifest import (
@@ -132,6 +133,56 @@ def _display_results(result, console: Console, verbose: bool = False) -> None:
                 console.print(
                     f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                 )
+
+
+def format_dataset_preprocess_summary(summary: dict[str, Any] | None) -> str | None:
+    """Build a short human-readable summary for dataset preprocessing output."""
+
+    if not summary:
+        return None
+
+    reference_filled = int(summary.get("references_filled_from_answer", 0) or 0) + int(
+        summary.get("references_filled_from_context", 0) or 0
+    )
+    contexts_cleaned = int(summary.get("contexts_removed", 0) or 0) + int(
+        summary.get("contexts_deduped", 0) or 0
+    )
+    contexts_trimmed = int(summary.get("contexts_truncated", 0) or 0) + int(
+        summary.get("contexts_limited", 0) or 0
+    )
+    references_missing = int(summary.get("references_missing", 0) or 0)
+    references_short = int(summary.get("references_short", 0) or 0)
+    dropped_cases = int(summary.get("dropped_cases", 0) or 0)
+    empty_questions = int(summary.get("empty_questions", 0) or 0)
+    empty_answers = int(summary.get("empty_answers", 0) or 0)
+
+    parts: list[str] = []
+    if reference_filled:
+        parts.append(
+            "reference 보강 "
+            f"{reference_filled}건(답변 {summary.get('references_filled_from_answer', 0)}"
+            f"/컨텍스트 {summary.get('references_filled_from_context', 0)})"
+        )
+    reference_issues = max(0, references_missing + references_short - reference_filled)
+    if reference_issues:
+        parts.append(f"reference 부족 {reference_issues}건")
+    if contexts_cleaned or contexts_trimmed:
+        parts.append(
+            "컨텍스트 정리 "
+            f"{contexts_cleaned + contexts_trimmed}건(빈값/중복 {contexts_cleaned}"
+            f", 길이/개수 제한 {contexts_trimmed})"
+        )
+    if dropped_cases:
+        parts.append(f"케이스 제외 {dropped_cases}건")
+    if empty_questions or empty_answers:
+        parts.append(
+            "비어있는 필드 "
+            f"{empty_questions + empty_answers}건(질문 {empty_questions}/답변 {empty_answers})"
+        )
+
+    if not parts:
+        return None
+    return "데이터셋 전처리: " + ", ".join(parts)
 
 
 def _display_memory_insights(insights: dict[str, Any], console: Console) -> None:
@@ -719,6 +770,13 @@ def _merge_evaluation_runs(
                 incoming.total_cost_usd or 0.0
             )
         merged.finished_at = incoming.finished_at
+
+    merged_preprocess = merge_preprocess_summaries(
+        (merged.tracker_metadata or {}).get("dataset_preprocess"),
+        (incoming.tracker_metadata or {}).get("dataset_preprocess"),
+    )
+    if merged_preprocess:
+        merged.tracker_metadata["dataset_preprocess"] = merged_preprocess
 
     merged.dataset_name = dataset_name
     merged.dataset_version = dataset_version
