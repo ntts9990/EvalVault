@@ -348,11 +348,17 @@ class CausalAnalysisAdapter(BaseAnalysisAdapter):
 
                 # 상관 분석
                 try:
-                    correlation, p_value = stats.pearsonr(x, y)
-                    # Handle NaN (constant input)
-                    if np.isnan(correlation):
+                    x_std = float(np.std(x))
+                    y_std = float(np.std(y))
+                    if np.isclose(x_std, 0.0) or np.isclose(y_std, 0.0):
                         correlation = 0.0
                         p_value = 1.0
+                    else:
+                        correlation, p_value = stats.pearsonr(x, y)
+                        # Handle NaN (constant input)
+                        if np.isnan(correlation):
+                            correlation = 0.0
+                            p_value = 1.0
                 except Exception:
                     correlation = 0.0
                     p_value = 1.0
