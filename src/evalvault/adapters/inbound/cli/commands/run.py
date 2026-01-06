@@ -257,7 +257,6 @@ def register_run_commands(
             rich_help_panel="Run modes",
         ),
         db_path: Path | None = db_option(
-            default=None,
             help_text="Path to SQLite database file for storing results.",
         ),
         use_domain_memory: bool = typer.Option(
@@ -1296,7 +1295,6 @@ def register_run_commands(
             help="Comma-separated prompt files to capture in Phoenix metadata.",
         ),
         db_path: Path | None = db_option(
-            default=None,
             help_text="Path to SQLite database file for storing results.",
         ),
         use_domain_memory: bool = typer.Option(
@@ -1506,7 +1504,6 @@ def register_run_commands(
             help="Comma-separated prompt files to capture in Phoenix metadata.",
         ),
         db_path: Path | None = db_option(
-            default=None,
             help_text="Path to SQLite database file for storing results.",
         ),
         use_domain_memory: bool = typer.Option(
