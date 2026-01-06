@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
@@ -334,9 +334,7 @@ export function AnalysisResultView() {
                             ) : reportText ? (
                                 renderMarkdown ? (
                                     <div className="bg-background border border-border rounded-lg p-6 text-sm max-h-[60vh] overflow-auto">
-                                        <div className="prose prose-sm max-w-none">
-                                            <ReactMarkdown>{reportText}</ReactMarkdown>
-                                        </div>
+                                        <MarkdownContent text={reportText} />
                                     </div>
                                 ) : (
                                     <VirtualizedText

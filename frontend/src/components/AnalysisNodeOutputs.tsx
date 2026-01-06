@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "./MarkdownContent";
 import { VirtualizedText } from "./VirtualizedText";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -178,9 +178,7 @@ export function AnalysisNodeOutputs({
                                             />
                                         ) : (
                                             <div className="bg-background border border-border rounded-lg p-3 text-sm">
-                                                <div className="prose prose-sm max-w-none">
-                                                    <ReactMarkdown>{reportText}</ReactMarkdown>
-                                                </div>
+                                                <MarkdownContent text={reportText} />
                                             </div>
                                         )}
                                     </div>

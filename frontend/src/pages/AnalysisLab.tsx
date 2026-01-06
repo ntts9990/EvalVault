@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
     fetchAnalysisIntents,
@@ -913,9 +913,7 @@ export function AnalysisLab() {
                                         ) : reportText ? (
                                             renderMarkdown ? (
                                                 <div className="bg-background border border-border rounded-lg p-4 text-sm max-h-80 overflow-auto">
-                                                    <div className="prose prose-sm max-w-none">
-                                                        <ReactMarkdown>{reportText}</ReactMarkdown>
-                                                    </div>
+                                                    <MarkdownContent text={reportText} />
                                                 </div>
                                             ) : (
                                                 <VirtualizedText
