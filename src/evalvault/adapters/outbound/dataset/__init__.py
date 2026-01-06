@@ -5,6 +5,7 @@ from evalvault.adapters.outbound.dataset.csv_loader import CSVDatasetLoader
 from evalvault.adapters.outbound.dataset.excel_loader import ExcelDatasetLoader
 from evalvault.adapters.outbound.dataset.json_loader import JSONDatasetLoader
 from evalvault.adapters.outbound.dataset.loader_factory import get_loader, register_loader
+from evalvault.adapters.outbound.dataset.method_input_loader import MethodInputDatasetLoader
 from evalvault.adapters.outbound.dataset.streaming_loader import (
     StreamingConfig,
     StreamingCSVLoader,
@@ -21,6 +22,7 @@ __all__ = [
     "CSVDatasetLoader",
     "ExcelDatasetLoader",
     "JSONDatasetLoader",
+    "MethodInputDatasetLoader",
     "StreamingCSVLoader",
     "StreamingConfig",
     "StreamingDatasetLoader",

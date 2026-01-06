@@ -1,0 +1,27 @@
+{
+  "name": "base_questions_template",
+  "version": "1.0.0",
+  "metadata": {
+    "domain": "auto_insurance",
+    "language": "en",
+    "description": "Question-first template for method plugins"
+  },
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "question": "How is auto insurance premium calculated?",
+      "ground_truth": "Premiums depend on vehicle details, driver profile, and selected coverage.",
+      "contexts": [
+        "Premiums are calculated based on vehicle type, driver age, claim history, and coverage."
+      ],
+      "metadata": {
+        "intent": "explanation",
+        "difficulty": "medium"
+      }
+    }
+  ]
+}

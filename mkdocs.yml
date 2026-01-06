@@ -106,6 +106,7 @@ nav:
   - Guides:
     - User Guide: guides/USER_GUIDE.md
     - CLI Guide: guides/CLI_GUIDE.md
+    - Method Plugins: method_plugins.md
     - Ragas Performance Tuning: guides/RAGAS_PERFORMANCE_TUNING.md
     - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
     - Release Checklist: guides/RELEASE_CHECKLIST.md
