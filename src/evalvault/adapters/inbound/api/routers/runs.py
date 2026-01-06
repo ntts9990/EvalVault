@@ -34,6 +34,7 @@ class RunSummaryResponse(BaseModel):
 
     run_id: str
     dataset_name: str
+    project_name: str | None = None
     model_name: str
     pass_rate: float
     total_test_cases: int
@@ -41,6 +42,7 @@ class RunSummaryResponse(BaseModel):
     started_at: str  # ISO format string
     finished_at: str | None = None
     metrics_evaluated: list[str] = []
+    avg_metric_scores: dict[str, float] | None = None
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None
     phoenix_drift: float | None = None
@@ -72,6 +74,7 @@ class StartEvaluationRequest(BaseModel):
     parallel: bool = True
     batch_size: int = 5
     thresholds: dict[str, float] | None = None
+    project_name: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
@@ -309,6 +312,7 @@ async def start_evaluation_endpoint(
         parallel=request.parallel,
         batch_size=request.batch_size,
         thresholds=request.thresholds or {},
+        project_name=request.project_name,
         retriever_config=request.retriever_config,
         memory_config=request.memory_config,
         tracker_config=request.tracker_config,
@@ -419,6 +423,7 @@ def list_runs(
         {
             "run_id": s.run_id,
             "dataset_name": s.dataset_name,
+            "project_name": s.project_name,
             "model_name": s.model_name,
             "pass_rate": s.pass_rate,
             "total_test_cases": s.total_test_cases,
@@ -426,6 +431,7 @@ def list_runs(
             "started_at": s.started_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "metrics_evaluated": s.metrics_evaluated,
+            "avg_metric_scores": s.avg_metric_scores or None,
             "total_cost_usd": s.total_cost_usd,
             "phoenix_precision": s.phoenix_precision,
             "phoenix_drift": s.phoenix_drift,

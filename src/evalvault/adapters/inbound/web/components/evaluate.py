@@ -22,6 +22,7 @@ class EvaluationConfig:
     langfuse_enabled: bool = False
     parallel: bool = True
     thresholds: dict[str, float] = field(default_factory=dict)
+    project_name: str | None = None
 
     def is_valid(self) -> bool:
         """설정 유효성 검증.
@@ -49,6 +50,7 @@ class EvaluationConfig:
             model_name=self.model_name,
             langfuse_enabled=self.langfuse_enabled,
             thresholds=self.thresholds,
+            project_name=self.project_name,
         )
 
     def get_validation_errors(self) -> list[str]:

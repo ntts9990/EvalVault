@@ -7,6 +7,7 @@ import {
     fetchDatasetTemplate,
     fetchModels,
     fetchMetrics,
+    fetchRuns,
     fetchConfig,
     startEvaluation,
     uploadDataset,
@@ -28,6 +29,8 @@ export function EvaluationStudio() {
     const [selectedModel, setSelectedModel] = useState<string>("");
     const [selectedProvider, setSelectedProvider] = useState<"ollama" | "openai" | "vllm">("ollama");
     const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set(["faithfulness", "answer_relevancy"]));
+    const [projectName, setProjectName] = useState<string>("");
+    const [projectOptions, setProjectOptions] = useState<string[]>([]);
 
     // Advanced Options State
     const [retrieverMode, setRetrieverMode] = useState<"none" | "bm25" | "hybrid">("none");
@@ -113,13 +116,22 @@ export function EvaluationStudio() {
     useEffect(() => {
         async function loadOptions() {
             try {
-                const [d, met, cfg] = await Promise.all([
+                const [d, met, cfg, runList] = await Promise.all([
                     fetchDatasets(),
                     fetchMetrics(),
-                    fetchConfig().catch(() => null)
+                    fetchConfig().catch(() => null),
+                    fetchRuns().catch(() => [])
                 ]);
                 setDatasets(d);
                 setAvailableMetrics(met);
+                const projects = Array.from(
+                    new Set(
+                        runList
+                            .map(run => (run.project_name || "").trim())
+                            .filter(name => name.length > 0)
+                    )
+                ).sort((a, b) => a.localeCompare(b));
+                setProjectOptions(projects);
 
                 if (d.length > 0) setSelectedDataset(d[0].path);
 
@@ -210,6 +222,7 @@ export function EvaluationStudio() {
                 dataset_path: selectedDataset,
                 model: selectedModel,
                 metrics: Array.from(selectedMetrics),
+                project_name: projectName.trim() || undefined,
                 parallel: batchSize > 1,
                 batch_size: batchSize,
                 retriever_config: retrieverMode !== "none"
@@ -388,6 +401,39 @@ export function EvaluationStudio() {
                                         </div>
                                     </div>
                                 ))
+                            )}
+                        </div>
+                    </section>
+
+                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <Target className="w-5 h-5 text-primary" />
+                            Project Label
+                        </h2>
+                        <div className="space-y-3">
+                            <input
+                                list="project-options"
+                                value={projectName}
+                                onChange={(event) => setProjectName(event.target.value)}
+                                placeholder="e.g. Insurance QA Revamp"
+                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                            />
+                            <datalist id="project-options">
+                                {projectOptions.map((project) => (
+                                    <option key={project} value={project} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-muted-foreground">
+                                Project labels drive dashboard and report filtering.
+                            </p>
+                            {projectName && (
+                                <button
+                                    type="button"
+                                    onClick={() => setProjectName("")}
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Clear project label
+                                </button>
                             )}
                         </div>
                     </section>

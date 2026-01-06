@@ -7,7 +7,8 @@ import {
     PlayCircle,
     Brain,
     X,
-    FlaskConical
+    FlaskConical,
+    FileText
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -21,6 +22,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { icon: Brain, label: "Domain Memory", href: "/domain" },
         { icon: Database, label: "Knowledge Base", href: "/knowledge" },
         { icon: FlaskConical, label: "Analysis Lab", href: "/analysis" },
+        { icon: FileText, label: "Customer Report", href: "/reports" },
         { icon: Settings, label: "Settings", href: "/settings" },
     ];
 

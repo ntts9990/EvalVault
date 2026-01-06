@@ -479,6 +479,8 @@ class WebUIAdapter:
             raise e
 
         result.tracker_metadata.setdefault("run_mode", "web")
+        if request.project_name:
+            result.tracker_metadata["project"] = request.project_name
         if request.prompt_config:
             result.tracker_metadata["prompt_config"] = request.prompt_config
         if retriever_instance:
@@ -560,6 +562,16 @@ class WebUIAdapter:
             for run in runs:
                 prompt_entries = extract_prompt_entries(getattr(run, "tracker_metadata", None))
                 metadata = getattr(run, "tracker_metadata", {}) or {}
+                project_name = metadata.get("project") or metadata.get("project_name")
+                if isinstance(project_name, str):
+                    project_name = project_name.strip() or None
+                else:
+                    project_name = None
+                avg_metric_scores = {}
+                for metric_name in run.metrics_evaluated:
+                    avg_score = run.get_avg_score(metric_name)
+                    if avg_score is not None:
+                        avg_metric_scores[metric_name] = avg_score
                 summary = RunSummary(
                     run_id=run.run_id,
                     dataset_name=run.dataset_name,
@@ -574,6 +586,8 @@ class WebUIAdapter:
                     total_tokens=run.total_tokens,
                     total_cost_usd=run.total_cost_usd,
                     phoenix_prompts=prompt_entries,
+                    project_name=project_name,
+                    avg_metric_scores=avg_metric_scores,
                 )
 
                 if resolver and resolver.can_resolve(getattr(run, "tracker_metadata", None)):
@@ -590,6 +604,10 @@ class WebUIAdapter:
                         continue
                     if filters.model_name and filters.model_name != summary.model_name:
                         continue
+                    if filters.date_from and summary.started_at < filters.date_from:
+                        continue
+                    if filters.date_to and summary.started_at > filters.date_to:
+                        continue
                     if filters.min_pass_rate and summary.pass_rate < filters.min_pass_rate:
                         continue
                     if filters.max_pass_rate and summary.pass_rate > filters.max_pass_rate:
@@ -598,6 +616,10 @@ class WebUIAdapter:
                         not summary.run_mode or summary.run_mode.lower() != filters.run_mode.lower()
                     ):
                         continue
+                    if filters.project_names:
+                        allowed = {name.strip() for name in filters.project_names if name.strip()}
+                        if summary.project_name not in allowed:
+                            continue
 
                 summaries.append(summary)
 
@@ -791,6 +813,7 @@ class WebUIAdapter:
         batch_size: int = 5,
         on_progress: Callable[[EvalProgress], None] | None = None,
         run_mode: str | None = None,
+        project_name: str | None = None,
     ) -> EvaluationRun:
         """데이터셋 객체로 직접 평가 실행.
 
@@ -855,6 +878,8 @@ class WebUIAdapter:
 
         metadata = getattr(result, "tracker_metadata", None) or {}
         metadata.setdefault("run_mode", (run_mode or "full"))
+        if project_name:
+            metadata["project"] = project_name
         result.tracker_metadata = metadata
 
         # 결과 저장

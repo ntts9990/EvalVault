@@ -187,6 +187,11 @@ class EvaluationRun:
         run_mode = self.tracker_metadata.get("run_mode")
         if isinstance(run_mode, str) and run_mode:
             summary["run_mode"] = run_mode
+        project_name = self.tracker_metadata.get("project") or self.tracker_metadata.get(
+            "project_name"
+        )
+        if isinstance(project_name, str) and project_name:
+            summary["project_name"] = project_name
         # 각 메트릭 평균
         for metric in self.metrics_evaluated:
             avg = self.get_avg_score(metric)

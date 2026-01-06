@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../config";
 export interface RunSummary {
     run_id: string;
     dataset_name: string;
+    project_name?: string | null;
     model_name: string;
     pass_rate: number;
     total_test_cases: number;
@@ -10,6 +11,7 @@ export interface RunSummary {
     started_at: string;
     finished_at: string | null;
     metrics_evaluated: string[];
+    avg_metric_scores?: Record<string, number> | null;
     total_cost_usd: number | null;
     phoenix_precision: number | null;
     phoenix_drift: number | null;
@@ -80,6 +82,7 @@ export interface StartEvaluationRequest {
     parallel?: boolean;
     batch_size?: number;
     thresholds?: Record<string, number>;
+    project_name?: string;
     retriever_config?: Record<string, any>;
     memory_config?: Record<string, any>;
     tracker_config?: Record<string, any>;

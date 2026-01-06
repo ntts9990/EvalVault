@@ -22,6 +22,7 @@ class EvalRequest:
     thresholds: dict[str, float] = field(default_factory=dict)
     parallel: bool = True
     batch_size: int = 5
+    project_name: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
@@ -61,6 +62,8 @@ class RunSummary:
     phoenix_experiment_url: str | None = None
     phoenix_dataset_url: str | None = None
     phoenix_prompts: list[dict[str, Any]] = field(default_factory=list)
+    project_name: str | None = None
+    avg_metric_scores: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,6 +77,7 @@ class RunFilters:
     min_pass_rate: float | None = None
     max_pass_rate: float | None = None
     run_mode: str | None = None
+    project_names: list[str] = field(default_factory=list)
 
 
 class WebUIPort(Protocol):
