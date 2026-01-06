@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
 import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
@@ -22,6 +23,11 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     running: { label: "실행 중", color: "text-blue-600" },
     pending: { label: "대기", color: "text-muted-foreground" },
 };
+
+function isPrioritySummary(value: any): value is PrioritySummary {
+    if (!value || typeof value !== "object") return false;
+    return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
+}
 
 function downloadText(filename: string, content: string, type: string) {
     const blob = new Blob([content], { type });
@@ -140,6 +146,17 @@ export function AnalysisResultView() {
         if (typeof window === "undefined") return;
         window.open(window.location.href, "_blank", "noopener,noreferrer");
     };
+
+    const prioritySummary = useMemo(() => {
+        if (!result) return null;
+        const finalOutput = result.final_output || {};
+        for (const entry of Object.values(finalOutput)) {
+            if (isPrioritySummary(entry)) return entry;
+        }
+        const nodeOutput = result.node_results?.priority_summary?.output;
+        if (isPrioritySummary(nodeOutput)) return nodeOutput;
+        return null;
+    }, [result]);
 
     return (
         <Layout>
@@ -321,6 +338,10 @@ export function AnalysisResultView() {
                                     className="bg-background border border-border rounded-lg p-4 text-xs"
                                 />
                             </div>
+                        )}
+
+                        {prioritySummary && (
+                            <PrioritySummaryPanel summary={prioritySummary} />
                         )}
 
                         <div>
