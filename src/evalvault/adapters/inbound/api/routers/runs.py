@@ -90,6 +90,68 @@ class ModelItemResponse(BaseModel):
     supports_tools: bool | None = None
 
 
+def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
+    return {
+        "summary": run.to_summary_dict(),
+        "results": [
+            {
+                "test_case_id": result.test_case_id,
+                "question": result.question,
+                "answer": result.answer,
+                "ground_truth": result.ground_truth,
+                "contexts": result.contexts,
+                "metrics": [
+                    {
+                        "name": metric.name,
+                        "score": metric.score,
+                        "passed": metric.passed,
+                        "reason": metric.reason,
+                    }
+                    for metric in result.metrics
+                ],
+            }
+            for result in run.results
+        ],
+    }
+
+
+def _build_case_counts(base_run: EvaluationRun, target_run: EvaluationRun) -> dict[str, int]:
+    base_map = {result.test_case_id: result for result in base_run.results}
+    target_map = {result.test_case_id: result for result in target_run.results}
+    case_ids = set(base_map) | set(target_map)
+    counts = {
+        "regressions": 0,
+        "improvements": 0,
+        "same_pass": 0,
+        "same_fail": 0,
+        "new": 0,
+        "removed": 0,
+    }
+
+    for case_id in case_ids:
+        base_case = base_map.get(case_id)
+        target_case = target_map.get(case_id)
+        if base_case is None:
+            counts["new"] += 1
+            continue
+        if target_case is None:
+            counts["removed"] += 1
+            continue
+
+        base_passed = base_case.all_passed
+        target_passed = target_case.all_passed
+        if base_passed and target_passed:
+            counts["same_pass"] += 1
+        elif not base_passed and not target_passed:
+            counts["same_fail"] += 1
+        elif base_passed and not target_passed:
+            counts["regressions"] += 1
+        else:
+            counts["improvements"] += 1
+
+    return counts
+
+
 # --- Options Endpoints ---
 
 
@@ -180,6 +242,57 @@ def get_dataset_template(template_format: str) -> Response:
 
 
 # --- Endpoints ---
+
+
+@router.get("/compare", response_model=None)
+def compare_runs(
+    adapter: AdapterDep,
+    base: str | None = Query(None, description="Base run ID"),
+    target: str | None = Query(None, description="Target run ID"),
+    run_id1: str | None = Query(None, description="Base run ID (alias)"),
+    run_id2: str | None = Query(None, description="Target run ID (alias)"),
+) -> dict[str, Any]:
+    """Compare two evaluation runs and return summary + run details."""
+    base_id = base or run_id1
+    target_id = target or run_id2
+    if not base_id or not target_id:
+        raise HTTPException(status_code=400, detail="base and target run IDs are required")
+
+    try:
+        base_run = adapter.get_run_details(base_id)
+        target_run = adapter.get_run_details(target_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    metrics = sorted(set(base_run.metrics_evaluated) | set(target_run.metrics_evaluated))
+    metric_deltas = []
+    for metric in metrics:
+        base_score = base_run.get_avg_score(metric)
+        target_score = target_run.get_avg_score(metric)
+        delta = (
+            target_score - base_score
+            if base_score is not None and target_score is not None
+            else None
+        )
+        metric_deltas.append(
+            {
+                "name": metric,
+                "base": base_score,
+                "target": target_score,
+                "delta": delta,
+            }
+        )
+
+    return {
+        "base": _serialize_run_details(base_run),
+        "target": _serialize_run_details(target_run),
+        "metric_deltas": metric_deltas,
+        "case_counts": _build_case_counts(base_run, target_run),
+        "pass_rate_delta": target_run.pass_rate - base_run.pass_rate,
+        "total_cases_delta": target_run.total_test_cases - base_run.total_test_cases,
+    }
 
 
 @router.post("/start", status_code=200)
@@ -325,32 +438,7 @@ def get_run_details(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
     """Get detailed information for a specific run."""
     try:
         run: EvaluationRun = adapter.get_run_details(run_id)
-        # Using to_summary_dict() or returning full object.
-        # Returning full object might be complex due to validation, so we start with summary dict
-        # and enrich it with results if needed.
-        # For now, let's return a detailed dict.
-        return {
-            "summary": run.to_summary_dict(),
-            "results": [
-                {
-                    "test_case_id": r.test_case_id,
-                    "question": r.question,
-                    "answer": r.answer,
-                    "ground_truth": r.ground_truth,
-                    "contexts": r.contexts,
-                    "metrics": [
-                        {
-                            "name": m.name,
-                            "score": m.score,
-                            "passed": m.passed,
-                            "reason": m.reason,
-                        }
-                        for m in r.metrics
-                    ],
-                }
-                for r in run.results
-            ],
-        }
+        return _serialize_run_details(run)
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as e:

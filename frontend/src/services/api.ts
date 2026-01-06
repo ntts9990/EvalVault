@@ -35,6 +35,31 @@ export interface RunDetailsResponse {
     results: TestCase[];
 }
 
+export interface RunComparisonMetric {
+    name: string;
+    base: number | null;
+    target: number | null;
+    delta: number | null;
+}
+
+export interface RunComparisonCounts {
+    regressions: number;
+    improvements: number;
+    same_pass: number;
+    same_fail: number;
+    new: number;
+    removed: number;
+}
+
+export interface RunComparisonResponse {
+    base: RunDetailsResponse;
+    target: RunDetailsResponse;
+    metric_deltas: RunComparisonMetric[];
+    case_counts: RunComparisonCounts;
+    pass_rate_delta: number;
+    total_cases_delta: number;
+}
+
 export interface DatasetItem {
     name: string;
     path: string;
@@ -121,6 +146,18 @@ export async function fetchRunDetails(runId: string): Promise<RunDetailsResponse
     const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunComparison(
+    baseRunId: string,
+    targetRunId: string
+): Promise<RunComparisonResponse> {
+    const params = new URLSearchParams({ base: baseRunId, target: targetRunId });
+    const response = await fetch(`${API_BASE_URL}/runs/compare?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch run comparison: ${response.statusText}`);
     }
     return response.json();
 }

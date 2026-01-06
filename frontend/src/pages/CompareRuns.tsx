@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import { fetchRunDetails, type RunDetailsResponse } from "../services/api";
+import {
+    fetchRunComparison,
+    type RunComparisonCounts,
+    type RunDetailsResponse,
+} from "../services/api";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
 import {
     ArrowLeft,
@@ -10,6 +14,8 @@ import {
     ArrowRight,
     TrendingUp,
     TrendingDown,
+    PlusCircle,
+    MinusCircle,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
 
@@ -20,11 +26,12 @@ export function CompareRuns() {
 
     const [baseRun, setBaseRun] = useState<RunDetailsResponse | null>(null);
     const [targetRun, setTargetRun] = useState<RunDetailsResponse | null>(null);
+    const [caseCounts, setCaseCounts] = useState<RunComparisonCounts | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     // View state
-    const [showOnlyDiff, setShowOnlyDiff] = useState(false);
+    const [filterMode, setFilterMode] = useState<"all" | "changes" | "regressions">("all");
 
     useEffect(() => {
         async function loadData() {
@@ -35,12 +42,10 @@ export function CompareRuns() {
             }
 
             try {
-                const [base, target] = await Promise.all([
-                    fetchRunDetails(baseId),
-                    fetchRunDetails(targetId)
-                ]);
-                setBaseRun(base);
-                setTargetRun(target);
+                const comparison = await fetchRunComparison(baseId, targetId);
+                setBaseRun(comparison.base);
+                setTargetRun(comparison.target);
+                setCaseCounts(comparison.case_counts);
             } catch (err) {
                 setError("Failed to load runs for comparison");
             } finally {
@@ -96,35 +101,80 @@ export function CompareRuns() {
 
     // 2. Prepare Diff Table Rows
     // Match test cases by ID (or question if ID mapping is loose, but ID is best)
-    const combinedResults = baseRun.results.map(baseCase => {
-        const targetCase = targetRun.results.find(tc => tc.test_case_id === baseCase.test_case_id);
-        const basePassed = baseCase.metrics.every(m => m.passed);
-        const targetPassed = targetCase ? targetCase.metrics.every(m => m.passed) : false;
+    const isPassed = (tc?: RunDetailsResponse["results"][number]) =>
+        tc ? tc.metrics.every(m => m.passed) : false;
 
-        // Status: "same_pass", "same_fail", "regression", "improvement", "removed"
+    const baseMap = new Map(baseRun.results.map(tc => [tc.test_case_id, tc]));
+    const targetMap = new Map(targetRun.results.map(tc => [tc.test_case_id, tc]));
+    const combinedResults: {
+        id: string;
+        question: string | null;
+        baseAnswer: string | null;
+        targetAnswer: string | null;
+        status: "same_pass" | "same_fail" | "regression" | "improvement" | "removed" | "new";
+        basePassed: boolean;
+        targetPassed: boolean;
+    }[] = [];
+
+    for (const [caseId, baseCase] of baseMap.entries()) {
+        const targetCase = targetMap.get(caseId);
+        const basePassed = isPassed(baseCase);
+        const targetPassed = isPassed(targetCase);
+
         let status: "same_pass" | "same_fail" | "regression" | "improvement" | "removed" | "new" = "same_pass";
-
         if (!targetCase) status = "removed";
         else if (basePassed && !targetPassed) status = "regression";
         else if (!basePassed && targetPassed) status = "improvement";
         else if (basePassed && targetPassed) status = "same_pass";
         else status = "same_fail";
 
-        return {
+        combinedResults.push({
             id: baseCase.test_case_id,
             question: baseCase.question,
             baseAnswer: baseCase.answer,
-            targetAnswer: targetCase?.answer || "(N/A)",
+            targetAnswer: targetCase?.answer ?? "(N/A)",
             status,
             basePassed,
-            targetPassed
-        };
-    });
+            targetPassed,
+        });
+    }
+
+    for (const [caseId, targetCase] of targetMap.entries()) {
+        if (baseMap.has(caseId)) continue;
+        const targetPassed = isPassed(targetCase);
+        combinedResults.push({
+            id: targetCase.test_case_id,
+            question: targetCase.question,
+            baseAnswer: "(N/A)",
+            targetAnswer: targetCase.answer,
+            status: "new",
+            basePassed: false,
+            targetPassed,
+        });
+    }
 
     // Filter
-    const visibleRows = showOnlyDiff
-        ? combinedResults.filter(r => r.status === "regression" || r.status === "improvement")
-        : combinedResults;
+    const computedCounts = combinedResults.reduce<RunComparisonCounts>(
+        (acc, row) => {
+            acc[row.status] += 1;
+            return acc;
+        },
+        {
+            regressions: 0,
+            improvements: 0,
+            same_pass: 0,
+            same_fail: 0,
+            new: 0,
+            removed: 0,
+        }
+    );
+    const resolvedCounts = caseCounts ?? computedCounts;
+
+    const visibleRows = combinedResults.filter((row) => {
+        if (filterMode === "all") return true;
+        if (filterMode === "regressions") return row.status === "regression";
+        return row.status !== "same_pass" && row.status !== "same_fail";
+    });
 
     const passRateDelta = targetRun.summary.pass_rate - baseRun.summary.pass_rate;
 
@@ -172,7 +222,7 @@ export function CompareRuns() {
                     <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                         <p className="text-sm text-muted-foreground mb-1">Regressions</p>
                         <p className="text-3xl font-bold text-rose-500">
-                            {combinedResults.filter(r => r.status === "regression").length}
+                            {resolvedCounts.regressions}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">Test cases that flipped from Pass to Fail</p>
                     </div>
@@ -181,10 +231,25 @@ export function CompareRuns() {
                     <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                         <p className="text-sm text-muted-foreground mb-1">Improvements</p>
                         <p className="text-3xl font-bold text-emerald-500">
-                            {combinedResults.filter(r => r.status === "improvement").length}
+                            {resolvedCounts.improvements}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">Test cases that flipped from Fail to Pass</p>
                     </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-8 text-xs">
+                    <span className="px-2 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-600">
+                        Regressions {resolvedCounts.regressions}
+                    </span>
+                    <span className="px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600">
+                        Improvements {resolvedCounts.improvements}
+                    </span>
+                    <span className="px-2 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-600">
+                        New {resolvedCounts.new}
+                    </span>
+                    <span className="px-2 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600">
+                        Removed {resolvedCounts.removed}
+                    </span>
                 </div>
 
                 {/* Metric Delta Chart */}
@@ -232,17 +297,23 @@ export function CompareRuns() {
 
                 {/* Diff Table */}
                 <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/20">
+                    <div className="p-4 border-b border-border flex flex-wrap justify-between items-center gap-3 bg-secondary/20">
                         <h3 className="font-semibold">Test Case Comparison</h3>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showOnlyDiff}
-                                onChange={(e) => setShowOnlyDiff(e.target.checked)}
-                                className="rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                            Show only changes (Regressions/Improvements)
-                        </label>
+                        <div className="flex items-center gap-2 text-xs">
+                            {(["all", "changes", "regressions"] as const).map((mode) => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setFilterMode(mode)}
+                                    className={`px-2.5 py-1 rounded-full border transition-colors ${filterMode === mode
+                                        ? "border-primary bg-primary/10 text-primary"
+                                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                                        }`}
+                                >
+                                    {mode === "all" ? "All" : mode === "changes" ? "Changes" : "Regressions"}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="divide-y divide-border">
@@ -258,6 +329,8 @@ export function CompareRuns() {
                                             {/* Status Icon */}
                                             {row.status === "regression" && <TrendingDown className="w-5 h-5 text-rose-500" />}
                                             {row.status === "improvement" && <TrendingUp className="w-5 h-5 text-emerald-500" />}
+                                            {row.status === "new" && <PlusCircle className="w-5 h-5 text-blue-500" />}
+                                            {row.status === "removed" && <MinusCircle className="w-5 h-5 text-amber-500" />}
                                             {row.status === "same_pass" && <CheckCircle2 className="w-5 h-5 text-emerald-500/30" />}
                                             {row.status === "same_fail" && <XCircle className="w-5 h-5 text-rose-500/30" />}
                                         </div>
@@ -266,6 +339,8 @@ export function CompareRuns() {
                                             <div className="flex gap-2 mt-1">
                                                 {row.status === "regression" && <span className="text-[10px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded font-mono uppercase">Regression</span>}
                                                 {row.status === "improvement" && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded font-mono uppercase">Improvement</span>}
+                                                {row.status === "new" && <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded font-mono uppercase">New</span>}
+                                                {row.status === "removed" && <span className="text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded font-mono uppercase">Removed</span>}
                                             </div>
                                         </div>
                                     </div>
