@@ -53,6 +53,14 @@ docs/
 | [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 평가 담당자 | 설치, 환경설정, CLI, Web UI, 트러블슈팅 |
 | [guides/CLI_GUIDE.md](guides/CLI_GUIDE.md) | CLI 사용자 | 명령어 참조, 옵션, 예시 |
 | [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
+| [guides/PROJECT_STRUCTURE_METHODS.md](guides/PROJECT_STRUCTURE_METHODS.md) | 개발자/기여자 | 프로젝트 구조 파악 방법론 모음 |
+| [guides/structure-methods/01-folder-topology.md](guides/structure-methods/01-folder-topology.md) | 개발자/기여자 | 구조 파악: 폴더 지형도 + 책임 태깅 |
+| [guides/structure-methods/02-hexagonal-layer-map.md](guides/structure-methods/02-hexagonal-layer-map.md) | 개발자/기여자 | 구조 파악: 헥사고날 레이어 맵 |
+| [guides/structure-methods/03-entrypoint-flow.md](guides/structure-methods/03-entrypoint-flow.md) | 개발자/기여자 | 구조 파악: 엔트리포인트 흐름 추적 |
+| [guides/structure-methods/04-c4-component-view.md](guides/structure-methods/04-c4-component-view.md) | 개발자/기여자 | 구조 파악: C4/컴포넌트 관점 |
+| [guides/structure-methods/05-dependency-graph.md](guides/structure-methods/05-dependency-graph.md) | 개발자/기여자 | 구조 파악: 모듈 의존성 그래프 |
+| [guides/structure-methods/06-data-config-flow.md](guides/structure-methods/06-data-config-flow.md) | 개발자/기여자 | 구조 파악: 데이터/설정 플로우 |
+| [guides/structure-methods/07-test-driven-map.md](guides/structure-methods/07-test-driven-map.md) | 개발자/기여자 | 구조 파악: 테스트 기반 기능 지도 |
 | [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
 | [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
 | [guides/RELEASE_CHECKLIST.md](guides/RELEASE_CHECKLIST.md) | 운영/개발 | 배포 체크리스트, 릴리즈 노트 템플릿 |
