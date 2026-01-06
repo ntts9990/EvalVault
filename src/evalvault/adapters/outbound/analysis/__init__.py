@@ -58,6 +58,9 @@ from evalvault.adapters.outbound.analysis.nlp_analyzer_module import NLPAnalyzer
 from evalvault.adapters.outbound.analysis.pattern_detector_module import (
     PatternDetectorModule,
 )
+from evalvault.adapters.outbound.analysis.priority_summary_module import (
+    PrioritySummaryModule,
+)
 from evalvault.adapters.outbound.analysis.ragas_evaluator_module import (
     RagasEvaluatorModule,
 )
@@ -126,6 +129,7 @@ __all__ = [
     "MorphemeQualityCheckerModule",
     "NLPAnalyzerModule",
     "PatternDetectorModule",
+    "PrioritySummaryModule",
     "RagasEvaluatorModule",
     "RetrievalAnalyzerModule",
     "RetrievalQualityCheckerModule",
