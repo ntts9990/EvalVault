@@ -102,7 +102,13 @@ jobs:
         if: steps.version.outputs.should_release == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          attestations: true
+        # Uses OIDC Trusted Publisher - no API token needed
+        # Setup: PyPI → Manage → Publishing → Add trusted publisher
+        #   - Owner: ntts9990
+        #   - Repository: EvalVault
+        #   - Workflow: release.yml
+        #   - Environment: (empty)
 
       - name: Create GitHub Release
         if: steps.version.outputs.should_release == 'true'
