@@ -103,7 +103,7 @@ curl http://localhost:6006/v1/traces
 
 ```bash
 # OpenTelemetry 의존성 설치
-uv sync --extra dev
+uv sync --extra dev --extra phoenix
 ```
 
 또는 직접 설치:
@@ -154,6 +154,7 @@ uv run evalvault run "$DATASET" \
 - `--phoenix-dataset`: EvalVault 데이터셋(문제/답변/컨텍스트/threshold/메타데이터)을 Phoenix Dataset으로 업로드합니다. 설명을 생략하면 `"{name} v{version}"` 또는 `metadata.description`이 자동 적용됩니다.
 - `--phoenix-experiment`: 업로드된 Dataset과 연결된 Experiment를 생성하고 EvalVault 점수, Pass Rate, Domain Memory 상태를 Phoenix 메타데이터로 포함합니다.
 - 두 결과 모두 `result.tracker_metadata["phoenix"]`에 dataset/experiment URL을 저장하므로 CLI JSON 출력이나 후속 자동화에서 Phoenix 화면으로 바로 이동할 수 있습니다.
+- Streaming 모드(`--stream`)에서는 Dataset/Experiment 업로드가 지원되지 않습니다.
 
 ### 연동 확인
 

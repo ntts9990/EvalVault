@@ -8,7 +8,7 @@ EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있
 
 | 영역 | 설명 | 엔트리 포인트 |
 |------|------|---------------|
-| 루트 명령 | `init`, `run`, `pipeline`, `history`, `compare`, `export`, `analyze`, `generate`, `gate`, `agent`, `experiment`, `config`, `metrics`, `langfuse`, `web` | `register_all_commands()` |
+| 루트 명령 | `init`, `run`, `pipeline`, `history`, `compare`, `export`, `analyze`, `generate`, `gate`, `agent`, `experiment`, `config`, `metrics`, `langfuse`, `web`, `serve-api` | `register_all_commands()` |
 | 서브앱 | `domain`, `kg`, `benchmark`, `phoenix`, `stage`, `debug` | `attach_sub_apps()` |
 | 공통 옵션 | `--profile/-p`, `--db/-D`, `--memory-db/-M` | `cli/utils/options.py` |
 
@@ -25,7 +25,7 @@ uv run evalvault kg stats ./docs --use-llm --profile dev
 | 옵션 | 설명 | 사용 예 |
 |------|------|---------|
 | `--profile, -p` | `config/models.yaml`에 정의된 프로필을 적용합니다. | `uv run evalvault run dataset.json -p dev` |
-| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
+| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `EVALVAULT_DB_PATH` 또는 `evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
 | `--memory-db, -M` | 도메인 메모리 SQLite 경로입니다. 기본값은 `evalvault_memory.db`. | `uv run evalvault domain memory stats -M data/memory.db` |
 
 도움말에 공통 옵션을 추가할 때는 `cli/utils/options.py`의 팩토리를 사용해 동일한 설명과 기본값을 재사용합니다.
@@ -58,13 +58,13 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 
 | 모드 | 명령 | 동작 |
 |------|------|------|
-| Simple | `uv run evalvault run --mode simple DATASET.json`<br>`uv run evalvault run-simple DATASET.json` | `faithfulness,answer_relevancy` 메트릭, Phoenix tracker, Domain Memory/Prompt OFF, Quick Fix 메시지를 자동 출력 |
+| Simple | `uv run evalvault run --mode simple DATASET.json`<br>`uv run evalvault run-simple DATASET.json` | `faithfulness,answer_relevancy` 메트릭 + Phoenix tracker 고정, Domain Memory/Prompt manifest 비활성 |
 | Full | `uv run evalvault run --mode full DATASET.json`<br>`uv run evalvault run-full DATASET.json` | 모든 Typer 옵션(프로파일, Prompt manifest, Phoenix dataset/experiment, Domain Memory, streaming)을 노출 |
 
 - `uv run evalvault history --mode simple/full`로 CLI 결과를 필터링할 수 있습니다.
 - Web UI(Evaluation Studio/Reports)도 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
 
-- `--thresholds`, `--db`, `--profile`, `--tracker`를 조합해 CI나 실험용 러너를 구성합니다.
+- 임계값은 데이터셋 `thresholds`(없으면 0.7 기본값)를 사용하며, Domain Memory 또는 API 요청에서만 오버라이드됩니다.
 - Domain Memory 연동:
   - `--use-domain-memory`: 학습된 신뢰도로 임계값을 자동 보정합니다.
   - `--memory-domain` / `--memory-language`: 도메인·언어를 강제 지정합니다.
@@ -77,14 +77,15 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   - `--kg`: GraphRAG용 Knowledge Graph JSON 파일을 지정합니다.
   - `--stream` 모드에서는 retriever 적용을 건너뜁니다.
 - `run-simple`/`run-full`에서도 동일한 retriever 옵션을 사용할 수 있습니다.
+- `--stream` 모드에서는 Domain Memory 및 Phoenix Dataset/Experiment 업로드가 지원되지 않습니다.
 
 #### Evaluation Presets
 
 | 프리셋 | 설명 | 기본 메트릭 |
 |--------|------|-------------|
-| `quick` | 빠른 반복 평가 | `faithfulness` |
-| `production` | 프로덕션 밸런스 | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall` |
-| `comprehensive` | 전체 메트릭 평가 | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity` |
+| `quick` | 빠른 반복 평가 (parallel, batch_size=10) | `faithfulness` |
+| `production` | 프로덕션 밸런스 (parallel, batch_size=5) | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall` |
+| `comprehensive` | 전체 메트릭 평가 (parallel, batch_size=3) | `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity` |
 
 - `--preset`을 지정하면 메트릭/병렬 처리 설정을 기본값으로 적용합니다.
 - `--metrics`를 명시하면 프리셋 메트릭을 덮어씁니다.
@@ -107,7 +108,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 
 ### 3.2 `pipeline`
 ```bash
-uv run evalvault pipeline analyze "요약해줘" --profile analysis
+uv run evalvault pipeline analyze "요약해줘" --profile dev
 ```
 - 파이프라인 노드별 출력이 Rich 테이블로 표시됩니다.
 
@@ -152,6 +153,20 @@ uv run evalvault benchmark retrieval tests/fixtures/benchmark/retrieval_ground_t
   - `--embedding-model`: Dense/Hybrid 임베딩 모델명 오버라이드
   - `--kg`: GraphRAG 선택 시 필수
   - `--output`: `.json` 또는 `.csv` 저장
+
+### 3.7 `serve-api`
+```bash
+uv run evalvault serve-api --reload
+```
+- React Web UI가 호출하는 FastAPI 백엔드를 실행합니다.
+- 기본 주소: `http://127.0.0.1:8000`
+
+### 3.8 `web`
+```bash
+uv run evalvault web --db evalvault.db
+```
+- Streamlit 기반 **간단 미리보기용(레거시)** 대시보드를 실행합니다.
+- `--extra web` 설치가 필요합니다.
 
 ---
 

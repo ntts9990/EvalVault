@@ -20,6 +20,7 @@ cd EvalVault
 
 # 의존성 설치 (uv 사용 권장)
 uv sync --extra dev
+uv sync --extra dev --extra analysis --extra korean --extra web
 ```
 
 pip을 사용하는 경우:
@@ -100,9 +101,9 @@ Tip: `--db`를 빼면 결과가 콘솔에만 출력되고 history/export/Web UI�
 
 출력 예시:
 ```
-EvalVault v1.0.0
+EvalVault
 ================
-Dataset: insurance-qa-dataset (5 test cases)
+Dataset: e2e-insurance-qa-korean (5 test cases)
 Metrics: faithfulness
 
 Evaluating... [####################################] 100%
@@ -115,6 +116,8 @@ Pass Rate: 100% (5/5 passed)
 Results saved to database: evalvault.db
 Run ID: abc123-def456-...
 ```
+
+Tip: threshold는 데이터셋에 포함되며, 자세한 형식은 [02-basic-evaluation.md](02-basic-evaluation.md)를 참고하세요.
 
 ---
 

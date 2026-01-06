@@ -1202,10 +1202,10 @@ Adapters → Ports → Domain
 |------|------|
 | **언어** | Python 3.12+ |
 | **CLI 프레임워크** | Typer |
-| **Web UI** | React + FastAPI |
-| **평가 프레임워크** | Ragas v1.0 |
+| **Web UI** | React + FastAPI (메인) + Streamlit(옵션) |
+| **평가 프레임워크** | Ragas 0.4.x |
 | **데이터베이스** | SQLite (기본), PostgreSQL (선택) |
-| **추적 시스템** | Langfuse, MLflow |
+| **추적 시스템** | Langfuse, Phoenix, MLflow |
 | **LLM API** | OpenAI, Anthropic, Azure OpenAI, Ollama |
 | **설정 관리** | Pydantic Settings |
 | **타입 검증** | Python typing, Protocol |
@@ -1222,7 +1222,7 @@ Adapters → Ports → Domain
 ---
 
 **문서 버전**: 2.0
-**최종 업데이트**: 2026-01-02
+**최종 업데이트**: 2026-01-06
 **작성자**: EvalVault Team
 
 ### 변경 이력

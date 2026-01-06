@@ -2,7 +2,7 @@
 
 > Audience: 기여자/개발자
 > Purpose: 로컬 개발·테스트·린트·문서 갱신의 기본 루틴을 표준화
-> Last Updated: 2026-01-07
+> Last Updated: 2026-01-06
 
 ---
 
@@ -14,12 +14,14 @@
 uv sync --extra dev
 ```
 
-기능별 extras(선택):
+`dev`는 주요 extras를 포함합니다. 필요 시 개별 extras만 선택 설치할 수도 있습니다:
 - `--extra korean`: 한국어 NLP
 - `--extra analysis`: 통계/NLP 분석 보조
 - `--extra postgres`: PostgreSQL 저장소
 - `--extra mlflow`: MLflow tracker
+- `--extra phoenix`: Phoenix 트레이싱
 - `--extra docs`: MkDocs 문서 빌드
+- `--extra web`: Streamlit Web UI (레거시/미리보기)
 
 ---
 

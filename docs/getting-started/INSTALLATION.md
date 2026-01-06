@@ -1,7 +1,7 @@
 # EvalVault 설치 가이드
 
 > Audience: 처음 사용자
-> Last Updated: 2026-01-07
+> Last Updated: 2026-01-06
 
 ---
 
@@ -17,6 +17,7 @@ uv pip install evalvault
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
 uv sync --extra dev
+uv sync --extra dev --extra analysis --extra korean --extra web
 ```
 
 필요한 추가 기능은 extras로 확장합니다.
@@ -30,6 +31,7 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 추적/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
+| `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
 
