@@ -30,7 +30,7 @@ def register_web_command(app: typer.Typer, console: Console) -> None:
             help="Host to bind the web server to.",
         ),
         db_path: Path = db_option(
-            help_text="Path to SQLite database file.", default=Path("evalvault.db")
+            help_text="Path to SQLite database file.",
         ),
     ) -> None:
         """Launch the EvalVault Web UI (Streamlit dashboard)."""

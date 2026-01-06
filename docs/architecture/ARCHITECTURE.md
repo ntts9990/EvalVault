@@ -2137,7 +2137,8 @@ class ExperimentManager:
         self._storage = storage
 
 # 어댑터에서 주입
-storage = SQLiteStorageAdapter(db_path="evalvault.db")
+settings = Settings()
+storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
 manager = ExperimentManager(storage=storage)  # 의존성 주입
 ```
 

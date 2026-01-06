@@ -379,7 +379,7 @@ class WebUIAdapter:
         memory_domain = memory_config.get("domain") or dataset.metadata.get("domain") or "default"
         memory_language = memory_config.get("language") or "ko"
         memory_augment = bool(memory_config.get("augment_context"))
-        memory_db_path = memory_config.get("db_path") or "evalvault_memory.db"
+        memory_db_path = memory_config.get("db_path") or settings.evalvault_memory_db_path
         memory_evaluator = None
 
         memory_active = False
@@ -1262,7 +1262,7 @@ def create_adapter() -> WebUIAdapter:
     settings = Settings()
 
     # Storage 생성 (기본 SQLite)
-    db_path = Path("evalvault.db")
+    db_path = Path(settings.evalvault_db_path)
     storage = SQLiteStorageAdapter(db_path=db_path)
 
     # LLM adapter 생성 (API 키 없으면 None)

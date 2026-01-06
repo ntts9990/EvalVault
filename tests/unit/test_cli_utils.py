@@ -55,7 +55,7 @@ def test_options_factories_and_normalize() -> None:
     assert "--profile" in profile.param_decls
 
     db_option = options.db_option()
-    assert db_option.default == Path("evalvault.db")
+    assert db_option.default == Path("data/db/evalvault.db")
     assert db_option.show_default is True
 
     db_none = options.db_option(default=None)
@@ -63,7 +63,7 @@ def test_options_factories_and_normalize() -> None:
     assert db_none.show_default is False
 
     memory_db = options.memory_db_option()
-    assert memory_db.default == Path("evalvault_memory.db")
+    assert memory_db.default == Path("data/db/evalvault_memory.db")
     assert memory_db.show_default is True
 
 

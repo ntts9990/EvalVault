@@ -18,6 +18,7 @@ from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_xlsx,
 )
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.config.settings import get_settings
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
@@ -367,7 +368,8 @@ async def start_evaluation_endpoint(
                 )
 
                 try:
-                    memory_db = memory_config.get("db_path") or "evalvault_memory.db"
+                    settings = get_settings()
+                    memory_db = memory_config.get("db_path") or settings.evalvault_memory_db_path
                     domain = memory_config.get("domain") or "default"
                     language = memory_config.get("language") or "ko"
                     memory_adapter = SQLiteDomainMemoryAdapter(memory_db)

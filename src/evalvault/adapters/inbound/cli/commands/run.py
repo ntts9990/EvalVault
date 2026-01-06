@@ -278,7 +278,7 @@ def register_run_commands(
             rich_help_panel="Domain Memory (full mode)",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,
@@ -1313,7 +1313,7 @@ def register_run_commands(
             help="Language code for Domain Memory lookups (default: ko).",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,
@@ -1522,7 +1522,7 @@ def register_run_commands(
             help="Language code for Domain Memory lookups (default: ko).",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,

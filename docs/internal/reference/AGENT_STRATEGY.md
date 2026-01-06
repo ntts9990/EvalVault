@@ -197,11 +197,11 @@
 evalvault run benchmark_data.json \
   --metrics faithfulness,answer_relevancy,context_precision \
   --parallel --batch-size 10 \
-  --db evalvault.db \
+  --db data/db/evalvault.db \
   --output daily_$(date +%Y%m%d).json
 
 # 2. 품질 게이트 검사
-evalvault gate "$RUN_ID" --db evalvault.db \
+evalvault gate "$RUN_ID" --db data/db/evalvault.db \
   --threshold faithfulness:0.8 \
   --threshold answer_relevancy:0.7 \
   --fail-on-regression
@@ -211,7 +211,7 @@ evalvault benchmark run --name korean-rag \
   --output weekly_benchmark.json
 ```
 
-`RUN_ID`는 `evalvault run` 출력 또는 `evalvault history --db evalvault.db`에서 확인합니다.
+`RUN_ID`는 `evalvault run` 출력 또는 `evalvault history --db data/db/evalvault.db`에서 확인합니다.
 
 **에이전트 역할**:
 - **quality-monitor**: 정기 평가 스케줄링, 결과 수집, 알림
@@ -609,13 +609,13 @@ jobs:
           uv sync --extra dev
           uv run evalvault run benchmark_data.json \
             --metrics faithfulness,answer_relevancy \
-            --db evalvault.db \
+            --db data/db/evalvault.db \
             --output results/daily_$(date +%Y%m%d).json
 
       - name: Check quality gate
         run: |
           # RUN_ID는 evalvault run 출력 또는 history에서 추출
-          uv run evalvault gate "$RUN_ID" --db evalvault.db \
+          uv run evalvault gate "$RUN_ID" --db data/db/evalvault.db \
             --threshold faithfulness:0.8 \
             --fail-on-regression
 

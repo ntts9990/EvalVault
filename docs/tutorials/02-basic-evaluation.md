@@ -134,7 +134,7 @@ EvalVault는 [Ragas](https://docs.ragas.io/) 프레임워크 기반의 6가지 �
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics faithfulness --db evalvault.db
+uv run evalvault run "$DATASET" --metrics faithfulness --db data/db/evalvault.db
 ```
 
 #### Answer Relevancy (답변 관련성)
@@ -148,7 +148,7 @@ uv run evalvault run "$DATASET" --metrics faithfulness --db evalvault.db
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics answer_relevancy --db evalvault.db
+uv run evalvault run "$DATASET" --metrics answer_relevancy --db data/db/evalvault.db
 ```
 
 #### Context Precision (컨텍스트 정밀도)
@@ -162,7 +162,7 @@ uv run evalvault run "$DATASET" --metrics answer_relevancy --db evalvault.db
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics context_precision --db evalvault.db
+uv run evalvault run "$DATASET" --metrics context_precision --db data/db/evalvault.db
 ```
 
 #### Context Recall (컨텍스트 재현율)
@@ -176,7 +176,7 @@ uv run evalvault run "$DATASET" --metrics context_precision --db evalvault.db
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics context_recall --db evalvault.db
+uv run evalvault run "$DATASET" --metrics context_recall --db data/db/evalvault.db
 ```
 
 #### Factual Correctness (사실적 정확성)
@@ -190,7 +190,7 @@ uv run evalvault run "$DATASET" --metrics context_recall --db evalvault.db
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics factual_correctness --db evalvault.db
+uv run evalvault run "$DATASET" --metrics factual_correctness --db data/db/evalvault.db
 ```
 
 #### Semantic Similarity (의미적 유사도)
@@ -204,7 +204,7 @@ uv run evalvault run "$DATASET" --metrics factual_correctness --db evalvault.db
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics semantic_similarity --db evalvault.db
+uv run evalvault run "$DATASET" --metrics semantic_similarity --db data/db/evalvault.db
 ```
 
 ### 메트릭 선택 가이드
@@ -224,7 +224,7 @@ uv run evalvault run "$DATASET" --metrics semantic_similarity --db evalvault.db
 ### 기본 명령어
 
 ```bash
-uv run evalvault run <dataset_path> --metrics <metrics> --db evalvault.db
+uv run evalvault run <dataset_path> --metrics <metrics> --db data/db/evalvault.db
 ```
 
 ### 옵션 상세
@@ -264,28 +264,28 @@ Available Metrics:
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics faithfulness --db evalvault.db
+uv run evalvault run "$DATASET" --metrics faithfulness --db data/db/evalvault.db
 ```
 
 ### 여러 메트릭 동시 평가
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics faithfulness,answer_relevancy,context_precision --db evalvault.db
+uv run evalvault run "$DATASET" --metrics faithfulness,answer_relevancy,context_precision --db data/db/evalvault.db
 ```
 
 ### 모든 메트릭 평가
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics faithfulness,answer_relevancy,context_precision,context_recall,factual_correctness,semantic_similarity --db evalvault.db
+uv run evalvault run "$DATASET" --metrics faithfulness,answer_relevancy,context_precision,context_recall,factual_correctness,semantic_similarity --db data/db/evalvault.db
 ```
 
 ### 병렬 평가 (대규모 데이터셋)
 
 ```bash
 LARGE_DATASET="scripts/perf/r3_evalvault_run_dataset.json"
-uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel --batch-size 10 --db evalvault.db
+uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel --batch-size 10 --db data/db/evalvault.db
 ```
 
 ### 프로필 지정
@@ -293,17 +293,17 @@ uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel --batch-
 ```bash
 # Ollama (dev 환경)
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --profile dev --metrics faithfulness --db evalvault.db
+uv run evalvault run "$DATASET" --profile dev --metrics faithfulness --db data/db/evalvault.db
 
 # OpenAI
-uv run evalvault run "$DATASET" --profile openai --metrics faithfulness --db evalvault.db
+uv run evalvault run "$DATASET" --profile openai --metrics faithfulness --db data/db/evalvault.db
 ```
 
 ### Langfuse 추적 활성화
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
-uv run evalvault run "$DATASET" --metrics faithfulness --tracker langfuse --db evalvault.db
+uv run evalvault run "$DATASET" --metrics faithfulness --tracker langfuse --db data/db/evalvault.db
 ```
 
 ---
@@ -313,7 +313,7 @@ uv run evalvault run "$DATASET" --metrics faithfulness --tracker langfuse --db e
 ### 히스토리 조회
 
 ```bash
-uv run evalvault history --limit 10 --db evalvault.db
+uv run evalvault history --limit 10 --db data/db/evalvault.db
 ```
 
 출력 예시:
@@ -329,7 +329,7 @@ def456...                             insurance-qa         faithfulness,answer_.
 ### 결과 비교
 
 ```bash
-uv run evalvault compare <id1> <id2> --db evalvault.db
+uv run evalvault compare <id1> <id2> --db data/db/evalvault.db
 ```
 
 출력 예시:
@@ -345,7 +345,7 @@ context_precision   0.90       0.88       -0.02
 ### 결과 내보내기
 
 ```bash
-uv run evalvault export <run_id> -o results.json --db evalvault.db
+uv run evalvault export <run_id> -o results.json --db data/db/evalvault.db
 ```
 
 내보낸 JSON 구조:

@@ -20,7 +20,7 @@ cd EvalVault
 
 # 의존성 설치 (uv 사용 권장)
 uv sync --extra dev
-uv sync --extra dev --extra analysis --extra korean --extra web
+# dev는 모든 extras를 포함합니다. 경량 설치가 필요하면 개별 extras만 선택하세요.
 ```
 
 pip을 사용하는 경우:
@@ -52,7 +52,7 @@ cp .env.example .env
 ollama pull gemma3:1b
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
-  --db evalvault.db \
+  --db data/db/evalvault.db \
   --profile dev
 ```
 
@@ -65,7 +65,7 @@ cp .env.example .env
 printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
-  --db evalvault.db
+  --db data/db/evalvault.db
 ```
 
 Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
@@ -94,7 +94,7 @@ Langfuse: Not configured
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
-  --db evalvault.db
+  --db data/db/evalvault.db
 ```
 
 Tip: `--db`를 빼면 결과가 콘솔에만 출력되고 history/export/Web UI에는 저장되지 않습니다.
@@ -113,7 +113,7 @@ Results:
 faithfulness: 0.92
 Pass Rate: 100% (5/5 passed)
 
-Results saved to database: evalvault.db
+Results saved to database: data/db/evalvault.db
 Run ID: abc123-def456-...
 ```
 
@@ -125,10 +125,10 @@ Tip: threshold는 데이터셋에 포함되며, 자세한 형식은 [02-basic-ev
 
 ```bash
 # 평가 히스토리 조회 (동일한 DB 경로)
-uv run evalvault history --db evalvault.db
+uv run evalvault history --db data/db/evalvault.db
 
 # 상세 결과 내보내기
-uv run evalvault export <run_id> -o result.json --db evalvault.db
+uv run evalvault export <run_id> -o result.json --db data/db/evalvault.db
 
 ```
 Web UI로 보려면 Step 5에서 API + React 프론트를 실행한 뒤
@@ -201,8 +201,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 |------|--------|
 | 1. 설치 | `uv sync --extra dev` |
 | 2. 환경 설정 | `.env` 파일에 `OPENAI_API_KEY` 설정 |
-| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness --db evalvault.db` |
-| 4. 결과 확인 | `uv run evalvault history --db evalvault.db` 또는 Web UI(`http://localhost:5173`) |
+| 3. 평가 실행 | `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness --db data/db/evalvault.db` |
+| 4. 결과 확인 | `uv run evalvault history --db data/db/evalvault.db` 또는 Web UI(`http://localhost:5173`) |
 | 5. (선택) API + React 실행 | `uv run evalvault serve-api --reload` + `npm run dev` |
 
 소요 시간: 약 5분

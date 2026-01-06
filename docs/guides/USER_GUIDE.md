@@ -60,11 +60,11 @@ uv pip install evalvault
 ```bash
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
-uv sync --extra dev        # 기본 개발 환경
-uv sync --extra dev --extra analysis --extra korean --extra web     # 전체 기능
+uv sync --extra dev        # 전체 기능 포함 (dev 도구 + 모든 extras)
+# 경량 설치 예시: uv sync --extra analysis
 ```
 
-Phoenix 트레이싱을 쓰면 `--extra phoenix`를 추가로 설치하세요.
+Phoenix 트레이싱은 `dev`에 포함되어 있습니다. 경량 설치라면 `--extra phoenix`를 추가하세요.
 Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12를 고정하므로 추가 설치가 필요 없습니다.
 
 ---
@@ -89,7 +89,8 @@ uv run evalvault init
 ```bash
 # 공통
 EVALVAULT_PROFILE=dev              # config/models.yaml에 정의된 프로필
-EVALVAULT_DB_PATH=evalvault.db     # SQLite 저장 경로 (API/CLI 공통)
+EVALVAULT_DB_PATH=data/db/evalvault.db     # SQLite 저장 경로 (API/CLI 공통)
+EVALVAULT_MEMORY_DB_PATH=data/db/evalvault_memory.db  # 도메인 메모리 DB 경로
 OPENAI_API_KEY=sk-...
 
 # Langfuse (선택)
@@ -122,7 +123,7 @@ cp .env.example .env
 ollama pull gemma3:1b
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
-  --db evalvault.db \
+  --db data/db/evalvault.db \
   --profile dev
 ```
 
@@ -135,7 +136,7 @@ cp .env.example .env
 printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
-  --db evalvault.db
+  --db data/db/evalvault.db
 ```
 
 Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
@@ -271,7 +272,7 @@ uv run evalvault run tests/fixtures/sample_dataset.json \
   --metrics faithfulness,answer_relevancy \
   --profile dev \
   --tracker langfuse \
-  --db evalvault.db
+  --db data/db/evalvault.db
 ```
 
 옵션 요약:
@@ -337,9 +338,9 @@ Web UI 제약:
 
 ### 히스토리/비교/내보내기
 ```bash
-uv run evalvault history --limit 20 --db evalvault.db
-uv run evalvault compare <run_a> <run_b> --db evalvault.db
-uv run evalvault export <run_id> -o run.json --db evalvault.db
+uv run evalvault history --limit 20 --db data/db/evalvault.db
+uv run evalvault compare <run_a> <run_b> --db data/db/evalvault.db
+uv run evalvault export <run_id> -o run.json --db data/db/evalvault.db
 ```
 
 ### Web UI (React + FastAPI) {#web-ui}
@@ -368,7 +369,7 @@ npm run dev
 Streamlit UI는 간단 미리보기용으로만 유지되며 점진적 페이드아웃 예정입니다.
 
 ```bash
-uv run evalvault web --db evalvault.db
+uv run evalvault web --db data/db/evalvault.db
 ```
 
 - `--extra web` 설치가 필요합니다.
@@ -379,8 +380,8 @@ uv run evalvault web --db evalvault.db
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
 
 ```bash
-uv run evalvault stage ingest examples/stage_events.jsonl --db evalvault.db
-uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage ingest examples/stage_events.jsonl --db data/db/evalvault.db
+uv run evalvault stage summary run_20260103_001 --db data/db/evalvault.db
 uv run evalvault stage compute-metrics run_20260103_001 \
   --thresholds-json config/stage_metric_thresholds.json \
   --thresholds-profile dev
@@ -395,9 +396,9 @@ uv run evalvault stage compute-metrics run_20260103_001 \
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness \
   --profile dev \
-  --db evalvault.db
+  --db data/db/evalvault.db
 ```
-- 평가 실행 후 `uv run evalvault history --limit 1 --db evalvault.db`로 `run_id`를 확인합니다.
+- 평가 실행 후 `uv run evalvault history --limit 1 --db data/db/evalvault.db`로 `run_id`를 확인합니다.
 - 동일한 `run_id`로 stage 이벤트를 기록하면 `uv run evalvault analyze <run_id> --playbook`에서
   단계별 개선 가이드까지 확인할 수 있습니다.
 
@@ -406,7 +407,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 ## 저장·추적
 
 ### SQLite/PostgreSQL
-- 기본값은 `evalvault.db` (SQLite)
+- 기본값은 `data/db/evalvault.db` (SQLite)
 - PostgreSQL 사용 시 `.env`에 `POSTGRES_CONNECTION_STRING=postgresql://...` 또는 `POSTGRES_HOST/PORT/USER/PASSWORD`를 설정하고 `uv sync --extra postgres` 를 실행합니다.
 - 분석 파이프라인 저장 결과는 `pipeline_results` 테이블에 기록됩니다.
 
@@ -493,7 +494,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
     --drift-key embedding_drift_score \
     --drift-threshold 0.18 \
     --slack-webhook https://hooks.slack.com/services/... \
-    --gate-command "uv run evalvault gate RUN_ID --format github-actions --db evalvault.db" \
+    --gate-command "uv run evalvault gate RUN_ID --format github-actions --db data/db/evalvault.db" \
     --run-regressions threshold \
     --regression-config config/regressions/default.json
   ```

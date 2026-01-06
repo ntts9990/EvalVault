@@ -40,7 +40,7 @@ from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 
 # 메모리 어댑터 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 hook = DomainLearningHook(memory_adapter)
 
 # 평가 완료 후 메모리 형성
@@ -155,7 +155,7 @@ from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomai
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 
 # 메모리 어댑터 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 evaluator = RagasEvaluator()
 memory_evaluator = MemoryAwareEvaluator(
     evaluator=evaluator,
@@ -209,7 +209,7 @@ from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 
 # 메모리 기반 분석 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 analysis = MemoryBasedAnalysis(memory_adapter)
 
 # 인사이트 생성 (과거 학습 메모리와 비교)
@@ -251,7 +251,7 @@ actions = analysis.apply_successful_behaviors(
 - `--use-domain-memory`: Domain Memory를 활용하여 threshold 자동 조정
 - `--memory-domain`: 도메인 이름 지정 (기본값: dataset metadata에서 추출)
 - `--memory-language`: 언어 코드 지정 (기본값: ko)
-- `--memory-db`: Domain Memory 데이터베이스 경로 (기본값: evalvault_memory.db)
+- `--memory-db`: Domain Memory 데이터베이스 경로 (기본값: data/db/evalvault_memory.db)
 - `--augment-context`: 각 테스트 케이스의 컨텍스트에 관련 사실 자동 추가
 
 **사용 예제**:

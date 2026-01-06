@@ -25,8 +25,12 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins.",
     )
     evalvault_db_path: str = Field(
-        default="evalvault.db",
+        default="data/db/evalvault.db",
         description="SQLite database path for API/CLI storage.",
+    )
+    evalvault_memory_db_path: str = Field(
+        default="data/db/evalvault_memory.db",
+        description="SQLite database path for Domain Memory storage.",
     )
 
     # LLM Provider Selection

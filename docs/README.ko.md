@@ -32,9 +32,9 @@ Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `te
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
   --profile dev \
-  --db evalvault.db
-uv run evalvault history --db evalvault.db
-uv run evalvault analyze <RUN_ID> --db evalvault.db
+  --db data/db/evalvault.db
+uv run evalvault history --db data/db/evalvault.db
+uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db
 ```
 Tip: Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 맞추세요.
 
@@ -146,7 +146,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-`dev`는 analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic을 포함합니다. 필요하면 extras로 확장합니다.
+`dev`는 analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs를 포함합니다. 필요하면 extras로 확장합니다.
 
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
@@ -154,9 +154,11 @@ uv sync --extra dev
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 형태소·검색 |
 | `postgres` | psycopg | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
+| `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
 | `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
+| `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
 
@@ -172,7 +174,8 @@ uv sync --extra dev
    SQLite 경로를 바꾸려면 아래 값을 추가합니다.
    ```bash
    # .env
-   EVALVAULT_DB_PATH=/path/to/evalvault.db
+   EVALVAULT_DB_PATH=/path/to/data/db/evalvault.db
+   EVALVAULT_MEMORY_DB_PATH=/path/to/data/db/evalvault_memory.db
    ```
    vLLM(OpenAI-compatible)을 쓰려면 `EVALVAULT_PROFILE=vllm`로 설정하고
    `.env`에 `VLLM_BASE_URL`, `VLLM_MODEL`을 추가합니다.
@@ -202,7 +205,7 @@ uv sync --extra dev
    ollama pull gemma3:1b
    uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
      --metrics faithfulness \
-     --db evalvault.db \
+     --db data/db/evalvault.db \
      --profile dev
    ```
    Tip: `answer_relevancy` 등 임베딩 메트릭을 쓰려면 `qwen3-embedding:0.6b`도 내려받으세요.
@@ -213,7 +216,7 @@ uv sync --extra dev
    printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
    uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
      --metrics faithfulness \
-     --db evalvault.db
+     --db data/db/evalvault.db
    ```
    Tip: 임베딩 메트릭은 `VLLM_EMBEDDING_MODEL`과 `/v1/embeddings` 엔드포인트가 필요합니다.
 
@@ -235,14 +238,14 @@ uv sync --extra dev
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --db evalvault.db
+     --db data/db/evalvault.db
    ```
    Tip: 결과를 history/export/Web UI에서 보려면 `--db` 경로를 동일하게 유지하세요.
    Phoenix 추적이 필요하면 `--tracker phoenix`를 추가하고 `uv sync --extra phoenix`로 설치합니다.
 
 4. **히스토리 확인**
    ```bash
-   uv run evalvault history --db evalvault.db
+   uv run evalvault history --db data/db/evalvault.db
    ```
 
 Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.

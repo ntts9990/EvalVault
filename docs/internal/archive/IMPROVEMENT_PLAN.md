@@ -1050,7 +1050,7 @@ from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluato
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 memory_evaluator = MemoryAwareEvaluator(
     evaluator=RagasEvaluator(),
     memory_port=memory_adapter,

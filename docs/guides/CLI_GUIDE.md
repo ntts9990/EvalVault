@@ -25,8 +25,8 @@ uv run evalvault kg stats ./docs --use-llm --profile dev
 | 옵션 | 설명 | 사용 예 |
 |------|------|---------|
 | `--profile, -p` | `config/models.yaml`에 정의된 프로필을 적용합니다. | `uv run evalvault run dataset.json -p dev` |
-| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `EVALVAULT_DB_PATH` 또는 `evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
-| `--memory-db, -M` | 도메인 메모리 SQLite 경로입니다. 기본값은 `evalvault_memory.db`. | `uv run evalvault domain memory stats -M data/memory.db` |
+| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `EVALVAULT_DB_PATH` 또는 `data/db/evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
+| `--memory-db, -M` | 도메인 메모리 SQLite 경로입니다. 기본값은 `EVALVAULT_MEMORY_DB_PATH` 또는 `data/db/evalvault_memory.db`. | `uv run evalvault domain memory stats -M data/memory.db` |
 
 도움말에 공통 옵션을 추가할 때는 `cli/utils/options.py`의 팩토리를 사용해 동일한 설명과 기본값을 재사용합니다.
 
@@ -132,8 +132,8 @@ uv run evalvault domain show insurance
 
 ### 3.5 `stage`
 ```bash
-uv run evalvault stage ingest stage_events.jsonl --db evalvault.db
-uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage ingest stage_events.jsonl --db data/db/evalvault.db
+uv run evalvault stage summary run_20260103_001 --db data/db/evalvault.db
 uv run evalvault stage compute-metrics run_20260103_001 --thresholds-json config/stage_metric_thresholds.json
 ```
 - `ingest`: JSON/JSONL stage events를 저장합니다.
@@ -168,7 +168,7 @@ uv run evalvault serve-api --reload
 
 ### 3.8 `web`
 ```bash
-uv run evalvault web --db evalvault.db
+uv run evalvault web --db data/db/evalvault.db
 ```
 - Streamlit 기반 **간단 미리보기용(레거시)** 대시보드를 실행합니다.
 - `--extra web` 설치가 필요합니다.
