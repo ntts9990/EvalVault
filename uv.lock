@@ -935,7 +935,7 @@ wheels = [
 
 [[package]]
 name = "evalvault"
-version = "1.39.2"
+version = "1.40.0"
 source = { editable = "." }
 dependencies = [
     { name = "chardet" },
