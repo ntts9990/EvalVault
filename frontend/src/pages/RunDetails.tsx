@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { fetchRunDetails, type RunDetailsResponse } from "../services/api";
 import { Layout } from "../components/Layout";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
@@ -18,6 +18,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 export function RunDetails() {
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
     const [data, setData] = useState<RunDetailsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,25 @@ export function RunDetails() {
         }
         loadDetails();
     }, [id]);
+
+    useEffect(() => {
+        if (!data || !location.hash) return;
+        const match = location.hash.match(/^#case-(.+)$/);
+        if (!match) return;
+        const caseId = decodeURIComponent(match[1]);
+        if (!data.results.some(result => result.test_case_id === caseId)) return;
+        setExpandedCases(prev => {
+            const next = new Set(prev);
+            next.add(caseId);
+            return next;
+        });
+        requestAnimationFrame(() => {
+            const target = document.getElementById(`case-${caseId}`);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        });
+    }, [data, location.hash]);
 
     /*
     useEffect(() => {
@@ -294,6 +314,7 @@ export function RunDetails() {
 
                         return (
                             <div
+                                id={`case-${result.test_case_id}`}
                                 key={result.test_case_id}
                                 className={`bg-card border rounded-xl overflow-hidden transition-all ${isExpanded ? "ring-2 ring-primary/20 border-primary shadow-md" : "border-border hover:border-border/80"
                                     }`}

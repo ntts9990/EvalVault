@@ -92,6 +92,56 @@ function formatMetrics(metrics: Record<string, any> | null | undefined) {
     });
 }
 
+function normalizeDetailItems(
+    items: any[],
+    options: {
+        titleKeys: string[];
+        detailKeys: string[];
+        scoreKey?: string;
+    }
+) {
+    const { titleKeys, detailKeys, scoreKey } = options;
+    return items.map((item, index) => {
+        if (!item || typeof item !== "object") {
+            return {
+                title: `Item ${index + 1}`,
+                detail: String(item),
+                score: null,
+            };
+        }
+        const title =
+            titleKeys.map((key) => item[key]).find((value) => value) || `Item ${index + 1}`;
+        const detail =
+            detailKeys.map((key) => item[key]).find((value) => value)
+            || (item.detail ?? item.message ?? JSON.stringify(item));
+        const scoreValue = scoreKey ? item[scoreKey] : null;
+        const score =
+            typeof scoreValue === "number" && Number.isFinite(scoreValue)
+                ? scoreValue.toFixed(3)
+                : null;
+        return {
+            title: String(title),
+            detail: String(detail),
+            score,
+        };
+    });
+}
+
+function normalizeStringList(items: any[]) {
+    return items.map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+            const text = item.intervention || item.recommendation || item.detail || item.message;
+            if (text) return String(text);
+        }
+        try {
+            return JSON.stringify(item);
+        } catch {
+            return String(item);
+        }
+    });
+}
+
 export function AnalysisNodeOutputs({
     nodeResults,
     nodeDefinitions,
@@ -130,6 +180,22 @@ export function AnalysisNodeOutputs({
                     const insights =
                         output && typeof output === "object" && Array.isArray(output.insights)
                             ? output.insights
+                            : null;
+                    const recommendations =
+                        output && typeof output === "object" && Array.isArray(output.recommendations)
+                            ? output.recommendations
+                            : null;
+                    const diagnostics =
+                        output && typeof output === "object" && Array.isArray(output.diagnostics)
+                            ? output.diagnostics
+                            : null;
+                    const causes =
+                        output && typeof output === "object" && Array.isArray(output.causes)
+                            ? output.causes
+                            : null;
+                    const interventions =
+                        output && typeof output === "object" && Array.isArray(output.interventions)
+                            ? output.interventions
                             : null;
                     const evidence = extractEvidence(output);
                     const rawText = (() => {
@@ -207,6 +273,80 @@ export function AnalysisNodeOutputs({
                                         {insights.slice(0, 8).map((item: string, index: number) => (
                                             <li key={`${node.id}-insight-${index}`}>{String(item)}</li>
                                         ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {diagnostics && diagnostics.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground">진단 항목</p>
+                                        <div className="space-y-2">
+                                            {normalizeDetailItems(diagnostics, {
+                                                titleKeys: ["metric", "name", "type"],
+                                                detailKeys: ["issue", "reason", "detail", "message"],
+                                                scoreKey: "score",
+                                            })
+                                                .slice(0, 8)
+                                                .map((item, index) => (
+                                                    <div
+                                                        key={`${node.id}-diagnostic-${index}`}
+                                                        className="border border-border rounded-md px-2 py-1 text-xs"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-semibold text-foreground">{item.title}</span>
+                                                            {item.score && (
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {item.score}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-muted-foreground">{item.detail}</p>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {causes && causes.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground">근본 원인</p>
+                                        <div className="space-y-2">
+                                            {normalizeDetailItems(causes, {
+                                                titleKeys: ["metric", "name", "type"],
+                                                detailKeys: ["reason", "description", "detail", "message"],
+                                            })
+                                                .slice(0, 8)
+                                                .map((item, index) => (
+                                                    <div
+                                                        key={`${node.id}-cause-${index}`}
+                                                        className="border border-border rounded-md px-2 py-1 text-xs"
+                                                    >
+                                                        <div className="font-semibold text-foreground">{item.title}</div>
+                                                        <p className="text-muted-foreground">{item.detail}</p>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {recommendations && recommendations.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground">권장 사항</p>
+                                        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                                            {normalizeStringList(recommendations).slice(0, 8).map((item, index) => (
+                                                <li key={`${node.id}-recommendation-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {interventions && interventions.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground">개선 개입</p>
+                                        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                                            {normalizeStringList(interventions).slice(0, 8).map((item, index) => (
+                                                <li key={`${node.id}-intervention-${index}`}>{item}</li>
+                                            ))}
                                         </ul>
                                     </div>
                                 )}

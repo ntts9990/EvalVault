@@ -19,6 +19,15 @@ class DiagnosticPlaybookModule(BaseAnalysisModule):
     requires = ["ragas_evaluator"]
     tags = ["analysis", "diagnostic"]
 
+    METRIC_REMEDIATION_HINTS: dict[str, str] = {
+        "faithfulness": "Constrain answers to retrieved context and strengthen evidence citation.",
+        "factual_correctness": "Re-verify source data and add post-hoc fact checks.",
+        "answer_relevancy": "Tighten prompt alignment and query understanding.",
+        "context_recall": "Increase retriever recall via top_k, query expansion, or chunk tuning.",
+        "context_precision": "Improve reranking and noise filtering to reduce irrelevant contexts.",
+        "semantic_similarity": "Revisit reference phrasing or adjust evaluation tolerance.",
+    }
+
     def execute(
         self,
         inputs: dict[str, Any],
@@ -36,7 +45,9 @@ class DiagnosticPlaybookModule(BaseAnalysisModule):
             if score >= threshold:
                 continue
             issue = f"{metric} is below threshold ({score:.2f} < {threshold:.2f})."
-            recommendation = f"Review data and prompts related to {metric}."
+            recommendation = self.METRIC_REMEDIATION_HINTS.get(
+                metric, f"Review data and prompts related to {metric}."
+            )
             diagnostics.append({"metric": metric, "issue": issue, "score": score})
             recommendations.append(recommendation)
 

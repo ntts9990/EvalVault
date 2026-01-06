@@ -54,6 +54,27 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     pending: { label: "대기", color: "text-muted-foreground" },
 };
 
+const RUN_REQUIRED_MODULES = new Set([
+    "run_loader",
+    "retrieval_analyzer",
+    "retrieval_quality_checker",
+    "nlp_analyzer",
+    "pattern_detector",
+    "morpheme_analyzer",
+    "morpheme_quality_checker",
+    "embedding_analyzer",
+    "embedding_distribution",
+    "causal_analyzer",
+    "model_analyzer",
+    "run_analyzer",
+    "run_comparator",
+    "search_comparator",
+    "statistical_comparator",
+    "time_series_analyzer",
+    "trend_detector",
+    "priority_summary",
+]);
+
 function isPrioritySummary(value: any): value is PrioritySummary {
     if (!value || typeof value !== "object") return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
@@ -65,6 +86,7 @@ export function AnalysisLab() {
     const [runs, setRuns] = useState<RunSummary[]>([]);
     const [runError, setRunError] = useState<string | null>(null);
     const [selectedRunId, setSelectedRunId] = useState<string>("");
+    const [analysisRunId, setAnalysisRunId] = useState<string | null>(null);
     const [selectedIntent, setSelectedIntent] = useState<AnalysisIntentInfo | null>(null);
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -246,23 +268,25 @@ export function AnalysisLab() {
 
     const handleRun = async (intent: AnalysisIntentInfo) => {
         if (!intent.available || loading) return;
+        const runIdForAnalysis = selectedRunId || null;
         setSelectedIntent(intent);
         setError(null);
         setSaveError(null);
         setResult(null);
         setSavedResultId(null);
         setLastQuery(intent.sample_query);
+        setAnalysisRunId(runIdForAnalysis);
         setLoading(true);
         try {
             const params: Record<string, any> = {
                 use_llm_report: useLlmReport,
             };
-            if (recomputeRagas && selectedRunId) {
+            if (recomputeRagas && runIdForAnalysis) {
                 params.recompute_ragas = true;
             }
             const analysis = await runAnalysis(
                 intent.sample_query,
-                selectedRunId || undefined,
+                runIdForAnalysis || undefined,
                 intent.intent,
                 params
             );
@@ -297,7 +321,7 @@ export function AnalysisLab() {
             const payload = {
                 intent: result.intent,
                 query: lastQuery || selectedIntent?.sample_query || result.intent,
-                run_id: selectedRunId || null,
+                run_id: analysisRunId,
                 pipeline_id: result.pipeline_id || null,
                 profile: saveProfile.trim() ? saveProfile.trim() : null,
                 tags: tags.length > 0 ? tags : null,
@@ -366,6 +390,10 @@ export function AnalysisLab() {
 
     const reportText = useMemo(() => {
         if (!result?.final_output) return null;
+        const reportEntry = (result.final_output as Record<string, any>).report;
+        if (reportEntry && typeof reportEntry === "object" && typeof reportEntry.report === "string") {
+            return reportEntry.report as string;
+        }
         const entries = Object.values(result.final_output);
         for (const entry of entries) {
             if (entry && typeof entry === "object" && "report" in entry && typeof (entry as any).report === "string") {
@@ -400,6 +428,10 @@ export function AnalysisLab() {
         || "분석";
 
     const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
+    const requiresRunData = useMemo(() => {
+        const nodes = intentDefinition?.nodes || selectedIntent?.nodes || [];
+        return nodes.some(node => RUN_REQUIRED_MODULES.has(node.module));
+    }, [intentDefinition, selectedIntent]);
 
     const prioritySummary = useMemo(() => {
         if (!result) return null;
@@ -451,11 +483,17 @@ export function AnalysisLab() {
                             {runError && (
                                 <p className="text-xs text-destructive mt-2">{runError}</p>
                             )}
-                            {!selectedRunId && (
-                                <p className="text-xs text-muted-foreground mt-3">
-                                    Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.
-                                </p>
-                            )}
+                        {!selectedRunId && (
+                            <p className="text-xs text-muted-foreground mt-3">
+                                Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.
+                            </p>
+                        )}
+                        {!selectedRunId && selectedIntent && requiresRunData && (
+                            <p className="text-xs text-amber-600 mt-2">
+                                선택한 인텐트는 Run 데이터가 필요합니다. 샘플 모드에서는 결과가
+                                제한될 수 있습니다.
+                            </p>
+                        )}
                             <div className="mt-4 space-y-2 text-xs">
                                 <label className="flex items-center gap-2 text-muted-foreground">
                                     <input
@@ -872,6 +910,13 @@ export function AnalysisLab() {
                                                     </div>
                                                 );
                                             })}
+                                        </div>
+                                    )}
+
+                                    {!analysisRunId && requiresRunData && (
+                                        <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs">
+                                            Run 데이터가 없어 일부 분석 결과가 비어 있을 수 있습니다.
+                                            정확한 분석을 위해 Run을 선택해 다시 실행하세요.
                                         </div>
                                     )}
 
