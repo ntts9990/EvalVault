@@ -118,17 +118,44 @@ export interface SystemConfig {
     [key: string]: any;
 }
 
-export interface ImprovementItem {
-    category: string;
-    description: string;
-    priority: "high" | "medium" | "low";
-    suggestion: string;
+export interface ImprovementAction {
+    action_id: string;
+    title: string;
+    description?: string;
+    implementation_hint?: string;
+    expected_improvement: number;
+    expected_improvement_range?: number[];
+    effort: "low" | "medium" | "high";
+    priority_score?: number;
+}
+
+export interface ImprovementGuide {
+    guide_id: string;
+    created_at: string;
+    component: string;
+    target_metrics: string[];
+    priority: string;
+    actions: ImprovementAction[];
+    evidence?: Record<string, any> | null;
+    affected_test_case_ids?: string[];
+    verification_command?: string;
+    metadata?: Record<string, any> | null;
 }
 
 export interface ImprovementReport {
+    report_id: string;
     run_id: string;
-    improvements: ImprovementItem[];
-    summary: string;
+    created_at: string;
+    total_test_cases: number;
+    failed_test_cases: number;
+    pass_rate: number;
+    metric_scores: Record<string, number>;
+    metric_thresholds: Record<string, number>;
+    metric_gaps: Record<string, number>;
+    guides: ImprovementGuide[];
+    total_expected_improvement: Record<string, number>;
+    analysis_methods_used: string[];
+    metadata: Record<string, any>;
 }
 
 export interface LLMReport {

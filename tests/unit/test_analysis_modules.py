@@ -572,6 +572,95 @@ class TestCausalAnalyzerModule:
 
 
 # =============================================================================
+# DiagnosticPlaybookModule Tests
+# =============================================================================
+
+
+class TestDiagnosticPlaybookModule:
+    """DiagnosticPlaybookModule 테스트 - 진단 플레이북 모듈."""
+
+    def test_execute_uses_run_thresholds(self):
+        """run threshold를 우선 적용."""
+        from evalvault.adapters.outbound.analysis.diagnostic_playbook_module import (
+            DiagnosticPlaybookModule,
+        )
+        from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="run-1",
+            thresholds={"faithfulness": 0.8},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.75, threshold=0.8)],
+                )
+            ],
+        )
+
+        module = DiagnosticPlaybookModule()
+        inputs = {
+            "load_data": {"run": run},
+            "ragas_eval": {"metrics": {"faithfulness": 0.75}},
+        }
+
+        result = module.execute(inputs)
+
+        assert result["diagnostics"][0]["threshold"] == 0.8
+        assert result["diagnostics"][0]["gap"] == 0.05
+        assert result["recommendations"]
+
+    def test_execute_fallback_threshold(self):
+        """run 정보가 없으면 기본 threshold 사용."""
+        from evalvault.adapters.outbound.analysis.diagnostic_playbook_module import (
+            DiagnosticPlaybookModule,
+        )
+
+        module = DiagnosticPlaybookModule()
+        inputs = {"ragas_eval": {"metrics": {"faithfulness": 0.55}}}
+
+        result = module.execute(inputs, params={"metric_threshold": 0.6})
+
+        assert result["diagnostics"][0]["threshold"] == 0.6
+        assert result["threshold"] == 0.6
+
+
+# =============================================================================
+# RetrievalBenchmarkModule Tests
+# =============================================================================
+
+
+class TestRetrievalBenchmarkModule:
+    """RetrievalBenchmarkModule 테스트 - 검색 벤치마크 모듈."""
+
+    def test_execute_requires_path(self):
+        """benchmark_path 없으면 에러."""
+        from evalvault.adapters.outbound.analysis.retrieval_benchmark_module import (
+            RetrievalBenchmarkModule,
+        )
+
+        module = RetrievalBenchmarkModule()
+        result = module.execute({"__context__": {}})
+
+        assert result["available"] is False
+        assert "benchmark_path" in result["error"]
+
+    def test_execute_invalid_path(self):
+        """존재하지 않는 경로면 에러."""
+        from evalvault.adapters.outbound.analysis.retrieval_benchmark_module import (
+            RetrievalBenchmarkModule,
+        )
+
+        module = RetrievalBenchmarkModule()
+        result = module.execute(
+            {"__context__": {}},
+            params={"benchmark_path": "not-found.json"},
+        )
+
+        assert result["available"] is False
+        assert "벤치마크 파일" in result["error"]
+
+
+# =============================================================================
 # VerificationReportModule Tests
 # =============================================================================
 

@@ -9,11 +9,13 @@ import {
     fetchAnalysisIntents,
     fetchAnalysisHistory,
     fetchRuns,
+    fetchImprovementGuide,
     runAnalysis,
     saveAnalysisResult,
     type AnalysisHistoryItem,
     type AnalysisIntentInfo,
     type AnalysisResult,
+    type ImprovementReport,
     type RunSummary,
 } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
@@ -44,6 +46,10 @@ const CATEGORY_META: Record<string, { label: string; description: string }> = {
         label: "보고서",
         description: "요약/상세/비교 리포트",
     },
+    benchmark: {
+        label: "벤치마크",
+        description: "실제 문서 기반 검색 성능 측정",
+    },
 };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -54,10 +60,32 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     pending: { label: "대기", color: "text-muted-foreground" },
 };
 
+const PRIORITY_META: Record<string, { label: string; color: string }> = {
+    p0_critical: { label: "P0 Critical", color: "text-rose-600" },
+    p1_high: { label: "P1 High", color: "text-amber-600" },
+    p2_medium: { label: "P2 Medium", color: "text-yellow-600" },
+    p3_low: { label: "P3 Low", color: "text-emerald-600" },
+};
+
+const EFFORT_LABEL: Record<string, string> = {
+    low: "낮음",
+    medium: "중간",
+    high: "높음",
+};
+
 const RUN_REQUIRED_MODULES = new Set([
     "run_loader",
+    "ragas_evaluator",
+    "low_performer_extractor",
+    "diagnostic_playbook",
+    "root_cause_analyzer",
     "retrieval_analyzer",
     "retrieval_quality_checker",
+    "bm25_searcher",
+    "embedding_searcher",
+    "hybrid_rrf",
+    "hybrid_weighted",
+    "search_comparator",
     "nlp_analyzer",
     "pattern_detector",
     "morpheme_analyzer",
@@ -68,7 +96,6 @@ const RUN_REQUIRED_MODULES = new Set([
     "model_analyzer",
     "run_analyzer",
     "run_comparator",
-    "search_comparator",
     "statistical_comparator",
     "time_series_analyzer",
     "trend_detector",
@@ -105,6 +132,13 @@ export function AnalysisLab() {
     const [metadataError, setMetadataError] = useState<string | null>(null);
     const [useLlmReport, setUseLlmReport] = useState(true);
     const [recomputeRagas, setRecomputeRagas] = useState(false);
+    const [benchmarkPath, setBenchmarkPath] = useState(
+        "examples/benchmarks/korean_rag/retrieval_test.json"
+    );
+    const [benchmarkTopK, setBenchmarkTopK] = useState(5);
+    const [benchmarkNdcgK, setBenchmarkNdcgK] = useState("");
+    const [benchmarkUseHybrid, setBenchmarkUseHybrid] = useState(false);
+    const [benchmarkEmbeddingProfile, setBenchmarkEmbeddingProfile] = useState("");
     const [historySearch, setHistorySearch] = useState("");
     const [intentFilter, setIntentFilter] = useState("all");
     const [runFilter, setRunFilter] = useState("all");
@@ -113,6 +147,10 @@ export function AnalysisLab() {
     const [dateTo, setDateTo] = useState("");
     const [sortOrder, setSortOrder] = useState("newest");
     const [compareSelection, setCompareSelection] = useState<string[]>([]);
+    const [improvementReport, setImprovementReport] = useState<ImprovementReport | null>(null);
+    const [improvementLoading, setImprovementLoading] = useState(false);
+    const [improvementError, setImprovementError] = useState<string | null>(null);
+    const [includeImprovementLlm, setIncludeImprovementLlm] = useState(false);
 
     useEffect(() => {
         async function loadCatalog() {
@@ -155,6 +193,11 @@ export function AnalysisLab() {
             setRecomputeRagas(false);
         }
     }, [selectedRunId, recomputeRagas]);
+
+    useEffect(() => {
+        setImprovementReport(null);
+        setImprovementError(null);
+    }, [analysisRunId]);
 
     const groupedCatalog = useMemo(() => {
         const grouped: Record<string, AnalysisIntentInfo[]> = {};
@@ -268,6 +311,11 @@ export function AnalysisLab() {
 
     const handleRun = async (intent: AnalysisIntentInfo) => {
         if (!intent.available || loading) return;
+        const isBenchmark = intent.intent === "benchmark_retrieval";
+        if (isBenchmark && !benchmarkPath.trim()) {
+            setError("벤치마크 파일 경로를 입력하세요.");
+            return;
+        }
         const runIdForAnalysis = selectedRunId || null;
         setSelectedIntent(intent);
         setError(null);
@@ -283,6 +331,20 @@ export function AnalysisLab() {
             };
             if (recomputeRagas && runIdForAnalysis) {
                 params.recompute_ragas = true;
+            }
+            if (isBenchmark) {
+                params.benchmark_path = benchmarkPath.trim();
+                params.top_k = benchmarkTopK;
+                if (benchmarkNdcgK.trim()) {
+                    const ndcgValue = Number(benchmarkNdcgK);
+                    if (!Number.isNaN(ndcgValue) && ndcgValue > 0) {
+                        params.ndcg_k = ndcgValue;
+                    }
+                }
+                params.use_hybrid_search = benchmarkUseHybrid;
+                if (benchmarkEmbeddingProfile.trim()) {
+                    params.embedding_profile = benchmarkEmbeddingProfile.trim();
+                }
             }
             const analysis = await runAnalysis(
                 intent.sample_query,
@@ -340,6 +402,20 @@ export function AnalysisLab() {
             setSaveError(err instanceof Error ? err.message : "Failed to save analysis result");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleLoadImprovement = async () => {
+        if (!analysisRunId || improvementLoading) return;
+        setImprovementLoading(true);
+        setImprovementError(null);
+        try {
+            const report = await fetchImprovementGuide(analysisRunId, includeImprovementLlm);
+            setImprovementReport(report);
+        } catch (err) {
+            setImprovementError(err instanceof Error ? err.message : "개선 가이드 로드 실패");
+        } finally {
+            setImprovementLoading(false);
         }
     };
 
@@ -428,6 +504,8 @@ export function AnalysisLab() {
         || "분석";
 
     const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
+    const activeIntentValue = intentDefinition?.intent || result?.intent || null;
+    const isBenchmarkIntent = activeIntentValue === "benchmark_retrieval";
     const requiresRunData = useMemo(() => {
         const nodes = intentDefinition?.nodes || selectedIntent?.nodes || [];
         return nodes.some(node => RUN_REQUIRED_MODULES.has(node.module));
@@ -520,6 +598,61 @@ export function AnalysisLab() {
                                     </p>
                                 )}
                             </div>
+                            {selectedIntent?.intent === "benchmark_retrieval" && (
+                                <div className="mt-4 space-y-3 text-xs">
+                                    <label className="text-muted-foreground">
+                                        벤치마크 파일 경로
+                                        <input
+                                            type="text"
+                                            value={benchmarkPath}
+                                            onChange={(event) => setBenchmarkPath(event.target.value)}
+                                            placeholder="examples/benchmarks/korean_rag/retrieval_test.json"
+                                            className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        />
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <label className="text-muted-foreground">
+                                            top_k
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={benchmarkTopK}
+                                                onChange={(event) => setBenchmarkTopK(Number(event.target.value))}
+                                                className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                            />
+                                        </label>
+                                        <label className="text-muted-foreground">
+                                            ndcg_k (선택)
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={benchmarkNdcgK}
+                                                onChange={(event) => setBenchmarkNdcgK(event.target.value)}
+                                                className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                            />
+                                        </label>
+                                    </div>
+                                    <label className="flex items-center gap-2 text-muted-foreground">
+                                        <input
+                                            type="checkbox"
+                                            className="accent-primary"
+                                            checked={benchmarkUseHybrid}
+                                            onChange={(event) => setBenchmarkUseHybrid(event.target.checked)}
+                                        />
+                                        하이브리드 검색 사용 (BM25 + Dense)
+                                    </label>
+                                    <label className="text-muted-foreground">
+                                        임베딩 프로필 (dev/prod)
+                                        <input
+                                            type="text"
+                                            value={benchmarkEmbeddingProfile}
+                                            onChange={(event) => setBenchmarkEmbeddingProfile(event.target.value)}
+                                            placeholder="dev"
+                                            className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-xs"
+                                        />
+                                    </label>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
@@ -724,7 +857,9 @@ export function AnalysisLab() {
                                     <div className="space-y-3">
                                         {intents.map(intent => {
                                             const isActive = selectedIntent?.intent === intent.intent;
-                                            const isDisabled = !intent.available || loading;
+                                            const isBenchmark = intent.intent === "benchmark_retrieval";
+                                            const isMissingBenchmarkPath = isBenchmark && !benchmarkPath.trim();
+                                            const isDisabled = !intent.available || loading || isMissingBenchmarkPath;
                                             return (
                                                 <button
                                                     key={intent.intent}
@@ -923,6 +1058,179 @@ export function AnalysisLab() {
                                     {prioritySummary && (
                                         <PrioritySummaryPanel summary={prioritySummary} />
                                     )}
+
+                                    <div className="border border-border rounded-lg p-4 space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <h3 className="text-sm font-semibold">개선 가이드</h3>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Run 기반 우선순위 개선 제안을 확인합니다.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-xs">
+                                                <label className="flex items-center gap-2 text-muted-foreground">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="accent-primary"
+                                                        checked={includeImprovementLlm}
+                                                        onChange={(event) =>
+                                                            setIncludeImprovementLlm(event.target.checked)
+                                                        }
+                                                        disabled={!analysisRunId}
+                                                    />
+                                                    LLM 보강
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadImprovement}
+                                                    disabled={!analysisRunId || improvementLoading}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40 disabled:opacity-60"
+                                                >
+                                                    {improvementLoading
+                                                        ? "불러오는 중..."
+                                                        : improvementReport
+                                                            ? "새로고침"
+                                                            : "불러오기"}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {!analysisRunId && (
+                                            <p className="text-xs text-amber-600">
+                                                개선 가이드는 Run 선택이 필요합니다.
+                                            </p>
+                                        )}
+
+                                        {improvementError && (
+                                            <p className="text-xs text-destructive">{improvementError}</p>
+                                        )}
+
+                                        {!improvementReport && !improvementLoading && analysisRunId && !improvementError && (
+                                            <p className="text-xs text-muted-foreground">
+                                                개선 가이드를 불러오면 우선순위와 예상 개선폭을 확인할 수 있습니다.
+                                            </p>
+                                        )}
+
+                                        {improvementReport && (
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                                    <div className="border border-border rounded-lg p-3">
+                                                        <p className="text-muted-foreground">Pass Rate</p>
+                                                        <p className="text-sm font-semibold mt-1">
+                                                            {(improvementReport.pass_rate * 100).toFixed(1)}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="border border-border rounded-lg p-3">
+                                                        <p className="text-muted-foreground">Failed Cases</p>
+                                                        <p className="text-sm font-semibold mt-1">
+                                                            {improvementReport.failed_test_cases}
+                                                            /
+                                                            {improvementReport.total_test_cases}
+                                                        </p>
+                                                    </div>
+                                                    <div className="border border-border rounded-lg p-3">
+                                                        <p className="text-muted-foreground">Guide Count</p>
+                                                        <p className="text-sm font-semibold mt-1">
+                                                            {improvementReport.guides.length}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <p className="text-xs font-semibold text-muted-foreground">메트릭 갭</p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        {Object.entries(improvementReport.metric_scores).map(
+                                                            ([metric, score]) => {
+                                                                const threshold = improvementReport.metric_thresholds[metric] ?? 0.7;
+                                                                const gap = improvementReport.metric_gaps[metric] ?? threshold - score;
+                                                                const passed = score >= threshold;
+                                                                return (
+                                                                    <div
+                                                                        key={metric}
+                                                                        className="border border-border rounded-lg p-3 text-xs"
+                                                                    >
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="font-medium">{metric}</span>
+                                                                            <span className={passed ? "text-emerald-600" : "text-rose-600"}>
+                                                                                {passed ? "통과" : "미달"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="text-muted-foreground mt-1">
+                                                                            score {score.toFixed(3)} / threshold {threshold.toFixed(2)} / gap {gap.toFixed(3)}
+                                                                        </p>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <p className="text-xs font-semibold text-muted-foreground">우선순위 가이드</p>
+                                                    {improvementReport.guides.length === 0 ? (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            현재 탐지된 개선 가이드가 없습니다.
+                                                        </p>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {improvementReport.guides.map((guide) => {
+                                                                const meta = PRIORITY_META[guide.priority] || {
+                                                                    label: guide.priority,
+                                                                    color: "text-muted-foreground",
+                                                                };
+                                                                const totalImprovement = guide.actions.reduce(
+                                                                    (sum, action) => sum + (action.expected_improvement || 0),
+                                                                    0
+                                                                );
+                                                                return (
+                                                                    <div key={guide.guide_id} className="border border-border rounded-lg p-3">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">
+                                                                                    {guide.component}
+                                                                                </p>
+                                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                                    대상 메트릭: {guide.target_metrics.join(", ") || "-"}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                <p className={`text-xs font-semibold ${meta.color}`}>
+                                                                                    {meta.label}
+                                                                                </p>
+                                                                                <p className="text-[11px] text-muted-foreground mt-1">
+                                                                                    예상 개선 +{(totalImprovement * 100).toFixed(1)}%
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                        {guide.actions.length > 0 && (
+                                                                            <div className="mt-3 space-y-2 text-xs">
+                                                                                {guide.actions.map((action) => (
+                                                                                    <div key={action.action_id} className="border border-border rounded-lg p-2">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <p className="font-medium">{action.title}</p>
+                                                                                            <span className="text-muted-foreground">
+                                                                                                {EFFORT_LABEL[action.effort] || action.effort}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        {action.description && (
+                                                                                            <p className="text-muted-foreground mt-1">{action.description}</p>
+                                                                                        )}
+                                                                                        <p className="text-muted-foreground mt-1">
+                                                                                            예상 개선 +{(action.expected_improvement * 100).toFixed(1)}%
+                                                                                        </p>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {selectedIntent?.nodes.length ? (
                                         <div>

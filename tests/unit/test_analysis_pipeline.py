@@ -78,6 +78,13 @@ class TestAnalysisIntent:
         assert hasattr(AnalysisIntent, "ANALYZE_TRENDS")
         assert AnalysisIntent.ANALYZE_TRENDS.value == "analyze_trends"
 
+    def test_intent_has_benchmark_retrieval(self):
+        """BENCHMARK_RETRIEVAL 의도 존재 확인."""
+        from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+
+        assert hasattr(AnalysisIntent, "BENCHMARK_RETRIEVAL")
+        assert AnalysisIntent.BENCHMARK_RETRIEVAL.value == "benchmark_retrieval"
+
     def test_intent_has_generate_summary(self):
         """GENERATE_SUMMARY 의도 존재 확인."""
         from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
@@ -107,10 +114,10 @@ class TestAnalysisIntent:
         assert isinstance(AnalysisIntent.VERIFY_MORPHEME, str)
 
     def test_all_intents_count(self):
-        """모든 의도가 12개인지 확인."""
+        """모든 의도가 13개인지 확인."""
         from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 
-        assert len(AnalysisIntent) == 12
+        assert len(AnalysisIntent) == 13
 
 
 # =============================================================================

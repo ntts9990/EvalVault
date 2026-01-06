@@ -114,6 +114,9 @@ class AnalysisIntent(Enum):
     ANALYZE_PATTERNS = "analyze_patterns"         # 패턴 분석
     ANALYZE_TRENDS = "analyze_trends"             # 시계열 추세 분석
 
+    # 벤치마크 (Benchmark)
+    BENCHMARK_RETRIEVAL = "benchmark_retrieval"   # 검색 벤치마크
+
     # 보고서 (Report)
     GENERATE_SUMMARY = "generate_summary"         # 요약 보고서
     GENERATE_DETAILED = "generate_detailed"       # 상세 보고서
@@ -160,6 +163,7 @@ class AnalysisNode:
 | `ragas_eval` | RAGAS 평가 | - | 6개 메트릭 평가 |
 | `diagnostic` | 진단 플레이북 | ragas_eval | 패턴 기반 문제 진단 |
 | `causal` | 인과 분석 | ragas_eval | 메트릭 간 인과 관계 분석 |
+| `retrieval_benchmark` | 검색 벤치마크 | - | 문서/쿼리 기반 검색 성능 평가 |
 | `report` | 보고서 생성 | * | LLM 기반 종합 보고서 |
 
 `data_loader` → `statistical_analyzer` 구간은 베이스 분석 어댑터와 직접 연동됩니다.

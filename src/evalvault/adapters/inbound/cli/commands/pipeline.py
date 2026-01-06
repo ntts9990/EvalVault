@@ -62,6 +62,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             PrioritySummaryModule,
             RagasEvaluatorModule,
             RetrievalAnalyzerModule,
+            RetrievalBenchmarkModule,
             RetrievalQualityCheckerModule,
             RootCauseAnalyzerModule,
             RunAnalyzerModule,
@@ -112,6 +113,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
         service.register_module(EmbeddingAnalyzerModule())
         service.register_module(EmbeddingDistributionModule())
         service.register_module(RetrievalAnalyzerModule())
+        service.register_module(RetrievalBenchmarkModule())
         service.register_module(RetrievalQualityCheckerModule())
         service.register_module(BM25SearcherModule())
         service.register_module(EmbeddingSearcherModule())
@@ -207,6 +209,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             AnalysisIntent.ANALYZE_LOW_METRICS: ("Analysis", "낮은 메트릭 원인 분석"),
             AnalysisIntent.ANALYZE_PATTERNS: ("Analysis", "패턴 분석"),
             AnalysisIntent.ANALYZE_TRENDS: ("Analysis", "추세 분석"),
+            AnalysisIntent.BENCHMARK_RETRIEVAL: ("Benchmark", "검색 벤치마크"),
             AnalysisIntent.GENERATE_SUMMARY: ("Report", "요약 보고서 생성"),
             AnalysisIntent.GENERATE_DETAILED: ("Report", "상세 보고서 생성"),
             AnalysisIntent.GENERATE_COMPARISON: ("Report", "비교 보고서 생성"),

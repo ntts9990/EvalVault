@@ -157,6 +157,17 @@ class IntentKeywordRegistry:
             "추이",
             "history",
         }
+        self._keywords[AnalysisIntent.BENCHMARK_RETRIEVAL] = {
+            "벤치마크",
+            "benchmark",
+            "검색 벤치마크",
+            "retrieval benchmark",
+            "검색 평가",
+            "retrieval 평가",
+            "retriever",
+            "recall@k",
+            "ndcg",
+        }
 
         # 보고서 (Report) - 높은 가중치 키워드 (보고서 관련 키워드가 있으면 우선)
         self._keywords[AnalysisIntent.GENERATE_SUMMARY] = {
