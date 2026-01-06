@@ -17,6 +17,7 @@
    - [데이터셋 준비](#데이터셋-준비)
 3. [핵심 워크플로](#핵심-워크플로)
    - [CLI 실행](#cli-실행)
+   - [KG/GraphRAG 흐름](#kggraphrag-흐름)
    - [히스토리/비교/내보내기](#히스토리비교내보내기)
    - [Web UI](#web-ui)
    - [단계별 성능 평가 (stage)](#단계별-성능-평가-stage)
@@ -298,6 +299,41 @@ uv run evalvault run tests/fixtures/sample_dataset.json \
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset production
 ```
+
+### KG/GraphRAG 흐름 {#kggraphrag-흐름}
+
+EvalVault에서 KG는 **데이터셋이 아니라 문서 지식**에서 생성합니다.
+GraphRAG는 `contexts`가 비어 있는 테스트 케이스에만 문서 기반 컨텍스트를 채웁니다.
+
+입력 양식 요약:
+- Retriever 문서: JSON/JSONL/TXT 지원.
+  - JSON은 `{"documents":[{"doc_id":"...","content":"..."}]}` 또는 리스트 형식.
+- KG JSON: `entities`/`relations` 배열.
+  - `source_document_id`는 retriever 문서 `doc_id`와 반드시 일치해야 합니다.
+- 템플릿: `templates/retriever_docs_template.json`,
+  `templates/kg_template.json`
+- 데이터셋 템플릿(JSON/CSV/XLSX)은 CLI 로더와 동일해 지정된 양식이면 정상 파싱됩니다.
+
+CLI 실행 예시:
+```bash
+uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
+  --retriever graphrag \
+  --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
+  --kg tests/fixtures/kg/minimal_graph.json \
+  --metrics faithfulness \
+  --profile dev
+```
+
+Web UI 제약:
+- Evaluation Studio는 `bm25/hybrid`만 노출되며 GraphRAG/KG 입력은 없습니다.
+- Knowledge Base가 생성한 `data/kg/knowledge_graph.json`은 `graph`로 감싸져 있어
+  `--kg`에 바로 사용할 수 없습니다. `graph`만 추출하거나
+  `{ "knowledge_graph": ... }`로 감싸서 사용하세요.
+
+개선 필요:
+- Web UI에서 GraphRAG/`--kg` 입력 및 KG 파일 검증 흐름 추가
+- `kg build`/Web UI 산출물과 `--kg` 로더 포맷 통일
+- `doc_id` 정합성 검증 및 자동 매핑 도구 제공
 
 ### 히스토리/비교/내보내기
 ```bash

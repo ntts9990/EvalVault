@@ -58,6 +58,9 @@
 
 !!! warning
     `source_document_id`는 **retriever 문서의 `doc_id`와 반드시 일치**해야 합니다.
+    `evalvault kg build`나 Web UI Knowledge Base 출력은 `graph` 키로 감싸져 있어
+    `--kg`로 바로 로드되지 않습니다. `graph`만 추출하거나
+    `{ "knowledge_graph": ... }`로 감싸서 사용하세요.
 
 ## 4. 운영 절차
 
@@ -66,6 +69,8 @@
 - GraphRAG는 `--retriever-docs` 파일을 기준으로 문서 본문을 로딩합니다.
 - `doc_id`는 KG의 `source_document_id`와 일치해야 경고 없이 정상 매핑됩니다.
 - 지원 형식: JSON/JSONL/TXT
+- 템플릿: `docs/templates/retriever_docs_template.json`,
+  `docs/templates/kg_template.json`
 
 ```json
 [

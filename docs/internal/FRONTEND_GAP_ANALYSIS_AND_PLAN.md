@@ -62,7 +62,106 @@
 
 ---
 
-## 4. Stage Analysis & Waterfall (Medium Priority)
+## 4. GraphRAG Configuration & KG Validation (High Priority)
+*Ref: [LIGHTRAG_OPERATIONS_GUIDE.md], [CLI_GUIDE.md]*
+
+**Gap**: Evaluation Studio exposes only `bm25/hybrid`. There is no UI for GraphRAG/KG input, and the Knowledge Base output is not directly usable with `--kg`.
+
+### Implementation Strategy
+*   **Evaluation Studio (Advanced Config)**:
+    * Add `graphrag` to retriever modes and expose `top_k`.
+    * Add KG JSON picker (upload + server path) alongside retriever docs.
+    * Add inline note: GraphRAG fills contexts **only when empty**.
+    * Add "Validate KG" action: show entity/relation counts and doc_id mismatches (first N).
+*   **Knowledge Base**:
+    * List KG build outputs in `data/kg` with "Use in Evaluation" action.
+    * Provide "Normalize Format" toggle to wrap as `{ "knowledge_graph": ... }`.
+    * Show doc_id alignment summary (KG `source_document_id` vs retriever docs `doc_id`).
+*   **Backend**:
+    * Accept KG payloads wrapped in `graph` or `knowledge_graph`.
+    * Add KG validation endpoint (schema + doc_id match) and KG upload endpoint.
+
+### Scope Proposal (v1)
+*   **Phase 1 (MVP)**:
+    * Enable `graphrag` retriever mode in Evaluation Studio.
+    * Support KG file upload + server path selection.
+    * Show a hard warning: GraphRAG only fills empty `contexts`.
+*   **Phase 2 (Validation)**:
+    * KG schema validation (entities/relations) and doc_id mismatch check (first N).
+    * Surface validation result inline before run.
+*   **Phase 3 (Knowledge Base UX)**:
+    * List KG outputs in `data/kg` with "Use in Evaluation".
+    * Normalize/export KG to `knowledge_graph` wrapper for CLI parity.
+
+### API Priority (v1)
+1. `POST /runs/options/kg` (upload KG JSON, return server path)
+2. `POST /knowledge/validate` (schema + doc_id alignment report)
+3. `GET /knowledge/kg-files` (list server-side KG outputs)
+
+### Validation Spec (v1)
+**Goal**: Fail fast on invalid KG structure and warn on doc_id mismatches before running GraphRAG.
+
+**Request (JSON)**:
+```json
+{
+  "kg_path": "data/kg/knowledge_graph.json",
+  "retriever_docs_path": "data/retriever_docs/graphrag_docs.json",
+  "max_samples": 10
+}
+```
+*Optional*: allow inline `kg_payload` to validate without server file storage.
+*Normalization*: accept `{ "graph": ... }` or `{ "knowledge_graph": ... }` wrappers.
+
+**Validation Checks**
+1. **Schema**
+   - `entities`/`relations` are arrays.
+   - Entity: `name`, `entity_type` required; `confidence` in `[0,1]`; `provenance` in `regex|llm|manual|unknown` (default `unknown`).
+   - Relation: `source`, `target`, `relation_type` required; `source != target`; `confidence` in `[0,1]`.
+2. **Integrity**
+   - Relation endpoints exist in entity set (orphan relations -> warning).
+   - Duplicate entity names reported (first N).
+3. **doc_id Alignment**
+   - KG `source_document_id` must exist in retriever docs `doc_id`.
+   - Missing `source_document_id` counted (warning).
+   - Unused retriever docs reported (info).
+
+**Response (JSON)**:
+```json
+{
+  "valid": false,
+  "errors": [
+    {"code": "KG_SCHEMA", "message": "Missing entities array"}
+  ],
+  "warnings": [
+    {"code": "DOC_ID_MISMATCH", "message": "Unknown doc_id: doc-999"}
+  ],
+  "summary": {
+    "entities": 120,
+    "relations": 310,
+    "orphan_relations": 4,
+    "missing_source_document_id": 12,
+    "doc_id_mismatches": 7
+  },
+  "samples": {
+    "orphan_relations": [{"source": "A", "target": "B"}],
+    "unknown_doc_ids": ["doc-999"]
+  }
+}
+```
+
+**UI Usage**
+- `valid=false` + `errors` → Run disabled.
+- `warnings` only → Allow run with “Run Anyway” confirmation.
+- Surface doc_id mismatch counts inline with a “Fix doc_id” hint.
+
+### Out of Scope (v1)
+* KG visualization/graph explorer
+* KG diff/versioning UI
+* Auto doc_id reconciliation or mapping wizard
+
+---
+
+## 5. Stage Analysis & Waterfall (Medium Priority)
 *Ref: [OBSERVABILITY_PLAYBOOK.md], [06-production-tips.md]*
 
 **Gap**: `evalvault stage` command exists, but no UI to visualize latency breakdown.
@@ -75,7 +174,7 @@
 
 ---
 
-## 5. Domain Memory Insights (Medium Priority)
+## 6. Domain Memory Insights (Medium Priority)
 *Ref: [07-domain-memory.md]*
 
 **Gap**: Tutorial mentions "Trend Analysis" and "Context Augmentation", but UI only lists Facts/Behaviors.
@@ -90,12 +189,15 @@
 
 ---
 
-## 6. Technical Integration Plan
+## 7. Technical Integration Plan
 
 ### API Extensions Needed
 1.  `GET /runs/compare`: (Or client-side merge).
 2.  `POST /runs/start`: Support `phoenix_config` (dataset/experiment names) and `batch_size`.
 3.  `GET /domain/trends`: Endpoint to fetch metric history for a domain.
+4.  `POST /runs/options/kg`: Upload KG JSON file (server storage).
+5.  `POST /knowledge/validate`: Validate KG schema and doc_id mapping.
+6.  `GET /knowledge/kg-files`: List KG outputs in `data/kg`.
 
 ### Visual Style
 *   **Consistency**: Use existing `lucide-react` icons and `Tailwind` spacing.

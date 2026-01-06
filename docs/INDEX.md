@@ -20,7 +20,7 @@ docs/
 │   ├── guides/                      # USER/CLI/DEV/OBS 가이드
 │   ├── architecture/ARCHITECTURE.md # 아키텍처 가이드
 │   ├── status/                      # STATUS/ROADMAP
-│   ├── templates/                   # 데이터셋 템플릿 (JSON/CSV/XLSX)
+│   ├── templates/                   # 데이터셋/KG/문서 템플릿
 │   └── tutorials/                   # 7개 튜토리얼
 │
 └── 🔧 개발용 문서 (Internal)

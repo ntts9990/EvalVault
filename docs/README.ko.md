@@ -73,6 +73,39 @@ Domain Memory를 켜면 자동 조정될 수 있습니다.
 
 ---
 
+## KG/GraphRAG 사용 (문서 기반)
+
+EvalVault에서 KG는 **평가 데이터셋이 아니라 문서 지식**에서 생성합니다.
+데이터셋은 질문/답변/컨텍스트를 담는 평가 케이스이고, GraphRAG는
+`contexts`가 비어 있는 케이스에만 문서 기반 컨텍스트를 채웁니다.
+
+**입력 양식**
+- Retriever 문서: JSON/JSONL/TXT 지원.
+  - JSON은 `{"documents":[{"doc_id":"...","content":"..."}]}` 또는 리스트 형식.
+- KG JSON: `entities`/`relations` 배열.
+  - `source_document_id`는 retriever 문서의 `doc_id`와 반드시 일치해야 합니다.
+- 템플릿: `templates/retriever_docs_template.json`,
+  `templates/kg_template.json`
+- Web UI 템플릿(JSON/CSV/XLSX)은 CLI 로더와 동일해 지정된 양식이면 정상 파싱됩니다.
+
+**CLI 예시 (GraphRAG)**
+```bash
+uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
+  --retriever graphrag \
+  --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
+  --kg tests/fixtures/kg/minimal_graph.json \
+  --metrics faithfulness \
+  --profile dev
+```
+
+**Web UI 제약**
+- Evaluation Studio는 `bm25/hybrid`만 노출되며 GraphRAG/KG 입력은 없습니다.
+- Knowledge Base가 생성한 `data/kg/knowledge_graph.json`은 `graph`로 감싸져 있어
+  `--kg`에 바로 사용할 수 없습니다. `graph`만 추출하거나
+  `{ "knowledge_graph": ... }`로 감싸서 사용하세요.
+
+---
+
 ## 개요
 
 EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
@@ -88,6 +121,12 @@ EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 FastAPI + React 
 **현재 상태 메모**
 - Web UI 보고서는 기본/상세 템플릿 + LLM 보고서 중심이며 비교 템플릿은 준비 중입니다.
 - Domain Memory 인사이트는 CLI 중심으로 제공되며 Web UI 패널은 준비 중입니다.
+
+**개선 필요**
+- Web UI에서 GraphRAG/`--kg` 입력과 KG 파일 검증 흐름 추가
+- `kg build`/Web UI 산출물과 `--kg` 로더 포맷 통일
+- Knowledge Base의 KG 통계/파일 목록/문서 매핑 UI 보강
+- `doc_id` 정합성 검증 및 자동 매핑 도구 제공
 
 상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](guides/USER_GUIDE.md)를 참고하세요.
 

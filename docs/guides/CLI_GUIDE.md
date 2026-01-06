@@ -76,6 +76,11 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   - `--retriever-top-k`: 검색 결과 상위 k개를 컨텍스트로 사용합니다.
   - `--kg`: GraphRAG용 Knowledge Graph JSON 파일을 지정합니다.
   - `--stream` 모드에서는 retriever 적용을 건너뜁니다.
+- GraphRAG는 `contexts`가 비어 있는 테스트 케이스에만 컨텍스트를 채웁니다.
+- `--kg`는 `entities/relations` 구조(또는 `{ "knowledge_graph": ... }` 래퍼)를 기대합니다.
+  `evalvault kg build` 출력은 `graph` 키로 감싸져 있어 변환 후 사용이 필요합니다.
+- 템플릿: `docs/templates/retriever_docs_template.json`,
+  `docs/templates/kg_template.json`
 - `run-simple`/`run-full`에서도 동일한 retriever 옵션을 사용할 수 있습니다.
 - `--stream` 모드에서는 Domain Memory 및 Phoenix Dataset/Experiment 업로드가 지원되지 않습니다.
 
