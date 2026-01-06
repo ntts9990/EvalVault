@@ -1,6 +1,6 @@
 # EvalVault 문서 인덱스
 
-> **Last Updated**: 2026-01-07
+> **Last Updated**: 2026-01-06
 
 이 디렉터리(`docs/`)는 **배포/공개용 문서**와 **개발·운영 내부용 문서**를 분리하여 관리합니다.
 목적, 기능, 시점에 따라 아래 구조를 참고하세요.
@@ -20,7 +20,7 @@ docs/
 │   ├── guides/                      # USER/CLI/DEV/OBS 가이드
 │   ├── architecture/ARCHITECTURE.md # 아키텍처 가이드
 │   ├── status/                      # STATUS/ROADMAP
-│   ├── templates/                   # 데이터셋 템플릿 (JSON/CSV/XLSX)
+│   ├── templates/                   # 데이터셋/KG/문서 템플릿
 │   └── tutorials/                   # 7개 튜토리얼
 │
 └── 🔧 개발용 문서 (Internal)
@@ -56,6 +56,7 @@ docs/
 | [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
 | [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
 | [guides/RELEASE_CHECKLIST.md](guides/RELEASE_CHECKLIST.md) | 운영/개발 | 배포 체크리스트, 릴리즈 노트 템플릿 |
+| [guides/STREAMLIT_UI.md](guides/STREAMLIT_UI.md) | 참고 | Streamlit UI(레거시) 간단 미리보기 |
 
 ### 튜토리얼
 
@@ -141,4 +142,4 @@ docs/
 ---
 
 **문서 담당**: EvalVault 팀
-**최종 업데이트**: 2026-01-07
+**최종 업데이트**: 2026-01-06

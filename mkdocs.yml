@@ -9,7 +9,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  language: en
+  language: ko
   palette:
     # Light mode
     - media: "(prefers-color-scheme: light)"
@@ -95,13 +95,20 @@ markdown_extensions:
 
 nav:
   - Home: INDEX.md
+  - Docs Hub: DOCS_HUB.md
+  - Overview:
+    - README (Korean): README.ko.md
+    - Project Overview: PROJECT_OVERVIEW.md
+    - Source Guide: PROJECT_SOURCE_GUIDE.md
   - Getting Started:
     - Installation: getting-started/INSTALLATION.md
     - Quickstart: tutorials/01-quickstart.md
   - Guides:
     - User Guide: guides/USER_GUIDE.md
     - CLI Guide: guides/CLI_GUIDE.md
+    - Ragas Performance Tuning: guides/RAGAS_PERFORMANCE_TUNING.md
     - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
+    - Release Checklist: guides/RELEASE_CHECKLIST.md
     - Development Guide: guides/DEV_GUIDE.md
   - Tutorials:
     - Basic Evaluation: tutorials/02-basic-evaluation.md
@@ -127,13 +134,57 @@ nav:
       - Inbound: api/adapters/inbound.md
       - Outbound: api/adapters/outbound.md
     - Configuration: api/config.md
-  - Development:
+  - Status:
     - Roadmap: status/ROADMAP.md
     - Status: status/STATUS.md
-    - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
+  - Enterprise:
+    - Enterprise Readiness: enterprise/ENTERPRISE_READINESS.md
+    - Implementation Plan: enterprise/IMPLEMENTATION_PLAN.md
   - Internal:
-    - Development Guide: internal/reference/DEVELOPMENT_GUIDE.md
-    - Query Analysis: internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md
+    - Guides:
+      - D1 Debug Layer Agent Guide: internal/guides/D1_DEBUG_LAYER_AGENT_GUIDE.md
+    - Plans:
+      - Frontend Gap Analysis: internal/FRONTEND_GAP_ANALYSIS_AND_PLAN.md
+      - AB Test Comparison Plan: internal/plans/AB_TEST_COMPARISON_PLAN.md
+      - Agent Docs Sync Plan: internal/plans/AGENT_DOCS_SYNC_PLAN.md
+      - CLI Development Plan: internal/plans/CLI_DEVELOPMENT_PLAN.md
+      - Debug Tool Plan: internal/plans/DEBUG_TOOL_PLAN.md
+      - Docs Refactor Plan: internal/plans/DOCS_REFACTOR_PLAN.md
+      - P2 Agent Tasks: internal/plans/P2_AGENT_TASKS.md
+      - Parallel Work Plan: internal/plans/PARALLEL_WORK_PLAN.md
+      - User Scenario Execution Plan: internal/plans/USER_SCENARIO_EXECUTION_PLAN.md
+    - Reference:
+      - Development Guide: internal/reference/DEVELOPMENT_GUIDE.md
+      - Query Analysis: internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md
+      - Style Guide: internal/reference/STYLE_GUIDE.md
+      - Agent Strategy: internal/reference/AGENT_STRATEGY.md
+      - LightRAG Operations Guide: internal/reference/LIGHTRAG_OPERATIONS_GUIDE.md
+      - User Scenario Requirements: internal/reference/USER_SCENARIO_REQUIREMENTS.md
+    - Reports:
+      - R1 Completion Report: internal/reports/R1_COMPLETION_REPORT.md
+      - R2 Completion Report: internal/reports/R2_COMPLETION_REPORT.md
+      - R3 Progress Report: internal/reports/R3_PROGRESS_REPORT.md
+      - R4 Progress Report: internal/reports/R4_PROGRESS_REPORT.md
+    - Status:
+      - Internal Status: internal/status/STATUS.md
+      - O1 D1 Debug Report Summary: internal/status/O1_D1_DEBUG_REPORT_SUMMARY.md
+      - O1 Parallel Status: internal/status/O1_PARALLEL_STATUS.md
+    - Logs:
+      - Agent Review Quest Log: internal/logs/AGENT_REVIEW_QUEST_LOG.md
+    - Archive:
+      - Architecture Audit: internal/archive/ARCHITECTURE_AUDIT.md
+      - Completed: internal/archive/COMPLETED.md
+      - D1 Debug Layer R2 R3 Update: internal/archive/D1_debug_layer_r2_r3_update.md
+      - Domain Memory Usage: internal/archive/DOMAIN_MEMORY_USAGE.md
+      - Improvement Plan: internal/archive/IMPROVEMENT_PLAN.md
+      - Korean RAG Optimization: internal/archive/KOREAN_RAG_OPTIMIZATION.md
+      - Parallel Status: internal/archive/PARALLEL_STATUS.md
+      - Parallel Work Plan: internal/archive/PARALLEL_WORK_PLAN.md
+      - Qwen3 Embedding Integration: internal/archive/QWEN3_EMBEDDING_INTEGRATION.md
+      - RAG Performance Data Strategy Final: internal/archive/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md
+      - Ticket Streamlit Prompt Preview: internal/archive/TICKET_STREAMLIT_PROMPT_PREVIEW.md
+  - Legacy:
+    - Streamlit UI (Legacy): guides/STREAMLIT_UI.md
 
 extra:
   social:

@@ -52,6 +52,8 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --memory-language ko
 ```
 
+> Streaming 모드(`--stream`)에서는 Domain Memory를 사용할 수 없습니다.
+
 **동작 원리**:
 1. 과거 평가에서 학습한 메트릭별 신뢰도 점수 조회
 2. 신뢰도 점수에 따라 threshold 자동 조정:

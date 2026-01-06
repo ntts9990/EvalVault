@@ -17,6 +17,7 @@
    - [데이터셋 준비](#데이터셋-준비)
 3. [핵심 워크플로](#핵심-워크플로)
    - [CLI 실행](#cli-실행)
+   - [KG/GraphRAG 흐름](#kggraphrag-흐름)
    - [히스토리/비교/내보내기](#히스토리비교내보내기)
    - [Web UI](#web-ui)
    - [단계별 성능 평가 (stage)](#단계별-성능-평가-stage)
@@ -60,9 +61,10 @@ uv pip install evalvault
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
 uv sync --extra dev        # 기본 개발 환경
-uv sync --extra dev --extra analysis --extra korean               # 전체 기능
+uv sync --extra dev --extra analysis --extra korean --extra web     # 전체 기능
 ```
 
+Phoenix 트레이싱을 쓰면 `--extra phoenix`를 추가로 설치하세요.
 Extras 설명은 README 표를 참고하세요. `.python-version`이 Python 3.12를 고정하므로 추가 설치가 필요 없습니다.
 
 ---
@@ -219,7 +221,10 @@ profiles:
 - 또는 CLI `--profile <name>` / `-p <name>` (예: dev, openai, vllm)
 
 ### 데이터셋 준비
-EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습니다.
+EvalVault는 JSON/CSV/Excel을 지원합니다. **threshold는 데이터셋에 포함**되며,
+값이 없으면 기본값 `0.7`을 사용합니다. Domain Memory를 켜면 신뢰도에 따라 자동 조정될 수 있습니다.
+
+JSON 예시는 아래와 같습니다.
 
 ```json
 {
@@ -238,7 +243,13 @@ EvalVault는 JSON/CSV/Excel을 지원합니다. JSON 예시는 아래와 같습�
 }
 ```
 
-CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고, 선택적으로 `threshold_*` 컬럼을 넣을 수 있습니다. `threshold_*` 값은 첫 번째로 채워진 행 기준으로 데이터셋 전체 임계값으로 사용됩니다. `contexts`는 `|` 로 구분합니다. 대용량 파일은 Streaming Dataset Loader가 자동 적용됩니다.
+- `thresholds`: 메트릭별 pass 기준 (0.0~1.0)
+- `ground_truth`: `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity`에 필요
+
+CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고,
+선택적으로 `threshold_*` 컬럼을 넣을 수 있습니다. `threshold_*` 값은 **첫 번째로 채워진 행 기준**으로
+데이터셋 전체 임계값으로 사용됩니다. `contexts`는 JSON 배열 문자열 또는 `|` 로 구분합니다.
+대용량 파일은 `--stream` 옵션으로 스트리밍 평가를 활성화하세요.
 
 #### 데이터셋 템플릿
 빈 템플릿은 아래 위치에서 사용할 수 있습니다. 필요한 값만 채워 바로 사용할 수 있습니다.
@@ -266,21 +277,63 @@ uv run evalvault run tests/fixtures/sample_dataset.json \
 옵션 요약:
 - `--metrics` : 쉼표로 구분된 메트릭 목록
 - `--preset` : `quick`/`production`/`comprehensive` 프리셋 적용
+- `--mode` : `simple`/`full` 실행 모드 (또는 `run-simple`/`run-full` 별칭)
 - `--parallel / --batch-size (-b)` : 대량 데이터 병렬 평가
+- `--stream / --stream-chunk-size` : 대용량 데이터셋 스트리밍 평가
 - `--tracker {none,langfuse,phoenix,mlflow}` : 추적기 선택
 - `--db path/to.sqlite` : SQLite 저장소 지정
 - `--use-domain-memory` : Domain Memory 기반 threshold/컨텍스트 보강 활성화
+
+참고:
+- Simple 모드에서는 메트릭/트래커가 고정되고 Domain Memory/Prompt manifest가 비활성화됩니다.
+- Streaming 모드에서는 Domain Memory와 Phoenix Dataset/Experiment 업로드를 사용할 수 없습니다.
 
 ### 메트릭 가이드 {#metrics}
 
 - `uv run evalvault metrics`로 사용 가능한 메트릭을 확인합니다.
 - 기본 추천: `faithfulness` → `answer_relevancy` → `context_precision/context_recall`.
 - `semantic_similarity`, `factual_correctness`는 ground truth가 있는 데이터셋에서만 사용하세요.
+- 커스텀 메트릭(예: `insurance_term_accuracy`)도 metrics 목록에 함께 표시됩니다.
 
 프리셋 예시:
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --preset production
 ```
+
+### KG/GraphRAG 흐름 {#kggraphrag-흐름}
+
+EvalVault에서 KG는 **데이터셋이 아니라 문서 지식**에서 생성합니다.
+GraphRAG는 `contexts`가 비어 있는 테스트 케이스에만 문서 기반 컨텍스트를 채웁니다.
+
+입력 양식 요약:
+- Retriever 문서: JSON/JSONL/TXT 지원.
+  - JSON은 `{"documents":[{"doc_id":"...","content":"..."}]}` 또는 리스트 형식.
+- KG JSON: `entities`/`relations` 배열.
+  - `source_document_id`는 retriever 문서 `doc_id`와 반드시 일치해야 합니다.
+- 템플릿: `templates/retriever_docs_template.json`,
+  `templates/kg_template.json`
+- 데이터셋 템플릿(JSON/CSV/XLSX)은 CLI 로더와 동일해 지정된 양식이면 정상 파싱됩니다.
+
+CLI 실행 예시:
+```bash
+uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
+  --retriever graphrag \
+  --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
+  --kg tests/fixtures/kg/minimal_graph.json \
+  --metrics faithfulness \
+  --profile dev
+```
+
+Web UI 제약:
+- Evaluation Studio는 `bm25/hybrid`만 노출되며 GraphRAG/KG 입력은 없습니다.
+- Knowledge Base가 생성한 `data/kg/knowledge_graph.json`은 `graph`로 감싸져 있어
+  `--kg`에 바로 사용할 수 없습니다. `graph`만 추출하거나
+  `{ "knowledge_graph": ... }`로 감싸서 사용하세요.
+
+개선 필요:
+- Web UI에서 GraphRAG/`--kg` 입력 및 KG 파일 검증 흐름 추가
+- `kg build`/Web UI 산출물과 `--kg` 로더 포맷 통일
+- `doc_id` 정합성 검증 및 자동 매핑 도구 제공
 
 ### 히스토리/비교/내보내기
 ```bash
@@ -289,7 +342,7 @@ uv run evalvault compare <run_a> <run_b> --db evalvault.db
 uv run evalvault export <run_id> -o run.json --db evalvault.db
 ```
 
-### Web UI (React + FastAPI)
+### Web UI (React + FastAPI) {#web-ui}
 ```bash
 # 1) API 서버 실행
 uv run evalvault serve-api --reload
@@ -310,6 +363,17 @@ npm run dev
 - 직접 호출 시에는 API 서버 `.env`에 `CORS_ORIGINS`로 프론트 오리진을 추가합니다.
 - Analysis Lab에서 “결과 저장”을 누르면 SQLite/PostgreSQL의 `pipeline_results`에 저장되며,
   저장된 결과는 좌측 목록에서 즉시 불러옵니다 (`/api/v1/pipeline/results`).
+
+### Streamlit Web UI (레거시/미리보기)
+Streamlit UI는 간단 미리보기용으로만 유지되며 점진적 페이드아웃 예정입니다.
+
+```bash
+uv run evalvault web --db evalvault.db
+```
+
+- `--extra web` 설치가 필요합니다.
+- React UI와 별도이며, 로컬 DB를 빠르게 조회할 때만 권장합니다.
+- 자세한 내용은 [Streamlit Web UI (Legacy)](STREAMLIT_UI.md)를 참고하세요.
 
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
@@ -439,6 +503,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 
 ## Domain Memory & 분석 기능 {#도메인-메모리-활용}
 - `--use-domain-memory` : 평가 전 Domain Memory의 신뢰도로 메트릭 임계값을 자동 조정하고 관련 사실을 컨텍스트에 보강합니다.
+- Streaming 모드(`--stream`)에서는 Domain Memory를 사용할 수 없습니다.
 - `MemoryBasedAnalysis` : `uv run evalvault analyze`에서 과거 LearningMemory와 현재 성능을 비교하여 추세/추천을 생성합니다. (Web UI 미노출)
 - **Web UI 인사이트**: Domain Memory/MemoryBasedAnalysis 인사이트는 CLI 출력 기준으로만 제공됩니다.
 - `ImprovementGuideService` : 규칙 기반 패턴 탐지 + LLM 인사이트를 결합해 우선순위가 매겨진 개선 액션을 제공합니다.
@@ -448,7 +513,7 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 
 ## 한국어 NLP & 데이터 스트리밍
 - `uv sync --extra korean` 설치 시 Kiwi 기반 형태소 분석, BM25/Dense/Hybrid 검색기, 한국어 Faithfulness/Factual 검증기가 활성화됩니다.
-- 대용량 CSV/JSON/Excel은 `StreamingDatasetLoader`가 청크 단위로 처리하여 메모리 사용량을 줄이고 진행률 콜백을 제공합니다 (`StreamingConfig.chunk_size`, `max_rows` 등 조정 가능).
+- 대용량 CSV/JSON/Excel은 `--stream` 옵션으로 청크 단위 평가를 활성화할 수 있습니다 (`--stream-chunk-size`로 조정).
 
 ---
 

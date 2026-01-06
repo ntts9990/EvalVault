@@ -1,6 +1,6 @@
 # EvalVault 기능 상세 스펙
 
-> **Last Updated**: 2026-01-03
+> **Last Updated**: 2026-01-06
 > **Status**: 기술 참조 문서
 
 이 문서는 EvalVault의 주요 기능에 대한 상세 기술 스펙을 정리합니다.
@@ -149,7 +149,7 @@ pipeline:
 ### 2.5 CLI 사용
 
 ```bash
-evalvault pipeline analyze "요약해줘" --profile analysis
+evalvault pipeline analyze "요약해줘" --profile dev
 
 # 템플릿 조회
 python scripts/pipeline_template_inspect.py --intent analyze_low_metrics

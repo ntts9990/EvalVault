@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
+import { MarkdownContent } from "../components/MarkdownContent";
+import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
     fetchAnalysisIntents,
@@ -52,6 +53,11 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     running: { label: "실행 중", color: "text-blue-600" },
     pending: { label: "대기", color: "text-muted-foreground" },
 };
+
+function isPrioritySummary(value: any): value is PrioritySummary {
+    if (!value || typeof value !== "object") return false;
+    return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
+}
 
 export function AnalysisLab() {
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
@@ -394,6 +400,17 @@ export function AnalysisLab() {
         || "분석";
 
     const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
+
+    const prioritySummary = useMemo(() => {
+        if (!result) return null;
+        const finalOutput = result.final_output || {};
+        for (const entry of Object.values(finalOutput)) {
+            if (isPrioritySummary(entry)) return entry;
+        }
+        const nodeOutput = result.node_results?.priority_summary?.output;
+        if (isPrioritySummary(nodeOutput)) return nodeOutput;
+        return null;
+    }, [result]);
 
     return (
         <Layout>
@@ -858,6 +875,10 @@ export function AnalysisLab() {
                                         </div>
                                     )}
 
+                                    {prioritySummary && (
+                                        <PrioritySummaryPanel summary={prioritySummary} />
+                                    )}
+
                                     {selectedIntent?.nodes.length ? (
                                         <div>
                                             <h3 className="text-sm font-semibold mb-3">실행 단계</h3>
@@ -913,9 +934,7 @@ export function AnalysisLab() {
                                         ) : reportText ? (
                                             renderMarkdown ? (
                                                 <div className="bg-background border border-border rounded-lg p-4 text-sm max-h-80 overflow-auto">
-                                                    <div className="prose prose-sm max-w-none">
-                                                        <ReactMarkdown>{reportText}</ReactMarkdown>
-                                                    </div>
+                                                    <MarkdownContent text={reportText} />
                                                 </div>
                                             ) : (
                                                 <VirtualizedText

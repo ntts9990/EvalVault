@@ -131,19 +131,17 @@ uv run evalvault run "$LARGE_DATASET" --metrics faithfulness --parallel --batch-
 
 ### 메모리 최적화
 
-```python
-# 스트리밍 평가 (대용량 데이터셋)
-from evalvault.domain.services.evaluator import RagasEvaluator
+대용량 데이터셋은 CLI `--stream`으로 청크 단위 평가를 권장합니다.
 
-evaluator = RagasEvaluator(llm_adapter=llm)
-
-# 청크 단위로 처리
-for chunk in chunked(test_cases, chunk_size=100):
-    results = evaluator.evaluate(chunk, metrics=["faithfulness"])
-    save_results(results)
-    del results
-    gc.collect()
+```bash
+LARGE_DATASET="scripts/perf/r3_evalvault_run_dataset.json"
+uv run evalvault run "$LARGE_DATASET" \
+  --metrics faithfulness \
+  --stream --stream-chunk-size 200 \
+  --parallel --batch-size 20
 ```
+
+> Streaming 모드에서는 Domain Memory 및 Phoenix Dataset/Experiment 업로드를 사용할 수 없습니다.
 
 ### 타임아웃 설정
 
@@ -155,14 +153,17 @@ OLLAMA_TIMEOUT=300  # 5분
 ### 재시도 로직
 
 ```python
+from evalvault.domain.services.evaluator import RagasEvaluator
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+evaluator = RagasEvaluator()
 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=60)
 )
-def evaluate_with_retry(dataset, metrics):
-    return evaluator.evaluate(dataset, metrics)
+async def evaluate_with_retry(dataset, metrics, llm_adapter):
+    return await evaluator.evaluate(dataset=dataset, metrics=metrics, llm=llm_adapter)
 ```
 
 ---

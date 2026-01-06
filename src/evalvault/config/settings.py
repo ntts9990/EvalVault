@@ -34,6 +34,14 @@ class Settings(BaseSettings):
         default="openai",
         description="LLM provider: 'openai', 'ollama', or 'vllm'",
     )
+    faithfulness_fallback_provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider for faithfulness fallback evaluation.",
+    )
+    faithfulness_fallback_model: str | None = Field(
+        default=None,
+        description="Optional model name for faithfulness fallback evaluation.",
+    )
 
     # OpenAI Configuration
     openai_api_key: str | None = Field(default=None, description="OpenAI API key")

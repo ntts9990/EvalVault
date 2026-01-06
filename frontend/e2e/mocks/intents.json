@@ -1,0 +1,22 @@
+[
+    {
+        "intent": "performance_summary",
+        "label": "Performance Summary",
+        "category": "reporting",
+        "description": "Summarize run performance",
+        "sample_query": "Summarize run run-123",
+        "available": true,
+        "missing_modules": [],
+        "nodes": []
+    },
+    {
+        "intent": "error_analysis",
+        "label": "Error Analysis",
+        "category": "debugging",
+        "description": "Analyze errors",
+        "sample_query": "Analyze errors in run-123",
+        "available": true,
+        "missing_modules": [],
+        "nodes": []
+    }
+]

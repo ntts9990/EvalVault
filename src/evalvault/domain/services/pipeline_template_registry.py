@@ -348,6 +348,12 @@ class PipelineTemplateRegistry:
                 depends_on=["low_samples", "diagnostic", "causal"],
             ),
             AnalysisNode(
+                id="priority_summary",
+                name="우선순위 요약",
+                module="priority_summary",
+                depends_on=["load_data", "ragas_eval"],
+            ),
+            AnalysisNode(
                 id="report",
                 name="LLM 분석 보고서",
                 module="llm_report",
@@ -379,6 +385,12 @@ class PipelineTemplateRegistry:
                 name="패턴 탐지",
                 module="pattern_detector",
                 depends_on=["nlp_analysis"],
+            ),
+            AnalysisNode(
+                id="priority_summary",
+                name="우선순위 요약",
+                module="priority_summary",
+                depends_on=["load_data"],
             ),
             AnalysisNode(
                 id="report",
@@ -445,6 +457,12 @@ class PipelineTemplateRegistry:
                 depends_on=["load_data"],
             ),
             AnalysisNode(
+                id="priority_summary",
+                name="우선순위 요약",
+                module="priority_summary",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
                 id="report",
                 name="LLM 요약 보고서",
                 module="llm_report",
@@ -482,6 +500,12 @@ class PipelineTemplateRegistry:
                 name="인과 분석",
                 module="causal_analyzer",
                 depends_on=["load_data", "statistics"],
+            ),
+            AnalysisNode(
+                id="priority_summary",
+                name="우선순위 요약",
+                module="priority_summary",
+                depends_on=["load_data"],
             ),
             AnalysisNode(
                 id="report",

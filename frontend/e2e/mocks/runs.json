@@ -1,0 +1,38 @@
+[
+    {
+        "run_id": "run-123",
+        "dataset_name": "test-dataset-v1",
+        "model_name": "gpt-4-turbo",
+        "pass_rate": 85.5,
+        "total_test_cases": 20,
+        "passed_test_cases": 17,
+        "started_at": "2023-10-27T10:00:00Z",
+        "finished_at": "2023-10-27T10:05:00Z",
+        "metrics_evaluated": [
+            "accuracy",
+            "relevance"
+        ],
+        "total_cost_usd": 0.15,
+        "phoenix_precision": 0.92,
+        "phoenix_drift": 0.01,
+        "phoenix_experiment_url": "http://localhost:6006/projects/1"
+    },
+    {
+        "run_id": "run-124",
+        "dataset_name": "test-dataset-v2",
+        "model_name": "claude-3-opus",
+        "pass_rate": 90.0,
+        "total_test_cases": 20,
+        "passed_test_cases": 18,
+        "started_at": "2023-10-28T14:00:00Z",
+        "finished_at": "2023-10-28T14:10:00Z",
+        "metrics_evaluated": [
+            "accuracy",
+            "faithfulness"
+        ],
+        "total_cost_usd": 0.25,
+        "phoenix_precision": 0.95,
+        "phoenix_drift": 0.0,
+        "phoenix_experiment_url": null
+    }
+]

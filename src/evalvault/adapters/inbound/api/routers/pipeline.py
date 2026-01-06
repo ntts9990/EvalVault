@@ -224,6 +224,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
         MorphemeQualityCheckerModule,
         NLPAnalyzerModule,
         PatternDetectorModule,
+        PrioritySummaryModule,
         RagasEvaluatorModule,
         RetrievalAnalyzerModule,
         RetrievalQualityCheckerModule,
@@ -251,6 +252,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
     service.register_module(VerificationReportModule())
     service.register_module(ComparisonReportModule())
     service.register_module(LLMReportModule(llm_adapter=llm_adapter))
+    service.register_module(PrioritySummaryModule())
 
     service.register_module(MorphemeAnalyzerModule())
     service.register_module(MorphemeQualityCheckerModule())

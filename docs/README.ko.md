@@ -11,9 +11,104 @@ English version? See the [root README](https://github.com/ntts9990/EvalVault/blo
 
 ---
 
+## 가장 빠르게 Ragas 결과 보는 방법 (Web -> CLI)
+
+**Web (React + FastAPI)**
+```bash
+uv run evalvault serve-api --reload
+```
+```bash
+cd frontend
+npm install
+npm run dev
+```
+브라우저에서 `http://localhost:5173`에 접속한 뒤 Evaluation Studio에서 평가를 실행하고
+Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `tests/fixtures/e2e/insurance_qa_korean.json` 업로드)
+
+> Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시로 유지되며 점진적 페이드아웃 예정입니다.
+
+**CLI (터미널)**
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --profile dev \
+  --db evalvault.db
+uv run evalvault history --db evalvault.db
+uv run evalvault analyze <RUN_ID> --db evalvault.db
+```
+Tip: Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 맞추세요.
+
+---
+
+## 데이터셋 구성 (threshold는 데이터셋별)
+
+EvalVault는 임계값(threshold)을 **데이터셋에 포함**시켜 데이터셋마다 다른 합격 기준을
+가질 수 있게 합니다. 메트릭별 threshold가 비어 있으면 기본값 `0.7`을 사용하며,
+Domain Memory를 켜면 자동 조정될 수 있습니다.
+
+```json
+{
+  "name": "insurance-qa",
+  "version": "1.0.0",
+  "thresholds": { "faithfulness": 0.8, "answer_relevancy": 0.7 },
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "question": "보장금액은 얼마인가요?",
+      "answer": "보장금액은 1억원입니다.",
+      "contexts": ["보장금액은 1억원입니다."],
+      "ground_truth": "1억원"
+    }
+  ]
+}
+```
+
+- 테스트케이스 필수 필드: `id`, `question`, `answer`, `contexts`
+- `ground_truth`는 `context_precision`, `context_recall`,
+  `factual_correctness`, `semantic_similarity`에 필요
+- CSV/Excel: `threshold_*` 컬럼으로 임계값 지정 (첫 번째로 채워진 행 기준).
+  `contexts`는 JSON 배열 문자열 또는 `|`로 구분합니다.
+- 템플릿: `uv run evalvault init`로 `dataset_templates/` 생성,
+  또는 `tests/fixtures/sample_dataset.json` 참고.
+
+---
+
+## KG/GraphRAG 사용 (문서 기반)
+
+EvalVault에서 KG는 **평가 데이터셋이 아니라 문서 지식**에서 생성합니다.
+데이터셋은 질문/답변/컨텍스트를 담는 평가 케이스이고, GraphRAG는
+`contexts`가 비어 있는 케이스에만 문서 기반 컨텍스트를 채웁니다.
+
+**입력 양식**
+- Retriever 문서: JSON/JSONL/TXT 지원.
+  - JSON은 `{"documents":[{"doc_id":"...","content":"..."}]}` 또는 리스트 형식.
+- KG JSON: `entities`/`relations` 배열.
+  - `source_document_id`는 retriever 문서의 `doc_id`와 반드시 일치해야 합니다.
+- 템플릿: `templates/retriever_docs_template.json`,
+  `templates/kg_template.json`
+- Web UI 템플릿(JSON/CSV/XLSX)은 CLI 로더와 동일해 지정된 양식이면 정상 파싱됩니다.
+
+**CLI 예시 (GraphRAG)**
+```bash
+uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
+  --retriever graphrag \
+  --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
+  --kg tests/fixtures/kg/minimal_graph.json \
+  --metrics faithfulness \
+  --profile dev
+```
+
+**Web UI 제약**
+- Evaluation Studio는 `bm25/hybrid`만 노출되며 GraphRAG/KG 입력은 없습니다.
+- Knowledge Base가 생성한 `data/kg/knowledge_graph.json`은 `graph`로 감싸져 있어
+  `--kg`에 바로 사용할 수 없습니다. `graph`만 추출하거나
+  `{ "knowledge_graph": ... }`로 감싸서 사용하세요.
+
+---
+
 ## 개요
 
-EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
+EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 FastAPI + React Web UI를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
 
 **주요 특징**
 - Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
@@ -26,6 +121,12 @@ EvalVault는 Ragas v1.0 메트릭을 기반으로 Typer CLI와 FastAPI + React W
 **현재 상태 메모**
 - Web UI 보고서는 기본/상세 템플릿 + LLM 보고서 중심이며 비교 템플릿은 준비 중입니다.
 - Domain Memory 인사이트는 CLI 중심으로 제공되며 Web UI 패널은 준비 중입니다.
+
+**개선 필요**
+- Web UI에서 GraphRAG/`--kg` 입력과 KG 파일 검증 흐름 추가
+- `kg build`/Web UI 산출물과 `--kg` 로더 포맷 통일
+- Knowledge Base의 KG 통계/파일 목록/문서 매핑 UI 보강
+- `doc_id` 정합성 검증 및 자동 매핑 도구 제공
 
 상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](guides/USER_GUIDE.md)를 참고하세요.
 
@@ -45,7 +146,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-필요한 추가 기능은 extras로 확장합니다.
+`dev`는 analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic을 포함합니다. 필요하면 extras로 확장합니다.
 
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
@@ -55,6 +156,7 @@ uv sync --extra dev
 | `mlflow` | mlflow | MLflow 추적기 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
+| `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
 
@@ -126,6 +228,7 @@ uv sync --extra dev
    npm run dev
    ```
    브라우저에서 `http://localhost:5173`를 열어 확인합니다.
+   참고: Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시입니다.
 
 3. **평가 실행**
    ```bash

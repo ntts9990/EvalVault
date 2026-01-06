@@ -125,6 +125,14 @@ class RagasEvaluator:
 
     def __init__(self, *, preprocessor: DatasetPreprocessor | None = None) -> None:
         self._preprocessor = preprocessor or DatasetPreprocessor()
+        self._korean_toolkit = None
+        self._faithfulness_ragas_failed = False
+        self._faithfulness_fallback_llm = None
+        self._faithfulness_fallback_metric = None
+        self._faithfulness_fallback_failed = False
+        self._faithfulness_fallback_logged = False
+        self._active_llm_provider = None
+        self._active_llm_model = None
 
     async def evaluate(
         self,
@@ -159,6 +167,8 @@ class RagasEvaluator:
         Note:
             임계값 우선순위: CLI 옵션 > 데이터셋 내장 > 기본값(0.7)
         """
+        self._active_llm_provider = getattr(llm, "provider_name", None)
+        self._active_llm_model = llm.get_model_name()
         # Resolve thresholds: CLI > dataset > default(0.7)
         resolved_thresholds = {}
         for metric in metrics:
@@ -536,6 +546,11 @@ class RagasEvaluator:
         scores: dict[str, float] = {}
 
         for metric in ragas_metrics:
+            if metric.name == "faithfulness" and self._faithfulness_ragas_failed:
+                fallback_score = await self._score_faithfulness_with_fallback(sample)
+                if fallback_score is not None:
+                    scores[metric.name] = fallback_score
+                    continue
             try:
                 # Ragas >=0.4 uses ascore() with kwargs
                 if hasattr(metric, "ascore"):
@@ -597,11 +612,224 @@ class RagasEvaluator:
 
                 scores[metric.name] = score_value
             except Exception as e:
-                # 개별 메트릭 실패 시 로그 출력 후 0.0으로 처리
-                logger.error(f"Failed to score metric {metric.name}: {e}", exc_info=True)
-                scores[metric.name] = 0.0
+                fallback_score = None
+                if metric.name == "faithfulness":
+                    if not self._faithfulness_ragas_failed:
+                        logger.warning(
+                            "Failed to score metric %s via Ragas (%s). "
+                            "Switching to fallback scoring.",
+                            metric.name,
+                            self._summarize_ragas_error(e),
+                        )
+                        self._faithfulness_ragas_failed = True
+                    fallback_score = await self._score_faithfulness_with_fallback(sample)
+                if fallback_score is not None:
+                    scores[metric.name] = fallback_score
+                else:
+                    # 개별 메트릭 실패 시 로그 출력 후 0.0으로 처리
+                    logger.error(f"Failed to score metric {metric.name}: {e}", exc_info=True)
+                    scores[metric.name] = 0.0
 
         return scores
+
+    def _fallback_korean_faithfulness(self, sample: SingleTurnSample) -> float | None:
+        """Fallback faithfulness scoring for Korean text when Ragas fails."""
+        if not sample.response or not sample.retrieved_contexts:
+            return None
+
+        text = f"{sample.response} {' '.join(sample.retrieved_contexts)}"
+        if not self._contains_korean(text):
+            return None
+
+        if self._korean_toolkit is None:
+            try:
+                from evalvault.adapters.outbound.nlp.korean.toolkit import KoreanNLPToolkit
+            except Exception:  # pragma: no cover - optional dependency
+                return None
+            self._korean_toolkit = KoreanNLPToolkit()
+
+        try:
+            result = self._korean_toolkit.check_faithfulness(
+                answer=sample.response,
+                contexts=sample.retrieved_contexts,
+            )
+        except Exception:  # pragma: no cover - best effort fallback
+            return None
+
+        score = getattr(result, "score", None)
+        try:
+            return float(score)
+        except (TypeError, ValueError):
+            return None
+
+    async def _score_faithfulness_with_fallback(
+        self,
+        sample: SingleTurnSample,
+    ) -> float | None:
+        metric = self._get_faithfulness_fallback_metric()
+        if metric is None:
+            return self._fallback_korean_faithfulness(sample)
+
+        try:
+            if hasattr(metric, "ascore"):
+                all_args = {
+                    "user_input": sample.user_input,
+                    "response": sample.response,
+                    "retrieved_contexts": sample.retrieved_contexts,
+                    "reference": sample.reference,
+                }
+                required_args = self.METRIC_ARGS.get(
+                    metric.name,
+                    ["user_input", "response", "retrieved_contexts"],
+                )
+                kwargs = {k: v for k, v in all_args.items() if k in required_args and v is not None}
+                result = await metric.ascore(**kwargs)
+            elif hasattr(metric, "single_turn_ascore"):
+                result = await metric.single_turn_ascore(sample)
+            else:
+                raise AttributeError(f"{metric.__class__.__name__} does not support scoring API.")
+
+            if hasattr(result, "value"):
+                score_value = result.value
+            elif hasattr(result, "score"):
+                score_value = result.score
+            else:
+                score_value = result
+
+            score_value = float(score_value)
+            if math.isnan(score_value):
+                raise ValueError("Metric returned NaN")
+            return score_value
+        except Exception as exc:
+            if not self._faithfulness_fallback_failed:
+                logger.warning(
+                    "Faithfulness fallback LLM failed (%s). Using Korean fallback.",
+                    self._summarize_ragas_error(exc),
+                )
+                self._faithfulness_fallback_failed = True
+            return self._fallback_korean_faithfulness(sample)
+
+    def _get_faithfulness_fallback_metric(self):
+        if self._faithfulness_fallback_failed:
+            return None
+        if self._faithfulness_fallback_metric is not None:
+            return self._faithfulness_fallback_metric
+
+        llm = self._get_faithfulness_fallback_llm()
+        if llm is None:
+            return None
+
+        metric_class = self.METRIC_MAP.get("faithfulness")
+        if not metric_class:
+            return None
+        try:
+            self._faithfulness_fallback_metric = metric_class(llm=llm.as_ragas_llm())
+            return self._faithfulness_fallback_metric
+        except Exception as exc:
+            if not self._faithfulness_fallback_failed:
+                logger.warning(
+                    "Faithfulness fallback metric init failed (%s).",
+                    self._summarize_ragas_error(exc),
+                )
+                self._faithfulness_fallback_failed = True
+            return None
+
+    def _get_faithfulness_fallback_llm(self) -> LLMPort | None:
+        if self._faithfulness_fallback_failed:
+            return None
+        if self._faithfulness_fallback_llm is not None:
+            return self._faithfulness_fallback_llm
+
+        try:
+            from evalvault.adapters.outbound.llm import create_llm_adapter_for_model
+            from evalvault.config.settings import Settings
+        except Exception:
+            return None
+
+        settings = Settings()
+        provider, model = self._resolve_faithfulness_fallback_config(settings)
+        if not provider or not model:
+            return None
+
+        try:
+            llm = create_llm_adapter_for_model(provider, model, settings)
+            self._faithfulness_fallback_llm = llm
+            if not self._faithfulness_fallback_logged:
+                logger.warning(
+                    "Faithfulness fallback LLM enabled: %s/%s",
+                    provider,
+                    model,
+                )
+                self._faithfulness_fallback_logged = True
+            return llm
+        except Exception as exc:
+            if not self._faithfulness_fallback_failed:
+                logger.warning(
+                    "Faithfulness fallback LLM init failed (%s).",
+                    self._summarize_ragas_error(exc),
+                )
+                self._faithfulness_fallback_failed = True
+            return None
+
+    def _resolve_faithfulness_fallback_config(self, settings) -> tuple[str | None, str | None]:
+        provider = (
+            settings.faithfulness_fallback_provider.strip().lower()
+            if settings.faithfulness_fallback_provider
+            else None
+        )
+        model = settings.faithfulness_fallback_model
+        active_provider = (
+            self._active_llm_provider.strip().lower()
+            if isinstance(self._active_llm_provider, str) and self._active_llm_provider.strip()
+            else None
+        )
+        default_provider = active_provider or settings.llm_provider.lower()
+
+        if not provider and model:
+            provider = default_provider
+        if provider and not model:
+            model = self._default_faithfulness_fallback_model(provider)
+        if not provider and not model:
+            provider = default_provider
+            model = self._default_faithfulness_fallback_model(default_provider)
+
+        if not provider or not model:
+            return None, None
+        return provider, model
+
+    @staticmethod
+    def _default_faithfulness_fallback_model(provider: str) -> str | None:
+        if provider == "ollama":
+            return "gpt-oss-safeguard:20b"
+        if provider == "vllm":
+            return "gpt-oss-120b"
+        return None
+
+    @staticmethod
+    def _contains_korean(text: str) -> bool:
+        return any("\uac00" <= ch <= "\ud7a3" for ch in text)
+
+    @staticmethod
+    def _summarize_ragas_error(exc: Exception) -> str:
+        root = exc
+        last_attempt = getattr(root, "last_attempt", None)
+        if last_attempt is not None:
+            try:
+                last_exc = last_attempt.exception()
+                if last_exc:
+                    root = last_exc
+            except Exception:
+                pass
+        cause = getattr(root, "__cause__", None)
+        if cause:
+            root = cause
+        message = str(root).strip()
+        if not message:
+            return root.__class__.__name__
+        first_line = message.splitlines()[0]
+        if len(first_line) > 200:
+            first_line = f"{first_line[:200]}..."
+        return f"{root.__class__.__name__}: {first_line}"
 
     async def _evaluate_with_custom_metrics(
         self, dataset: Dataset, metrics: list[str]

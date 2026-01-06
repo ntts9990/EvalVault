@@ -1,0 +1,56 @@
+{
+    "summary": {
+        "run_id": "run-123",
+        "dataset_name": "test-dataset-v1",
+        "model_name": "gpt-4-turbo",
+        "pass_rate": 85.5,
+        "total_test_cases": 20,
+        "passed_test_cases": 17,
+        "started_at": "2023-10-27T10:00:00Z",
+        "finished_at": "2023-10-27T10:05:00Z",
+        "metrics_evaluated": [
+            "accuracy",
+            "relevance"
+        ],
+        "total_cost_usd": 0.15,
+        "phoenix_precision": 0.92,
+        "phoenix_drift": 0.01,
+        "phoenix_experiment_url": "http://localhost:6006/projects/1"
+    },
+    "results": [
+        {
+            "test_case_id": "tc-1",
+            "question": "What is RAG?",
+            "answer": "Retrieval Augmented Generation.",
+            "ground_truth": "RAG implies retrieving context...",
+            "contexts": [
+                "Context 1 about RAG"
+            ],
+            "metrics": [
+                {
+                    "name": "accuracy",
+                    "score": 1.0,
+                    "passed": true,
+                    "reason": "Exact match"
+                }
+            ]
+        },
+        {
+            "test_case_id": "tc-2",
+            "question": "Explain consistency.",
+            "answer": "Consistency means...",
+            "ground_truth": "Consistency...",
+            "contexts": [
+                "Context 2"
+            ],
+            "metrics": [
+                {
+                    "name": "accuracy",
+                    "score": 0.0,
+                    "passed": false,
+                    "reason": "Wrong answer"
+                }
+            ]
+        }
+    ]
+}

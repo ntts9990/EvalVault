@@ -1,6 +1,6 @@
 # EvalVault 에이전트 시스템 종합 활용 전략
 
-> Last Updated: 2026-01-01
+> Last Updated: 2026-01-06
 > Version: 2.0
 > Status: 검증 완료 / 구현 가능
 
@@ -197,18 +197,21 @@
 evalvault run benchmark_data.json \
   --metrics faithfulness,answer_relevancy,context_precision \
   --parallel --batch-size 10 \
+  --db evalvault.db \
   --output daily_$(date +%Y%m%d).json
 
 # 2. 품질 게이트 검사
-evalvault gate daily_$(date +%Y%m%d).json \
-  --thresholds faithfulness=0.8,answer_relevancy=0.7 \
+evalvault gate "$RUN_ID" --db evalvault.db \
+  --threshold faithfulness:0.8 \
+  --threshold answer_relevancy:0.7 \
   --fail-on-regression
 
 # 3. 벤치마크 (주간)
-evalvault benchmark production_data.json \
-  --runs 5 \
-  --report weekly_benchmark.md
+evalvault benchmark run --name korean-rag \
+  --output weekly_benchmark.json
 ```
+
+`RUN_ID`는 `evalvault run` 출력 또는 `evalvault history --db evalvault.db`에서 확인합니다.
 
 **에이전트 역할**:
 - **quality-monitor**: 정기 평가 스케줄링, 결과 수집, 알림
@@ -606,12 +609,14 @@ jobs:
           uv sync --extra dev
           uv run evalvault run benchmark_data.json \
             --metrics faithfulness,answer_relevancy \
+            --db evalvault.db \
             --output results/daily_$(date +%Y%m%d).json
 
       - name: Check quality gate
         run: |
-          uv run evalvault gate results/daily_*.json \
-            --thresholds faithfulness=0.8 \
+          # RUN_ID는 evalvault run 출력 또는 history에서 추출
+          uv run evalvault gate "$RUN_ID" --db evalvault.db \
+            --threshold faithfulness:0.8 \
             --fail-on-regression
 
       - name: Generate report

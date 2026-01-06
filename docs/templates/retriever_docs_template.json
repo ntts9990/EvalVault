@@ -1,0 +1,12 @@
+{
+  "documents": [
+    {
+      "doc_id": "doc-001",
+      "content": "AlphaCorp provides the BetaPlan insurance product."
+    },
+    {
+      "doc_id": "doc-002",
+      "content": "BetaPlan includes coverage details for policy holders."
+    }
+  ]
+}

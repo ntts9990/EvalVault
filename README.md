@@ -11,6 +11,67 @@ Prefer Korean docs? Read the [한국어 README](README.ko.md).
 
 ---
 
+## Fastest Way to See Ragas Results (Web -> CLI)
+
+**Web (React + FastAPI)**
+```bash
+uv run evalvault serve-api --reload
+```
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:5173`, run an evaluation in Evaluation Studio (for example, upload
+`tests/fixtures/e2e/insurance_qa_korean.json`), then check Analysis Lab/Reports for scores
+and insights.
+
+**CLI (terminal view)**
+```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --profile dev \
+  --db evalvault.db
+uv run evalvault history --db evalvault.db
+uv run evalvault analyze <RUN_ID> --db evalvault.db
+```
+Tip: keep the same `--db` (or `EVALVAULT_DB_PATH`) so the Web UI can read the run.
+
+---
+
+## Dataset Format (thresholds live in the dataset)
+
+EvalVault treats thresholds as part of the dataset, so each dataset can carry its own
+pass criteria. Missing metric thresholds fall back to `0.7`, and Domain Memory can
+adjust them when `--use-domain-memory` is enabled.
+
+```json
+{
+  "name": "insurance-qa",
+  "version": "1.0.0",
+  "thresholds": { "faithfulness": 0.8, "answer_relevancy": 0.7 },
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "question": "What is the coverage amount?",
+      "answer": "The coverage amount is 1M.",
+      "contexts": ["Coverage amount is 1M."],
+      "ground_truth": "1M"
+    }
+  ]
+}
+```
+
+- Required test case fields: `id`, `question`, `answer`, `contexts`
+- `ground_truth` is required for `context_precision`, `context_recall`,
+  `factual_correctness`, `semantic_similarity`
+- CSV/Excel: add `threshold_*` columns (first non-empty row wins). `contexts` can be a
+  JSON array string or `|`-separated.
+- Generate templates via `uv run evalvault init` (`dataset_templates/`) or start from
+  `tests/fixtures/sample_dataset.json`.
+
+---
+
 ## Overview
 
 EvalVault measures RAG quality with Ragas 0.4.x metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air-gapped profiles without wiring new scripts for each dataset.
@@ -45,7 +106,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-Add extras as needed:
+`dev` now bundles analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic. Add extras as needed:
 
 | Extra | Packages | Purpose |
 |-------|----------|---------|
@@ -55,6 +116,7 @@ Add extras as needed:
 | `mlflow` | mlflow | MLflow tracker |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix tracing, dataset/experiment sync |
 | `anthropic` | anthropic | Anthropic LLM adapter |
+| `web` | streamlit, plotly | Streamlit Web UI |
 
 `uv` automatically downloads Python 3.12 based on `.python-version`.
 
@@ -187,6 +249,8 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 | `context_recall` | Recall of the retrieved context |
 | `factual_correctness` | Factual accuracy compared to ground truth |
 | `semantic_similarity` | Semantic similarity between answer and ground truth |
+
+Custom metric example: `insurance_term_accuracy` (domain-specific term grounding).
 
 ---
 

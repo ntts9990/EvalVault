@@ -40,12 +40,42 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
     ) -> None:
         """Analyze evaluation results using natural language query."""
         from evalvault.adapters.outbound.analysis import (
+            AnalysisReportModule,
+            BM25SearcherModule,
             CausalAnalyzerModule,
+            ComparisonReportModule,
             DataLoaderModule,
+            DetailedReportModule,
+            DiagnosticPlaybookModule,
+            EmbeddingAnalyzerModule,
+            EmbeddingDistributionModule,
+            EmbeddingSearcherModule,
+            HybridRRFModule,
+            HybridWeightedModule,
+            LLMReportModule,
+            LowPerformerExtractorModule,
+            ModelAnalyzerModule,
+            MorphemeAnalyzerModule,
+            MorphemeQualityCheckerModule,
             NLPAnalyzerModule,
+            PatternDetectorModule,
+            PrioritySummaryModule,
+            RagasEvaluatorModule,
+            RetrievalAnalyzerModule,
+            RetrievalQualityCheckerModule,
+            RootCauseAnalyzerModule,
+            RunAnalyzerModule,
+            RunComparatorModule,
+            RunLoaderModule,
+            SearchComparatorModule,
             StatisticalAnalyzerModule,
+            StatisticalComparatorModule,
             SummaryReportModule,
+            TimeSeriesAnalyzerModule,
+            TrendDetectorModule,
+            VerificationReportModule,
         )
+        from evalvault.adapters.outbound.llm import get_llm_adapter
         from evalvault.domain.entities.analysis import StatisticalAnalysis
         from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
@@ -58,11 +88,47 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
 
         service = AnalysisPipelineService()
         storage = SQLiteStorageAdapter(db_path=db_path)
+        llm_adapter = None
+        try:
+            llm_adapter = get_llm_adapter(settings)
+        except Exception as exc:
+            console.print(f"[yellow]Warning: LLM adapter initialization failed ({exc})[/yellow]")
+
         service.register_module(DataLoaderModule(storage=storage))
+        service.register_module(RunLoaderModule(storage=storage))
         service.register_module(StatisticalAnalyzerModule())
         service.register_module(NLPAnalyzerModule())
         service.register_module(CausalAnalyzerModule())
         service.register_module(SummaryReportModule())
+        service.register_module(DetailedReportModule())
+        service.register_module(AnalysisReportModule())
+        service.register_module(VerificationReportModule())
+        service.register_module(ComparisonReportModule())
+        service.register_module(LLMReportModule(llm_adapter=llm_adapter))
+        service.register_module(PrioritySummaryModule())
+
+        service.register_module(MorphemeAnalyzerModule())
+        service.register_module(MorphemeQualityCheckerModule())
+        service.register_module(EmbeddingAnalyzerModule())
+        service.register_module(EmbeddingDistributionModule())
+        service.register_module(RetrievalAnalyzerModule())
+        service.register_module(RetrievalQualityCheckerModule())
+        service.register_module(BM25SearcherModule())
+        service.register_module(EmbeddingSearcherModule())
+        service.register_module(HybridRRFModule())
+        service.register_module(HybridWeightedModule())
+        service.register_module(SearchComparatorModule())
+        service.register_module(ModelAnalyzerModule())
+        service.register_module(RunAnalyzerModule())
+        service.register_module(StatisticalComparatorModule())
+        service.register_module(RunComparatorModule())
+        service.register_module(RagasEvaluatorModule(llm_adapter=llm_adapter))
+        service.register_module(LowPerformerExtractorModule())
+        service.register_module(DiagnosticPlaybookModule())
+        service.register_module(RootCauseAnalyzerModule())
+        service.register_module(PatternDetectorModule())
+        service.register_module(TimeSeriesAnalyzerModule())
+        service.register_module(TrendDetectorModule())
 
         intent = service.get_intent(query)
         console.print(f"Detected Intent: [green]{intent.value}[/green]\n")

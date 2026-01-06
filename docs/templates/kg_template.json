@@ -1,0 +1,38 @@
+{
+  "entities": [
+    {
+      "name": "AlphaCorp",
+      "entity_type": "organization",
+      "canonical_name": "alphacorp",
+      "source_document_id": "doc-001",
+      "attributes": {
+        "domain": "insurance"
+      },
+      "confidence": 0.95,
+      "provenance": "manual"
+    },
+    {
+      "name": "BetaPlan",
+      "entity_type": "product",
+      "canonical_name": "betaplan",
+      "source_document_id": "doc-002",
+      "attributes": {
+        "domain": "insurance"
+      },
+      "confidence": 0.9,
+      "provenance": "manual"
+    }
+  ],
+  "relations": [
+    {
+      "source": "AlphaCorp",
+      "target": "BetaPlan",
+      "relation_type": "provides",
+      "attributes": {
+        "evidence": "AlphaCorp provides the BetaPlan product."
+      },
+      "confidence": 0.9,
+      "provenance": "manual"
+    }
+  ]
+}
