@@ -4,8 +4,8 @@
 EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, services, and metrics, `src/evalvault/ports` define contracts, and `src/evalvault/adapters` wire Typer CLI, LLM, storage, and tracing integrations. Runtime profiles and secrets live in `config/` (notably `models.yaml`) plus `.env`, while datasets sit in `data/` and curated fixtures in `tests/fixtures/`. Docs that clarify architecture and roadmap live under `docs/`, and automation helpers remain in `scripts/`. Mirror production modules with tests in `tests/unit`, `tests/integration`, and `tests/e2e_data` to preserve coverage.
 
 ## Build, Test, and Development Commands
-- `uv sync --extra dev`: install basic runtime plus dev tooling on Python 3.12.
-- `uv sync --extra dev --extra analysis --extra korean --extra web`: install full development environment (recommended).
+- `uv sync --extra dev`: install full development environment (dev tools + all feature extras) on Python 3.12.
+- `uv sync --extra <analysis|korean|web|postgres|mlflow|phoenix|docs|anthropic|perf>`: install only selected feature extras (omit dev tooling).
   - `--extra korean`: Korean NLP (kiwipiepy, rank-bm25, sentence-transformers)
   - `--extra analysis`: Statistical/NLP analysis helpers (scikit-learn)
   - `--extra web`: Streamlit Web UI (streamlit, plotly)

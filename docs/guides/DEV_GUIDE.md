@@ -14,7 +14,7 @@
 uv sync --extra dev
 ```
 
-`dev`는 주요 extras를 포함합니다. 필요 시 개별 extras만 선택 설치할 수도 있습니다:
+`dev`는 모든 extras를 포함합니다. 경량 설치가 필요하면 dev 대신 개별 extras만 선택하세요:
 - `--extra korean`: 한국어 NLP
 - `--extra analysis`: 통계/NLP 분석 보조
 - `--extra postgres`: PostgreSQL 저장소
@@ -22,6 +22,8 @@ uv sync --extra dev
 - `--extra phoenix`: Phoenix 트레이싱
 - `--extra docs`: MkDocs 문서 빌드
 - `--extra web`: Streamlit Web UI (레거시/미리보기)
+- `--extra anthropic`: Anthropic LLM 어댑터
+- `--extra perf`: FAISS/JSON 스트리밍 등 성능 보조
 
 ---
 
