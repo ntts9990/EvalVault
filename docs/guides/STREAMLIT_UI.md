@@ -15,7 +15,7 @@
 ## 실행
 
 ```bash
-uv run evalvault web --db evalvault.db
+uv run evalvault web --db data/db/evalvault.db
 ```
 
 ---

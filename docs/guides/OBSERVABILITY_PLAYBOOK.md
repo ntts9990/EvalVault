@@ -30,7 +30,7 @@ uv run python scripts/ops/phoenix_watch.py \
   --drift-threshold 0.2 \
   --slack-webhook https://hooks.slack.com/services/... \
   --issue-file reports/phoenix_watch.md \
-  --gate-command "uv run evalvault gate RUN_ID --format github-actions --db evalvault.db" \
+  --gate-command "uv run evalvault gate RUN_ID --format github-actions --db data/db/evalvault.db" \
   --run-regressions threshold \
   --regression-config config/regressions/default.json \
   --regression-suite integration-english-smoke \

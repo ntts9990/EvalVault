@@ -71,6 +71,12 @@ INTENT_CATALOG = {
         "description": "시간에 따른 추세를 분석합니다.",
         "sample_query": "메트릭 추세를 분석해줘",
     },
+    AnalysisIntent.BENCHMARK_RETRIEVAL: {
+        "label": "검색 벤치마크",
+        "category": "benchmark",
+        "description": "실제 문서 기반 검색 성능을 벤치마크합니다.",
+        "sample_query": "검색 벤치마크를 실행해줘",
+    },
     AnalysisIntent.GENERATE_SUMMARY: {
         "label": "요약 보고서",
         "category": "report",
@@ -227,6 +233,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
         PrioritySummaryModule,
         RagasEvaluatorModule,
         RetrievalAnalyzerModule,
+        RetrievalBenchmarkModule,
         RetrievalQualityCheckerModule,
         RootCauseAnalyzerModule,
         RunAnalyzerModule,
@@ -259,6 +266,7 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
     service.register_module(EmbeddingAnalyzerModule())
     service.register_module(EmbeddingDistributionModule())
     service.register_module(RetrievalAnalyzerModule())
+    service.register_module(RetrievalBenchmarkModule())
     service.register_module(RetrievalQualityCheckerModule())
     service.register_module(BM25SearcherModule())
     service.register_module(EmbeddingSearcherModule())

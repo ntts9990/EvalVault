@@ -19,9 +19,12 @@ class EvaluationConfig:
     dataset_path: str
     metrics: list[str]
     model_name: str = "gpt-5-nano"
+    evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     parallel: bool = True
     thresholds: dict[str, float] = field(default_factory=dict)
+    threshold_profile: str | None = None
+    project_name: str | None = None
 
     def is_valid(self) -> bool:
         """설정 유효성 검증.
@@ -47,8 +50,11 @@ class EvaluationConfig:
             dataset_path=self.dataset_path,
             metrics=self.metrics,
             model_name=self.model_name,
+            evaluation_task=self.evaluation_task,
             langfuse_enabled=self.langfuse_enabled,
             thresholds=self.thresholds,
+            threshold_profile=self.threshold_profile,
+            project_name=self.project_name,
         )
 
     def get_validation_errors(self) -> list[str]:

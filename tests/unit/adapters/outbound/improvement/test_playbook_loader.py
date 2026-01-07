@@ -219,6 +219,9 @@ class TestPlaybookLoader:
         assert playbook is not None
         assert playbook.version == "1.0.0"
         assert "faithfulness" in playbook.metrics
+        assert "summary_faithfulness" in playbook.metrics
+        assert "summary_score" in playbook.metrics
+        assert "entity_preservation" in playbook.metrics
         assert "context_precision" in playbook.metrics
 
     def test_load_cached(self):
@@ -255,3 +258,6 @@ class TestGetDefaultPlaybook:
         assert playbook is not None
         assert isinstance(playbook, Playbook)
         assert "faithfulness" in playbook.metrics
+        assert "summary_faithfulness" in playbook.metrics
+        assert "summary_score" in playbook.metrics
+        assert "entity_preservation" in playbook.metrics

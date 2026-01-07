@@ -14,6 +14,7 @@ from urllib.request import urlopen
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
 from evalvault.domain.services.prompt_status import extract_prompt_entries
+from evalvault.domain.services.threshold_profiles import apply_threshold_profile
 from evalvault.ports.inbound.web_port import (
     EvalProgress,
     EvalRequest,
@@ -37,7 +38,10 @@ AVAILABLE_METRICS = [
     "context_recall",
     "factual_correctness",
     "semantic_similarity",
+    "summary_score",
+    "summary_faithfulness",
     "insurance_term_accuracy",
+    "entity_preservation",
 ]
 
 
@@ -353,6 +357,10 @@ class WebUIAdapter:
         except Exception as e:
             raise RuntimeError(f"Failed to load dataset: {e}")
 
+        requested_domain = (request.memory_config or {}).get("domain")
+        if requested_domain:
+            dataset.metadata["domain"] = requested_domain
+
         settings = self._settings or Settings()
         tracker_provider, tracker = self._get_tracker(settings, request.tracker_config)
 
@@ -379,8 +387,24 @@ class WebUIAdapter:
         memory_domain = memory_config.get("domain") or dataset.metadata.get("domain") or "default"
         memory_language = memory_config.get("language") or "ko"
         memory_augment = bool(memory_config.get("augment_context"))
-        memory_db_path = memory_config.get("db_path") or "evalvault_memory.db"
+        memory_db_path = memory_config.get("db_path") or settings.evalvault_memory_db_path
         memory_evaluator = None
+        requested_thresholds = request.thresholds or {}
+        if request.threshold_profile or requested_thresholds:
+            base_thresholds = dict(dataset.thresholds or {})
+            if requested_thresholds:
+                base_thresholds.update(requested_thresholds)
+            resolved_thresholds = {
+                metric: base_thresholds.get(metric, 0.7) for metric in request.metrics
+            }
+            if request.threshold_profile:
+                resolved_thresholds = apply_threshold_profile(
+                    request.metrics,
+                    resolved_thresholds,
+                    request.threshold_profile,
+                )
+        else:
+            resolved_thresholds = request.thresholds or {}
 
         memory_active = False
         if memory_enabled:
@@ -448,7 +472,7 @@ class WebUIAdapter:
                     dataset=dataset,
                     metrics=request.metrics,
                     llm=llm_adapter,
-                    thresholds=request.thresholds or {},
+                    thresholds=resolved_thresholds,
                     parallel=request.parallel,
                     batch_size=request.batch_size,
                     domain=memory_domain,
@@ -463,7 +487,7 @@ class WebUIAdapter:
                     dataset=dataset,
                     metrics=request.metrics,
                     llm=llm_adapter,
-                    thresholds=request.thresholds or {},
+                    thresholds=resolved_thresholds,
                     parallel=request.parallel,
                     batch_size=request.batch_size,
                     retriever=retriever_instance,
@@ -479,6 +503,10 @@ class WebUIAdapter:
             raise e
 
         result.tracker_metadata.setdefault("run_mode", "web")
+        if request.evaluation_task:
+            result.tracker_metadata.setdefault("evaluation_task", request.evaluation_task)
+        if request.project_name:
+            result.tracker_metadata["project"] = request.project_name
         if request.prompt_config:
             result.tracker_metadata["prompt_config"] = request.prompt_config
         if retriever_instance:
@@ -494,6 +522,10 @@ class WebUIAdapter:
                 "language": memory_language,
                 "augment_context": memory_augment,
             }
+        if request.threshold_profile:
+            result.tracker_metadata["threshold_profile"] = (
+                str(request.threshold_profile).strip().lower()
+            )
 
         if tracker and tracker_provider:
             try:
@@ -560,6 +592,20 @@ class WebUIAdapter:
             for run in runs:
                 prompt_entries = extract_prompt_entries(getattr(run, "tracker_metadata", None))
                 metadata = getattr(run, "tracker_metadata", {}) or {}
+                project_name = metadata.get("project") or metadata.get("project_name")
+                if isinstance(project_name, str):
+                    project_name = project_name.strip() or None
+                else:
+                    project_name = None
+                evaluation_task = metadata.get("evaluation_task")
+                threshold_profile = metadata.get("threshold_profile")
+                if not isinstance(threshold_profile, str) or not threshold_profile:
+                    threshold_profile = None
+                avg_metric_scores = {}
+                for metric_name in run.metrics_evaluated:
+                    avg_score = run.get_avg_score(metric_name)
+                    if avg_score is not None:
+                        avg_metric_scores[metric_name] = avg_score
                 summary = RunSummary(
                     run_id=run.run_id,
                     dataset_name=run.dataset_name,
@@ -571,9 +617,13 @@ class WebUIAdapter:
                     finished_at=run.finished_at,
                     metrics_evaluated=run.metrics_evaluated,
                     run_mode=metadata.get("run_mode"),
+                    evaluation_task=evaluation_task if isinstance(evaluation_task, str) else None,
+                    threshold_profile=threshold_profile,
                     total_tokens=run.total_tokens,
                     total_cost_usd=run.total_cost_usd,
                     phoenix_prompts=prompt_entries,
+                    project_name=project_name,
+                    avg_metric_scores=avg_metric_scores,
                 )
 
                 if resolver and resolver.can_resolve(getattr(run, "tracker_metadata", None)):
@@ -590,6 +640,10 @@ class WebUIAdapter:
                         continue
                     if filters.model_name and filters.model_name != summary.model_name:
                         continue
+                    if filters.date_from and summary.started_at < filters.date_from:
+                        continue
+                    if filters.date_to and summary.started_at > filters.date_to:
+                        continue
                     if filters.min_pass_rate and summary.pass_rate < filters.min_pass_rate:
                         continue
                     if filters.max_pass_rate and summary.pass_rate > filters.max_pass_rate:
@@ -598,6 +652,10 @@ class WebUIAdapter:
                         not summary.run_mode or summary.run_mode.lower() != filters.run_mode.lower()
                     ):
                         continue
+                    if filters.project_names:
+                        allowed = {name.strip() for name in filters.project_names if name.strip()}
+                        if summary.project_name not in allowed:
+                            continue
 
                 summaries.append(summary)
 
@@ -791,6 +849,7 @@ class WebUIAdapter:
         batch_size: int = 5,
         on_progress: Callable[[EvalProgress], None] | None = None,
         run_mode: str | None = None,
+        project_name: str | None = None,
     ) -> EvaluationRun:
         """데이터셋 객체로 직접 평가 실행.
 
@@ -855,6 +914,8 @@ class WebUIAdapter:
 
         metadata = getattr(result, "tracker_metadata", None) or {}
         metadata.setdefault("run_mode", (run_mode or "full"))
+        if project_name:
+            metadata["project"] = project_name
         result.tracker_metadata = metadata
 
         # 결과 저장
@@ -1262,7 +1323,7 @@ def create_adapter() -> WebUIAdapter:
     settings = Settings()
 
     # Storage 생성 (기본 SQLite)
-    db_path = Path("evalvault.db")
+    db_path = Path(settings.evalvault_db_path)
     storage = SQLiteStorageAdapter(db_path=db_path)
 
     # LLM adapter 생성 (API 키 없으면 None)

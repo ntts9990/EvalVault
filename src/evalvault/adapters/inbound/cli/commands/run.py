@@ -135,7 +135,19 @@ def register_run_commands(
         evaluation_preset: str | None = typer.Option(
             None,
             "--preset",
-            help=f"Use a preset configuration (quick/production/comprehensive). {format_preset_help()}",
+            help=(
+                "Use a preset configuration (quick/production/summary/comprehensive). "
+                f"{format_preset_help()}"
+            ),
+        ),
+        summary: bool = typer.Option(
+            False,
+            "--summary",
+            help=(
+                "Enable summarization evaluation preset "
+                "(summary_score, summary_faithfulness, entity_preservation)."
+            ),
+            rich_help_panel="Simple mode preset",
         ),
         metrics: str = typer.Option(
             "faithfulness,answer_relevancy",
@@ -143,6 +155,12 @@ def register_run_commands(
             "-m",
             help="Comma-separated list of metrics to evaluate. Overrides preset if both are specified.",
             rich_help_panel="Simple mode preset",
+        ),
+        threshold_profile: str | None = typer.Option(
+            None,
+            "--threshold-profile",
+            help="Apply a threshold profile (summary/qa) to matching metrics.",
+            rich_help_panel="Full mode options",
         ),
         profile: str | None = profile_option(
             help_text="Model profile (dev, prod, openai). Overrides .env setting.",
@@ -278,7 +296,7 @@ def register_run_commands(
             rich_help_panel="Domain Memory (full mode)",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,
@@ -327,6 +345,7 @@ def register_run_commands(
         Presets:
           • quick — Fast iteration with faithfulness metric only.
           • production — Balanced evaluation with 4 core metrics.
+          • summary — Summarization evaluation with 3 summary-focused metrics.
           • comprehensive — Complete evaluation with all 6 metrics.
 
         \b
@@ -336,6 +355,9 @@ def register_run_commands(
 
           # Use preset for quick iteration
           evalvault run --preset quick dataset.json
+
+          # Summarization evaluation
+          evalvault run --summary dataset.json
 
           # Production run with JSON output
           evalvault run --preset production dataset.json -o results.json
@@ -381,6 +403,25 @@ def register_run_commands(
         ):
             _print_run_mode_banner(console, preset)
 
+        summary_flag = summary
+        if summary_flag and preset.default_metrics:
+            print_cli_warning(
+                console,
+                "Simple 모드에서는 요약 평가 옵션이 적용되지 않습니다.",
+                tips=["--mode full로 전환해 요약 메트릭을 사용하세요."],
+            )
+
+        if summary_flag and evaluation_preset and evaluation_preset.lower() != "summary":
+            print_cli_error(
+                console,
+                "--summary 옵션은 다른 preset과 함께 사용할 수 없습니다.",
+                fixes=["--summary 또는 --preset summary 중 하나만 사용하세요."],
+            )
+            raise typer.Exit(1)
+
+        if summary_flag and not preset.default_metrics:
+            evaluation_preset = evaluation_preset or "summary"
+
         # Handle evaluation preset
         eval_preset_config = None
         if evaluation_preset:
@@ -401,6 +442,12 @@ def register_run_commands(
 
         metric_list = parse_csv_option(metrics)
         metrics_override = _option_was_provided(ctx, "metrics")
+        if summary_flag and metrics_override:
+            print_cli_warning(
+                console,
+                "--metrics가 지정되어 요약 프리셋 적용을 건너뜁니다.",
+                tips=["요약 전용 메트릭을 사용하려면 --metrics 옵션을 제거하세요."],
+            )
 
         # Apply preset metrics if preset is specified and metrics not explicitly overridden
         if eval_preset_config and not metrics_override:
@@ -559,6 +606,8 @@ def register_run_commands(
             "metrics": metric_list,
             "run_mode": preset.name,
         }
+        if threshold_profile:
+            phoenix_trace_metadata["threshold.profile"] = str(threshold_profile).strip().lower()
 
         # Load dataset or configure streaming metadata
         if stream:
@@ -600,6 +649,10 @@ def register_run_commands(
                         ],
                     )
                     raise typer.Exit(1) from exc
+
+        if memory_domain:
+            ds.metadata["domain"] = memory_domain
+            phoenix_trace_metadata["dataset.meta.domain"] = memory_domain
 
         retriever_instance: RetrieverPort | None = None
         retriever_doc_ids: list[str] | None = None
@@ -776,7 +829,20 @@ def register_run_commands(
                     if retriever == "graphrag" and kg:
                         phoenix_trace_metadata["retriever.kg"] = str(kg)
 
-        resolved_thresholds = _resolve_thresholds(metric_list, ds)
+        try:
+            resolved_thresholds = _resolve_thresholds(
+                metric_list,
+                ds,
+                profile=threshold_profile,
+            )
+        except ValueError as exc:
+            print_cli_error(
+                console,
+                "Threshold profile 값이 올바르지 않습니다.",
+                details=str(exc),
+                fixes=["--threshold-profile summary|qa 중 하나를 선택하세요."],
+            )
+            raise typer.Exit(2) from exc
 
         phoenix_dataset_name = phoenix_dataset
         if phoenix_experiment and not phoenix_dataset_name:
@@ -900,14 +966,14 @@ def register_run_commands(
                     f"[dim]Appended Domain Memory facts to {enriched} test case(s).[/dim]"
                 )
 
-        if ds.thresholds:
-            console.print("[dim]Thresholds from dataset:[/dim]")
-            for metric, threshold in ds.thresholds.items():
-                console.print(f"  [dim]{metric}: {threshold}[/dim]")
-            console.print()
-        elif resolved_thresholds:
-            console.print("[dim]Thresholds in use:[/dim]")
-            for metric, threshold in resolved_thresholds.items():
+        if resolved_thresholds:
+            if ds.thresholds and not threshold_profile:
+                console.print("[dim]Thresholds from dataset:[/dim]")
+                thresholds_to_show = ds.thresholds
+            else:
+                console.print("[dim]Thresholds in use:[/dim]")
+                thresholds_to_show = resolved_thresholds
+            for metric, threshold in thresholds_to_show.items():
                 console.print(f"  [dim]{metric}: {threshold}[/dim]")
             console.print()
 
@@ -1028,6 +1094,9 @@ def register_run_commands(
             )
 
         _display_results(result, console, verbose)
+
+        if threshold_profile:
+            result.tracker_metadata["threshold_profile"] = str(threshold_profile).strip().lower()
 
         if memory_adapter and memory_required:
             analyzer = MemoryBasedAnalysis(memory_port=memory_adapter)
@@ -1196,11 +1265,24 @@ def register_run_commands(
             exists=True,
             readable=True,
         ),
+        summary: bool = typer.Option(
+            False,
+            "--summary",
+            help=(
+                "Enable summarization evaluation preset "
+                "(summary_score, summary_faithfulness, entity_preservation)."
+            ),
+        ),
         metrics: str = typer.Option(
             "faithfulness,answer_relevancy",
             "--metrics",
             "-m",
             help="Comma-separated list of metrics to evaluate.",
+        ),
+        threshold_profile: str | None = typer.Option(
+            None,
+            "--threshold-profile",
+            help="Apply a threshold profile (summary/qa) to matching metrics.",
         ),
         profile: str | None = profile_option(
             help_text="Model profile (dev, prod, openai). Overrides .env setting.",
@@ -1313,7 +1395,7 @@ def register_run_commands(
             help="Language code for Domain Memory lookups (default: ko).",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,
@@ -1358,7 +1440,9 @@ def register_run_commands(
             run(
                 dataset=dataset,
                 evaluation_preset=None,
+                summary=summary,
                 metrics=metrics,
+                threshold_profile=threshold_profile,
                 profile=profile,
                 model=model,
                 output=output,
@@ -1405,11 +1489,24 @@ def register_run_commands(
             exists=True,
             readable=True,
         ),
+        summary: bool = typer.Option(
+            False,
+            "--summary",
+            help=(
+                "Enable summarization evaluation preset "
+                "(summary_score, summary_faithfulness, entity_preservation)."
+            ),
+        ),
         metrics: str = typer.Option(
             "faithfulness,answer_relevancy",
             "--metrics",
             "-m",
             help="Comma-separated list of metrics to evaluate.",
+        ),
+        threshold_profile: str | None = typer.Option(
+            None,
+            "--threshold-profile",
+            help="Apply a threshold profile (summary/qa) to matching metrics.",
         ),
         profile: str | None = profile_option(
             help_text="Model profile (dev, prod, openai). Overrides .env setting.",
@@ -1522,7 +1619,7 @@ def register_run_commands(
             help="Language code for Domain Memory lookups (default: ko).",
         ),
         memory_db: Path = memory_db_option(
-            help_text="Path to Domain Memory database (default: evalvault_memory.db).",
+            help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
             False,
@@ -1567,7 +1664,9 @@ def register_run_commands(
             run(
                 dataset=dataset,
                 evaluation_preset=None,
+                summary=summary,
                 metrics=metrics,
+                threshold_profile=threshold_profile,
                 profile=profile,
                 model=model,
                 output=output,

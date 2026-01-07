@@ -10,8 +10,8 @@ Stage 이벤트 샘플 데이터입니다. `evalvault stage` 명령으로 수집
 사용합니다.
 
 ```bash
-uv run evalvault stage ingest examples/stage_events.jsonl --db evalvault.db
-uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage ingest examples/stage_events.jsonl --db data/db/evalvault.db
+uv run evalvault stage summary run_20260103_001 --db data/db/evalvault.db
 uv run evalvault stage compute-metrics run_20260103_001 --thresholds-json config/stage_metric_thresholds.json
 ```
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { fetchRunDetails, type RunDetailsResponse } from "../services/api";
 import { Layout } from "../components/Layout";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
@@ -15,15 +15,18 @@ import {
     BookOpen
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
 
 export function RunDetails() {
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
     const [data, setData] = useState<RunDetailsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     // Tabs
     const [activeTab, setActiveTab] = useState<"overview" | "performance">("overview");
     const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
+    const summaryMetricSet = new Set(SUMMARY_METRICS);
 
     useEffect(() => {
         async function loadDetails() {
@@ -39,6 +42,25 @@ export function RunDetails() {
         }
         loadDetails();
     }, [id]);
+
+    useEffect(() => {
+        if (!data || !location.hash) return;
+        const match = location.hash.match(/^#case-(.+)$/);
+        if (!match) return;
+        const caseId = decodeURIComponent(match[1]);
+        if (!data.results.some(result => result.test_case_id === caseId)) return;
+        setExpandedCases(prev => {
+            const next = new Set(prev);
+            next.add(caseId);
+            return next;
+        });
+        requestAnimationFrame(() => {
+            const target = document.getElementById(`case-${caseId}`);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        });
+    }, [data, location.hash]);
 
     /*
     useEffect(() => {
@@ -113,6 +135,31 @@ export function RunDetails() {
     );
 
     const { summary, results } = data;
+    const summaryThresholds = summary.thresholds || {};
+    const summaryMetrics = summary.metrics_evaluated.filter((metric) =>
+        summaryMetricSet.has(metric)
+    );
+    const thresholdProfileLabel = summary.threshold_profile
+        ? summary.threshold_profile.toUpperCase()
+        : "Dataset/default";
+    const summarySafetyRows = summaryMetrics.map((metric) => {
+        const scores = results.flatMap(
+            (result) =>
+                result.metrics
+                    ?.filter((entry) => entry.name === metric)
+                    .map((entry) => normalizeScore(entry.score)) || []
+        );
+        const avg = safeAverage(scores);
+        const threshold =
+            summaryThresholds[metric] ?? SUMMARY_METRIC_THRESHOLDS[metric] ?? 0.7;
+        return {
+            metric,
+            avg,
+            threshold,
+            passed: avg >= threshold,
+        };
+    });
+    const summarySafetyAlert = summarySafetyRows.some((row) => !row.passed);
 
     return (
         <Layout>
@@ -181,6 +228,54 @@ export function RunDetails() {
                     </div>
                 </div>
 
+                {summarySafetyRows.length > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-8">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <h3 className="font-semibold mb-1 flex items-center gap-2">
+                                    <Target className="w-4 h-4 text-primary" />
+                                    Summary Safety
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                    Conservative thresholds apply when dataset thresholds are missing.
+                                </p>
+                            </div>
+                            <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold border ${summarySafetyAlert
+                                    ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                                    : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                    }`}
+                            >
+                                {summarySafetyAlert ? "Attention" : "OK"}
+                            </span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {summarySafetyRows.map((row) => (
+                                <div
+                                    key={row.metric}
+                                    className={`p-4 rounded-lg border ${row.passed
+                                        ? "bg-emerald-500/5 border-emerald-500/20"
+                                        : "bg-rose-500/5 border-rose-500/20"
+                                        }`}
+                                >
+                                    <p className="text-sm text-muted-foreground">{row.metric}</p>
+                                    <p
+                                        className={`text-2xl font-bold ${row.passed
+                                            ? "text-emerald-600"
+                                            : "text-rose-600"
+                                            }`}
+                                    >
+                                        {formatScore(row.avg)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Threshold {row.threshold.toFixed(2)}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === "overview" ? (
                     /* Charts & Summary Grid (Overview) */
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -227,6 +322,10 @@ export function RunDetails() {
                                 <p className="font-mono text-sm">
                                     {summary.total_cost_usd ? `$${summary.total_cost_usd.toFixed(4)}` : "N/A"}
                                 </p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-5">
+                                <p className="text-sm text-muted-foreground mb-1">Threshold Profile</p>
+                                <p className="text-sm font-semibold tracking-wide">{thresholdProfileLabel}</p>
                             </div>
                         </div>
                     </div>
@@ -294,6 +393,7 @@ export function RunDetails() {
 
                         return (
                             <div
+                                id={`case-${result.test_case_id}`}
                                 key={result.test_case_id}
                                 className={`bg-card border rounded-xl overflow-hidden transition-all ${isExpanded ? "ring-2 ring-primary/20 border-primary shadow-md" : "border-border hover:border-border/80"
                                     }`}
@@ -387,21 +487,37 @@ export function RunDetails() {
                                         <div>
                                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Metric Details</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {result.metrics.map(metric => (
-                                                    <div key={metric.name} className={`p-3 rounded-lg border ${metric.passed ? "bg-emerald-500/5 border-emerald-500/20" : "bg-rose-500/5 border-rose-500/20"}`}>
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <span className="font-medium text-sm">{metric.name}</span>
-                                                            <span className={`text-sm font-bold ${metric.passed ? "text-emerald-600" : "text-rose-600"}`}>
-                                                                {formatScore(metric.score)}
-                                                            </span>
+                                                {result.metrics.map((metric) => {
+                                                    const isSummaryMetric = summaryMetricSet.has(metric.name);
+                                                    return (
+                                                        <div
+                                                            key={metric.name}
+                                                            className={`p-3 rounded-lg border ${metric.passed
+                                                                ? "bg-emerald-500/5 border-emerald-500/20"
+                                                                : "bg-rose-500/5 border-rose-500/20"
+                                                                } ${isSummaryMetric ? "ring-1 ring-primary/20" : ""}`}
+                                                        >
+                                                            <div className="flex justify-between items-start mb-1 gap-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium text-sm">{metric.name}</span>
+                                                                    {isSummaryMetric && (
+                                                                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[10px] text-primary">
+                                                                            Summary
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`text-sm font-bold ${metric.passed ? "text-emerald-600" : "text-rose-600"}`}>
+                                                                    {formatScore(metric.score)}
+                                                                </span>
+                                                            </div>
+                                                            {metric.reason && (
+                                                                <p className="text-xs text-muted-foreground mt-2 italic">
+                                                                    "{metric.reason}"
+                                                                </p>
+                                                            )}
                                                         </div>
-                                                        {metric.reason && (
-                                                            <p className="text-xs text-muted-foreground mt-2 italic">
-                                                                "{metric.reason}"
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </div>

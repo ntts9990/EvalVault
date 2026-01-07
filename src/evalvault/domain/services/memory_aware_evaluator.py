@@ -123,7 +123,7 @@ class MemoryAwareEvaluator:
 
         resolved = dict(base_thresholds)
         for metric in metrics:
-            resolved.setdefault(metric, 0.7)
+            resolved.setdefault(metric, self._evaluator.default_threshold_for(metric))
 
         adjusted: dict[str, float] = {}
         for metric, base_value in resolved.items():

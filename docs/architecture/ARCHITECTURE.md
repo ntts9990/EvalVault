@@ -81,7 +81,8 @@
 │  │  └── web/                       │                    │  │   ├── azure_adapter.py          │
 │  │      ├── adapter.py             │                    │  │   ├── ollama_adapter.py         │
 │  │      ├── app.py                │                    │  │   ├── openai_adapter.py         │
-│  │      ├── components/           │                    │  │   └── llm_relation_augmenter.py │
+│  │      ├── components/           │                    │  │   ├── vllm_adapter.py           │
+│  │      │   ├── cards.py          │                    │  │   └── llm_relation_augmenter.py │
 │  │      │   ├── cards.py          │                    │  │                                 │
 │  │      │   ├── charts.py         │                    │  ├── storage/                      │
 │  │      │   ├── evaluate.py       │                    │  │   ├── __init__.py               │
@@ -93,7 +94,8 @@
 │                                   │                    │  ├── tracker/                      │
 │                                   │                    │  │   ├── __init__.py               │
 │                                   │                    │  │   ├── langfuse_adapter.py       │
-│                                   │                    │  │   └── mlflow_adapter.py         │
+│                                   │                    │  │   ├── mlflow_adapter.py         │
+│                                   │                    │  │   └── phoenix_adapter.py        │
 │                                   │                    │  │                                 │
 │                                   │                    │  ├── analysis/                     │
 │                                   │                    │  │   ├── statistical_adapter.py    │
@@ -2137,7 +2139,8 @@ class ExperimentManager:
         self._storage = storage
 
 # 어댑터에서 주입
-storage = SQLiteStorageAdapter(db_path="evalvault.db")
+settings = Settings()
+storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
 manager = ExperimentManager(storage=storage)  # 의존성 주입
 ```
 

@@ -63,7 +63,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 
 ### 2. 메모리 데이터베이스 경로 지정
 
-기본적으로 `evalvault_memory.db`를 사용하지만, 커스텀 경로를 지정할 수 있습니다:
+기본적으로 `data/db/evalvault_memory.db`를 사용하지만, 커스텀 경로를 지정할 수 있습니다:
 
 ```bash
 DATASET="tests/fixtures/e2e/insurance_qa_korean.json"
@@ -137,7 +137,7 @@ from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 
 # 메모리 기반 분석 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 analysis = MemoryBasedAnalysis(memory_adapter)
 
 # 인사이트 생성
@@ -196,7 +196,7 @@ from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomai
 from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 
 # 메모리 어댑터 초기화
-memory_adapter = SQLiteDomainMemoryAdapter("evalvault_memory.db")
+memory_adapter = SQLiteDomainMemoryAdapter("data/db/evalvault_memory.db")
 evaluator = RagasEvaluator()
 memory_evaluator = MemoryAwareEvaluator(
     evaluator=evaluator,
@@ -372,7 +372,7 @@ insights = analysis.generate_insights(
 
 ## 주의사항
 
-1. **메모리 데이터베이스 경로**: 기본값은 `evalvault_memory.db`입니다. 프로젝트별로 다른 경로를 사용하는 것을 권장합니다.
+1. **메모리 데이터베이스 경로**: 기본값은 `data/db/evalvault_memory.db`입니다. 프로젝트별로 다른 경로를 사용하는 것을 권장합니다.
 2. **도메인 분리**: 다른 도메인 간 메모리가 섞이지 않도록 `--memory-domain` 옵션을 명시적으로 지정하세요.
 3. **메모리 진화**: 정기적으로 `run_evolution()`을 실행하여 메모리를 정리하세요.
 4. **성능**: 대용량 메모리 데이터베이스의 경우 검색 성능이 저하될 수 있습니다.

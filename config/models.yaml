@@ -53,6 +53,27 @@ profiles:
       model: text-embedding-3-small
 
   # ──────────────────────────────────────────────────────────────
+  # OpenAI 변형 프로필 (비용/성능 선택)
+  # ──────────────────────────────────────────────────────────────
+  openai-mini:
+    description: "OpenAI API 사용 (경량: gpt-5-mini)"
+    llm:
+      provider: openai
+      model: gpt-5-mini
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+
+  openai-5-2:
+    description: "OpenAI API 사용 (고성능: gpt-5.2)"
+    llm:
+      provider: openai
+      model: gpt-5.2
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+
+  # ──────────────────────────────────────────────────────────────
   # vLLM OpenAI-compatible 서버 사용
   # ──────────────────────────────────────────────────────────────
   vllm:

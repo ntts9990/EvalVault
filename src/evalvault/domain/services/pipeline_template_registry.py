@@ -51,6 +51,9 @@ class PipelineTemplateRegistry:
         )
         self._templates[AnalysisIntent.ANALYZE_PATTERNS] = self._create_analyze_patterns_template()
         self._templates[AnalysisIntent.ANALYZE_TRENDS] = self._create_analyze_trends_template()
+        self._templates[AnalysisIntent.BENCHMARK_RETRIEVAL] = (
+            self._create_benchmark_retrieval_template()
+        )
 
         # 보고서 템플릿
         self._templates[AnalysisIntent.GENERATE_SUMMARY] = self._create_generate_summary_template()
@@ -333,7 +336,7 @@ class PipelineTemplateRegistry:
                 id="diagnostic",
                 name="진단 분석",
                 module="diagnostic_playbook",
-                depends_on=["ragas_eval"],
+                depends_on=["load_data", "ragas_eval"],
             ),
             AnalysisNode(
                 id="causal",
@@ -435,6 +438,20 @@ class PipelineTemplateRegistry:
         ]
         return AnalysisPipeline(
             intent=AnalysisIntent.ANALYZE_TRENDS,
+            nodes=nodes,
+        )
+
+    def _create_benchmark_retrieval_template(self) -> AnalysisPipeline:
+        """검색 벤치마크 템플릿."""
+        nodes = [
+            AnalysisNode(
+                id="retrieval_benchmark",
+                name="검색 벤치마크",
+                module="retrieval_benchmark",
+            )
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.BENCHMARK_RETRIEVAL,
             nodes=nodes,
         )
 

@@ -18,6 +18,7 @@ from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_xlsx,
 )
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.config.settings import get_settings
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
@@ -33,6 +34,7 @@ class RunSummaryResponse(BaseModel):
 
     run_id: str
     dataset_name: str
+    project_name: str | None = None
     model_name: str
     pass_rate: float
     total_test_cases: int
@@ -40,6 +42,10 @@ class RunSummaryResponse(BaseModel):
     started_at: str  # ISO format string
     finished_at: str | None = None
     metrics_evaluated: list[str] = []
+    run_mode: str | None = None
+    evaluation_task: str | None = None
+    threshold_profile: str | None = None
+    avg_metric_scores: dict[str, float] | None = None
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None
     phoenix_drift: float | None = None
@@ -68,9 +74,12 @@ class StartEvaluationRequest(BaseModel):
     dataset_path: str
     metrics: list[str]
     model: str
+    evaluation_task: str | None = None
     parallel: bool = True
     batch_size: int = 5
     thresholds: dict[str, float] | None = None
+    threshold_profile: str | None = None
+    project_name: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
@@ -88,6 +97,68 @@ class ModelItemResponse(BaseModel):
     id: str
     name: str
     supports_tools: bool | None = None
+
+
+def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
+    return {
+        "summary": run.to_summary_dict(),
+        "results": [
+            {
+                "test_case_id": result.test_case_id,
+                "question": result.question,
+                "answer": result.answer,
+                "ground_truth": result.ground_truth,
+                "contexts": result.contexts,
+                "metrics": [
+                    {
+                        "name": metric.name,
+                        "score": metric.score,
+                        "passed": metric.passed,
+                        "reason": metric.reason,
+                    }
+                    for metric in result.metrics
+                ],
+            }
+            for result in run.results
+        ],
+    }
+
+
+def _build_case_counts(base_run: EvaluationRun, target_run: EvaluationRun) -> dict[str, int]:
+    base_map = {result.test_case_id: result for result in base_run.results}
+    target_map = {result.test_case_id: result for result in target_run.results}
+    case_ids = set(base_map) | set(target_map)
+    counts = {
+        "regressions": 0,
+        "improvements": 0,
+        "same_pass": 0,
+        "same_fail": 0,
+        "new": 0,
+        "removed": 0,
+    }
+
+    for case_id in case_ids:
+        base_case = base_map.get(case_id)
+        target_case = target_map.get(case_id)
+        if base_case is None:
+            counts["new"] += 1
+            continue
+        if target_case is None:
+            counts["removed"] += 1
+            continue
+
+        base_passed = base_case.all_passed
+        target_passed = target_case.all_passed
+        if base_passed and target_passed:
+            counts["same_pass"] += 1
+        elif not base_passed and not target_passed:
+            counts["same_fail"] += 1
+        elif base_passed and not target_passed:
+            counts["regressions"] += 1
+        else:
+            counts["improvements"] += 1
+
+    return counts
 
 
 # --- Options Endpoints ---
@@ -182,6 +253,57 @@ def get_dataset_template(template_format: str) -> Response:
 # --- Endpoints ---
 
 
+@router.get("/compare", response_model=None)
+def compare_runs(
+    adapter: AdapterDep,
+    base: str | None = Query(None, description="Base run ID"),
+    target: str | None = Query(None, description="Target run ID"),
+    run_id1: str | None = Query(None, description="Base run ID (alias)"),
+    run_id2: str | None = Query(None, description="Target run ID (alias)"),
+) -> dict[str, Any]:
+    """Compare two evaluation runs and return summary + run details."""
+    base_id = base or run_id1
+    target_id = target or run_id2
+    if not base_id or not target_id:
+        raise HTTPException(status_code=400, detail="base and target run IDs are required")
+
+    try:
+        base_run = adapter.get_run_details(base_id)
+        target_run = adapter.get_run_details(target_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    metrics = sorted(set(base_run.metrics_evaluated) | set(target_run.metrics_evaluated))
+    metric_deltas = []
+    for metric in metrics:
+        base_score = base_run.get_avg_score(metric)
+        target_score = target_run.get_avg_score(metric)
+        delta = (
+            target_score - base_score
+            if base_score is not None and target_score is not None
+            else None
+        )
+        metric_deltas.append(
+            {
+                "name": metric,
+                "base": base_score,
+                "target": target_score,
+                "delta": delta,
+            }
+        )
+
+    return {
+        "base": _serialize_run_details(base_run),
+        "target": _serialize_run_details(target_run),
+        "metric_deltas": metric_deltas,
+        "case_counts": _build_case_counts(base_run, target_run),
+        "pass_rate_delta": target_run.pass_rate - base_run.pass_rate,
+        "total_cases_delta": target_run.total_test_cases - base_run.total_test_cases,
+    }
+
+
 @router.post("/start", status_code=200)
 async def start_evaluation_endpoint(
     request: StartEvaluationRequest,
@@ -192,9 +314,12 @@ async def start_evaluation_endpoint(
         dataset_path=request.dataset_path,
         metrics=request.metrics,
         model_name=request.model,
+        evaluation_task=request.evaluation_task or "qa",
         parallel=request.parallel,
         batch_size=request.batch_size,
         thresholds=request.thresholds or {},
+        threshold_profile=request.threshold_profile,
+        project_name=request.project_name,
         retriever_config=request.retriever_config,
         memory_config=request.memory_config,
         tracker_config=request.tracker_config,
@@ -254,7 +379,8 @@ async def start_evaluation_endpoint(
                 )
 
                 try:
-                    memory_db = memory_config.get("db_path") or "evalvault_memory.db"
+                    settings = get_settings()
+                    memory_db = memory_config.get("db_path") or settings.evalvault_memory_db_path
                     domain = memory_config.get("domain") or "default"
                     language = memory_config.get("language") or "ko"
                     memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
@@ -304,6 +430,7 @@ def list_runs(
         {
             "run_id": s.run_id,
             "dataset_name": s.dataset_name,
+            "project_name": s.project_name,
             "model_name": s.model_name,
             "pass_rate": s.pass_rate,
             "total_test_cases": s.total_test_cases,
@@ -311,6 +438,10 @@ def list_runs(
             "started_at": s.started_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "metrics_evaluated": s.metrics_evaluated,
+            "run_mode": s.run_mode,
+            "evaluation_task": s.evaluation_task,
+            "threshold_profile": s.threshold_profile,
+            "avg_metric_scores": s.avg_metric_scores or None,
             "total_cost_usd": s.total_cost_usd,
             "phoenix_precision": s.phoenix_precision,
             "phoenix_drift": s.phoenix_drift,
@@ -325,32 +456,7 @@ def get_run_details(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
     """Get detailed information for a specific run."""
     try:
         run: EvaluationRun = adapter.get_run_details(run_id)
-        # Using to_summary_dict() or returning full object.
-        # Returning full object might be complex due to validation, so we start with summary dict
-        # and enrich it with results if needed.
-        # For now, let's return a detailed dict.
-        return {
-            "summary": run.to_summary_dict(),
-            "results": [
-                {
-                    "test_case_id": r.test_case_id,
-                    "question": r.question,
-                    "answer": r.answer,
-                    "ground_truth": r.ground_truth,
-                    "contexts": r.contexts,
-                    "metrics": [
-                        {
-                            "name": m.name,
-                            "score": m.score,
-                            "passed": m.passed,
-                            "reason": m.reason,
-                        }
-                        for m in r.metrics
-                    ],
-                }
-                for r in run.results
-            ],
-        }
+        return _serialize_run_details(run)
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as e:

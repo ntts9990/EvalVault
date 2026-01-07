@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import math
 from collections.abc import Callable, Sequence
@@ -29,8 +31,16 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
         Faithfulness,
         SemanticSimilarity,
     )
+try:  # SummaryScore lives in different modules depending on Ragas version
+    from ragas.metrics.collections import SummaryScore as RagasSummaryScore
+except ImportError:  # pragma: no cover - fallback for older Ragas versions
+    try:
+        from ragas.metrics import SummarizationScore as RagasSummaryScore
+    except ImportError:  # pragma: no cover - no summary support available
+        RagasSummaryScore = None
 
 from evalvault.domain.entities import Dataset, EvaluationRun, MetricScore, TestCase, TestCaseResult
+from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
@@ -39,6 +49,16 @@ from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 from evalvault.ports.outbound.llm_port import LLMPort
 
 logger = logging.getLogger(__name__)
+
+
+class SummaryFaithfulness(Faithfulness):
+    """Faithfulness alias for summarization tasks."""
+
+    name = "summary_faithfulness"
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.name = "summary_faithfulness"
 
 
 @dataclass
@@ -82,15 +102,21 @@ class RagasEvaluator:
         "context_recall": ContextRecall,
         "factual_correctness": FactualCorrectness,
         "semantic_similarity": SemanticSimilarity,
+        "summary_score": RagasSummaryScore,
+        "summary_faithfulness": SummaryFaithfulness,
     }
 
     # Custom 메트릭 매핑 (Ragas 외부 메트릭)
     CUSTOM_METRIC_MAP = {
         "insurance_term_accuracy": InsuranceTermAccuracy,
+        "entity_preservation": EntityPreservation,
     }
 
     # Metrics that require embeddings
     EMBEDDING_REQUIRED_METRICS = {"answer_relevancy", "semantic_similarity"}
+
+    # Faithfulness variants that can share fallback behavior
+    FAITHFULNESS_METRICS = {"faithfulness", "summary_faithfulness"}
 
     # Metrics that require reference (ground_truth)
     REFERENCE_REQUIRED_METRICS = {
@@ -108,6 +134,19 @@ class RagasEvaluator:
         "context_recall": ["user_input", "retrieved_contexts", "reference"],
         "factual_correctness": ["response", "reference"],
         "semantic_similarity": ["response", "reference"],
+        "summary_score": ["response", "reference_contexts"],
+        "summary_faithfulness": ["user_input", "response", "retrieved_contexts"],
+    }
+
+    SUMMARY_SCORE_COEFF = 0.3
+    SUMMARY_SCORE_COEFF_BY_DOMAIN = {
+        "insurance": 0.15,
+    }
+    DEFAULT_THRESHOLD_FALLBACK = 0.7
+    DEFAULT_METRIC_THRESHOLDS = {
+        "summary_faithfulness": 0.9,
+        "summary_score": 0.85,
+        "entity_preservation": 0.9,
     }
 
     # Estimated pricing (USD per 1M tokens) as of Jan 2025
@@ -133,6 +172,7 @@ class RagasEvaluator:
         self._faithfulness_fallback_logged = False
         self._active_llm_provider = None
         self._active_llm_model = None
+        self._active_llm = None
 
     async def evaluate(
         self,
@@ -169,6 +209,7 @@ class RagasEvaluator:
         """
         self._active_llm_provider = getattr(llm, "provider_name", None)
         self._active_llm_model = llm.get_model_name()
+        self._active_llm = llm
         # Resolve thresholds: CLI > dataset > default(0.7)
         resolved_thresholds = {}
         for metric in metrics:
@@ -180,7 +221,7 @@ class RagasEvaluator:
                 resolved_thresholds[metric] = dataset.thresholds[metric]
             else:
                 # 기본값
-                resolved_thresholds[metric] = 0.7
+                resolved_thresholds[metric] = self.default_threshold_for(metric)
 
         # Initialize evaluation run
         run = EvaluationRun(
@@ -325,6 +366,7 @@ class RagasEvaluator:
                 user_input=test_case.question,
                 response=test_case.answer,
                 retrieved_contexts=test_case.contexts,
+                reference_contexts=test_case.contexts,
                 reference=test_case.ground_truth,
             )
             ragas_samples.append(sample)
@@ -336,6 +378,8 @@ class RagasEvaluator:
             ragas_embeddings = llm.as_ragas_embeddings()
 
         # Initialize Ragas metrics with LLM (new Ragas API requires llm at init)
+        domain_hint = dataset.metadata.get("domain") if isinstance(dataset.metadata, dict) else None
+        summary_score_coeff = self._resolve_summary_score_coeff(domain_hint)
         ragas_metrics = []
         for metric_name in metrics:
             metric_class = self.METRIC_MAP.get(metric_name)
@@ -343,6 +387,14 @@ class RagasEvaluator:
                 # Pass embeddings for metrics that require it
                 if metric_name in self.EMBEDDING_REQUIRED_METRICS and ragas_embeddings:
                     ragas_metrics.append(metric_class(llm=ragas_llm, embeddings=ragas_embeddings))
+                elif metric_name == "summary_score":
+                    ragas_metrics.append(
+                        self._build_summary_score_metric(
+                            metric_class,
+                            ragas_llm,
+                            summary_score_coeff,
+                        )
+                    )
                 else:
                     ragas_metrics.append(metric_class(llm=ragas_llm))
 
@@ -546,7 +598,12 @@ class RagasEvaluator:
         scores: dict[str, float] = {}
 
         for metric in ragas_metrics:
-            if metric.name == "faithfulness" and self._faithfulness_ragas_failed:
+            if metric.name in self.FAITHFULNESS_METRICS and self._faithfulness_ragas_failed:
+                if metric.name == "summary_faithfulness":
+                    judge_score = await self._score_summary_faithfulness_judge(sample)
+                    if judge_score is not None:
+                        scores[metric.name] = judge_score
+                        continue
                 fallback_score = await self._score_faithfulness_with_fallback(sample)
                 if fallback_score is not None:
                     scores[metric.name] = fallback_score
@@ -558,6 +615,7 @@ class RagasEvaluator:
                         "user_input": sample.user_input,
                         "response": sample.response,
                         "retrieved_contexts": sample.retrieved_contexts,
+                        "reference_contexts": sample.reference_contexts,
                         "reference": sample.reference,
                     }
                     required_args = self.METRIC_ARGS.get(
@@ -576,6 +634,7 @@ class RagasEvaluator:
                         "user_input": sample.user_input,
                         "response": sample.response,
                         "retrieved_contexts": sample.retrieved_contexts,
+                        "reference_contexts": sample.reference_contexts,
                         "reference": sample.reference,
                     }
                 else:
@@ -602,6 +661,11 @@ class RagasEvaluator:
                     score_value = 0.0
 
                 if math.isnan(score_value):
+                    if metric.name == "summary_faithfulness":
+                        judge_score = await self._score_summary_faithfulness_judge(sample)
+                        if judge_score is not None:
+                            scores[metric.name] = judge_score
+                            continue
                     logger.warning(
                         "Metric %s returned NaN. Using 0.0. ragas_input=%s ragas_output=%r",
                         metric.name,
@@ -613,7 +677,9 @@ class RagasEvaluator:
                 scores[metric.name] = score_value
             except Exception as e:
                 fallback_score = None
-                if metric.name == "faithfulness":
+                if metric.name == "summary_faithfulness":
+                    fallback_score = await self._score_summary_faithfulness_judge(sample)
+                if fallback_score is None and metric.name in self.FAITHFULNESS_METRICS:
                     if not self._faithfulness_ragas_failed:
                         logger.warning(
                             "Failed to score metric %s via Ragas (%s). "
@@ -631,6 +697,25 @@ class RagasEvaluator:
                     scores[metric.name] = 0.0
 
         return scores
+
+    @classmethod
+    def _resolve_summary_score_coeff(cls, domain: str | None) -> float:
+        if not domain:
+            return cls.SUMMARY_SCORE_COEFF
+        normalized = str(domain).strip().lower()
+        return cls.SUMMARY_SCORE_COEFF_BY_DOMAIN.get(normalized, cls.SUMMARY_SCORE_COEFF)
+
+    def _build_summary_score_metric(self, metric_class, ragas_llm, coeff: float | None = None):
+        if coeff is None:
+            coeff = self.SUMMARY_SCORE_COEFF
+        try:
+            return metric_class(llm=ragas_llm, coeff=coeff)
+        except TypeError:
+            return metric_class(llm=ragas_llm)
+
+    @classmethod
+    def default_threshold_for(cls, metric_name: str) -> float:
+        return cls.DEFAULT_METRIC_THRESHOLDS.get(metric_name, cls.DEFAULT_THRESHOLD_FALLBACK)
 
     def _fallback_korean_faithfulness(self, sample: SingleTurnSample) -> float | None:
         """Fallback faithfulness scoring for Korean text when Ragas fails."""
@@ -660,6 +745,55 @@ class RagasEvaluator:
         try:
             return float(score)
         except (TypeError, ValueError):
+            return None
+
+    async def _score_summary_faithfulness_judge(self, sample: SingleTurnSample) -> float | None:
+        llm = self._active_llm
+        if llm is None or not sample.response or not sample.retrieved_contexts:
+            return None
+
+        context = "\n\n".join(sample.retrieved_contexts)
+        prompt = (
+            "You are a strict summarization faithfulness judge.\n"
+            "Given the CONTEXT and SUMMARY, determine whether every claim in SUMMARY is supported by CONTEXT.\n"
+            "If any numbers, conditions, exclusions, durations, or eligibility are missing, added, or "
+            "contradicted, verdict is unsupported.\n"
+            'Return JSON only: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
+            f"CONTEXT:\n{context}\n\nSUMMARY:\n{sample.response}\n"
+        )
+
+        try:
+            response_text = await asyncio.to_thread(llm.generate_text, prompt, json_mode=True)
+        except NotImplementedError:
+            try:
+                response_text = await llm.agenerate_text(prompt)
+            except Exception:
+                return None
+        except Exception:
+            return None
+
+        payload = self._parse_json_payload(response_text)
+        if not payload:
+            return None
+
+        verdict = str(payload.get("verdict", "")).strip().lower()
+        if verdict == "supported":
+            return 1.0
+        if verdict == "unsupported":
+            return 0.0
+        return None
+
+    @staticmethod
+    def _parse_json_payload(text: str) -> dict[str, Any] | None:
+        if not text:
+            return None
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end < start:
+            return None
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
             return None
 
     async def _score_faithfulness_with_fallback(

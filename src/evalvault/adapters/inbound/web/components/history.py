@@ -33,6 +33,7 @@ class RunFilter:
     date_to: datetime | None = None
     metrics: list[str] = field(default_factory=list)
     run_mode: str | None = None
+    project_names: list[str] = field(default_factory=list)
 
     def apply(self, runs: list[RunSummary]) -> list[RunSummary]:
         """필터 적용.
@@ -69,6 +70,8 @@ class RunFilter:
             filtered = [
                 r for r in filtered if r.run_mode and r.run_mode.lower() == self.run_mode.lower()
             ]
+        if self.project_names:
+            filtered = [r for r in filtered if r.project_name in self.project_names]
 
         return filtered
 
@@ -88,6 +91,7 @@ class RunFilter:
             date_from=self.date_from,
             date_to=self.date_to,
             run_mode=self.run_mode,
+            project_names=self.project_names,
         )
 
     def is_empty(self) -> bool:
@@ -103,6 +107,7 @@ class RunFilter:
                 self.date_to,
                 self.metrics if self.metrics else None,
                 self.run_mode,
+                self.project_names if self.project_names else None,
             ]
         )
 
@@ -174,6 +179,7 @@ class RunTable:
                 {
                     "run_id": run.run_id,
                     "dataset_name": run.dataset_name,
+                    "project_name": run.project_name,
                     "run_mode": run.run_mode,
                     "model_name": run.model_name,
                     "pass_rate": run.pass_rate,
@@ -297,6 +303,7 @@ class HistoryExporter:
             [
                 "run_id",
                 "dataset_name",
+                "project_name",
                 "run_mode",
                 "model_name",
                 "pass_rate",
@@ -320,6 +327,7 @@ class HistoryExporter:
                 [
                     run.run_id,
                     run.dataset_name,
+                    run.project_name or "",
                     run.run_mode or "",
                     run.model_name,
                     f"{run.pass_rate:.4f}",
@@ -353,6 +361,7 @@ class HistoryExporter:
                 {
                     "run_id": run.run_id,
                     "dataset_name": run.dataset_name,
+                    "project_name": run.project_name,
                     "model_name": run.model_name,
                     "run_mode": run.run_mode,
                     "pass_rate": run.pass_rate,
@@ -405,4 +414,5 @@ class RunSearch:
             or query_lower in r.model_name.lower()
             or query_lower in r.run_id.lower()
             or (r.run_mode and query_lower in r.run_mode.lower())
+            or (r.project_name and query_lower in r.project_name.lower())
         ]

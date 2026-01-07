@@ -159,7 +159,7 @@ def handle_storage_error(
         "",
         "Try a different output location:",
         "  --output ~/results.json",
-        "  --db ~/evalvault.db",
+        "  --db ./data/db/evalvault.db",
     ]
 
     print_cli_error(

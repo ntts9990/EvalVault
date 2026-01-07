@@ -73,8 +73,7 @@ src/evalvault/
 
 ```bash
 # Install dependencies (uv sync 사용 필수)
-uv sync --extra dev                              # 기본 개발 환경
-uv sync --extra dev --extra analysis --extra korean --extra web   # 전체 기능 개발 환경 (권장)
+uv sync --extra dev                              # 전체 기능 개발 환경 (dev 도구 + 모든 extras)
 
 # Optional extras:
 #   --extra korean  : 한국어 NLP (kiwipiepy, rank-bm25)

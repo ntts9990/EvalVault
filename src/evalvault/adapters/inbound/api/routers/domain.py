@@ -6,12 +6,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.config.settings import get_settings
 
 router = APIRouter()
+DEFAULT_MEMORY_DB_PATH = get_settings().evalvault_memory_db_path
 
 
 # --- Dependencies ---
-def get_memory_adapter(db_path: str = "evalvault_memory.db") -> SQLiteDomainMemoryAdapter:
+def get_memory_adapter(db_path: str = DEFAULT_MEMORY_DB_PATH) -> SQLiteDomainMemoryAdapter:
     """Get memory adapter instance."""
     return SQLiteDomainMemoryAdapter(db_path)
 
@@ -51,7 +53,7 @@ def list_facts(
     language: str | None = None,
     subject: str | None = None,
     limit: int = 100,
-    db_path: str = "evalvault_memory.db",
+    db_path: str = DEFAULT_MEMORY_DB_PATH,
 ):
     """List factual facts."""
     adapter = get_memory_adapter(db_path)
@@ -73,7 +75,7 @@ def list_facts(
 
 
 @router.get("/facts/{fact_id}", response_model=FactResponse)
-def get_fact(fact_id: str, db_path: str = "evalvault_memory.db"):
+def get_fact(fact_id: str, db_path: str = DEFAULT_MEMORY_DB_PATH):
     """Get a specific fact."""
     adapter = get_memory_adapter(db_path)
     try:
@@ -94,7 +96,7 @@ def get_fact(fact_id: str, db_path: str = "evalvault_memory.db"):
 
 
 @router.delete("/facts/{fact_id}")
-def delete_fact(fact_id: str, db_path: str = "evalvault_memory.db"):
+def delete_fact(fact_id: str, db_path: str = DEFAULT_MEMORY_DB_PATH):
     """Delete a fact."""
     adapter = get_memory_adapter(db_path)
     if adapter.delete_fact(fact_id):
@@ -104,7 +106,7 @@ def delete_fact(fact_id: str, db_path: str = "evalvault_memory.db"):
 
 @router.get("/behaviors", response_model=list[BehaviorResponse])
 def list_behaviors(
-    domain: str | None = None, limit: int = 100, db_path: str = "evalvault_memory.db"
+    domain: str | None = None, limit: int = 100, db_path: str = DEFAULT_MEMORY_DB_PATH
 ):
     """List behaviors."""
     adapter = get_memory_adapter(db_path)

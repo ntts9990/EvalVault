@@ -9,6 +9,7 @@ import { AnalysisCompareView } from './pages/AnalysisCompareView';
 import { AnalysisResultView } from './pages/AnalysisResultView';
 import { CompareRuns } from './pages/CompareRuns';
 import { Settings } from './pages/Settings';
+import { CustomerReport } from './pages/CustomerReport';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/analysis" element={<AnalysisLab />} />
         <Route path="/analysis/compare" element={<AnalysisCompareView />} />
         <Route path="/analysis/results/:id" element={<AnalysisResultView />} />
+        <Route path="/reports" element={<CustomerReport />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>

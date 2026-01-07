@@ -67,6 +67,9 @@ from evalvault.adapters.outbound.analysis.ragas_evaluator_module import (
 from evalvault.adapters.outbound.analysis.retrieval_analyzer_module import (
     RetrievalAnalyzerModule,
 )
+from evalvault.adapters.outbound.analysis.retrieval_benchmark_module import (
+    RetrievalBenchmarkModule,
+)
 from evalvault.adapters.outbound.analysis.retrieval_quality_checker_module import (
     RetrievalQualityCheckerModule,
 )
@@ -132,6 +135,7 @@ __all__ = [
     "PrioritySummaryModule",
     "RagasEvaluatorModule",
     "RetrievalAnalyzerModule",
+    "RetrievalBenchmarkModule",
     "RetrievalQualityCheckerModule",
     "RootCauseAnalyzerModule",
     "RunAnalyzerModule",

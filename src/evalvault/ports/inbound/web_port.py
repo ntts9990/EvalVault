@@ -18,10 +18,13 @@ class EvalRequest:
     dataset_path: str
     metrics: list[str]
     model_name: str = "openai/gpt-5-nano"
+    evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)
+    threshold_profile: str | None = None
     parallel: bool = True
     batch_size: int = 5
+    project_name: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
@@ -54,6 +57,8 @@ class RunSummary:
     metrics_evaluated: list[str]
     passed_test_cases: int = 0
     run_mode: str | None = None
+    evaluation_task: str | None = None
+    threshold_profile: str | None = None
     total_tokens: int = 0
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None
@@ -61,6 +66,8 @@ class RunSummary:
     phoenix_experiment_url: str | None = None
     phoenix_dataset_url: str | None = None
     phoenix_prompts: list[dict[str, Any]] = field(default_factory=list)
+    project_name: str | None = None
+    avg_metric_scores: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,6 +81,7 @@ class RunFilters:
     min_pass_rate: float | None = None
     max_pass_rate: float | None = None
     run_mode: str | None = None
+    project_names: list[str] = field(default_factory=list)
 
 
 class WebUIPort(Protocol):

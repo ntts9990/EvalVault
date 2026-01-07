@@ -28,6 +28,7 @@ from evalvault.domain.entities.improvement import (
     RAGImprovementGuide,
 )
 from evalvault.domain.entities.kg import EntityModel, RelationModel
+from evalvault.domain.entities.method import MethodInput, MethodInputDataset, MethodOutput
 from evalvault.domain.entities.rag_trace import (
     GenerationData,
     RAGTraceData,
@@ -83,6 +84,10 @@ __all__ = [
     # KG
     "EntityModel",
     "RelationModel",
+    # Method
+    "MethodInput",
+    "MethodInputDataset",
+    "MethodOutput",
     # RAG Trace
     "GenerationData",
     "RAGTraceData",

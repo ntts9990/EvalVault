@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 # Streamlit 앱 실행 시 src 경로 추가
@@ -49,7 +50,14 @@ def create_app():
         # 네비게이션
         page = st.radio(
             "Navigation",
-            options=["🏠 Home", "📊 Evaluate", "📋 History", "🔧 Improve", "📄 Reports"],
+            options=[
+                "🏠 Home",
+                "📊 Evaluate",
+                "📋 History",
+                "🔧 Improve",
+                "📄 Reports",
+                "🧾 고객 리포트",
+            ],
             label_visibility="collapsed",
         )
 
@@ -83,6 +91,181 @@ def create_app():
         render_improvement_page(adapter, session)
     elif page == "📄 Reports":
         render_reports_page(adapter, session)
+    elif page == "🧾 고객 리포트":
+        render_customer_report_page(adapter, session)
+
+
+def _project_label(option: str) -> str:
+    from evalvault.adapters.inbound.web.components import (
+        ALL_PROJECTS_TOKEN,
+        UNASSIGNED_PROJECT_TOKEN,
+    )
+
+    if option == ALL_PROJECTS_TOKEN:
+        return "전체"
+    if option == UNASSIGNED_PROJECT_TOKEN:
+        return "미분류"
+    return option
+
+
+def _resolve_date_range(
+    range_label: str,
+    custom_range: tuple[date, date] | None,
+) -> tuple[datetime | None, datetime | None]:
+    today = datetime.now().date()
+    if range_label == "전체":
+        return None, None
+    if range_label == "최근 7일":
+        start = today - timedelta(days=6)
+        end = today
+    elif range_label == "최근 30일":
+        start = today - timedelta(days=29)
+        end = today
+    elif range_label == "최근 90일":
+        start = today - timedelta(days=89)
+        end = today
+    elif range_label == "올해":
+        start = date(today.year, 1, 1)
+        end = today
+    elif range_label == "직접 선택" and custom_range and len(custom_range) == 2:
+        start, end = custom_range
+    else:
+        return None, None
+
+    return datetime.combine(start, time.min), datetime.combine(end, time.max)
+
+
+def _previous_period_range(
+    date_from: datetime | None,
+    date_to: datetime | None,
+) -> tuple[datetime | None, datetime | None]:
+    if not date_from or not date_to:
+        return None, None
+
+    delta_days = (date_to.date() - date_from.date()).days + 1
+    prev_end = date_from.date() - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=delta_days - 1)
+    return datetime.combine(prev_start, time.min), datetime.combine(prev_end, time.max)
+
+
+def _filter_runs_by_date(
+    runs,
+    date_from: datetime | None,
+    date_to: datetime | None,
+):
+    if not date_from and not date_to:
+        return list(runs)
+    filtered = []
+    for run in runs:
+        if date_from and run.started_at < date_from:
+            continue
+        if date_to and run.started_at > date_to:
+            continue
+        filtered.append(run)
+    return filtered
+
+
+def _build_customer_report_html(
+    *,
+    stats,
+    range_label: str,
+    project_labels: list[str],
+    trend_fig,
+    metric_fig,
+) -> str:
+    trend_html = trend_fig.to_html(full_html=False, include_plotlyjs="cdn")
+    metric_html = metric_fig.to_html(full_html=False, include_plotlyjs=False)
+    projects_display = ", ".join(project_labels) if project_labels else "전체"
+    cost_value = stats.total_cost or 0.0
+    pass_rate = stats.avg_pass_rate * 100
+
+    return f"""<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EvalVault 고객 리포트</title>
+    <style>
+      body {{
+        font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        margin: 0;
+        background: #0f172a;
+        color: #e2e8f0;
+      }}
+      .container {{
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 32px 24px 56px;
+      }}
+      .meta {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+      }}
+      .card {{
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 16px;
+        padding: 18px;
+      }}
+      .card h3 {{
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #94a3b8;
+      }}
+      .card p {{
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+      }}
+      .section-title {{
+        margin: 32px 0 12px;
+        font-size: 18px;
+      }}
+      .badge {{
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #1e293b;
+        color: #cbd5f5;
+        font-size: 12px;
+      }}
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>EvalVault 고객 리포트</h1>
+      <p class="badge">기간: {range_label} · 프로젝트: {projects_display}</p>
+
+      <div class="meta">
+        <div class="card">
+          <h3>평가 수</h3>
+          <p>{stats.total_runs:,}</p>
+        </div>
+        <div class="card">
+          <h3>테스트 케이스</h3>
+          <p>{stats.total_test_cases:,}</p>
+        </div>
+        <div class="card">
+          <h3>평균 통과율</h3>
+          <p>{pass_rate:.1f}%</p>
+        </div>
+        <div class="card">
+          <h3>총 비용 (USD)</h3>
+          <p>${cost_value:,.2f}</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">Pass Rate 트렌드</h2>
+      {trend_html}
+
+      <h2 class="section-title">메트릭 평균 추이</h2>
+      {metric_html}
+    </div>
+  </body>
+</html>
+"""
 
 
 def render_home_page(adapter, session):
@@ -90,14 +273,16 @@ def render_home_page(adapter, session):
     import streamlit as st
 
     from evalvault.adapters.inbound.web.components import (
+        ALL_PROJECTS_TOKEN,
         DashboardStats,
-        MetricSummaryCard,
         RecentRunsList,
-        create_pass_rate_chart,
+        build_project_options,
+        create_metric_trend_chart,
         create_trend_chart,
+        filter_runs_by_projects,
     )
 
-    st.header("Welcome to EvalVault")
+    st.header("📊 Dashboard")
     st.markdown(
         """
         EvalVault는 RAG (Retrieval-Augmented Generation) 시스템을 평가하고
@@ -106,58 +291,121 @@ def render_home_page(adapter, session):
     )
 
     # 평가 데이터 조회
-    runs = adapter.list_runs(limit=20)
+    runs = adapter.list_runs(limit=200)
+
+    st.subheader("필터")
+    filter_col1, filter_col2, filter_col3 = st.columns([2, 2, 3])
+
+    with filter_col1:
+        range_label = st.selectbox(
+            "기간",
+            options=["최근 7일", "최근 30일", "최근 90일", "올해", "전체", "직접 선택"],
+            index=1,
+        )
+        custom_range = None
+        if range_label == "직접 선택":
+            today = datetime.now().date()
+            custom_range = st.date_input(
+                "기간 선택",
+                value=(today - timedelta(days=29), today),
+            )
+
+    with filter_col2:
+        project_options = build_project_options(runs)
+        selected_projects = st.multiselect(
+            "프로젝트",
+            options=project_options,
+            default=[ALL_PROJECTS_TOKEN],
+            format_func=_project_label,
+        )
+
+    with filter_col3:
+        st.caption("기간과 프로젝트 기준으로 대시보드를 집계합니다.")
+        if range_label == "전체":
+            st.caption("기간: 전체")
+        elif range_label == "직접 선택" and custom_range and len(custom_range) == 2:
+            st.caption(f"기간: {custom_range[0]} ~ {custom_range[1]}")
+        else:
+            st.caption(f"기간: {range_label}")
+
+    date_from, date_to = _resolve_date_range(range_label, custom_range)
+    filtered_runs = filter_runs_by_projects(runs, selected_projects)
+    filtered_runs = _filter_runs_by_date(filtered_runs, date_from, date_to)
+    filtered_runs = sorted(filtered_runs, key=lambda r: r.started_at, reverse=True)
+
+    prev_from, prev_to = _previous_period_range(date_from, date_to)
+    prev_runs = filter_runs_by_projects(runs, selected_projects)
+    prev_runs = _filter_runs_by_date(prev_runs, prev_from, prev_to)
+    prev_stats = DashboardStats.from_runs(prev_runs) if prev_from and prev_to else None
 
     # 대시보드 통계 계산
-    stats = DashboardStats.from_runs(runs)
+    stats = DashboardStats.from_runs(filtered_runs)
+    deltas = stats.compare_to(prev_stats) if prev_stats else None
 
     # 통계 카드 섹션
-    st.subheader("Overview")
+    st.subheader("요약 지표")
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        card = MetricSummaryCard(
-            title="Total Runs",
-            value=stats.total_runs,
-            format_type="number",
+        st.metric(
+            label="평가 수",
+            value=f"{stats.total_runs:,}",
+            delta=deltas["total_runs"] if deltas else None,
         )
-        st.metric(label=card.title, value=card.formatted_value)
 
     with col2:
-        card = MetricSummaryCard(
-            title="Test Cases",
-            value=stats.total_test_cases,
-            format_type="number",
+        st.metric(
+            label="테스트 케이스",
+            value=f"{stats.total_test_cases:,}",
+            delta=deltas["total_test_cases"] if deltas else None,
         )
-        st.metric(label=card.title, value=card.formatted_value)
 
     with col3:
-        card = MetricSummaryCard(
-            title="Avg Pass Rate",
-            value=stats.avg_pass_rate,
-            format_type="percent",
+        pass_rate_value = stats.avg_pass_rate * 100
+        pass_rate_delta = deltas["avg_pass_rate"] * 100 if deltas else None
+        st.metric(
+            label="평균 통과율",
+            value=f"{pass_rate_value:.1f}%",
+            delta=f"{pass_rate_delta:+.1f}p" if pass_rate_delta is not None else None,
         )
-        st.metric(label=card.title, value=card.formatted_value)
 
     with col4:
-        card = MetricSummaryCard(
-            title="Total Cost",
-            value=stats.total_cost,
-            format_type="currency",
+        cost_value = stats.total_cost or 0.0
+        cost_delta = deltas["total_cost"] if deltas else None
+        st.metric(
+            label="총 비용 (USD)",
+            value=f"${cost_value:,.2f}",
+            delta=f"{cost_delta:+.2f}" if cost_delta is not None else None,
         )
-        st.metric(label=card.title, value=card.formatted_value)
 
     # 차트 섹션
     st.divider()
     chart_col1, chart_col2 = st.columns(2)
 
     with chart_col1:
-        pass_rate_fig = create_pass_rate_chart(runs[:10])
-        st.plotly_chart(pass_rate_fig, width="stretch", key="home_pass_rate_chart")
+        trend_fig = create_trend_chart(filtered_runs, title="기간별 Pass Rate")
+        st.plotly_chart(trend_fig, width="stretch", key="home_trend_chart")
 
     with chart_col2:
-        trend_fig = create_trend_chart(runs)
-        st.plotly_chart(trend_fig, width="stretch", key="home_trend_chart")
+        metric_candidates = sorted(
+            {
+                metric
+                for run in filtered_runs
+                for metric in (getattr(run, "avg_metric_scores", {}) or {})
+            }
+        )
+        selected_metrics = st.multiselect(
+            "메트릭 트렌드",
+            options=metric_candidates,
+            default=metric_candidates[:2],
+            key="home_metric_trend",
+        )
+        metric_fig = create_metric_trend_chart(
+            filtered_runs,
+            selected_metrics,
+            title="메트릭 평균 추이",
+        )
+        st.plotly_chart(metric_fig, width="stretch", key="home_metric_trend_chart")
 
     # 지원 메트릭 섹션
     st.divider()
@@ -187,9 +435,9 @@ def render_home_page(adapter, session):
     st.divider()
     st.subheader("품질 현황 및 개선 제안")
 
-    if runs:
+    if filtered_runs:
         # 가장 최근 실행의 품질 게이트 표시
-        latest_run = runs[0]
+        latest_run = filtered_runs[0]
         try:
             gate_report = adapter.check_quality_gate(latest_run.run_id)
 
@@ -247,14 +495,16 @@ def render_home_page(adapter, session):
     st.divider()
     st.subheader("최근 평가")
 
-    recent_list = RecentRunsList(runs=runs, max_items=5)
+    recent_list = RecentRunsList(runs=filtered_runs, max_items=5)
 
     if not recent_list.is_empty:
         for run in recent_list.displayed_runs:
             col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
             with col1:
                 emoji = recent_list.get_pass_rate_emoji(run.pass_rate)
+                project_label = run.project_name or "미분류"
                 st.text(f"{emoji} {run.dataset_name}")
+                st.caption(f"프로젝트: {project_label}")
                 extra_bits: list[str] = []
                 if run.phoenix_precision is not None:
                     extra_bits.append(f"P@K {run.phoenix_precision:.2f}")
@@ -294,6 +544,7 @@ def render_evaluate_page(adapter, session):
         FileUploadHandler,
         MetricSelector,
     )
+    from evalvault.adapters.inbound.web.components.projects import collect_project_names
 
     st.header("📊 Evaluate")
     st.markdown("데이터셋을 업로드하고 RAG 평가를 실행합니다.")
@@ -376,9 +627,33 @@ def render_evaluate_page(adapter, session):
         else:
             st.error(f"❌ {validation_result.error_message}")
 
+    # 프로젝트 선택 섹션
+    st.divider()
+    st.subheader("2. 프로젝트 선택")
+
+    existing_projects = collect_project_names(adapter.list_runs(limit=200))
+    project_choice = st.selectbox(
+        "프로젝트",
+        options=["선택 안 함", "직접 입력"] + existing_projects,
+        index=0,
+        help="평가 결과를 프로젝트 단위로 묶어 대시보드에서 필터링할 수 있습니다.",
+    )
+
+    project_name = None
+    if project_choice == "직접 입력":
+        project_name = st.text_input(
+            "새 프로젝트 이름",
+            value=session.selected_project or "",
+            placeholder="예: 보험 QA 개선",
+        ).strip()
+    elif project_choice != "선택 안 함":
+        project_name = project_choice
+
+    session.selected_project = project_name or None
+
     # 메트릭 선택 섹션
     st.divider()
-    st.subheader("2. 메트릭 선택")
+    st.subheader("3. 메트릭 선택")
 
     # 카테고리별 그룹화
     categories = metric_selector.get_metrics_by_category()
@@ -496,6 +771,7 @@ def render_evaluate_page(adapter, session):
                             parallel=parallel_mode,
                             batch_size=5,
                             run_mode=session.selected_run_mode,
+                            project_name=session.selected_project,
                         )
                         elapsed = time.time() - start_time
 
@@ -505,6 +781,8 @@ def render_evaluate_page(adapter, session):
 
                     # 결과 표시
                     st.success(f"✅ 평가 완료! (Run ID: `{result.run_id}`)")
+                    if session.selected_project:
+                        st.caption(f"프로젝트: {session.selected_project}")
 
                     # 요약 메트릭
                     result_cols = st.columns(4)
@@ -878,6 +1156,147 @@ def render_improvement_page(adapter, session):
                 file_name=f"improvement_guide_{report.run_id}.md",
                 mime="text/markdown",
             )
+
+
+def render_customer_report_page(adapter, session):
+    """고객 공유용 리포트 페이지 렌더링."""
+    import streamlit as st
+
+    from evalvault.adapters.inbound.web.components import (
+        ALL_PROJECTS_TOKEN,
+        DashboardStats,
+        build_project_options,
+        create_metric_trend_chart,
+        create_trend_chart,
+        filter_runs_by_projects,
+    )
+
+    st.header("🧾 고객 리포트")
+    st.markdown(
+        """
+        고객에게 공유하기 쉬운 요약 리포트를 제공합니다.
+        기간/프로젝트 필터를 적용한 뒤 HTML로 내보낼 수 있습니다.
+        """
+    )
+
+    runs = adapter.list_runs(limit=300)
+
+    filter_col1, filter_col2 = st.columns([2, 3])
+    with filter_col1:
+        range_label = st.selectbox(
+            "기간",
+            options=["최근 7일", "최근 30일", "최근 90일", "올해", "전체", "직접 선택"],
+            index=1,
+            key="customer_range",
+        )
+        custom_range = None
+        if range_label == "직접 선택":
+            today = datetime.now().date()
+            custom_range = st.date_input(
+                "기간 선택",
+                value=(today - timedelta(days=29), today),
+                key="customer_range_custom",
+            )
+
+    with filter_col2:
+        project_options = build_project_options(runs)
+        selected_projects = st.multiselect(
+            "프로젝트",
+            options=project_options,
+            default=[ALL_PROJECTS_TOKEN],
+            format_func=_project_label,
+            key="customer_projects",
+        )
+
+    date_from, date_to = _resolve_date_range(range_label, custom_range)
+    filtered_runs = filter_runs_by_projects(runs, selected_projects)
+    filtered_runs = _filter_runs_by_date(filtered_runs, date_from, date_to)
+    filtered_runs = sorted(filtered_runs, key=lambda r: r.started_at, reverse=True)
+
+    stats = DashboardStats.from_runs(filtered_runs)
+
+    st.subheader("요약")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("평가 수", f"{stats.total_runs:,}")
+    with col2:
+        st.metric("테스트 케이스", f"{stats.total_test_cases:,}")
+    with col3:
+        st.metric("평균 통과율", f"{stats.avg_pass_rate * 100:.1f}%")
+    with col4:
+        st.metric("총 비용 (USD)", f"${(stats.total_cost or 0.0):,.2f}")
+
+    st.divider()
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        trend_fig = create_trend_chart(filtered_runs, title="기간별 Pass Rate")
+        st.plotly_chart(trend_fig, width="stretch", key="customer_trend_chart")
+    with chart_col2:
+        metric_candidates = sorted(
+            {
+                metric
+                for run in filtered_runs
+                for metric in (getattr(run, "avg_metric_scores", {}) or {})
+            }
+        )
+        selected_metrics = st.multiselect(
+            "메트릭 트렌드",
+            options=metric_candidates,
+            default=metric_candidates[:2],
+            key="customer_metric_trend",
+        )
+        metric_fig = create_metric_trend_chart(
+            filtered_runs,
+            selected_metrics,
+            title="메트릭 평균 추이",
+        )
+        st.plotly_chart(metric_fig, width="stretch", key="customer_metric_trend_chart")
+
+    st.divider()
+    st.subheader("최근 평가 요약")
+    if filtered_runs:
+        summary_rows = [
+            {
+                "Date": run.started_at.strftime("%Y-%m-%d"),
+                "Project": run.project_name or "미분류",
+                "Dataset": run.dataset_name,
+                "Model": run.model_name,
+                "Pass Rate": f"{run.pass_rate * 100:.1f}%",
+                "Test Cases": run.total_test_cases,
+            }
+            for run in filtered_runs[:10]
+        ]
+        st.dataframe(summary_rows, width="stretch")
+    else:
+        st.info("선택한 조건에 해당하는 평가가 없습니다.")
+
+    st.divider()
+    st.subheader("공유용 리포트")
+    if ALL_PROJECTS_TOKEN in selected_projects:
+        project_labels = ["전체"]
+    else:
+        project_labels = [_project_label(name) for name in selected_projects]
+
+    if range_label == "직접 선택" and custom_range and len(custom_range) == 2:
+        range_display = f"{custom_range[0]} ~ {custom_range[1]}"
+    else:
+        range_display = range_label
+
+    html_report = _build_customer_report_html(
+        stats=stats,
+        range_label=range_display,
+        project_labels=project_labels,
+        trend_fig=trend_fig,
+        metric_fig=metric_fig,
+    )
+
+    st.download_button(
+        "📥 HTML 리포트 다운로드",
+        data=html_report,
+        file_name="evalvault_customer_report.html",
+        mime="text/html",
+    )
+    st.caption("생성된 HTML을 고객에게 전달하면 읽기 전용 리포트로 활용할 수 있습니다.")
 
 
 def main():

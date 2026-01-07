@@ -119,6 +119,112 @@ metrics:
             effort: medium
 
   # =========================================================================
+  # Summary Faithfulness (요약 충실도)
+  # =========================================================================
+  summary_faithfulness:
+    description: "요약 내용이 원문 근거에 충실한지 평가"
+    default_threshold: 0.9
+
+    patterns:
+      - pattern_id: summary_hallucination
+        pattern_type: hallucination
+        description: "요약에 원문 근거 없는 주장/조건 추가"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "summary_faithfulness < 0.9"
+
+        component: generator
+        priority: p0_critical
+
+        actions:
+          - title: "요약 근거 고정"
+            description: "요약이 컨텍스트 근거만 사용하도록 강화"
+            implementation_hint: |
+              # 프롬프트에 추가
+              "요약은 제공된 컨텍스트에 있는 정보만 사용하세요.
+              숫자/기간/조건/면책은 반드시 근거 문장을 포함하세요."
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: low
+
+  # =========================================================================
+  # Summary Score (요약 점수)
+  # =========================================================================
+  summary_score:
+    description: "요약 핵심 정보 보존/간결성 평가"
+    default_threshold: 0.85
+
+    patterns:
+      - pattern_id: summary_incomplete
+        pattern_type: incomplete_answer
+        description: "요약에서 핵심 정보 누락"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "summary_score < 0.85"
+
+        component: generator
+        priority: p1_high
+
+        actions:
+          - title: "요약 구조 개선"
+            description: "핵심 항목을 빠짐없이 포함하도록 구조화"
+            implementation_hint: |
+              # 요약 포맷 예시
+              "- 보장 범위:\n- 면책/제외:\n- 기간/금액:\n"
+            expected_improvement: 0.10
+            expected_improvement_range: [0.06, 0.14]
+            effort: low
+
+          - title: "컨텍스트 축약"
+            description: "요약 대상 컨텍스트를 핵심 중심으로 정리"
+            implementation_hint: |
+              # 요약 전 컨텍스트 전처리
+              "핵심 조항/수치만 선별 후 요약"
+            expected_improvement: 0.08
+            expected_improvement_range: [0.05, 0.12]
+            effort: medium
+
+  # =========================================================================
+  # Entity Preservation (엔티티 보존)
+  # =========================================================================
+  entity_preservation:
+    description: "보험 핵심 엔티티 보존율 평가"
+    default_threshold: 0.9
+
+    patterns:
+      - pattern_id: entity_missing
+        pattern_type: incomplete_answer
+        description: "요약에서 금액/기간/비율/면책 엔티티 누락"
+
+        detection_rules:
+          - type: metric_threshold
+            condition: "entity_preservation < 0.9"
+
+        component: generator
+        priority: p0_critical
+
+        actions:
+          - title: "엔티티 하이라이트"
+            description: "요약 입력에서 엔티티를 강조"
+            implementation_hint: |
+              # 컨텍스트 전처리
+              "[금액][기간][비율][면책] 항목에 태그를 붙여 요약"
+            expected_improvement: 0.12
+            expected_improvement_range: [0.08, 0.18]
+            effort: low
+
+          - title: "후처리 검증"
+            description: "요약 후 엔티티 누락 검증 및 재생성"
+            implementation_hint: |
+              # 요약 후 검증 규칙
+              "금액/기간/비율이 누락되면 재요약"
+            expected_improvement: 0.10
+            expected_improvement_range: [0.06, 0.14]
+            effort: medium
+
+  # =========================================================================
   # Context Precision (컨텍스트 정밀도)
   # =========================================================================
   context_precision:

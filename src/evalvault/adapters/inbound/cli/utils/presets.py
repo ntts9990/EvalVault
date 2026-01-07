@@ -41,6 +41,17 @@ PRESETS: dict[str, EvaluationPreset] = {
         parallel=True,
         batch_size=5,
     ),
+    "summary": EvaluationPreset(
+        name="summary",
+        description="Summarization evaluation with summary-focused metrics",
+        metrics=(
+            "summary_score",
+            "summary_faithfulness",
+            "entity_preservation",
+        ),
+        parallel=True,
+        batch_size=5,
+    ),
     "comprehensive": EvaluationPreset(
         name="comprehensive",
         description="Complete evaluation with all available metrics",
@@ -62,7 +73,7 @@ def get_preset(name: str | None) -> EvaluationPreset | None:
     """Get preset by name (case-insensitive).
 
     Args:
-        name: Preset name (quick, production, comprehensive)
+        name: Preset name (quick, production, summary, comprehensive)
 
     Returns:
         EvaluationPreset if found, None otherwise

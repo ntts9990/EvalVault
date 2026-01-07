@@ -78,6 +78,7 @@ dev = [
     "pytest-rerunfailures",
     "pytest-html",      # HTML test reports
     "ruff",
+    "pydeps>=3.0.1",
     "python-multipart",
     # Full feature extras (analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs)
     "scikit-learn>=1.8.0",

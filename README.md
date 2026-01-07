@@ -31,9 +31,9 @@ and insights.
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
   --profile dev \
-  --db evalvault.db
-uv run evalvault history --db evalvault.db
-uv run evalvault analyze <RUN_ID> --db evalvault.db
+  --db data/db/evalvault.db
+uv run evalvault history --db data/db/evalvault.db
+uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db
 ```
 Tip: keep the same `--db` (or `EVALVAULT_DB_PATH`) so the Web UI can read the run.
 
@@ -106,7 +106,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-`dev` now bundles analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic. Add extras as needed:
+`dev` now bundles analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs. Add extras as needed:
 
 | Extra | Packages | Purpose |
 |-------|----------|---------|
@@ -114,9 +114,11 @@ uv sync --extra dev
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | Korean tokenization & retrieval |
 | `postgres` | psycopg | PostgreSQL storage |
 | `mlflow` | mlflow | MLflow tracker |
+| `docs` | mkdocs, mkdocs-material, mkdocstrings | Docs build |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix tracing, dataset/experiment sync |
 | `anthropic` | anthropic | Anthropic LLM adapter |
 | `web` | streamlit, plotly | Streamlit Web UI |
+| `perf` | faiss-cpu, ijson | Large dataset performance helpers |
 
 `uv` automatically downloads Python 3.12 based on `.python-version`.
 
@@ -132,7 +134,8 @@ uv sync --extra dev
    Optional SQLite path override:
    ```bash
    # .env
-   EVALVAULT_DB_PATH=/path/to/evalvault.db
+   EVALVAULT_DB_PATH=/path/to/data/db/evalvault.db
+   EVALVAULT_MEMORY_DB_PATH=/path/to/data/db/evalvault_memory.db
    ```
    vLLM (OpenAI-compatible) usage:
    ```bash
@@ -149,7 +152,7 @@ uv sync --extra dev
    ollama pull gemma3:1b
    uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
      --metrics faithfulness \
-     --db evalvault.db \
+     --db data/db/evalvault.db \
      --profile dev
    ```
    Tip: embedding metrics like `answer_relevancy` also need `qwen3-embedding:0.6b`.
@@ -160,7 +163,7 @@ uv sync --extra dev
    printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
    uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
      --metrics faithfulness \
-     --db evalvault.db
+     --db data/db/evalvault.db
    ```
    Tip: embedding metrics require `VLLM_EMBEDDING_MODEL` and a `/v1/embeddings` endpoint.
    If you use Ollama models that support tool/function calling, list them in
@@ -198,14 +201,14 @@ uv sync --extra dev
    uv run evalvault run tests/fixtures/sample_dataset.json \
      --metrics faithfulness,answer_relevancy \
      --profile dev \
-     --db evalvault.db
+     --db data/db/evalvault.db
    ```
    Tip: `--db` stores results for `history/export/web`. Add `--tracker phoenix` only if
    Phoenix is configured (and `uv sync --extra phoenix` is installed).
 
 4. **Inspect history**
    ```bash
-   uv run evalvault history --db evalvault.db
+   uv run evalvault history --db data/db/evalvault.db
    ```
 
 More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).

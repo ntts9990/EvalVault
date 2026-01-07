@@ -18,6 +18,7 @@ tests/fixtures/
     ├── edge_cases.*             # 엣지 케이스 테스트
     ├── evaluation_test_sample.json
     ├── comprehensive_dataset.json  # 종합 E2E 테스트
+    ├── summary_eval_minimal.json   # 요약 평가 최소 케이스
     └── insurance_document.txt      # 테스트용 보험 문서
 ```
 

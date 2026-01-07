@@ -39,7 +39,10 @@ AVAILABLE_METRICS: list[str] = [
     "context_recall",
     "factual_correctness",
     "semantic_similarity",
+    "summary_score",
+    "summary_faithfulness",
     "insurance_term_accuracy",
+    "entity_preservation",
 ]
 
 register_all_commands(app, console, available_metrics=AVAILABLE_METRICS)

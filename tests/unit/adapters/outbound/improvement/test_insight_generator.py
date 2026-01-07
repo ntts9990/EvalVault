@@ -137,6 +137,57 @@ class TestInsightGenerator:
 
         assert insight.pattern_type == "off_topic_response"
 
+    def test_fallback_single_analysis_summary_faithfulness(self):
+        """LLM 없이 summary_faithfulness 분석."""
+        generator = InsightGenerator()
+
+        failure = FailureSample(
+            test_case_id="tc-001",
+            question="질문",
+            answer="답변",
+            contexts=["컨텍스트"],
+            metric_scores={"summary_faithfulness": 0.3},
+        )
+
+        insight = generator._fallback_single_analysis(failure)
+
+        assert insight.pattern_type == "hallucination"
+        assert "충실하지 않음" in insight.failure_reason
+
+    def test_fallback_single_analysis_summary_score(self):
+        """LLM 없이 summary_score 분석."""
+        generator = InsightGenerator()
+
+        failure = FailureSample(
+            test_case_id="tc-001",
+            question="질문",
+            answer="답변",
+            contexts=["컨텍스트"],
+            metric_scores={"summary_score": 0.4},
+        )
+
+        insight = generator._fallback_single_analysis(failure)
+
+        assert insight.pattern_type == "incomplete_answer"
+        assert "요약 핵심 정보" in insight.failure_reason
+
+    def test_fallback_single_analysis_entity_preservation(self):
+        """LLM 없이 entity_preservation 분석."""
+        generator = InsightGenerator()
+
+        failure = FailureSample(
+            test_case_id="tc-001",
+            question="질문",
+            answer="답변",
+            contexts=["컨텍스트"],
+            metric_scores={"entity_preservation": 0.4},
+        )
+
+        insight = generator._fallback_single_analysis(failure)
+
+        assert insight.pattern_type == "incomplete_answer"
+        assert "핵심 엔티티" in insight.failure_reason
+
     def test_fallback_batch_analysis_faithfulness(self):
         """LLM 없이 faithfulness 배치 분석."""
         generator = InsightGenerator()
@@ -178,6 +229,26 @@ class TestInsightGenerator:
 
         assert insight.prioritized_improvements[0]["component"] == "retriever"
         assert "Reranker" in insight.prioritized_improvements[0]["action"]
+
+    def test_fallback_batch_analysis_summary_score(self):
+        """LLM 없이 summary_score 배치 분석."""
+        generator = InsightGenerator()
+
+        failures = [
+            FailureSample(
+                test_case_id=f"tc-{i:03d}",
+                question=f"질문 {i}",
+                answer=f"답변 {i}",
+                contexts=["컨텍스트"],
+                metric_scores={"summary_score": 0.4},
+            )
+            for i in range(5)
+        ]
+
+        insight = generator._fallback_batch_analysis(failures, "summary_score")
+
+        assert insight.prioritized_improvements[0]["component"] == "prompt"
+        assert "체크리스트" in insight.prioritized_improvements[0]["action"]
 
     def test_analyze_single_failure_no_llm(self):
         """LLM 없이 단일 실패 분석."""

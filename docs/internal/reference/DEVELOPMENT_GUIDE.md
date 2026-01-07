@@ -6,6 +6,16 @@
 
 이 문서는 EvalVault 개발에 필요한 모든 정보를 통합한 내부 개발 가이드입니다.
 
+## 📚 관련 문서
+
+| 문서 | 역할 |
+|------|------|
+| [PROJECT_MAP.md](./PROJECT_MAP.md) | 프로젝트 구조/클래스/데이터 흐름 종합 지도 |
+| [ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md) | C4 Model 기반 아키텍처 다이어그램 |
+| [CLASS_CATALOG.md](./CLASS_CATALOG.md) | 전체 클래스 카탈로그 |
+| [FEATURE_SPECS.md](./FEATURE_SPECS.md) | 주요 기능 상세 스펙 |
+| [AGENT_STRATEGY.md](./AGENT_STRATEGY.md) | 에이전트 시스템 종합 활용 전략 |
+
 ---
 
 ## 목차
@@ -36,21 +46,23 @@
 # 기본 개발 환경
 uv sync --extra dev
 
-# 전체 기능 포함
-uv sync --extra dev --extra analysis --extra korean --extra phoenix --extra docs
+# dev는 모든 extras를 포함합니다. 경량 설치가 필요하면 개별 extras만 선택하세요.
 ```
 
 ### 1.3 Optional Dependencies
 
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
-| `dev` | pytest, ruff, mypy | 개발 도구 |
+| `dev` | pytest, ruff, pydeps | 개발 도구 + 전체 기능 |
 | `analysis` | scikit-learn | 통계/NLP 분석 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 NLP |
 | `postgres` | psycopg | PostgreSQL 지원 |
 | `mlflow` | mlflow | MLflow 트래커 |
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix, opentelemetry | Phoenix 트레이싱 |
+| `anthropic` | anthropic | Anthropic LLM 어댑터 |
+| `web` | streamlit, plotly, watchdog | Streamlit Web UI |
+| `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 ### 1.4 환경 변수
 
@@ -1366,15 +1378,15 @@ CREATE TABLE stage_metrics (
 
 1. **수집**: 각 단계에서 `StageEvent`를 기록하고, 대용량 데이터는 payload store로 분리.
    - CLI(JSONL): `evalvault run <dataset> --stage-events stage_events.jsonl`
-   - CLI(SQLite): `evalvault run <dataset> --db evalvault.db --stage-store`
+   - CLI(SQLite): `evalvault run <dataset> --db data/db/evalvault.db --stage-store`
 2. **저장**: JSONL로 수집한 경우 `StageStoragePort`를 통해 SQLite에 적재.
-   - CLI: `evalvault stage ingest stage_events.jsonl --db evalvault.db`
+   - CLI: `evalvault stage ingest stage_events.jsonl --db data/db/evalvault.db`
 3. **계산**: StageMetric 계산 로직으로 메트릭 생성
    - CLI: `evalvault stage compute-metrics <run_id> --thresholds-json config/stage_metric_thresholds.json`
    - `--thresholds-json` 미지정 시 템플릿 파일이 존재하면 자동 적용
    - `--thresholds-profile` 미지정 시 `Settings.evalvault_profile` 사용
 4. **분석/리포트**: `run_id` 기준 StageEvent/Metric을 로드하여 단계별 진단 실행.
-   - CLI: `evalvault stage report <run_id> --db evalvault.db`
+   - CLI: `evalvault stage report <run_id> --db data/db/evalvault.db`
    - `--playbook`으로 개선 액션 템플릿 교체 가능
 5. **개선 가이드**: ImprovementGuideService에 `stage_metrics`를 전달해 규칙 기반 가이드 생성.
    - 액션 템플릿: `config/stage_metric_playbook.yaml`

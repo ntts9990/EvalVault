@@ -106,10 +106,20 @@ nav:
   - Guides:
     - User Guide: guides/USER_GUIDE.md
     - CLI Guide: guides/CLI_GUIDE.md
+    - Method Plugins: method_plugins.md
     - Ragas Performance Tuning: guides/RAGAS_PERFORMANCE_TUNING.md
     - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
     - Release Checklist: guides/RELEASE_CHECKLIST.md
     - Development Guide: guides/DEV_GUIDE.md
+    - Project Structure Methods:
+      - Overview: guides/PROJECT_STRUCTURE_METHODS.md
+      - Folder Topology: guides/structure-methods/01-folder-topology.md
+      - Hexagonal Layer Map: guides/structure-methods/02-hexagonal-layer-map.md
+      - Entrypoint Flow: guides/structure-methods/03-entrypoint-flow.md
+      - C4 Component View: guides/structure-methods/04-c4-component-view.md
+      - Dependency Graph: guides/structure-methods/05-dependency-graph.md
+      - Data Config Flow: guides/structure-methods/06-data-config-flow.md
+      - Test Driven Map: guides/structure-methods/07-test-driven-map.md
   - Tutorials:
     - Basic Evaluation: tutorials/02-basic-evaluation.md
     - Custom Metrics: tutorials/03-custom-metrics.md

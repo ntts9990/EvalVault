@@ -1,0 +1,13 @@
+methods:
+  baseline_oracle:
+    class_path: "evalvault.adapters.outbound.methods.baseline_oracle:BaselineOracleMethod"
+    description: "Use ground truth as the answer when available."
+    tags:
+      - baseline
+      - oracle
+#  team_method_external:
+#    runner: external
+#    command: "bash -lc 'cd ../team_method && uv run python -m team_method.run --input \"$EVALVAULT_METHOD_INPUT\" --output \"$EVALVAULT_METHOD_OUTPUT\"'"
+#    shell: true
+#    timeout_seconds: 3600
+#    description: "Team method executed in its own env"

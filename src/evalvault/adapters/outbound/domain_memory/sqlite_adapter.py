@@ -35,13 +35,14 @@ class SQLiteDomainMemoryAdapter:
     Implements DomainMemoryPort using SQLite for local persistence.
     """
 
-    def __init__(self, db_path: str | Path = "evalvault_memory.db"):
+    def __init__(self, db_path: str | Path = "data/db/evalvault_memory.db"):
         """Initialize SQLite domain memory adapter.
 
         Args:
             db_path: Path to SQLite database file
         """
         self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self) -> None:

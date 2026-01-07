@@ -3,6 +3,7 @@
 from evalvault.adapters.inbound.web.components.cards import MetricSummaryCard, StatCard
 from evalvault.adapters.inbound.web.components.charts import (
     create_metric_breakdown_chart,
+    create_metric_trend_chart,
     create_pass_rate_chart,
     create_trend_chart,
 )
@@ -29,6 +30,12 @@ from evalvault.adapters.inbound.web.components.progress import (
     EvaluationProgress,
     ProgressStep,
 )
+from evalvault.adapters.inbound.web.components.projects import (
+    ALL_PROJECTS_TOKEN,
+    UNASSIGNED_PROJECT_TOKEN,
+    build_project_options,
+    filter_runs_by_projects,
+)
 from evalvault.adapters.inbound.web.components.reports import (
     ReportConfig,
     ReportDownloader,
@@ -52,6 +59,7 @@ __all__ = [
     "create_pass_rate_chart",
     "create_metric_breakdown_chart",
     "create_trend_chart",
+    "create_metric_trend_chart",
     # Lists
     "RecentRunsList",
     # Stats
@@ -61,6 +69,11 @@ __all__ = [
     "ValidationResult",
     # Metrics
     "MetricSelector",
+    # Projects
+    "ALL_PROJECTS_TOKEN",
+    "UNASSIGNED_PROJECT_TOKEN",
+    "build_project_options",
+    "filter_runs_by_projects",
     # Progress
     "EvaluationProgress",
     "ProgressStep",

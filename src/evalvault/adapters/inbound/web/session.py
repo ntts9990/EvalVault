@@ -28,6 +28,7 @@ class WebSession:
     selected_model: str | None = None
     selected_metrics: list[str] = field(default_factory=list)
     selected_run_mode: str = "simple"
+    selected_project: str | None = None
 
     # 평가 옵션
     langfuse_enabled: bool = False

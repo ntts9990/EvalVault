@@ -25,8 +25,8 @@ uv run evalvault kg stats ./docs --use-llm --profile dev
 | 옵션 | 설명 | 사용 예 |
 |------|------|---------|
 | `--profile, -p` | `config/models.yaml`에 정의된 프로필을 적용합니다. | `uv run evalvault run dataset.json -p dev` |
-| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `EVALVAULT_DB_PATH` 또는 `evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
-| `--memory-db, -M` | 도메인 메모리 SQLite 경로입니다. 기본값은 `evalvault_memory.db`. | `uv run evalvault domain memory stats -M data/memory.db` |
+| `--db, -D` | 평가 결과를 저장할 SQLite 경로입니다. 기본값은 `EVALVAULT_DB_PATH` 또는 `data/db/evalvault.db`. | `uv run evalvault history -D reports/evalvault.db` |
+| `--memory-db, -M` | 도메인 메모리 SQLite 경로입니다. 기본값은 `EVALVAULT_MEMORY_DB_PATH` 또는 `data/db/evalvault_memory.db`. | `uv run evalvault domain memory stats -M data/memory.db` |
 
 도움말에 공통 옵션을 추가할 때는 `cli/utils/options.py`의 팩토리를 사용해 동일한 설명과 기본값을 재사용합니다.
 
@@ -65,6 +65,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 - Web UI(Evaluation Studio/Reports)도 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
 
 - 임계값은 데이터셋 `thresholds`(없으면 0.7 기본값)를 사용하며, Domain Memory 또는 API 요청에서만 오버라이드됩니다.
+- `--threshold-profile summary|qa`로 요약/QA 권장 임계값을 선택 적용할 수 있습니다(선택된 메트릭에만 덮어쓰기).
 - Domain Memory 연동:
   - `--use-domain-memory`: 학습된 신뢰도로 임계값을 자동 보정합니다.
   - `--memory-domain` / `--memory-language`: 도메인·언어를 강제 지정합니다.
@@ -100,6 +101,14 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --summary \
+  --threshold-profile summary
+
+uv run evalvault run tests/fixtures/e2e/summary_eval_minimal.json \
+  --metrics faithfulness,answer_relevancy \
+  --threshold-profile qa
+
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --retriever hybrid \
   --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
   --retriever-top-k 5
@@ -132,8 +141,8 @@ uv run evalvault domain show insurance
 
 ### 3.5 `stage`
 ```bash
-uv run evalvault stage ingest stage_events.jsonl --db evalvault.db
-uv run evalvault stage summary run_20260103_001 --db evalvault.db
+uv run evalvault stage ingest stage_events.jsonl --db data/db/evalvault.db
+uv run evalvault stage summary run_20260103_001 --db data/db/evalvault.db
 uv run evalvault stage compute-metrics run_20260103_001 --thresholds-json config/stage_metric_thresholds.json
 ```
 - `ingest`: JSON/JSONL stage events를 저장합니다.
@@ -168,7 +177,7 @@ uv run evalvault serve-api --reload
 
 ### 3.8 `web`
 ```bash
-uv run evalvault web --db evalvault.db
+uv run evalvault web --db data/db/evalvault.db
 ```
 - Streamlit 기반 **간단 미리보기용(레거시)** 대시보드를 실행합니다.
 - `--extra web` 설치가 필요합니다.

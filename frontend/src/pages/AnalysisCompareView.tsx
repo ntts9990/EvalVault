@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { type PriorityCase, type PrioritySummary } from "../components/PrioritySummaryPanel";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import { Activity, AlertCircle, ArrowLeft, GitCompare } from "lucide-react";
@@ -83,6 +84,54 @@ function formatMetricValue(value: number | undefined) {
     return value.toFixed(4);
 }
 
+function isPrioritySummary(value: any): value is PrioritySummary {
+    if (!value || typeof value !== "object") return false;
+    return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
+}
+
+function extractPrioritySummary(result: SavedAnalysisResult | null): PrioritySummary | null {
+    if (!result) return null;
+    const finalOutput = result.final_output || {};
+    for (const entry of Object.values(finalOutput)) {
+        if (isPrioritySummary(entry)) return entry;
+    }
+    const nodeOutput = result.node_results?.priority_summary?.output;
+    if (isPrioritySummary(nodeOutput)) return nodeOutput;
+    return null;
+}
+
+function uniqueCases(cases: PriorityCase[]) {
+    const seen = new Set<string>();
+    const unique: PriorityCase[] = [];
+    for (const item of cases) {
+        const key = item.test_case_id || item.question_preview || JSON.stringify(item);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(item);
+    }
+    return unique;
+}
+
+function buildCaseSet(cases: PriorityCase[]) {
+    const ids = new Set<string>();
+    for (const item of cases) {
+        if (item.test_case_id) {
+            ids.add(item.test_case_id);
+        }
+    }
+    return ids;
+}
+
+function aggregateFailedMetrics(cases: PriorityCase[]) {
+    const counts = new Map<string, number>();
+    for (const item of cases) {
+        for (const metric of item.failed_metrics || []) {
+            counts.set(metric, (counts.get(metric) || 0) + 1);
+        }
+    }
+    return counts;
+}
+
 export function AnalysisCompareView() {
     const [searchParams] = useSearchParams();
     const idA = searchParams.get("a");
@@ -142,6 +191,57 @@ export function AnalysisCompareView() {
         });
 
         return rows;
+    }, [resultA, resultB]);
+
+    const priorityDiff = useMemo(() => {
+        const priorityA = extractPrioritySummary(resultA);
+        const priorityB = extractPrioritySummary(resultB);
+        if (!priorityA || !priorityB) return null;
+
+        const bottomA = buildCaseSet(priorityA.bottom_cases || []);
+        const bottomB = buildCaseSet(priorityB.bottom_cases || []);
+        const impactA = buildCaseSet(priorityA.impact_cases || []);
+        const impactB = buildCaseSet(priorityB.impact_cases || []);
+
+        const buildDelta = (setA: Set<string>, setB: Set<string>) => {
+            const added = Array.from(setB).filter((id) => !setA.has(id));
+            const removed = Array.from(setA).filter((id) => !setB.has(id));
+            const shared = Array.from(setA).filter((id) => setB.has(id));
+            return { added, removed, shared };
+        };
+
+        const bottomDelta = buildDelta(bottomA, bottomB);
+        const impactDelta = buildDelta(impactA, impactB);
+
+        const combinedA = uniqueCases([
+            ...(priorityA.bottom_cases || []),
+            ...(priorityA.impact_cases || []),
+        ]);
+        const combinedB = uniqueCases([
+            ...(priorityB.bottom_cases || []),
+            ...(priorityB.impact_cases || []),
+        ]);
+        const metricCountsA = aggregateFailedMetrics(combinedA);
+        const metricCountsB = aggregateFailedMetrics(combinedB);
+
+        const metricKeys = new Set([...metricCountsA.keys(), ...metricCountsB.keys()]);
+        const metricDeltas = Array.from(metricKeys).map((metric) => {
+            const aCount = metricCountsA.get(metric) || 0;
+            const bCount = metricCountsB.get(metric) || 0;
+            return {
+                metric,
+                aCount,
+                bCount,
+                delta: bCount - aCount,
+            };
+        });
+        metricDeltas.sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
+
+        return {
+            bottom: bottomDelta,
+            impact: impactDelta,
+            metricDeltas,
+        };
     }, [resultA, resultB]);
 
     const nodeRows = useMemo(() => {
@@ -331,6 +431,71 @@ export function AnalysisCompareView() {
                                     })
                                 )}
                             </div>
+                        </div>
+
+                        <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold">우선순위 케이스 변화</h3>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Priority summary 기반으로 추가/해소된 케이스를 비교합니다.
+                                    </p>
+                                </div>
+                            </div>
+                            {!priorityDiff ? (
+                                <p className="text-xs text-muted-foreground">
+                                    우선순위 요약 데이터가 없어 비교할 수 없습니다.
+                                </p>
+                            ) : (
+                                <div className="space-y-4 text-xs">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="border border-border rounded-lg p-3">
+                                            <p className="font-semibold text-muted-foreground">하위 성능 케이스</p>
+                                            <p className="mt-1">
+                                                추가 {priorityDiff.bottom.added.length} · 해소 {priorityDiff.bottom.removed.length}
+                                            </p>
+                                            {(priorityDiff.bottom.added.length > 0 || priorityDiff.bottom.removed.length > 0) && (
+                                                <p className="text-[11px] text-muted-foreground mt-1">
+                                                    추가: {priorityDiff.bottom.added.slice(0, 5).join(", ") || "-"} · 해소: {priorityDiff.bottom.removed.slice(0, 5).join(", ") || "-"}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="border border-border rounded-lg p-3">
+                                            <p className="font-semibold text-muted-foreground">개선 우선 케이스</p>
+                                            <p className="mt-1">
+                                                추가 {priorityDiff.impact.added.length} · 해소 {priorityDiff.impact.removed.length}
+                                            </p>
+                                            {(priorityDiff.impact.added.length > 0 || priorityDiff.impact.removed.length > 0) && (
+                                                <p className="text-[11px] text-muted-foreground mt-1">
+                                                    추가: {priorityDiff.impact.added.slice(0, 5).join(", ") || "-"} · 해소: {priorityDiff.impact.removed.slice(0, 5).join(", ") || "-"}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="border border-border rounded-lg p-3">
+                                        <p className="font-semibold text-muted-foreground">실패 메트릭 변화</p>
+                                        {priorityDiff.metricDeltas.length === 0 ? (
+                                            <p className="text-[11px] text-muted-foreground mt-1">
+                                                비교할 실패 메트릭 변화가 없습니다.
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-1 mt-2">
+                                                {priorityDiff.metricDeltas.slice(0, 6).map((row) => (
+                                                    <div
+                                                        key={`metric-delta-${row.metric}`}
+                                                        className="flex items-center justify-between border border-border rounded-md px-2 py-1"
+                                                    >
+                                                        <span className="font-medium">{row.metric}</span>
+                                                        <span className="text-muted-foreground">
+                                                            A {row.aCount} → B {row.bCount} (Δ {row.delta})
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="border border-border rounded-xl p-4 bg-card">

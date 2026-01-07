@@ -103,7 +103,8 @@ curl http://localhost:6006/v1/traces
 
 ```bash
 # OpenTelemetry 의존성 설치
-uv sync --extra dev --extra phoenix
+uv sync --extra dev  # dev에 Phoenix 포함
+# 경량 설치: uv sync --extra phoenix
 ```
 
 또는 직접 설치:

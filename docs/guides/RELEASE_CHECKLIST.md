@@ -54,7 +54,7 @@ EvalVault 배포 전에 필수로 확인해야 할 항목과 릴리즈 노트 �
 
 ## 3. 데이터/DB 체크
 
-- SQLite 파일 백업을 준비했는가? (`cp evalvault.db evalvault.db.bak`)
+- SQLite 파일 백업을 준비했는가? (`cp data/db/evalvault.db data/db/evalvault.db.bak`)
 - Postgres를 쓰는 경우 스키마가 최신인지 확인했는가?
 - `pipeline_results`에 `profile/tags/metadata` 컬럼이 존재하는가?
   - 기존 DB는 어댑터 초기화 시 자동 마이그레이션됨.

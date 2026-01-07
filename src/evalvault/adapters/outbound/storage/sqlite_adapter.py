@@ -31,14 +31,15 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     Implements StoragePort using SQLite database for local persistence.
     """
 
-    def __init__(self, db_path: str | Path = "evalvault.db"):
+    def __init__(self, db_path: str | Path = "data/db/evalvault.db"):
         """Initialize SQLite storage adapter.
 
         Args:
-            db_path: Path to SQLite database file (default: evalvault.db)
+            db_path: Path to SQLite database file (default: data/db/evalvault.db)
         """
         super().__init__(SQLQueries())
         self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self) -> None:

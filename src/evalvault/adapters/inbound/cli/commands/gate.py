@@ -13,6 +13,7 @@ from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdap
 from evalvault.config.phoenix_support import get_phoenix_trace_url
 
 from ..utils.formatters import format_diff, format_score, format_status
+from ..utils.options import db_option
 
 
 def register_gate_commands(app: typer.Typer, console: Console) -> None:
@@ -45,7 +46,7 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
             "-f",
             help="Output format: table, json, or github-actions",
         ),
-        db_path: Path = typer.Option("evalvault.db", "--db", help="Database path"),
+        db_path: Path = db_option(help_text="Database path"),
     ) -> None:
         """Quality gate check for CI/CD pipelines."""
 

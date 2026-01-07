@@ -40,6 +40,9 @@ class AnalysisIntent(str, Enum):
     ANALYZE_PATTERNS = "analyze_patterns"  # 패턴 분석
     ANALYZE_TRENDS = "analyze_trends"  # 시계열 추세 분석
 
+    # 벤치마크 (Benchmark)
+    BENCHMARK_RETRIEVAL = "benchmark_retrieval"  # 검색 벤치마크
+
     # 보고서 (Report)
     GENERATE_SUMMARY = "generate_summary"  # 요약 보고서
     GENERATE_DETAILED = "generate_detailed"  # 상세 보고서

@@ -3,6 +3,7 @@ import { API_BASE_URL } from "../config";
 export interface RunSummary {
     run_id: string;
     dataset_name: string;
+    project_name?: string | null;
     model_name: string;
     pass_rate: number;
     total_test_cases: number;
@@ -10,6 +11,11 @@ export interface RunSummary {
     started_at: string;
     finished_at: string | null;
     metrics_evaluated: string[];
+    run_mode?: string | null;
+    evaluation_task?: string | null;
+    threshold_profile?: string | null;
+    thresholds?: Record<string, number> | null;
+    avg_metric_scores?: Record<string, number> | null;
     total_cost_usd: number | null;
     phoenix_precision: number | null;
     phoenix_drift: number | null;
@@ -35,6 +41,31 @@ export interface RunDetailsResponse {
     results: TestCase[];
 }
 
+export interface RunComparisonMetric {
+    name: string;
+    base: number | null;
+    target: number | null;
+    delta: number | null;
+}
+
+export interface RunComparisonCounts {
+    regressions: number;
+    improvements: number;
+    same_pass: number;
+    same_fail: number;
+    new: number;
+    removed: number;
+}
+
+export interface RunComparisonResponse {
+    base: RunDetailsResponse;
+    target: RunDetailsResponse;
+    metric_deltas: RunComparisonMetric[];
+    case_counts: RunComparisonCounts;
+    pass_rate_delta: number;
+    total_cases_delta: number;
+}
+
 export interface DatasetItem {
     name: string;
     path: string;
@@ -52,9 +83,12 @@ export interface StartEvaluationRequest {
     dataset_path: string;
     metrics: string[];
     model: string;
+    evaluation_task?: string;
     parallel?: boolean;
     batch_size?: number;
     thresholds?: Record<string, number>;
+    threshold_profile?: string;
+    project_name?: string;
     retriever_config?: Record<string, any>;
     memory_config?: Record<string, any>;
     tracker_config?: Record<string, any>;
@@ -90,17 +124,44 @@ export interface SystemConfig {
     [key: string]: any;
 }
 
-export interface ImprovementItem {
-    category: string;
-    description: string;
-    priority: "high" | "medium" | "low";
-    suggestion: string;
+export interface ImprovementAction {
+    action_id: string;
+    title: string;
+    description?: string;
+    implementation_hint?: string;
+    expected_improvement: number;
+    expected_improvement_range?: number[];
+    effort: "low" | "medium" | "high";
+    priority_score?: number;
+}
+
+export interface ImprovementGuide {
+    guide_id: string;
+    created_at: string;
+    component: string;
+    target_metrics: string[];
+    priority: string;
+    actions: ImprovementAction[];
+    evidence?: Record<string, any> | null;
+    affected_test_case_ids?: string[];
+    verification_command?: string;
+    metadata?: Record<string, any> | null;
 }
 
 export interface ImprovementReport {
+    report_id: string;
     run_id: string;
-    improvements: ImprovementItem[];
-    summary: string;
+    created_at: string;
+    total_test_cases: number;
+    failed_test_cases: number;
+    pass_rate: number;
+    metric_scores: Record<string, number>;
+    metric_thresholds: Record<string, number>;
+    metric_gaps: Record<string, number>;
+    guides: ImprovementGuide[];
+    total_expected_improvement: Record<string, number>;
+    analysis_methods_used: string[];
+    metadata: Record<string, any>;
 }
 
 export interface LLMReport {
@@ -121,6 +182,18 @@ export async function fetchRunDetails(runId: string): Promise<RunDetailsResponse
     const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunComparison(
+    baseRunId: string,
+    targetRunId: string
+): Promise<RunComparisonResponse> {
+    const params = new URLSearchParams({ base: baseRunId, target: targetRunId });
+    const response = await fetch(`${API_BASE_URL}/runs/compare?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch run comparison: ${response.statusText}`);
     }
     return response.json();
 }

@@ -1,0 +1,13 @@
+[project]
+name = "evalvault-method-plugin-template"
+version = "0.1.0"
+description = "Template for EvalVault method plugins"
+requires-python = ">=3.12"
+dependencies = ["evalvault"]
+
+[project.entry-points."evalvault.methods"]
+template_method = "method_plugin_template.methods:TemplateMethod"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

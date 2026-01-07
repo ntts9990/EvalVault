@@ -226,6 +226,9 @@ uv run evalvault run --preset quick sample_dataset.json
 # Run production-grade evaluation
 uv run evalvault run --preset production sample_dataset.json
 
+# Run summarization evaluation (summary metrics)
+uv run evalvault run --summary sample_dataset.json
+
 # Run with output file
 uv run evalvault run --preset production sample_dataset.json -o results.json
 

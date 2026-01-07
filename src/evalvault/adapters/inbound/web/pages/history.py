@@ -5,6 +5,8 @@ from __future__ import annotations
 
 def render_history_page(adapter, session):
     """이력 조회 페이지 렌더링."""
+    from datetime import datetime, time, timedelta
+
     import streamlit as st
 
     from evalvault.adapters.inbound.web.components import (
@@ -12,6 +14,12 @@ def render_history_page(adapter, session):
         RunFilter,
         RunSearch,
         RunTable,
+    )
+    from evalvault.adapters.inbound.web.components.projects import (
+        ALL_PROJECTS_TOKEN,
+        UNASSIGNED_PROJECT_TOKEN,
+        build_project_options,
+        filter_runs_by_projects,
     )
     from evalvault.adapters.inbound.web.components.prompt_panel import render_prompt_panel
     from evalvault.domain.services.prompt_status import format_prompt_summary_label
@@ -37,6 +45,22 @@ def render_history_page(adapter, session):
         model_options = ["All"] + sorted({r.model_name for r in all_runs})
         selected_model = st.selectbox("모델", options=model_options, index=0)
 
+        project_options = build_project_options(all_runs)
+
+        def project_label(option: str) -> str:
+            if option == ALL_PROJECTS_TOKEN:
+                return "전체"
+            if option == UNASSIGNED_PROJECT_TOKEN:
+                return "미분류"
+            return option
+
+        selected_projects = st.multiselect(
+            "프로젝트",
+            options=project_options,
+            default=[ALL_PROJECTS_TOKEN],
+            format_func=project_label,
+        )
+
         mode_values = sorted({r.run_mode for r in all_runs if r.run_mode})
         mode_options = ["All"] + mode_values
         selected_mode = st.selectbox(
@@ -49,18 +73,35 @@ def render_history_page(adapter, session):
         # 통과율 필터
         min_pass_rate = st.slider("최소 통과율", 0.0, 1.0, 0.0, 0.1)
 
-        # 날짜 필터 (UI만, 추후 구현)
-        st.checkbox("날짜 범위 필터", disabled=True, help="추후 구현 예정")
+        use_date_filter = st.checkbox("날짜 범위 필터", value=False)
+
+        date_from = None
+        date_to = None
+        if use_date_filter:
+            today = datetime.now().date()
+            date_range = st.date_input(
+                "날짜 범위",
+                value=(today - timedelta(days=30), today),
+                help="선택한 기간의 평가만 표시합니다.",
+            )
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                date_from = datetime.combine(date_range[0], time.min)
+                date_to = datetime.combine(date_range[1], time.max)
 
     # 검색 적용
     search = RunSearch(query=search_query)
     runs = search.search(all_runs)
+
+    # 프로젝트 필터 적용
+    runs = filter_runs_by_projects(runs, selected_projects)
 
     # 필터 적용
     run_filter = RunFilter(
         model_name=selected_model if selected_model != "All" else None,
         min_pass_rate=min_pass_rate if min_pass_rate > 0 else None,
         run_mode=selected_mode if selected_mode != "All" else None,
+        date_from=date_from,
+        date_to=date_to,
     )
     runs = run_filter.apply(runs)
 
@@ -110,12 +151,20 @@ def render_history_page(adapter, session):
         show_phoenix_column = any(
             r.phoenix_precision is not None or r.phoenix_drift is not None for r in runs
         )
-        column_config = [3, 1, 2, 2, 1, 1]
+        column_config = [3, 2, 1, 2, 2, 1, 1]
         if show_phoenix_column:
             column_config.append(1)
         column_config.append(1)
 
-        header_labels = ["Dataset", "Mode", "Model", "Metrics", "Pass Rate", "Date"]
+        header_labels = [
+            "Dataset",
+            "Project",
+            "Mode",
+            "Model",
+            "Metrics",
+            "Pass Rate",
+            "Date",
+        ]
         if show_phoenix_column:
             header_labels.append("Phoenix")
         header_labels.append("Actions")
@@ -132,6 +181,8 @@ def render_history_page(adapter, session):
             prompt_summary = format_prompt_summary_label(run.phoenix_prompts)
             if prompt_summary:
                 dataset_col.caption(f"Prompt: {prompt_summary}")
+            idx += 1
+            row_cols[idx].text(run.project_name or "미분류")
             idx += 1
             row_cols[idx].text((run.run_mode or "-").capitalize())
             idx += 1

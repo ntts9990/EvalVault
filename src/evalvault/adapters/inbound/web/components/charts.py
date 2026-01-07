@@ -157,7 +157,7 @@ def create_metric_breakdown_chart(metric_scores: dict[str, float]) -> go.Figure:
     return fig
 
 
-def create_trend_chart(runs: list[RunSummary]) -> go.Figure:
+def create_trend_chart(runs: list[RunSummary], *, title: str = "Pass Rate Trend") -> go.Figure:
     """통과율 트렌드 라인 차트 생성.
 
     Args:
@@ -206,7 +206,7 @@ def create_trend_chart(runs: list[RunSummary]) -> go.Figure:
     )
 
     fig.update_layout(
-        title={"text": "Pass Rate Trend", "font": {"size": 16}},
+        title={"text": title, "font": {"size": 16}},
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -220,6 +220,91 @@ def create_trend_chart(runs: list[RunSummary]) -> go.Figure:
         xaxis={
             "title": "Date",
             "gridcolor": "rgba(255,255,255,0.1)",
+        },
+    )
+
+    return fig
+
+
+def create_metric_trend_chart(
+    runs: list[RunSummary],
+    metrics: list[str],
+    *,
+    title: str = "Metric Trend",
+) -> go.Figure:
+    """메트릭별 평균 점수 트렌드 라인 차트 생성."""
+    if not runs or not metrics:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 14, "color": "#94A3B8"},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=300,
+        )
+        return fig
+
+    sorted_runs = sorted(runs, key=lambda r: r.started_at)
+    dates = [run.started_at for run in sorted_runs]
+    palette = [
+        "#38BDF8",
+        "#A78BFA",
+        "#F97316",
+        "#22C55E",
+        "#F59E0B",
+        "#EF4444",
+    ]
+
+    fig = go.Figure()
+    for idx, metric in enumerate(metrics):
+        scores = []
+        for run in sorted_runs:
+            avg_scores = getattr(run, "avg_metric_scores", {}) or {}
+            score = avg_scores.get(metric)
+            scores.append(score * 100 if score is not None else None)
+
+        fig.add_trace(
+            go.Scatter(
+                x=dates,
+                y=scores,
+                mode="lines+markers",
+                name=metric,
+                line={"width": 2, "color": palette[idx % len(palette)]},
+                marker={"size": 6, "color": palette[idx % len(palette)]},
+                hovertemplate=(f"Date: %{{x|%Y-%m-%d}}<br>{metric}: %{{y:.1f}}%<extra></extra>"),
+            )
+        )
+
+    fig.update_layout(
+        title={"text": title, "font": {"size": 16}},
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=320,
+        margin={"l": 40, "r": 40, "t": 50, "b": 40},
+        yaxis={
+            "title": "Score (%)",
+            "range": [0, 105],
+            "gridcolor": "rgba(255,255,255,0.1)",
+        },
+        xaxis={
+            "title": "Date",
+            "gridcolor": "rgba(255,255,255,0.1)",
+        },
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
         },
     )
 

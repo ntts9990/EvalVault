@@ -7,6 +7,7 @@ import {
     fetchDatasetTemplate,
     fetchModels,
     fetchMetrics,
+    fetchRuns,
     fetchConfig,
     startEvaluation,
     uploadDataset,
@@ -14,6 +15,9 @@ import {
 } from "../services/api";
 import { Play, Database, Brain, Target, CheckCircle2, AlertCircle, Settings, Upload, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
+
+const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
 
 export function EvaluationStudio() {
     const navigate = useNavigate();
@@ -27,7 +31,11 @@ export function EvaluationStudio() {
     const [selectedDataset, setSelectedDataset] = useState<string>("");
     const [selectedModel, setSelectedModel] = useState<string>("");
     const [selectedProvider, setSelectedProvider] = useState<"ollama" | "openai" | "vllm">("ollama");
-    const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set(["faithfulness", "answer_relevancy"]));
+    const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set(DEFAULT_METRICS));
+    const [summaryMode, setSummaryMode] = useState(false);
+    const [metricBackup, setMetricBackup] = useState<string[]>([]);
+    const [projectName, setProjectName] = useState<string>("");
+    const [projectOptions, setProjectOptions] = useState<string[]>([]);
 
     // Advanced Options State
     const [retrieverMode, setRetrieverMode] = useState<"none" | "bm25" | "hybrid">("none");
@@ -38,6 +46,7 @@ export function EvaluationStudio() {
     const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [batchSize, setBatchSize] = useState<number>(1);
+    const [thresholdProfile, setThresholdProfile] = useState<"none" | "summary" | "qa">("none");
 
     // Upload Modal State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -113,13 +122,22 @@ export function EvaluationStudio() {
     useEffect(() => {
         async function loadOptions() {
             try {
-                const [d, met, cfg] = await Promise.all([
+                const [d, met, cfg, runList] = await Promise.all([
                     fetchDatasets(),
                     fetchMetrics(),
-                    fetchConfig().catch(() => null)
+                    fetchConfig().catch(() => null),
+                    fetchRuns().catch(() => [])
                 ]);
                 setDatasets(d);
                 setAvailableMetrics(met);
+                const projects = Array.from(
+                    new Set(
+                        runList
+                            .map(run => (run.project_name || "").trim())
+                            .filter(name => name.length > 0)
+                    )
+                ).sort((a, b) => a.localeCompare(b));
+                setProjectOptions(projects);
 
                 if (d.length > 0) setSelectedDataset(d[0].path);
 
@@ -179,7 +197,26 @@ export function EvaluationStudio() {
         }
     };
 
+    const summaryMetricSet = new Set(SUMMARY_METRICS);
+    const summaryThresholdLabel = SUMMARY_METRICS.map((metric) => {
+        const threshold = SUMMARY_METRIC_THRESHOLDS[metric];
+        return `${metric} >= ${threshold.toFixed(2)}`;
+    }).join(" | ");
+
+    const toggleSummaryMode = () => {
+        if (!summaryMode) {
+            setMetricBackup(Array.from(selectedMetrics));
+            setSelectedMetrics(new Set(SUMMARY_METRICS));
+            setSummaryMode(true);
+            return;
+        }
+        const fallback = metricBackup.length ? metricBackup : DEFAULT_METRICS;
+        setSelectedMetrics(new Set(fallback));
+        setSummaryMode(false);
+    };
+
     const toggleMetric = (metric: string) => {
+        if (summaryMode) return;
         const newSet = new Set(selectedMetrics);
         if (newSet.has(metric)) {
             newSet.delete(metric);
@@ -210,8 +247,11 @@ export function EvaluationStudio() {
                 dataset_path: selectedDataset,
                 model: selectedModel,
                 metrics: Array.from(selectedMetrics),
+                evaluation_task: summaryMode ? "summarization" : "qa",
+                project_name: projectName.trim() || undefined,
                 parallel: batchSize > 1,
                 batch_size: batchSize,
+                threshold_profile: thresholdProfile !== "none" ? thresholdProfile : undefined,
                 retriever_config: retrieverMode !== "none"
                     ? { mode: retrieverMode, docs_path: docsPath.trim(), top_k: 5 }
                     : undefined,
@@ -392,6 +432,78 @@ export function EvaluationStudio() {
                         </div>
                     </section>
 
+                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <Target className="w-5 h-5 text-primary" />
+                            Project Label
+                        </h2>
+                        <div className="space-y-3">
+                            <input
+                                list="project-options"
+                                value={projectName}
+                                onChange={(event) => setProjectName(event.target.value)}
+                                placeholder="e.g. Insurance QA Revamp"
+                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                            />
+                            <datalist id="project-options">
+                                {projectOptions.map((project) => (
+                                    <option key={project} value={project} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-muted-foreground">
+                                Project labels drive dashboard and report filtering.
+                            </p>
+                            {projectName && (
+                                <button
+                                    type="button"
+                                    onClick={() => setProjectName("")}
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Clear project label
+                                </button>
+                            )}
+                        </div>
+                    </section>
+
+                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            Summary Evaluation
+                        </h2>
+                        <div
+                            onClick={toggleSummaryMode}
+                            className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all ${summaryMode
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/30"}`}
+                        >
+                            <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center ${summaryMode ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                                {summaryMode && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-medium text-sm">
+                                    Enable summary-focused preset
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Locks metrics to summary_faithfulness, summary_score, entity_preservation.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                            <p>Defaults apply when dataset thresholds are missing.</p>
+                            <p>{summaryThresholdLabel}</p>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {SUMMARY_METRICS.map(metric => (
+                                <span
+                                    key={metric}
+                                    className="px-2 py-0.5 rounded-full border border-border bg-secondary text-[11px] text-muted-foreground"
+                                >
+                                    {metric}
+                                </span>
+                            ))}
+                        </div>
+                    </section>
+
                     {/* Metrics Selection */}
                     <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -401,14 +513,17 @@ export function EvaluationStudio() {
                         <div className="flex flex-wrap gap-3">
                             {availableMetrics.map((metric) => {
                                 const isSelected = selectedMetrics.has(metric);
+                                const isSummaryMetric = summaryMetricSet.has(metric);
+                                const isDisabled = summaryMode;
                                 return (
                                     <button
                                         key={metric}
                                         onClick={() => toggleMetric(metric)}
-                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${isSelected
+                                        disabled={isDisabled}
+                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all border disabled:opacity-60 disabled:cursor-not-allowed ${isSelected
                                             ? "bg-primary text-primary-foreground border-primary"
                                             : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
-                                            }`}
+                                            } ${summaryMode && isSummaryMetric ? "ring-1 ring-primary/40" : ""}`}
                                     >
                                         <span className="inline-flex items-center gap-2">
                                             {metric}
@@ -519,6 +634,30 @@ export function EvaluationStudio() {
                                                 onChange={(e) => setBatchSize(Math.max(1, Number(e.target.value) || 1))}
                                                 className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
                                             />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Threshold Profile */}
+                                <div>
+                                    <h3 className="text-sm font-medium mb-3">Threshold Profile</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">
+                                                Apply recommended thresholds
+                                            </label>
+                                            <select
+                                                value={thresholdProfile}
+                                                onChange={(event) => setThresholdProfile(event.target.value as "none" | "summary" | "qa")}
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                            >
+                                                <option value="none">None (use dataset/default)</option>
+                                                <option value="summary">Summary profile (0.90/0.85/0.90)</option>
+                                                <option value="qa">QA profile (0.7/0.6 baseline)</option>
+                                            </select>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground flex items-center">
+                                            Only matching metrics are overridden; others keep dataset or default values.
                                         </div>
                                     </div>
                                 </div>

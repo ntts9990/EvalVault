@@ -17,10 +17,9 @@ uv pip install evalvault
 git clone https://github.com/ntts9990/EvalVault.git
 cd EvalVault
 uv sync --extra dev
-uv sync --extra dev --extra analysis --extra korean --extra web
 ```
 
-필요한 추가 기능은 extras로 확장합니다.
+`dev`는 모든 extras를 포함합니다. 경량 설치가 필요하면 개별 extras만 선택하세요.
 
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
@@ -32,6 +31,7 @@ uv sync --extra dev --extra analysis --extra korean --extra web
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 추적/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
 | `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
+| `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
 
