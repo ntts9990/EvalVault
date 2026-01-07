@@ -1,6 +1,6 @@
 # EvalVault CLI 가이드
 
-EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있는 Typer 모듈이 자동으로 등록되도록 구성되었습니다. `commands/__init__.py`가 루트 앱에 커맨드를 주입하고, `attach_sub_apps()`가 `domain`, `kg`, `benchmark` 서브앱을 연결합니다. 이 문서는 반복적으로 사용되는 패턴과 도움말 템플릿을 요약합니다.
+EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있는 Typer 모듈이 자동으로 등록되도록 구성되었습니다. `commands/__init__.py`가 루트 앱에 커맨드를 주입하고, `attach_sub_apps()`가 `domain`, `kg`, `benchmark`, `phoenix`, `stage`, `debug`, `method` 서브앱을 연결합니다. 이 문서는 반복적으로 사용되는 패턴과 도움말 템플릿을 요약합니다.
 
 ---
 
@@ -9,7 +9,7 @@ EvalVault CLI는 `src/evalvault/adapters/inbound/cli/commands/` 패키지에 있
 | 영역 | 설명 | 엔트리 포인트 |
 |------|------|---------------|
 | 루트 명령 | `init`, `run`, `pipeline`, `history`, `compare`, `export`, `analyze`, `generate`, `gate`, `agent`, `experiment`, `config`, `metrics`, `langfuse`, `web`, `serve-api` | `register_all_commands()` |
-| 서브앱 | `domain`, `kg`, `benchmark`, `phoenix`, `stage`, `debug` | `attach_sub_apps()` |
+| 서브앱 | `domain`, `kg`, `benchmark`, `phoenix`, `stage`, `debug`, `method` | `attach_sub_apps()` |
 | 공통 옵션 | `--profile/-p`, `--db/-D`, `--memory-db/-M` | `cli/utils/options.py` |
 
 ```bash
@@ -168,14 +168,27 @@ uv run evalvault benchmark retrieval tests/fixtures/benchmark/retrieval_ground_t
   - `--kg`: GraphRAG 선택 시 필수
   - `--output`: `.json` 또는 `.csv` 저장
 
-### 3.7 `serve-api`
+### 3.7 `method`
+```bash
+uv run evalvault method list
+uv run evalvault method run tests/fixtures/e2e/insurance_qa_korean.json \
+  --method baseline_oracle \
+  --metrics faithfulness
+```
+- `list`: 내부 레지스트리(`config/methods.yaml`) + 외부 entry point 메서드를 조회합니다.
+- `run`: base question 데이터셋을 입력으로 메서드를 실행하고 결과를 저장한 뒤 평가까지 이어집니다.
+- `--docs`: 검색 컨텍스트용 문서 파일(.json/.jsonl/.txt)을 전달합니다.
+- `--method-config` / `--method-config-file`: 메서드별 파라미터를 전달합니다.
+- `--no-evaluate`: 데이터셋만 생성하고 평가를 생략합니다.
+
+### 3.8 `serve-api`
 ```bash
 uv run evalvault serve-api --reload
 ```
 - React Web UI가 호출하는 FastAPI 백엔드를 실행합니다.
 - 기본 주소: `http://127.0.0.1:8000`
 
-### 3.8 `web`
+### 3.9 `web`
 ```bash
 uv run evalvault web --db data/db/evalvault.db
 ```

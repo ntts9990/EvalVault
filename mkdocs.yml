@@ -158,6 +158,7 @@ nav:
       - AB Test Comparison Plan: internal/plans/AB_TEST_COMPARISON_PLAN.md
       - Agent Docs Sync Plan: internal/plans/AGENT_DOCS_SYNC_PLAN.md
       - CLI Development Plan: internal/plans/CLI_DEVELOPMENT_PLAN.md
+      - Enterprise Method Testbed Plan: internal/plans/ENTERPRISE_METHOD_TESTBED_PLAN.md
       - Debug Tool Plan: internal/plans/DEBUG_TOOL_PLAN.md
       - Docs Refactor Plan: internal/plans/DOCS_REFACTOR_PLAN.md
       - P2 Agent Tasks: internal/plans/P2_AGENT_TASKS.md

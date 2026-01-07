@@ -52,6 +52,7 @@ docs/
 |------|------|------|
 | [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 평가 담당자 | 설치, 환경설정, CLI, Web UI, 트러블슈팅 |
 | [guides/CLI_GUIDE.md](guides/CLI_GUIDE.md) | CLI 사용자 | 명령어 참조, 옵션, 예시 |
+| [method_plugins.md](method_plugins.md) | 평가/개발자 | 메서드 플러그인 등록, 실행, 외부 커맨드 가이드 |
 | [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
 | [guides/PROJECT_STRUCTURE_METHODS.md](guides/PROJECT_STRUCTURE_METHODS.md) | 개발자/기여자 | 프로젝트 구조 파악 방법론 모음 |
 | [guides/structure-methods/01-folder-topology.md](guides/structure-methods/01-folder-topology.md) | 개발자/기여자 | 구조 파악: 폴더 지형도 + 책임 태깅 |
@@ -111,6 +112,7 @@ docs/
 | [status/O1_PARALLEL_STATUS.md](internal/status/O1_PARALLEL_STATUS.md) | 오케스트레이터 요약 |
 | [status/O1_D1_DEBUG_REPORT_SUMMARY.md](internal/status/O1_D1_DEBUG_REPORT_SUMMARY.md) | DebugReport 요약 |
 | [plans/DOCS_REFACTOR_PLAN.md](internal/plans/DOCS_REFACTOR_PLAN.md) | 문서 통합/최신화 계획 |
+| [plans/ENTERPRISE_METHOD_TESTBED_PLAN.md](internal/plans/ENTERPRISE_METHOD_TESTBED_PLAN.md) | Method Testbed 엔터프라이즈 반영 계획 |
 
 ### 설계 문서
 
