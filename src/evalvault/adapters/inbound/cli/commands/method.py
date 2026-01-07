@@ -19,6 +19,7 @@ from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.methods import ExternalCommandMethod, MethodRegistry
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities import Dataset
+from evalvault.domain.entities.method import MethodOutput
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.method_runner import MethodRunnerService
 from evalvault.ports.outbound.method_port import MethodRuntime
@@ -308,6 +309,7 @@ def create_method_app(console: Console) -> typer.Typer:
                 raise typer.Exit(1) from exc
         method_finished_at = datetime.now()
 
+        _write_method_outputs(method_result.outputs, method_output_path, console)
         output_path = output
         if save_dataset and output_path is None:
             output_path = artifacts_dir / "dataset.json"
@@ -497,6 +499,37 @@ def _write_method_config(config: dict[str, Any], artifacts_dir: Path) -> Path:
     path = artifacts_dir / "method_config.json"
     path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def _write_method_outputs(
+    outputs: list[MethodOutput],
+    output_path: Path,
+    console: Console,
+) -> None:
+    try:
+        payload = {
+            "outputs": [
+                {
+                    "id": output.id,
+                    "answer": output.answer,
+                    "contexts": output.contexts,
+                    "metadata": output.metadata,
+                    "retrieval_metadata": output.retrieval_metadata,
+                }
+                for output in outputs
+            ]
+        }
+        output_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        console.print(f"[green]Method outputs saved to {output_path}[/green]")
+    except Exception as exc:
+        print_cli_warning(
+            console,
+            "메서드 출력 저장에 실패했습니다.",
+            tips=[str(exc)],
+        )
 
 
 __all__ = ["create_method_app"]

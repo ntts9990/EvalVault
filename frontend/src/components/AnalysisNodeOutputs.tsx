@@ -10,11 +10,54 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     pending: { label: "대기", color: "text-muted-foreground" },
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+const getStringField = (record: Record<string, unknown>, key: string) => {
+    const value = record[key];
+    return typeof value === "string" ? value : null;
+};
+
+const getStringLikeField = (record: Record<string, unknown>, key: string) => {
+    const value = record[key];
+    if (typeof value === "string") return value;
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    return null;
+};
+
+const getStringArrayField = (record: Record<string, unknown>, key: string) => {
+    const value = record[key];
+    if (!Array.isArray(value)) return null;
+    const strings = value.filter((item): item is string => typeof item === "string");
+    return strings.length ? strings : null;
+};
+
+const getRecordField = (record: Record<string, unknown>, key: string) => {
+    const value = record[key];
+    return isRecord(value) ? value : null;
+};
+
+const getFirstString = (record: Record<string, unknown>, keys: string[]) => {
+    for (const key of keys) {
+        const value = getStringField(record, key);
+        if (value) return value;
+    }
+    return null;
+};
+
+const getFirstStringLike = (record: Record<string, unknown>, keys: string[]) => {
+    for (const key of keys) {
+        const value = getStringLikeField(record, key);
+        if (value) return value;
+    }
+    return null;
+};
+
 type NodeResult = {
     status?: string;
     error?: string | null;
     duration_ms?: number | null;
-    output?: any;
+    output?: unknown;
 };
 
 type NodeDefinition = {
@@ -24,7 +67,21 @@ type NodeDefinition = {
     depends_on: string[];
 };
 
-function formatValue(value: any) {
+const coerceNodeResult = (value: unknown): NodeResult => {
+    if (!isRecord(value)) return {};
+    const status = typeof value.status === "string" ? value.status : undefined;
+    const errorValue = value.error;
+    const error = typeof errorValue === "string" ? errorValue : errorValue ? String(errorValue) : null;
+    const durationMs = typeof value.duration_ms === "number" ? value.duration_ms : undefined;
+    return {
+        status,
+        error,
+        duration_ms: durationMs,
+        output: value.output,
+    };
+};
+
+function formatValue(value: unknown) {
     if (typeof value === "number" && Number.isFinite(value)) {
         return value.toFixed(4);
     }
@@ -50,7 +107,7 @@ function formatDuration(durationMs?: number | null) {
 }
 
 function normalizeNodeList(
-    nodeResults: Record<string, NodeResult>,
+    nodeResults: Record<string, unknown>,
     nodeDefinitions?: NodeDefinition[]
 ) {
     const definitionMap = new Map<string, NodeDefinition>();
@@ -69,20 +126,23 @@ function normalizeNodeList(
             id,
             name: definition?.name || id,
             module: definition?.module || id,
-            result: nodeResults[id],
+            result: coerceNodeResult(nodeResults[id]),
         };
     });
 }
 
-function extractEvidence(output: any) {
-    if (!output || typeof output !== "object") return [];
-    if (Array.isArray(output.evidence)) return output.evidence;
-    if (Array.isArray(output.evidence_samples)) return output.evidence_samples;
-    if (Array.isArray(output.samples)) return output.samples;
+function extractEvidence(output: unknown) {
+    if (!isRecord(output)) return [];
+    const candidates = [output.evidence, output.evidence_samples, output.samples];
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            return candidate.filter(isRecord);
+        }
+    }
     return [];
 }
 
-function formatMetrics(metrics: Record<string, any> | null | undefined) {
+function formatMetrics(metrics: Record<string, unknown> | null | undefined) {
     if (!metrics) return null;
     return Object.entries(metrics).map(([key, value]) => {
         if (typeof value === "number" && Number.isFinite(value)) {
@@ -147,7 +207,7 @@ export function AnalysisNodeOutputs({
     nodeDefinitions,
     title = "노드 출력",
 }: {
-    nodeResults?: Record<string, NodeResult> | null;
+    nodeResults?: Record<string, unknown> | null;
     nodeDefinitions?: NodeDefinition[];
     title?: string;
 }) {
@@ -170,16 +230,16 @@ export function AnalysisNodeOutputs({
                     const meta = STATUS_META[statusKey] || STATUS_META.pending;
                     const output = node.result?.output;
                     const reportText =
-                        output && typeof output === "object" && typeof output.report === "string"
+                        isRecord(output) && typeof output.report === "string"
                             ? output.report
                             : null;
                     const summary =
-                        output && typeof output === "object" && output.summary && typeof output.summary === "object"
+                        isRecord(output) && isRecord(output.summary)
                             ? output.summary
                             : null;
                     const insights =
-                        output && typeof output === "object" && Array.isArray(output.insights)
-                            ? output.insights
+                        isRecord(output) && Array.isArray(output.insights)
+                            ? output.insights.filter((item): item is string => typeof item === "string")
                             : null;
                     const recommendations =
                         output && typeof output === "object" && Array.isArray(output.recommendations)
@@ -270,7 +330,7 @@ export function AnalysisNodeOutputs({
                                     <div className="space-y-2">
                                         <p className="text-xs font-semibold text-muted-foreground">인사이트</p>
                                         <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                                        {insights.slice(0, 8).map((item: string, index: number) => (
+                                        {insights.slice(0, 8).map((item, index) => (
                                             <li key={`${node.id}-insight-${index}`}>{String(item)}</li>
                                         ))}
                                         </ul>
@@ -355,17 +415,23 @@ export function AnalysisNodeOutputs({
                                     <div className="space-y-2">
                                         <p className="text-xs font-semibold text-muted-foreground">증거 샘플</p>
                                         <div className="space-y-3">
-                                            {evidence.slice(0, 6).map((item: any, index: number) => {
+                                            {evidence.slice(0, 6).map((item, index) => {
+                                                const evidenceItem = isRecord(item) ? item : {};
                                                 const evidenceId =
-                                                    item.evidence_id
-                                                    || item.id
-                                                    || item.test_case_id
-                                                    || item.case_id
-                                                    || `evidence-${index + 1}`;
-                                                const question = item.question || item.query || item.user_input;
-                                                const answer = item.answer || item.response;
-                                                const contexts = item.contexts || item.retrieved_contexts;
-                                                const metrics = item.metrics || item.scores;
+                                                    getFirstStringLike(evidenceItem, [
+                                                        "evidence_id",
+                                                        "id",
+                                                        "test_case_id",
+                                                        "case_id",
+                                                    ]) || `evidence-${index + 1}`;
+                                                const question = getFirstString(evidenceItem, ["question", "query", "user_input"]);
+                                                const answer = getFirstString(evidenceItem, ["answer", "response"]);
+                                                const contexts =
+                                                    getStringArrayField(evidenceItem, "contexts")
+                                                    || getStringArrayField(evidenceItem, "retrieved_contexts");
+                                                const metrics =
+                                                    getRecordField(evidenceItem, "metrics")
+                                                    || getRecordField(evidenceItem, "scores");
                                                 const metricsText = formatMetrics(metrics);
 
                                                 return (

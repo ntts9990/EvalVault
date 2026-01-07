@@ -17,8 +17,15 @@ export type PriorityCase = {
     question_type_label?: string;
     question_preview?: string;
     analysis_hints?: string[];
-    metadata?: Record<string, any> | null;
+    metadata?: Record<string, unknown> | null;
     tags?: string[];
+};
+
+type RunMetadata = {
+    run_id?: string;
+    dataset_name?: string;
+    model_name?: string;
+    [key: string]: unknown;
 };
 
 export type PrioritySummary = {
@@ -28,7 +35,7 @@ export type PrioritySummary = {
     bottom_count?: number;
     bottom_cases?: PriorityCase[];
     impact_cases?: PriorityCase[];
-    run_metadata?: Record<string, any> | null;
+    run_metadata?: RunMetadata | null;
 };
 
 const TAG_LABELS: Record<string, string> = {
@@ -59,7 +66,7 @@ function formatGapList(gaps?: Record<string, number>) {
     return entries.map(([metric, gap]) => `${metric} +${formatScore(gap, 2)}`).join(", ");
 }
 
-function formatMetadata(metadata?: Record<string, any> | null) {
+function formatMetadata(metadata?: Record<string, unknown> | null) {
     if (!metadata) return null;
     try {
         return JSON.stringify(metadata, null, 2);
@@ -211,7 +218,7 @@ export function PrioritySummaryPanel({ summary }: { summary: PrioritySummary }) 
     const bottomCount = summary.bottom_count ?? bottomCases.length;
     const impactCount = summary.impact_count ?? impactCases.length;
     const totalCases = summary.total_cases ?? 0;
-    const runMeta = summary.run_metadata || {};
+    const runMeta: RunMetadata = summary.run_metadata || {};
     const runId = typeof runMeta.run_id === "string" ? runMeta.run_id : null;
 
     return (

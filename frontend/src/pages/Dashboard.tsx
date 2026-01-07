@@ -74,6 +74,12 @@ function projectLabel(value: string) {
     return value;
 }
 
+function formatThresholdProfileLabel(profile?: string | null) {
+    if (!profile) return "Default";
+    if (profile.toLowerCase() === "qa") return "QA";
+    return `${profile.charAt(0).toUpperCase()}${profile.slice(1)}`;
+}
+
 function applySearchFilter(runs: RunSummary[], query: string) {
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) return runs;
@@ -82,7 +88,8 @@ function applySearchFilter(runs: RunSummary[], query: string) {
             run.dataset_name.toLowerCase().includes(trimmed) ||
             run.model_name.toLowerCase().includes(trimmed) ||
             run.run_id.toLowerCase().includes(trimmed) ||
-            (run.project_name || "").toLowerCase().includes(trimmed)
+            (run.project_name || "").toLowerCase().includes(trimmed) ||
+            (run.threshold_profile || "").toLowerCase().includes(trimmed)
         );
     });
 }
@@ -657,6 +664,7 @@ export function Dashboard() {
                     {filteredRuns.map((run) => {
                         const isSelected = selectedRuns.has(run.run_id);
                         const project = run.project_name || "Unassigned";
+                        const thresholdProfileLabel = formatThresholdProfileLabel(run.threshold_profile);
                         return (
                             <div
                                 key={run.run_id}
@@ -685,6 +693,9 @@ export function Dashboard() {
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <span className="px-2 py-0.5 rounded-full bg-secondary/80 border border-border">
                                                 {project}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full bg-secondary/80 border border-border">
+                                                Threshold: {thresholdProfileLabel}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

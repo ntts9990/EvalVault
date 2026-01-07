@@ -18,6 +18,7 @@ class MethodRunResult:
     dataset: Dataset
     retrieval_metadata: dict[str, dict[str, Any]]
     method_metadata: dict[str, Any]
+    outputs: list[MethodOutput]
 
 
 class MethodRunnerService:
@@ -35,8 +36,9 @@ class MethodRunnerService:
         if inspect.isawaitable(outputs):
             outputs = await outputs
 
+        outputs_list = list(outputs)
         output_map: dict[str, MethodOutput] = {}
-        for output in outputs:
+        for output in outputs_list:
             output_map[output.id] = output
 
         test_cases: list[TestCase] = []
@@ -102,4 +104,5 @@ class MethodRunnerService:
             dataset=dataset,
             retrieval_metadata=retrieval_metadata,
             method_metadata=method_metadata,
+            outputs=outputs_list,
         )

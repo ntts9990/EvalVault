@@ -14,6 +14,7 @@ from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_csv,
     render_dataset_template_json,
     render_dataset_template_xlsx,
+    render_method_input_template_json,
 )
 
 
@@ -189,6 +190,7 @@ def _create_dataset_templates(console: Console, output_dir: Path) -> None:
     template_specs = [
         ("dataset_template.json", render_dataset_template_json()),
         ("dataset_template.csv", render_dataset_template_csv()),
+        ("method_input_template.json", render_method_input_template_json()),
     ]
 
     created_any = False

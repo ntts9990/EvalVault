@@ -27,11 +27,14 @@ const METRIC_EXCLUDE_KEYS = new Set([
     "evidence",
 ]);
 
-function extractNumericMetrics(output: Record<string, any> | null) {
-    const metrics: Record<string, number> = {};
-    const visited = new Set<any>();
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
 
-    const walk = (value: any, path: string, depth: number) => {
+function extractNumericMetrics(output: Record<string, unknown> | null) {
+    const metrics: Record<string, number> = {};
+    const visited = new Set<object>();
+
+    const walk = (value: unknown, path: string, depth: number) => {
         if (value === null || value === undefined) return;
         if (depth > 4) return;
 
@@ -42,7 +45,9 @@ function extractNumericMetrics(output: Record<string, any> | null) {
 
         if (Array.isArray(value)) {
             if (value.length === 0) return;
-            const numeric = value.filter((item) => typeof item === "number" && Number.isFinite(item));
+            const numeric = value.filter(
+                (item): item is number => typeof item === "number" && Number.isFinite(item)
+            );
             if (numeric.length === value.length) {
                 const avg = numeric.reduce((sum, item) => sum + item, 0) / numeric.length;
                 metrics[`${path}.avg`] = avg;
@@ -50,7 +55,7 @@ function extractNumericMetrics(output: Record<string, any> | null) {
             return;
         }
 
-        if (typeof value === "object") {
+        if (isRecord(value)) {
             if (visited.has(value)) return;
             visited.add(value);
             for (const [key, next] of Object.entries(value)) {
@@ -69,9 +74,14 @@ function buildNodeMap(result: SavedAnalysisResult | null) {
     const map: Record<string, { status: string; error?: string | null }> = {};
     if (!result?.node_results) return map;
     Object.entries(result.node_results).forEach(([nodeId, node]) => {
+        const nodeRecord = isRecord(node) ? node : null;
+        const statusValue = nodeRecord?.status;
+        const errorValue = nodeRecord?.error;
+        const status = typeof statusValue === "string" ? statusValue : "pending";
+        const error = typeof errorValue === "string" ? errorValue : errorValue ? String(errorValue) : null;
         map[nodeId] = {
-            status: (node as any)?.status || "pending",
-            error: (node as any)?.error || null,
+            status,
+            error,
         };
     });
     return map;

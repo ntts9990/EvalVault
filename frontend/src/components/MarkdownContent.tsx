@@ -27,8 +27,9 @@ export function MarkdownContent({ text, className = "" }: MarkdownContentProps) 
                             {children}
                         </pre>
                     ),
-                    code: ({ inline, className: codeClass, children, ...props }) => {
-                        if (inline) {
+                    code: ({ className: codeClass, children, ...props }) => {
+                        const isInline = !codeClass;
+                        if (isInline) {
                             return (
                                 <code
                                     className="rounded bg-muted px-1 py-0.5 text-[0.85em] break-words"
