@@ -24,8 +24,31 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     pending: { label: "대기", color: "text-muted-foreground" },
 };
 
-function isPrioritySummary(value: any): value is PrioritySummary {
-    if (!value || typeof value !== "object") return false;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+const getNodeStatus = (node: unknown) => {
+    if (!isRecord(node)) return "pending";
+    const status = node.status;
+    return typeof status === "string" ? status : "pending";
+};
+
+const getNodeError = (node: unknown) => {
+    if (!isRecord(node)) return null;
+    const error = node.error;
+    if (typeof error === "string") return error;
+    return error ? String(error) : null;
+};
+
+const getNodeOutput = (nodeResults: Record<string, unknown> | null | undefined, nodeId: string) => {
+    if (!nodeResults) return null;
+    const node = nodeResults[nodeId];
+    if (!isRecord(node)) return null;
+    return node.output;
+};
+
+function isPrioritySummary(value: unknown): value is PrioritySummary {
+    if (!isRecord(value)) return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
 }
 
@@ -75,9 +98,8 @@ export function AnalysisResultView() {
         }
         const entries = Object.values(result.final_output);
         for (const entry of entries) {
-            if (entry && typeof entry === "object" && "report" in entry) {
-                const report = (entry as any).report;
-                if (typeof report === "string") return report;
+            if (isRecord(entry) && typeof entry.report === "string") {
+                return entry.report;
             }
         }
         return null;
@@ -140,7 +162,7 @@ export function AnalysisResultView() {
                 document.body.removeChild(textarea);
             }
             setCopyStatus("success");
-        } catch (err) {
+        } catch {
             setCopyStatus("error");
         }
         setTimeout(() => setCopyStatus("idle"), 1500);
@@ -157,7 +179,7 @@ export function AnalysisResultView() {
         for (const entry of Object.values(finalOutput)) {
             if (isPrioritySummary(entry)) return entry;
         }
-        const nodeOutput = result.node_results?.priority_summary?.output;
+        const nodeOutput = getNodeOutput(result.node_results, "priority_summary");
         if (isPrioritySummary(nodeOutput)) return nodeOutput;
         return null;
     }, [result]);
@@ -308,7 +330,8 @@ export function AnalysisResultView() {
                                 <h2 className="text-sm font-semibold mb-3">실행 단계</h2>
                                 <div className="space-y-2">
                                     {Object.entries(result.node_results).map(([nodeId, node]) => {
-                                        const status = (node as any)?.status || "pending";
+                                        const status = getNodeStatus(node);
+                                        const errorText = getNodeError(node);
                                         const meta = STATUS_META[status] || STATUS_META.pending;
                                         return (
                                             <div
@@ -317,9 +340,9 @@ export function AnalysisResultView() {
                                             >
                                                 <div>
                                                     <p className="text-sm font-medium">{nodeId}</p>
-                                                    {(node as any)?.error && (
+                                                    {errorText && (
                                                         <p className="text-xs text-rose-600">
-                                                            {(node as any).error}
+                                                            {errorText}
                                                         </p>
                                                     )}
                                                 </div>

@@ -102,8 +102,31 @@ const RUN_REQUIRED_MODULES = new Set([
     "priority_summary",
 ]);
 
-function isPrioritySummary(value: any): value is PrioritySummary {
-    if (!value || typeof value !== "object") return false;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+const getNodeStatus = (node: unknown) => {
+    if (!isRecord(node)) return "pending";
+    const status = node.status;
+    return typeof status === "string" ? status : "pending";
+};
+
+const getNodeError = (node: unknown) => {
+    if (!isRecord(node)) return null;
+    const error = node.error;
+    if (typeof error === "string") return error;
+    return error ? String(error) : null;
+};
+
+const getNodeOutput = (nodeResults: Record<string, unknown> | null | undefined, nodeId: string) => {
+    if (!nodeResults) return null;
+    const node = nodeResults[nodeId];
+    if (!isRecord(node)) return null;
+    return node.output;
+};
+
+function isPrioritySummary(value: unknown): value is PrioritySummary {
+    if (!isRecord(value)) return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
 }
 
@@ -326,7 +349,7 @@ export function AnalysisLab() {
         setAnalysisRunId(runIdForAnalysis);
         setLoading(true);
         try {
-            const params: Record<string, any> = {
+            const params: Record<string, unknown> = {
                 use_llm_report: useLlmReport,
             };
             if (recomputeRagas && runIdForAnalysis) {
@@ -366,11 +389,11 @@ export function AnalysisLab() {
         setSaveError(null);
         setMetadataError(null);
         try {
-            let metadata: any = null;
+            let metadata: unknown = null;
             if (saveMetadataText.trim()) {
                 try {
                     metadata = JSON.parse(saveMetadataText);
-                } catch (err) {
+                } catch {
                     setMetadataError("메타데이터 JSON 형식이 올바르지 않습니다.");
                     setSaving(false);
                     return;
@@ -455,8 +478,8 @@ export function AnalysisLab() {
             running: 0,
             pending: 0,
         };
-        Object.values(nodeResults).forEach((node: any) => {
-            const status = node?.status || "pending";
+        Object.values(nodeResults).forEach((node) => {
+            const status = getNodeStatus(node);
             if (counts[status as keyof typeof counts] !== undefined) {
                 counts[status as keyof typeof counts] += 1;
             }
@@ -472,8 +495,8 @@ export function AnalysisLab() {
         }
         const entries = Object.values(result.final_output);
         for (const entry of entries) {
-            if (entry && typeof entry === "object" && "report" in entry && typeof (entry as any).report === "string") {
-                return (entry as any).report as string;
+            if (isRecord(entry) && typeof entry.report === "string") {
+                return entry.report;
             }
         }
         return null;
@@ -517,9 +540,14 @@ export function AnalysisLab() {
         for (const entry of Object.values(finalOutput)) {
             if (isPrioritySummary(entry)) return entry;
         }
-        const nodeOutput = result.node_results?.priority_summary?.output;
+        const nodeOutput = getNodeOutput(result.node_results, "priority_summary");
         if (isPrioritySummary(nodeOutput)) return nodeOutput;
         return null;
+    }, [result]);
+
+    const hasNodeError = useMemo(() => {
+        if (!result?.node_results) return false;
+        return Object.values(result.node_results).some((node) => Boolean(getNodeError(node)));
     }, [result]);
 
     return (
@@ -552,11 +580,16 @@ export function AnalysisLab() {
                                 className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                             >
                                 <option value="">샘플 데이터 사용</option>
-                                {runs.map(run => (
-                                    <option key={run.run_id} value={run.run_id}>
-                                        {run.dataset_name} · {run.model_name} · {run.run_id.slice(0, 8)}
-                                    </option>
-                                ))}
+                                {runs.map((run) => {
+                                    const profileLabel = run.threshold_profile
+                                        ? run.threshold_profile.toUpperCase()
+                                        : "DEFAULT";
+                                    return (
+                                        <option key={run.run_id} value={run.run_id}>
+                                            {run.dataset_name} · {run.model_name} · {profileLabel} · {run.run_id.slice(0, 8)}
+                                        </option>
+                                    );
+                                })}
                             </select>
                             {runError && (
                                 <p className="text-xs text-destructive mt-2">{runError}</p>
@@ -1237,8 +1270,7 @@ export function AnalysisLab() {
                                             <h3 className="text-sm font-semibold mb-3">실행 단계</h3>
                                             <div className="space-y-2">
                                                 {selectedIntent.nodes.map(node => {
-                                                    const nodeResult = result.node_results?.[node.id];
-                                                    const status = nodeResult?.status || "pending";
+                                                    const status = getNodeStatus(result.node_results?.[node.id]);
                                                     const meta = STATUS_META[status] || STATUS_META.pending;
                                                     return (
                                                         <div key={node.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2">
@@ -1311,7 +1343,7 @@ export function AnalysisLab() {
                                         title="노드 상세 출력"
                                     />
 
-                                    {result.node_results && Object.values(result.node_results).some((node: any) => node?.error) && (
+                                    {hasNodeError && (
                                         <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs">
                                             일부 단계에서 오류가 발생했습니다. 실행 로그를 확인하세요.
                                         </div>

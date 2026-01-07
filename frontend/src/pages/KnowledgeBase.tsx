@@ -81,7 +81,7 @@ export function KnowledgeBase() {
             await uploadDocuments(files);
             setFiles([]); // Clear selection
             // In a real app, we might refresh a file list here
-        } catch (err) {
+        } catch {
             setError("Failed to upload files");
         } finally {
             setUploading(false);
@@ -95,7 +95,7 @@ export function KnowledgeBase() {
             const { job_id } = await buildKnowledgeGraph({ workers: 4, rebuild: true });
             setBuildJobId(job_id);
             setBuildStatus("pending");
-        } catch (err) {
+        } catch {
             setError("Failed to start build");
             setBuilding(false);
         }

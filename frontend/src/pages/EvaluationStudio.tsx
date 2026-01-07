@@ -19,6 +19,9 @@ import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetr
 
 const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
 export function EvaluationStudio() {
     const navigate = useNavigate();
 
@@ -190,7 +193,7 @@ export function EvaluationStudio() {
                         : "Check provider configuration.";
                 setError(`No ${provider.toUpperCase()} models found. ${hint}`);
             }
-        } catch (err) {
+        } catch {
             setError(`${provider.toUpperCase()} 모델 목록을 불러오지 못했습니다.`);
         } finally {
             setModelsLoading(false);
@@ -259,8 +262,11 @@ export function EvaluationStudio() {
                 tracker_config: tracker !== "none" ? { provider: tracker } : undefined
             }, (event) => {
                 if (event.type === "progress") {
-                    setProgress(event.data.percent);
-                    setProgressMessage(event.data.message || "Processing...");
+                    const data = isRecord(event.data) ? event.data : {};
+                    const percent = typeof data.percent === "number" ? data.percent : 0;
+                    const message = typeof data.message === "string" ? data.message : "Processing...";
+                    setProgress(percent);
+                    setProgressMessage(message);
                 } else if (event.type === "info" || event.type === "warning" || event.type === "step") {
                     const msg = event.message || "";
                     setLogs(prev => [...prev, msg]);

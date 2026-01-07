@@ -507,6 +507,7 @@ export function CustomerReport() {
                                         <th className="py-2">Project</th>
                                         <th className="py-2">Dataset</th>
                                         <th className="py-2">Model</th>
+                                        <th className="py-2">Threshold</th>
                                         <th className="py-2">Pass Rate</th>
                                     </tr>
                                 </thead>
@@ -517,6 +518,7 @@ export function CustomerReport() {
                                             <td className="py-2">{run.project_name || "Unassigned"}</td>
                                             <td className="py-2">{run.dataset_name}</td>
                                             <td className="py-2">{run.model_name}</td>
+                                            <td className="py-2">{run.threshold_profile ? run.threshold_profile.toUpperCase() : "Default"}</td>
                                             <td className="py-2">{(run.pass_rate * 100).toFixed(1)}%</td>
                                         </tr>
                                     ))}

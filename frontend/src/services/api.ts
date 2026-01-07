@@ -89,10 +89,10 @@ export interface StartEvaluationRequest {
     thresholds?: Record<string, number>;
     threshold_profile?: string;
     project_name?: string;
-    retriever_config?: Record<string, any>;
-    memory_config?: Record<string, any>;
-    tracker_config?: Record<string, any>;
-    prompt_config?: Record<string, any>;
+    retriever_config?: Record<string, unknown>;
+    memory_config?: Record<string, unknown>;
+    tracker_config?: Record<string, unknown>;
+    prompt_config?: Record<string, unknown>;
 }
 
 export interface JobStatusResponse {
@@ -121,7 +121,7 @@ export interface Behavior {
 }
 
 export interface SystemConfig {
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface ImprovementAction {
@@ -253,7 +253,7 @@ export async function fetchMetrics(): Promise<string[]> {
 
 export interface EvaluationProgressEvent {
     type: "progress" | "info" | "warning" | "error" | "result" | "step";
-    data?: any;
+    data?: unknown;
     message?: string;
 }
 
@@ -401,8 +401,8 @@ export interface AnalysisResult {
     pipeline_id?: string | null;
     started_at?: string | null;
     finished_at?: string | null;
-    final_output: Record<string, any> | null;
-    node_results: Record<string, any>;
+    final_output: Record<string, unknown> | null;
+    node_results: Record<string, unknown>;
 }
 
 export interface AnalysisIntentInfo {
@@ -428,11 +428,11 @@ export interface SaveAnalysisResultRequest {
     pipeline_id?: string | null;
     profile?: string | null;
     tags?: string[] | null;
-    metadata?: Record<string, any> | null;
+    metadata?: unknown;
     is_complete: boolean;
     duration_ms?: number | null;
-    final_output?: Record<string, any> | null;
-    node_results?: Record<string, any> | null;
+    final_output?: Record<string, unknown> | null;
+    node_results?: Record<string, unknown> | null;
     started_at?: string | null;
     finished_at?: string | null;
 }
@@ -454,9 +454,9 @@ export interface AnalysisHistoryItem {
 
 export interface SavedAnalysisResult extends AnalysisHistoryItem {
     pipeline_id: string | null;
-    final_output: Record<string, any> | null;
-    node_results: Record<string, any> | null;
-    metadata?: Record<string, any> | null;
+    final_output: Record<string, unknown> | null;
+    node_results: Record<string, unknown> | null;
+    metadata?: unknown;
 }
 
 export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
@@ -469,7 +469,7 @@ export async function runAnalysis(
     query: string,
     runId?: string,
     intent?: string,
-    params?: Record<string, any>
+    params?: Record<string, unknown>
 ): Promise<AnalysisResult> {
     const response = await fetch(`${API_BASE_URL}/pipeline/analyze`, {
         method: "POST",
