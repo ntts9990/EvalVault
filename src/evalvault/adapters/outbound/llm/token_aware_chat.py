@@ -10,6 +10,15 @@ from evalvault.adapters.outbound.llm.base import TokenUsage
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 
 
+def _min_completion_tokens_for_model(model: str | None) -> int:
+    """Return the minimum completion tokens for known reasoning models."""
+    if not model:
+        return 4096
+    if str(model).startswith("gpt-5"):
+        return 16384
+    return 4096
+
+
 def _build_llm_span_attrs(provider: str, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Extract common LLM span attributes."""
 
@@ -69,7 +78,12 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
 
             async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
                 # Force high token limit for reasoning models
-                if "max_completion_tokens" not in kwargs or kwargs["max_completion_tokens"] < 4096:
+                model_name = str(kwargs.get("model") or "")
+                min_tokens = _min_completion_tokens_for_model(model_name)
+                if (
+                    "max_completion_tokens" not in kwargs
+                    or kwargs["max_completion_tokens"] < min_tokens
+                ):
                     kwargs["max_completion_tokens"] = 16384
 
                 # Remove max_tokens if present to avoid conflicts with reasoning models
@@ -129,9 +143,11 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                     if "max_tokens" not in kwargs or kwargs["max_tokens"] < 4096:
                         kwargs["max_tokens"] = 16384
                 else:
+                    model_name = str(kwargs.get("model") or "")
+                    min_tokens = _min_completion_tokens_for_model(model_name)
                     if (
                         "max_completion_tokens" not in kwargs
-                        or kwargs["max_completion_tokens"] < 4096
+                        or kwargs["max_completion_tokens"] < min_tokens
                     ):
                         kwargs["max_completion_tokens"] = 16384
                     if "max_tokens" in kwargs:

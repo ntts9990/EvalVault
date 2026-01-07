@@ -11,6 +11,16 @@ from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncO
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
 
+_DEFAULT_MAX_COMPLETION_TOKENS = 8192
+_GPT5_MAX_COMPLETION_TOKENS = 16384
+
+
+def _max_completion_tokens_for_model(model_name: str) -> int:
+    """Choose a safe max_completion_tokens for the given model."""
+    if model_name.startswith("gpt-5"):
+        return _GPT5_MAX_COMPLETION_TOKENS
+    return _DEFAULT_MAX_COMPLETION_TOKENS
+
 
 class OpenAIAdapter(BaseLLMAdapter):
     """OpenAI LLM adapter using Ragas native interface.
@@ -83,7 +93,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             response = await self._client.chat.completions.create(
                 model=self._model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=8192,  # 긴 보고서를 위해 증가
+                max_completion_tokens=_max_completion_tokens_for_model(self._model_name),
             )
             content = response.choices[0].message.content or ""
             if span:
@@ -117,7 +127,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         api_kwargs: dict = {
             "model": self._model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "max_completion_tokens": 8192,  # 긴 보고서를 위해 증가
+            "max_completion_tokens": _max_completion_tokens_for_model(self._model_name),
         }
 
         # JSON 모드 설정
