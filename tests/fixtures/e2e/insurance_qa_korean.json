@@ -2,6 +2,9 @@
   "name": "e2e-insurance-qa-korean",
   "version": "1.0.0",
   "description": "Korean insurance QA dataset for E2E testing",
+  "metadata": {
+    "domain": "insurance"
+  },
   "thresholds": {
     "faithfulness": 0.7,
     "answer_relevancy": 0.7,

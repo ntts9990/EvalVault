@@ -149,6 +149,18 @@ class TestStatisticalAnalysisAdapter:
         pass_rate_insights = [i for i in result.insights if "pass rate" in i.lower()]
         assert len(pass_rate_insights) > 0
 
+    def test_infer_causes_summary_metrics(self, adapter):
+        """요약 메트릭 원인 추론 테스트."""
+        causes = adapter._infer_causes("summary_faithfulness", 0.2)
+        assert "Summary contains unsupported statements" in causes
+        assert "Possible hallucination in summary" in causes
+
+        causes = adapter._infer_causes("summary_score", 0.2)
+        assert "Summary misses key information from context" in causes
+
+        causes = adapter._infer_causes("entity_preservation", 0.2)
+        assert "Critical entities are missing or altered in summary" in causes
+
 
 class TestStatisticalAdapterComparison:
     """두 실행 비교 테스트."""

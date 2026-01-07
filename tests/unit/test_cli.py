@@ -218,6 +218,78 @@ class TestCLIRun:
 
         # Assert with better error message
         assert result.exit_code == 0, f"CLI failed with output: {result.stdout}"
+
+    @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
+    @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
+    @patch(f"{RUN_COMMAND_MODULE}.Settings")
+    def test_run_with_summary_preset(
+        self,
+        mock_settings_cls,
+        mock_get_llm_adapter,
+        mock_evaluator_cls,
+        mock_get_loader,
+        mock_dataset,
+        tmp_path,
+    ):
+        """--summary 플래그가 요약 프리셋 메트릭을 적용한다."""
+        mock_settings = MagicMock()
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.openai_model = get_test_model()
+        mock_settings.llm_provider = "openai"
+        mock_settings.evalvault_profile = None
+        mock_settings_cls.return_value = mock_settings
+
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = mock_dataset
+        mock_get_loader.return_value = mock_loader
+
+        summary_metrics = [
+            MetricScore(name="summary_score", score=0.9, threshold=0.7),
+            MetricScore(name="summary_faithfulness", score=0.92, threshold=0.7),
+            MetricScore(name="entity_preservation", score=0.88, threshold=0.7),
+        ]
+        summary_run = EvaluationRun(
+            dataset_name="test-dataset",
+            dataset_version="1.0.0",
+            model_name=get_test_model(),
+            metrics_evaluated=[
+                "summary_score",
+                "summary_faithfulness",
+                "entity_preservation",
+            ],
+            thresholds={
+                "summary_score": 0.7,
+                "summary_faithfulness": 0.7,
+                "entity_preservation": 0.7,
+            },
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-001",
+                    metrics=summary_metrics,
+                )
+            ],
+        )
+
+        mock_evaluator = MagicMock()
+        mock_evaluator.evaluate = AsyncMock(return_value=summary_run)
+        mock_evaluator_cls.return_value = mock_evaluator
+
+        mock_llm = MagicMock()
+        mock_get_llm_adapter.return_value = mock_llm
+
+        test_file = tmp_path / "test.csv"
+        test_file.write_text("id,question,answer,contexts\n")
+
+        result = runner.invoke(app, ["run", str(test_file), "--summary"])
+
+        assert result.exit_code == 0, result.stdout
+        eval_kwargs = mock_evaluator.evaluate.await_args.kwargs
+        assert eval_kwargs["metrics"] == [
+            "summary_score",
+            "summary_faithfulness",
+            "entity_preservation",
+        ]
         assert "test-dataset" in result.stdout or "faithfulness" in result.stdout
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
@@ -3514,6 +3586,36 @@ class TestRunHelperFunctions:
         )
         assert resolved["faithfulness"] == 0.9
         assert resolved["answer_relevancy"] == 0.7
+
+    def test_resolve_thresholds_applies_profile(self):
+        dataset = Dataset(
+            name="demo",
+            version="1.0.0",
+            test_cases=[],
+            thresholds={"summary_score": 0.2},
+        )
+        resolved = run_command_module._resolve_thresholds(
+            ["summary_score", "summary_faithfulness"],
+            dataset,
+            profile="summary",
+        )
+        assert (
+            resolved["summary_score"]
+            == run_command_module.run_helpers.SUMMARY_RECOMMENDED_THRESHOLDS["summary_score"]
+        )
+
+    def test_resolve_thresholds_rejects_unknown_profile(self):
+        dataset = Dataset(
+            name="demo",
+            version="1.0.0",
+            test_cases=[],
+        )
+        with pytest.raises(ValueError, match="Unknown threshold profile"):
+            run_command_module._resolve_thresholds(
+                ["faithfulness"],
+                dataset,
+                profile="invalid",
+            )
 
     def test_merge_evaluation_runs_accumulates_tokens_and_cost(self):
         run_a = EvaluationRun(

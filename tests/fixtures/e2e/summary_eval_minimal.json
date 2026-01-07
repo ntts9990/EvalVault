@@ -1,0 +1,85 @@
+{
+  "name": "summary-eval-minimal",
+  "version": "1.0.0",
+  "description": "보험 요약 평가 최소 테스트셋 (ko/en 혼용, 정상 5/실패 3)",
+  "thresholds": {
+    "summary_faithfulness": 0.9,
+    "summary_score": 0.85,
+    "entity_preservation": 0.9
+  },
+  "test_cases": [
+    {
+      "id": "sum-001-pass-ko-exclusion",
+      "question": "아래 보험 안내를 2문장으로 요약해줘.",
+      "answer": "암 진단 시 3,000만원을 지급하며 계약 후 90일 이내 진단은 면책이다. 보험료는 20년 납입이고 보장은 80세 만기다.",
+      "contexts": [
+        "이 상품은 암 진단 시 3,000만원을 지급합니다. 단, 계약일로부터 90일 이내 진단된 암은 면책입니다.",
+        "보험료 납입기간은 20년이며 보장기간은 80세 만기입니다."
+      ],
+      "ground_truth": "암 진단 3,000만원, 90일 면책, 20년 납입, 80세 만기"
+    },
+    {
+      "id": "sum-002-pass-ko-amount-rate",
+      "question": "다음 보장 내용을 간단히 요약해줘.",
+      "answer": "상해 입원은 1일 5만원(최대 180일) 지급이며 수술비는 급여 80%, 비급여 50%를 보장한다.",
+      "contexts": [
+        "상해로 인한 입원 시 1일당 5만원이 지급되며 최대 180일까지 보장됩니다.",
+        "수술비는 급여 항목의 80%를 보장하고 비급여는 50% 보장합니다."
+      ]
+    },
+    {
+      "id": "sum-003-pass-en-duration-condition",
+      "question": "Summarize the coverage in two sentences.",
+      "answer": "Accident hospitalization is covered for up to 120 days per year. Illness coverage has a 30-day waiting period from the contract date.",
+      "contexts": [
+        "The policy covers hospitalization for accidents for up to 120 days per year.",
+        "Illness coverage starts after a 30-day waiting period from the contract date."
+      ]
+    },
+    {
+      "id": "sum-004-pass-mixed-same-chunk",
+      "question": "다음 내용을 간단히 요약해줘.",
+      "answer": "보험기간은 2024-01-01부터 2029-12-31까지이며 납입기간은 5년 월납이다. 자살은 계약 후 2년 이내에는 보장하지 않는다.",
+      "contexts": [
+        "보험기간은 2024-01-01부터 2029-12-31까지입니다. The premium payment term is 5 years and premiums are paid monthly.",
+        "면책조항: 자살은 계약 후 2년 이내에는 보장하지 않습니다."
+      ]
+    },
+    {
+      "id": "sum-005-pass-mixed-cross-chunks",
+      "question": "아래 보장 내용을 요약해줘.",
+      "answer": "질병 입원은 3일째부터 1일당 4만원을 지급하며 지급 조건은 병원 입원 치료일 때만 해당된다. 외래 진료는 보장되지 않는다.",
+      "contexts": [
+        "질병으로 인한 입원 시 입원 3일째부터 1일당 4만원이 지급됩니다.",
+        "Benefits are payable only when the insured is admitted to a licensed hospital; outpatient visits are excluded."
+      ]
+    },
+    {
+      "id": "sum-006-fail-ko-missing-exclusion",
+      "question": "다음 약관을 요약해줘.",
+      "answer": "뇌출혈 진단 시 2,000만원을 지급하며 추가 검사비도 지원한다.",
+      "contexts": [
+        "뇌출혈 진단 시 2,000만원이 지급됩니다. 단, 기존 질환으로 인한 재발은 면책입니다.",
+        "진단 관련 검사비는 연 1회 30만원 한도로 지원됩니다."
+      ]
+    },
+    {
+      "id": "sum-007-fail-ko-inverted-condition",
+      "question": "아래 조건을 요약해줘.",
+      "answer": "중도 해지 시에도 납입보험료의 100%가 환급된다.",
+      "contexts": [
+        "납입기간 5년을 모두 완료한 경우에만 납입보험료의 100%가 환급됩니다.",
+        "중도 해지 시에는 해지환급금이 없습니다."
+      ]
+    },
+    {
+      "id": "sum-008-fail-en-hallucination",
+      "question": "Summarize the benefits.",
+      "answer": "The plan pays $50 per day for injury hospitalization up to 60 days and also covers dental treatment.",
+      "contexts": [
+        "The plan pays $50 per day for hospitalization due to injury, up to 60 days per year.",
+        "It does not cover cosmetic procedures or outpatient services."
+      ]
+    }
+  ]
+}

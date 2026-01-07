@@ -859,6 +859,8 @@ class TestMetricMaps:
             "context_recall",
             "factual_correctness",
             "semantic_similarity",
+            "summary_score",
+            "summary_faithfulness",
         ]
 
         for metric in expected_metrics:
@@ -869,6 +871,7 @@ class TestMetricMaps:
         evaluator = RagasEvaluator()
 
         assert "insurance_term_accuracy" in evaluator.CUSTOM_METRIC_MAP
+        assert "entity_preservation" in evaluator.CUSTOM_METRIC_MAP
 
     def test_metric_args_defined_for_all_metrics(self):
         """METRIC_ARGS에 모든 메트릭의 인자가 정의되어 있는지 확인."""
@@ -889,6 +892,15 @@ class TestMetricMaps:
         }
 
         assert expected == evaluator.REFERENCE_REQUIRED_METRICS
+
+    def test_default_thresholds_for_summary_metrics(self):
+        """요약 전용 메트릭 기본 임계값 확인."""
+        evaluator = RagasEvaluator()
+
+        assert evaluator.default_threshold_for("summary_faithfulness") == pytest.approx(0.9)
+        assert evaluator.default_threshold_for("summary_score") == pytest.approx(0.85)
+        assert evaluator.default_threshold_for("entity_preservation") == pytest.approx(0.9)
+        assert evaluator.default_threshold_for("faithfulness") == pytest.approx(0.7)
 
 
 class TestEvaluatorIntegration:

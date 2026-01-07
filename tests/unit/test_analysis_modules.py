@@ -623,6 +623,35 @@ class TestDiagnosticPlaybookModule:
         assert result["diagnostics"][0]["threshold"] == 0.6
         assert result["threshold"] == 0.6
 
+    def test_execute_summary_faithfulness_hint(self):
+        """요약 메트릭 힌트 적용."""
+        from evalvault.adapters.outbound.analysis.diagnostic_playbook_module import (
+            DiagnosticPlaybookModule,
+        )
+        from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+
+        run = EvaluationRun(
+            run_id="run-summary",
+            thresholds={"summary_faithfulness": 0.9},
+            results=[
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="summary_faithfulness", score=0.5, threshold=0.9)],
+                )
+            ],
+        )
+
+        module = DiagnosticPlaybookModule()
+        inputs = {
+            "load_data": {"run": run},
+            "ragas_eval": {"metrics": {"summary_faithfulness": 0.5}},
+        }
+
+        result = module.execute(inputs)
+
+        assert result["diagnostics"][0]["threshold"] == 0.9
+        assert any("요약 근거" in rec for rec in result["recommendations"])
+
 
 # =============================================================================
 # RetrievalBenchmarkModule Tests
