@@ -22,11 +22,14 @@ class DiagnosticPlaybookModule(BaseAnalysisModule):
 
     METRIC_REMEDIATION_HINTS: dict[str, str] = {
         "faithfulness": ("답변을 검색 컨텍스트에 더 강하게 고정하고 근거 인용을 강화하세요."),
+        "summary_faithfulness": ("요약 근거가 원문과 일치하도록 근거 체크리스트를 추가하세요."),
         "factual_correctness": ("원천 데이터 검증 및 사후 팩트체크 단계를 추가하세요."),
         "answer_relevancy": "질문 의도 파악과 프롬프트 정렬을 점검하세요.",
         "context_recall": ("top_k 확대, 쿼리 확장, 청크 전략 조정으로 recall을 높이세요."),
         "context_precision": ("리랭킹/노이즈 필터링으로 불필요한 컨텍스트를 줄이세요."),
         "semantic_similarity": "레퍼런스 표현과 답변 서술 스타일을 정렬하세요.",
+        "summary_score": "요약 핵심 정보 보존과 간결성 균형을 점검하세요.",
+        "entity_preservation": "보험 핵심 엔티티(금액/기간/조건) 누락 여부를 점검하세요.",
     }
 
     def execute(

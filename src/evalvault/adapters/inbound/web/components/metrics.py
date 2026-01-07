@@ -40,11 +40,29 @@ AVAILABLE_METRICS = {
         "icon": "🔄",
         "category": "generation",
     },
+    "summary_score": {
+        "name": "Summary Score",
+        "description": "요약 내 핵심 정보 보존과 간결성 평가",
+        "icon": "📝",
+        "category": "summary",
+    },
+    "summary_faithfulness": {
+        "name": "Summary Faithfulness",
+        "description": "요약 내용이 원문 근거에 충실한지 평가",
+        "icon": "🧭",
+        "category": "summary",
+    },
     "insurance_term_accuracy": {
         "name": "Insurance Term Accuracy",
         "description": "보험 용어 정확성 평가",
         "icon": "📋",
         "category": "domain",
+    },
+    "entity_preservation": {
+        "name": "Entity Preservation",
+        "description": "보험 핵심 엔티티 보존율 평가",
+        "icon": "🏷️",
+        "category": "summary",
     },
 }
 

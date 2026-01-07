@@ -31,19 +31,25 @@ class PrioritySummaryModule(BaseAnalysisModule):
     METRIC_WEIGHTS: dict[str, float] = {
         "factual_correctness": 1.0,
         "faithfulness": 0.95,
+        "summary_faithfulness": 0.95,
         "answer_relevancy": 0.8,
         "context_recall": 0.7,
         "context_precision": 0.6,
         "semantic_similarity": 0.5,
+        "summary_score": 0.8,
+        "entity_preservation": 0.9,
     }
 
     METRIC_HINTS: dict[str, str] = {
         "factual_correctness": "사실 오류 가능성",
         "faithfulness": "컨텍스트-답변 정합성 점검 필요",
+        "summary_faithfulness": "요약 근거 불일치 가능성",
         "answer_relevancy": "질문 의도와 답변 불일치 가능성",
         "context_recall": "필수 컨텍스트 누락 가능성",
         "context_precision": "컨텍스트 노이즈/중복 가능성",
         "semantic_similarity": "답변 표현/구조 차이",
+        "summary_score": "요약 정보 보존/간결성 이슈",
+        "entity_preservation": "핵심 엔티티 누락 가능성",
     }
 
     QUESTION_TYPE_LABELS: dict[QuestionType, str] = {

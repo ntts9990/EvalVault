@@ -42,6 +42,10 @@ from evalvault.domain.services.prompt_manifest import (
     load_prompt_manifest,
     summarize_prompt_entry,
 )
+from evalvault.domain.services.threshold_profiles import (
+    SUMMARY_RECOMMENDED_THRESHOLDS,
+    apply_threshold_profile,
+)
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
@@ -82,6 +86,8 @@ RUN_MODE_PRESETS: dict[str, RunModePreset] = {
     ),
 }
 
+SUMMARY_METRIC_ORDER = ("summary_faithfulness", "summary_score", "entity_preservation")
+
 
 def _display_results(result, console: Console, verbose: bool = False) -> None:
     """Display evaluation results in a formatted table."""
@@ -121,6 +127,7 @@ def _display_results(result, console: Console, verbose: bool = False) -> None:
         )
 
     console.print(table)
+    _display_summary_guidance(result, console)
 
     if verbose:
         console.print("\n[bold]Detailed Results[/bold]\n")
@@ -133,6 +140,47 @@ def _display_results(result, console: Console, verbose: bool = False) -> None:
                 console.print(
                     f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                 )
+
+
+def _display_summary_guidance(result, console: Console) -> None:
+    summary_metrics = [
+        metric for metric in result.metrics_evaluated if metric in SUMMARY_RECOMMENDED_THRESHOLDS
+    ]
+    if not summary_metrics:
+        return
+
+    threshold_line = ", ".join(
+        f"{metric}>={SUMMARY_RECOMMENDED_THRESHOLDS[metric]:.2f}"
+        for metric in SUMMARY_METRIC_ORDER
+        if metric in SUMMARY_RECOMMENDED_THRESHOLDS
+    )
+    warnings = []
+    for metric in summary_metrics:
+        score = result.get_avg_score(metric)
+        if score is None:
+            continue
+        recommended = SUMMARY_RECOMMENDED_THRESHOLDS[metric]
+        if score < recommended:
+            warnings.append(f"- {metric}: {score:.3f} < {recommended:.2f}")
+
+    if warnings:
+        header = "[bold red]사용자 노출 기준 미달[/bold red]"
+        border_style = "red"
+    else:
+        header = "[bold]요약 평가 기준 참고[/bold]"
+        border_style = "yellow"
+
+    lines = [
+        header,
+        *warnings,
+        "",
+        f"- 권장 기준: {threshold_line}",
+        "- 혼용 언어/temperature 변동으로 점수가 흔들릴 수 있어 다회 실행 평균 확인을 권장합니다.",
+        "- 참고 문서: docs/guides/RAGAS_PERFORMANCE_TUNING.md, "
+        "docs/internal/reports/TEMPERATURE_SEED_ANALYSIS.md",
+    ]
+
+    console.print(Panel("\n".join(lines), title="Summary Evaluation", border_style=border_style))
 
 
 def format_dataset_preprocess_summary(summary: dict[str, Any] | None) -> str | None:
@@ -736,13 +784,20 @@ def _load_excel_thresholds_for_stream(path: Path) -> dict[str, float]:
     return extract_thresholds_from_rows(df.to_dict(orient="records"))
 
 
-def _resolve_thresholds(metrics: list[str], dataset: Dataset) -> dict[str, float]:
+def _resolve_thresholds(
+    metrics: list[str],
+    dataset: Dataset,
+    *,
+    profile: str | None = None,
+) -> dict[str, float]:
     """Resolve thresholds by preferring dataset values and falling back to defaults."""
 
     base_thresholds = dataset.thresholds or {}
     resolved: dict[str, float] = {}
     for metric in metrics:
         resolved[metric] = base_thresholds.get(metric, 0.7)
+    if profile:
+        resolved = apply_threshold_profile(metrics, resolved, profile)
     return resolved
 
 

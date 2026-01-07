@@ -284,6 +284,12 @@ class StatisticalAnalysisAdapter(BaseAnalysisAdapter):
                 causes.append("Possible hallucination")
             else:
                 causes.append("Partial mismatch with context")
+        elif metric_name == "summary_faithfulness":
+            if score < 0.3:
+                causes.append("Summary contains unsupported statements")
+                causes.append("Possible hallucination in summary")
+            else:
+                causes.append("Summary partially mismatches context")
 
         elif metric_name == "answer_relevancy":
             if score < 0.3:
@@ -302,6 +308,16 @@ class StatisticalAnalysisAdapter(BaseAnalysisAdapter):
 
         elif metric_name == "semantic_similarity":
             causes.append("Answer meaning differs from ground truth")
+        elif metric_name == "summary_score":
+            if score < 0.3:
+                causes.append("Summary misses key information from context")
+            else:
+                causes.append("Summary partially covers key information")
+        elif metric_name == "entity_preservation":
+            if score < 0.3:
+                causes.append("Critical entities are missing or altered in summary")
+            else:
+                causes.append("Some key entities are missing in summary")
 
         return causes
 

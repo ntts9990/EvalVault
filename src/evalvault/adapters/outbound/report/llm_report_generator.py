@@ -181,6 +181,72 @@ Semantic Similarity는 생성된 답변과 ground truth 간의 의미적 유사�
 5. **평가 방법론**: 다양한 유사도 측정 방법 비교
 
 마크다운 형식으로 작성해주세요.""",
+    "summary_score": """당신은 요약 평가 메트릭 전문가입니다.
+
+## 분석 대상
+- 메트릭: Summary Score (요약 점수)
+- 점수: {score:.3f} / 1.0
+- 임계값: {threshold:.2f}
+- 상태: {status}
+
+## Summary Score 메트릭 설명
+Summary Score는 요약이 원문 핵심 정보를 얼마나 보존하면서 간결하게 정리되었는지 측정합니다.
+낮은 점수는 정보 누락 또는 과도한 장황함을 의미할 수 있습니다.
+
+## 요청사항
+다음 내용을 포함하여 전문가 관점에서 분석해주세요:
+
+1. **현재 상태 진단**: 점수 해석과 요약 품질 진단
+2. **주요 원인 분석**: 정보 누락/장황함/핵심 포인트 왜곡 원인
+3. **개선 방안**: 요약 구조/프롬프트/컨텍스트 개선 제안
+4. **검증 포인트**: 핵심 정보 보존 체크리스트 제안
+5. **운영 팁**: 요약 품질 모니터링 방법
+
+마크다운 형식으로 작성해주세요.""",
+    "summary_faithfulness": """당신은 요약 평가 메트릭 전문가입니다.
+
+## 분석 대상
+- 메트릭: Summary Faithfulness (요약 충실도)
+- 점수: {score:.3f} / 1.0
+- 임계값: {threshold:.2f}
+- 상태: {status}
+
+## Summary Faithfulness 메트릭 설명
+Summary Faithfulness는 요약 내 주장/숫자/조건이 원문 근거와 일치하는지 측정합니다.
+낮은 점수는 원문에 없는 정보가 포함되었거나 조건이 왜곡되었음을 의미합니다.
+
+## 요청사항
+다음 내용을 포함하여 전문가 관점에서 분석해주세요:
+
+1. **현재 상태 진단**: 요약 충실도 상태 진단
+2. **주요 원인 분석**: 근거 누락, 환각, 조건 반전 등 원인
+3. **보험 리스크 관점**: 면책/제외/금액/기간/비율 왜곡 위험 설명
+4. **개선 방안**: 근거 인용/체크리스트/검증 파이프라인 제안
+5. **품질 게이트 제안**: 사용자 노출 전 확인 포인트
+
+마크다운 형식으로 작성해주세요.""",
+    "entity_preservation": """당신은 보험 요약 평가 메트릭 전문가입니다.
+
+## 분석 대상
+- 메트릭: Entity Preservation (엔티티 보존)
+- 점수: {score:.3f} / 1.0
+- 임계값: {threshold:.2f}
+- 상태: {status}
+
+## Entity Preservation 메트릭 설명
+Entity Preservation은 요약에서 보험 핵심 엔티티(금액/기간/비율/면책/조건)가
+원문과 비교해 얼마나 보존되었는지 측정합니다.
+
+## 요청사항
+다음 내용을 포함하여 전문가 관점에서 분석해주세요:
+
+1. **현재 상태 진단**: 핵심 엔티티 보존 상태 평가
+2. **주요 원인 분석**: 엔티티 누락/왜곡/치환 원인
+3. **개선 방안**: 엔티티 하이라이트/보존 프롬프트/후처리 제안
+4. **검증 기준**: 보험 문서에서 필수 엔티티 체크리스트
+5. **운영 팁**: 엔티티 보존율 모니터링/샘플 리뷰 방법
+
+마크다운 형식으로 작성해주세요.""",
 }
 
 # 기본 메트릭 분석 프롬프트 (등록되지 않은 메트릭용)
@@ -230,6 +296,13 @@ EXECUTIVE_SUMMARY_PROMPT = """당신은 RAG 시스템 평가 전문 컨설턴트
 
 마크다운 형식으로 작성해주세요. 전문적이면서도 이해하기 쉽게 작성해주세요."""
 
+SUMMARY_RECOMMENDED_THRESHOLDS = {
+    "summary_faithfulness": 0.90,
+    "summary_score": 0.85,
+    "entity_preservation": 0.90,
+}
+SUMMARY_METRIC_ORDER = ("summary_faithfulness", "summary_score", "entity_preservation")
+
 
 @dataclass
 class LLMReportSection:
@@ -258,6 +331,7 @@ class LLMReport:
 
     def to_markdown(self) -> str:
         """마크다운 형식으로 변환."""
+        summary_notice = _build_summary_notice(self.metric_analyses)
         lines = [
             f"# RAG 평가 보고서: {self.dataset_name}",
             "",
@@ -273,6 +347,18 @@ class LLMReport:
             "---",
             "",
         ]
+
+        if summary_notice:
+            lines.extend(
+                [
+                    "## 요약 평가 주의사항",
+                    "",
+                    summary_notice,
+                    "",
+                    "---",
+                    "",
+                ]
+            )
 
         for section in self.metric_analyses:
             lines.extend(
@@ -307,6 +393,42 @@ class LLMReport:
         )
 
         return "\n".join(lines)
+
+
+def _build_summary_notice(sections: list[LLMReportSection]) -> str | None:
+    summary_scores = {
+        section.metric_name: section.score
+        for section in sections
+        if section.metric_name in SUMMARY_RECOMMENDED_THRESHOLDS and section.score is not None
+    }
+    if not summary_scores:
+        return None
+
+    threshold_line = ", ".join(
+        f"{metric}>={SUMMARY_RECOMMENDED_THRESHOLDS[metric]:.2f}"
+        for metric in SUMMARY_METRIC_ORDER
+        if metric in SUMMARY_RECOMMENDED_THRESHOLDS
+    )
+    warnings = [
+        f"- {metric}: {score:.3f} < {SUMMARY_RECOMMENDED_THRESHOLDS[metric]:.2f}"
+        for metric, score in summary_scores.items()
+        if score < SUMMARY_RECOMMENDED_THRESHOLDS[metric]
+    ]
+
+    lines = []
+    if warnings:
+        lines.append("**기준 미달 메트릭**")
+        lines.extend(warnings)
+        lines.append("")
+    lines.extend(
+        [
+            f"- 사용자 노출 권장 기준: {threshold_line}",
+            "- 혼용 언어/temperature 변동으로 점수가 흔들릴 수 있어 다회 실행 평균 확인 권장.",
+            "- 참고 문서: docs/guides/RAGAS_PERFORMANCE_TUNING.md, "
+            "docs/internal/reports/TEMPERATURE_SEED_ANALYSIS.md",
+        ]
+    )
+    return "\n".join(lines)
 
 
 class LLMReportGenerator:

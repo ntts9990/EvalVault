@@ -42,6 +42,9 @@ class RunSummaryResponse(BaseModel):
     started_at: str  # ISO format string
     finished_at: str | None = None
     metrics_evaluated: list[str] = []
+    run_mode: str | None = None
+    evaluation_task: str | None = None
+    threshold_profile: str | None = None
     avg_metric_scores: dict[str, float] | None = None
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None
@@ -71,9 +74,11 @@ class StartEvaluationRequest(BaseModel):
     dataset_path: str
     metrics: list[str]
     model: str
+    evaluation_task: str | None = None
     parallel: bool = True
     batch_size: int = 5
     thresholds: dict[str, float] | None = None
+    threshold_profile: str | None = None
     project_name: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
@@ -309,9 +314,11 @@ async def start_evaluation_endpoint(
         dataset_path=request.dataset_path,
         metrics=request.metrics,
         model_name=request.model,
+        evaluation_task=request.evaluation_task or "qa",
         parallel=request.parallel,
         batch_size=request.batch_size,
         thresholds=request.thresholds or {},
+        threshold_profile=request.threshold_profile,
         project_name=request.project_name,
         retriever_config=request.retriever_config,
         memory_config=request.memory_config,
@@ -431,6 +438,9 @@ def list_runs(
             "started_at": s.started_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             "metrics_evaluated": s.metrics_evaluated,
+            "run_mode": s.run_mode,
+            "evaluation_task": s.evaluation_task,
+            "threshold_profile": s.threshold_profile,
             "avg_metric_scores": s.avg_metric_scores or None,
             "total_cost_usd": s.total_cost_usd,
             "phoenix_precision": s.phoenix_precision,

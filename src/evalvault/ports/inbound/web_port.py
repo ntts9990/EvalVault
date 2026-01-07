@@ -18,8 +18,10 @@ class EvalRequest:
     dataset_path: str
     metrics: list[str]
     model_name: str = "openai/gpt-5-nano"
+    evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)
+    threshold_profile: str | None = None
     parallel: bool = True
     batch_size: int = 5
     project_name: str | None = None
@@ -55,6 +57,8 @@ class RunSummary:
     metrics_evaluated: list[str]
     passed_test_cases: int = 0
     run_mode: str | None = None
+    evaluation_task: str | None = None
+    threshold_profile: str | None = None
     total_tokens: int = 0
     total_cost_usd: float | None = None
     phoenix_precision: float | None = None

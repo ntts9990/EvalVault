@@ -404,9 +404,16 @@ class InsightGenerator:
 
         # 메트릭 점수 기반 패턴 추론
         scores = failure.metric_scores
-        if scores.get("faithfulness", 1) < 0.5:
+        faith_score = scores.get("summary_faithfulness", scores.get("faithfulness", 1))
+        if faith_score < 0.5:
             insight.pattern_type = "hallucination"
             insight.failure_reason = "답변이 컨텍스트에 충실하지 않음"
+        elif scores.get("entity_preservation", 1) < 0.6:
+            insight.pattern_type = "incomplete_answer"
+            insight.failure_reason = "요약에 핵심 엔티티가 누락됨"
+        elif scores.get("summary_score", 1) < 0.5:
+            insight.pattern_type = "incomplete_answer"
+            insight.failure_reason = "요약 핵심 정보가 충분히 보존되지 않음"
         elif scores.get("context_precision", 1) < 0.5:
             insight.pattern_type = "irrelevant_context"
             insight.failure_reason = "검색된 컨텍스트의 관련성이 낮음"
@@ -450,13 +457,23 @@ class InsightGenerator:
             )
 
         # 기본 개선 제안
-        if metric_name == "faithfulness":
+        if metric_name in {"faithfulness", "summary_faithfulness"}:
             insight.prioritized_improvements = [
                 {
                     "priority": 1,
                     "component": "generator",
                     "action": "Temperature 감소 및 프롬프트 강화",
                     "expected_improvement": 0.10,
+                    "effort": "low",
+                }
+            ]
+        elif metric_name in {"summary_score", "entity_preservation"}:
+            insight.prioritized_improvements = [
+                {
+                    "priority": 1,
+                    "component": "prompt",
+                    "action": "요약 핵심 엔티티 보존 체크리스트 추가",
+                    "expected_improvement": 0.12,
                     "effort": "low",
                 }
             ]

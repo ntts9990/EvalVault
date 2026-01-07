@@ -11,6 +11,10 @@ export interface RunSummary {
     started_at: string;
     finished_at: string | null;
     metrics_evaluated: string[];
+    run_mode?: string | null;
+    evaluation_task?: string | null;
+    threshold_profile?: string | null;
+    thresholds?: Record<string, number> | null;
     avg_metric_scores?: Record<string, number> | null;
     total_cost_usd: number | null;
     phoenix_precision: number | null;
@@ -79,9 +83,11 @@ export interface StartEvaluationRequest {
     dataset_path: string;
     metrics: string[];
     model: string;
+    evaluation_task?: string;
     parallel?: boolean;
     batch_size?: number;
     thresholds?: Record<string, number>;
+    threshold_profile?: string;
     project_name?: string;
     retriever_config?: Record<string, any>;
     memory_config?: Record<string, any>;

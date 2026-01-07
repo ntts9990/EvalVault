@@ -43,6 +43,21 @@ def register_config_commands(app: typer.Typer, console: Console) -> None:
             "[green]Yes[/green]",
         )
         table.add_row(
+            "summary_score",
+            "Measures summary coverage and conciseness against contexts",
+            "[red]No[/red]",
+        )
+        table.add_row(
+            "summary_faithfulness",
+            "Measures whether summary statements are grounded in contexts",
+            "[red]No[/red]",
+        )
+        table.add_row(
+            "entity_preservation",
+            "Measures preservation of key insurance entities in summaries",
+            "[red]No[/red]",
+        )
+        table.add_row(
             "insurance_term_accuracy",
             "Measures if insurance terms in answer are grounded in contexts",
             "[red]No[/red]",

@@ -187,11 +187,20 @@ class EvaluationRun:
         run_mode = self.tracker_metadata.get("run_mode")
         if isinstance(run_mode, str) and run_mode:
             summary["run_mode"] = run_mode
+        evaluation_task = self.tracker_metadata.get("evaluation_task")
+        if isinstance(evaluation_task, str) and evaluation_task:
+            summary["evaluation_task"] = evaluation_task
+        threshold_profile = self.tracker_metadata.get("threshold_profile")
+        if isinstance(threshold_profile, str) and threshold_profile:
+            summary["threshold_profile"] = threshold_profile
         project_name = self.tracker_metadata.get("project") or self.tracker_metadata.get(
             "project_name"
         )
         if isinstance(project_name, str) and project_name:
             summary["project_name"] = project_name
+        summary["thresholds"] = {
+            metric: self._get_threshold(metric) for metric in self.metrics_evaluated
+        }
         # 각 메트릭 평균
         for metric in self.metrics_evaluated:
             avg = self.get_avg_score(metric)
