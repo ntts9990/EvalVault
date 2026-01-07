@@ -1,6 +1,19 @@
 # Query-Based DAG Analysis Pipeline 설계 문서
 
 > 사용자 쿼리를 분석하여 자동으로 DAG 스타일 분석 파이프라인을 실행하고 보고서를 생성하는 시스템
+>
+> **Last Updated**: 2026-01-07
+> **Status**: ✅ 구현 완료
+
+## 📚 관련 문서
+
+| 문서 | 역할 |
+|------|------|
+| [FEATURE_SPECS.md](./FEATURE_SPECS.md) | 기능 스펙 (DAG Pipeline 섹션) |
+| [PROJECT_MAP.md](./PROJECT_MAP.md) | 분석 파이프라인 Mermaid 다이어그램 |
+| [CLASS_CATALOG.md](./CLASS_CATALOG.md) | PipelineOrchestrator 등 클래스 상세 |
+
+---
 
 ## 1. 개요
 
@@ -311,101 +324,95 @@ pipeline:
    모듈 metadata의 `requires`/`optional_requires` 필드를 채워 템플릿 레벨에서
    의존성 그래프를 추적할 수 있도록 해야 합니다.
 
-## 5. MVP 구현 계획
+## 5. 구현 상태 (2026-01-07 현행화)
 
-### Phase 14.1: 기반 인프라 (1주차)
+> **Phase 14 전체 완료** - DAG 분석 파이프라인이 구현되어 운영 중입니다.
+
+### Phase 14.1: 기반 인프라 ✅ 완료
 
 **목표**: 분석 파이프라인 포트/어댑터 기본 구조
 
-- [ ] `AnalysisPipelinePort` 인터페이스 정의
-- [ ] `AnalysisModulePort` 플러그인 인터페이스 정의
-- [ ] `AnalysisIntent` 엔티티 및 분류기 구현
-- [ ] `AnalysisPipeline` 엔티티 구현
-- [ ] 테스트 작성 (TDD)
+- [x] `AnalysisPipelinePort` 인터페이스 정의
+- [x] `AnalysisModulePort` 플러그인 인터페이스 정의
+- [x] `AnalysisIntent` 엔티티 및 분류기 구현
+- [x] `AnalysisPipeline` 엔티티 구현
+- [x] 테스트 작성 (TDD)
 
-**생성 파일**:
+**구현 파일**:
 - `src/evalvault/ports/inbound/analysis_pipeline_port.py`
 - `src/evalvault/ports/outbound/analysis_module_port.py`
-- `src/evalvault/domain/entities/analysis_intent.py`
-- `src/evalvault/domain/entities/analysis_pipeline.py`
+- `src/evalvault/domain/entities/analysis_pipeline.py` (AnalysisIntent 포함)
 - `tests/unit/test_analysis_pipeline.py`
 
-### Phase 14.2: 의도 분류기 (1주차)
+### Phase 14.2: 의도 분류기 ✅ 완료
 
 **목표**: 사용자 쿼리에서 분석 의도 추출
 
-- [ ] 키워드 기반 규칙 분류기 (MVP)
-- [ ] LLM 기반 분류기 (확장)
-- [ ] 의도별 파이프라인 템플릿 매핑
-- [ ] 테스트 작성
+- [x] 키워드 기반 규칙 분류기 (MVP)
+- [ ] LLM 기반 분류기 (향후 확장)
+- [x] 의도별 파이프라인 템플릿 매핑
+- [x] 테스트 작성
 
-**생성 파일**:
-- `src/evalvault/domain/services/query_intent_classifier.py`
+**구현 파일**:
+- `src/evalvault/domain/services/intent_classifier.py`
 - `src/evalvault/domain/services/pipeline_template_registry.py`
+- `src/evalvault/ports/outbound/intent_classifier_port.py`
 - `tests/unit/test_intent_classifier.py`
 
-### Phase 14.3: DAG 파이프라인 빌더 (1-2주차)
+### Phase 14.3: DAG 파이프라인 빌더 ✅ 완료
 
-**목표**: LangGraph 기반 DAG 파이프라인 구성 및 실행
+**목표**: DAG 기반 파이프라인 구성 및 실행
 
-- [ ] `DAGPipelineBuilder` 서비스 구현
-- [ ] LangGraph StateGraph 통합
-- [ ] 노드 실행 및 결과 수집
-- [ ] 에러 핸들링 및 재시도 로직
-- [ ] 테스트 작성
+- [x] `PipelineOrchestrator` 서비스 구현
+- [x] DAG 토폴로지 정렬 및 실행
+- [x] 노드 실행 및 결과 수집
+- [x] 에러 핸들링 (실패/스킵 전파)
+- [x] 테스트 작성
 
-**생성 파일**:
-- `src/evalvault/domain/services/dag_pipeline_builder.py`
-- `src/evalvault/domain/services/dag_executor.py`
-- `tests/unit/test_dag_pipeline.py`
+**구현 파일**:
+- `src/evalvault/domain/services/pipeline_orchestrator.py`
+- `tests/unit/test_pipeline_orchestrator.py`
 
-### Phase 14.4: 분석 모듈 어댑터 (2주차)
+### Phase 14.4: 분석 모듈 어댑터 ✅ 완료 (40+ 모듈)
 
 **목표**: 핵심 분석 모듈 구현
 
-MVP 범위:
-- [ ] 형태소 분석기 (morpheme_analyzer)
-- [ ] BM25 검색 (bm25_searcher)
-- [ ] 하이브리드 검색 비교 (hybrid_comparator)
-- [ ] 진단 플레이북 (diagnostic_adapter)
+MVP 완료:
+- [x] `morpheme_analyzer_module.py` - 형태소 분석
+- [x] `bm25_searcher_module.py` - BM25 검색
+- [x] `hybrid_rrf_module.py`, `hybrid_weighted_module.py` - 하이브리드 검색
+- [x] `diagnostic_playbook_module.py` - 진단 플레이북
 
-**생성 파일**:
-- `src/evalvault/adapters/outbound/analysis/morpheme_analyzer.py`
-- `src/evalvault/adapters/outbound/analysis/bm25_searcher.py`
-- `src/evalvault/adapters/outbound/analysis/hybrid_comparator.py`
-- `src/evalvault/adapters/outbound/analysis/diagnostic_adapter.py`
-- `tests/unit/test_analysis_modules.py`
+확장 구현:
+- `data_loader_module.py`, `run_loader_module.py` - 데이터 로딩
+- `statistical_analyzer_module.py`, `nlp_analyzer_module.py`, `causal_analyzer_module.py` - 분석
+- `summary_report_module.py`, `verification_report_module.py`, `comparison_report_module.py` - 보고서
+- `embedding_*_module.py` - 임베딩 분석
+- `retrieval_*_module.py` - 검색 분석
+- 기타 40+ 모듈
 
-### Phase 14.5: 보고서 생성기 (2주차)
+**구현 위치**: `src/evalvault/adapters/outbound/analysis/`
+
+### Phase 14.5: 보고서 생성기 ✅ 완료
 
 **목표**: 분석 결과를 보고서로 변환
 
-- [ ] Markdown 보고서 템플릿
-- [ ] HTML 보고서 렌더러
-- [ ] LLM 요약 통합 (선택)
-- [ ] 차트/시각화 통합
-- [ ] 테스트 작성
+- [x] Markdown 보고서 템플릿 (`summary_report_module.py`)
+- [x] LLM 요약 통합 (`llm_report_module.py`)
+- [x] 다양한 리포트 타입 (verification, comparison, analysis, detailed)
 
-**생성 파일**:
-- `src/evalvault/domain/services/report_generator.py`
-- `src/evalvault/adapters/inbound/web/components/report_viewer.py`
-- `tests/unit/test_report_generator.py`
+**구현 파일**:
+- `src/evalvault/adapters/outbound/analysis/*_report_module.py`
+- `src/evalvault/adapters/outbound/report/markdown_adapter.py`
 
-### Phase 14.6: 웹 UI 통합 (2-3주차)
+### Phase 14.6: CLI 통합 ✅ 완료
 
-**목표**: React Analysis Lab 페이지
+**목표**: CLI pipeline 명령어
 
-- [ ] 쿼리 입력 UI
-- [ ] 파이프라인 시각화 (노드 그래프)
-- [ ] 실시간 진행 상황 표시
-- [ ] 결과 보고서 렌더링
-- [ ] 보고서 다운로드 (PDF/HTML/Markdown)
-- [ ] 테스트 작성
+- [x] 쿼리 기반 파이프라인 실행 (`evalvault pipeline analyze`)
+- [x] 템플릿 조회 (`scripts/pipeline_template_inspect.py`)
 
-**생성 파일**:
-- `src/evalvault/adapters/inbound/web/pages/analysis_assistant.py`
-- `src/evalvault/adapters/inbound/web/components/pipeline_visualizer.py`
-- `tests/unit/test_web_analysis_assistant.py`
+**참고**: Web UI 통합은 React 기반 별도 개발 진행 중
 
 ## 6. 확장 계획
 

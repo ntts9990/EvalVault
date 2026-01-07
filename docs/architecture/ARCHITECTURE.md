@@ -81,7 +81,8 @@
 │  │  └── web/                       │                    │  │   ├── azure_adapter.py          │
 │  │      ├── adapter.py             │                    │  │   ├── ollama_adapter.py         │
 │  │      ├── app.py                │                    │  │   ├── openai_adapter.py         │
-│  │      ├── components/           │                    │  │   └── llm_relation_augmenter.py │
+│  │      ├── components/           │                    │  │   ├── vllm_adapter.py           │
+│  │      │   ├── cards.py          │                    │  │   └── llm_relation_augmenter.py │
 │  │      │   ├── cards.py          │                    │  │                                 │
 │  │      │   ├── charts.py         │                    │  ├── storage/                      │
 │  │      │   ├── evaluate.py       │                    │  │   ├── __init__.py               │
@@ -93,7 +94,8 @@
 │                                   │                    │  ├── tracker/                      │
 │                                   │                    │  │   ├── __init__.py               │
 │                                   │                    │  │   ├── langfuse_adapter.py       │
-│                                   │                    │  │   └── mlflow_adapter.py         │
+│                                   │                    │  │   ├── mlflow_adapter.py         │
+│                                   │                    │  │   └── phoenix_adapter.py        │
 │                                   │                    │  │                                 │
 │                                   │                    │  ├── analysis/                     │
 │                                   │                    │  │   ├── statistical_adapter.py    │

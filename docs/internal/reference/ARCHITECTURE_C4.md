@@ -107,6 +107,7 @@
    - Anthropic: Claude 모델 평가
    - Azure OpenAI: Azure 호스팅 모델
    - Ollama: 로컬 모델 실행
+   - vLLM: 고성능 로컬/서버 모델
 
 2. **추적 시스템 (Tracing Systems)**
    - Langfuse: 평가 실행 추적 및 시각화
@@ -572,6 +573,29 @@
 | `BenchmarkSuite` | benchmark.py | 벤치마크 스위트 |
 | `BenchmarkConfig` | benchmark.py | 벤치마크 설정 |
 
+#### 4.1.8.1 Debug Entities (1 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `DebugReport` | debug.py | 디버그 리포트 |
+
+#### 4.1.8.2 Method Entities (3 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `MethodInput` | method.py | 메서드 입력 데이터 |
+| `MethodOutput` | method.py | 메서드 출력 데이터 |
+| `MethodInputDataset` | method.py | 메서드 입력 데이터셋 |
+
+#### 4.1.8.3 Stage Entities (4 클래스)
+
+| 클래스 | 파일 | 설명 |
+|--------|------|------|
+| `StagePayloadRef` | stage.py | 스테이지 페이로드 참조 |
+| `StageEvent` | stage.py | 스테이지 이벤트 |
+| `StageMetric` | stage.py | 스테이지 메트릭 |
+| `StageSummary` | stage.py | 스테이지 요약 |
+
 #### 4.1.9 Statistical Analysis Entities (27 클래스)
 
 | 클래스 | 파일 | 설명 |
@@ -634,6 +658,19 @@
 | `BasicTestsetGenerator` | testset_generator.py | 기본 테스트셋 생성기 |
 | `KnowledgeGraphTestsetGenerator` | testset_generator.py | 그래프 기반 테스트셋 생성기 |
 | `EmbeddingOverlay` | embedding_overlay.py | Phoenix 임베딩 클러스터 → Domain Memory fact 변환 |
+| `StageMetricService` | stage_metric_service.py | 단계별 메트릭 수집/관리 |
+| `StageSummaryService` | stage_summary_service.py | 단계별 요약 생성 |
+| `StageEventBuilder` | stage_event_builder.py | 스테이지 이벤트 빌드 |
+| `StageMetricGuideService` | stage_metric_guide_service.py | 메트릭 기반 개선 가이드 |
+| `MethodRunner` | method_runner.py | 평가 메서드 실행 |
+| `CacheMetrics` | cache_metrics.py | 캐시 성능 메트릭 관리 |
+| `DatasetPreprocessor` | dataset_preprocessor.py | 데이터셋 전처리 |
+| `DebugReportService` | debug_report_service.py | 디버그 리포트 생성 |
+| `PromptManifest` | prompt_manifest.py | 프롬프트 버전 관리 |
+| `PromptStatus` | prompt_status.py | 프롬프트 상태 추적 |
+| `RetrievalMetrics` | retrieval_metrics.py | 검색 품질 메트릭 계산 |
+| `RetrieverContext` | retriever_context.py | 검색 컨텍스트 관리 |
+| `ThresholdProfiles` | threshold_profiles.py | 메트릭 임계값 관리 |
 
 ---
 
@@ -799,7 +836,9 @@
 | `ThinkingTokenTrackingAsyncAnthropic` | anthropic_adapter.py | Thinking 토큰 추적 |
 | `OllamaAdapter` | ollama_adapter.py | Ollama 어댑터 |
 | `ThinkingTokenTrackingAsyncOpenAI` | ollama_adapter.py | Thinking 토큰 추적 (Ollama) |
+| `vLLMAdapter` | vllm_adapter.py | vLLM 어댑터 |
 | `LLMRelationAugmenter` | llm_relation_augmenter.py | LLM 기반 관계 증강 |
+| `InstructorFactory` | instructor_factory.py | Instructor 구조화 출력 팩토리 |
 
 ---
 
@@ -925,13 +964,16 @@
 
 ---
 
-### 4.15 Adapters Layer - Outbound Other (2 클래스)
+### 4.15 Adapters Layer - Outbound Other (6 클래스)
 
 | 클래스 | 파일 | 설명 |
 |--------|------|------|
 | `SQLiteDomainMemoryAdapter` | sqlite_adapter.py | SQLite 도메인 메모리 어댑터 |
 | `MemoryCacheAdapter` | memory_cache.py | 단순 LRU 캐시 |
 | `HybridCache` | hybrid_cache.py | Hot/Cold 2-tier 캐시 + Prefetch |
+| `NetworkXKGAdapter` | kg/networkx_adapter.py | NetworkX 기반 KG 어댑터 |
+| `GraphRAGRetriever` | kg/graph_rag_retriever.py | Graph-RAG 검색기 |
+| `ParallelKGBuilder` | kg/parallel_kg_builder.py | 병렬 KG 빌더 |
 
 **Observability Helpers**
 - `PhoenixSyncService`, `PhoenixDatasetInfo`, `PhoenixExperimentInfo` (`adapters/outbound/phoenix/sync_service.py`)는 Phoenix dataset/experiment API를 감싸고 CLI `--phoenix-*` 옵션과 함께 사용됩니다.
@@ -1037,7 +1079,7 @@ class DomainLearningHook:
    └─> CSV/JSON/Excel 파일을 Dataset 엔티티로 변환
 
 3. CLI Adapter가 LLM Adapter 생성
-   └─> 설정에 따라 OpenAI/Anthropic/Ollama 선택
+   └─> 설정에 따라 OpenAI/Anthropic/Ollama/vLLM 선택
 
 4. CLI Adapter가 RagasEvaluator.evaluate() 호출
    └─> 도메인 서비스가 평가 실행
@@ -1206,7 +1248,7 @@ Adapters → Ports → Domain
 | **평가 프레임워크** | Ragas 0.4.x |
 | **데이터베이스** | SQLite (기본), PostgreSQL (선택) |
 | **추적 시스템** | Langfuse, Phoenix, MLflow |
-| **LLM API** | OpenAI, Anthropic, Azure OpenAI, Ollama |
+| **LLM API** | OpenAI, Anthropic, Azure OpenAI, Ollama, vLLM |
 | **설정 관리** | Pydantic Settings |
 | **타입 검증** | Python typing, Protocol |
 

@@ -155,8 +155,94 @@ uv run evalvault run data.json \
 
 ---
 
+---
+
+## 재현성 (Reproducibility) 고려사항
+
+### 평가 결과의 변동성
+
+RAGAS 메트릭 평가는 LLM을 사용하므로, 동일한 입력에 대해 결과가 달라질 수 있습니다. 이는 다음과 같은 이유 때문입니다:
+
+1. **LLM의 비결정론적 샘플링**: 대부분의 LLM은 기본적으로 비결정론적으로 동작
+2. **Temperature 설정**: 기본값이 1.0 이상인 경우 변동성 증가
+3. **Seed 설정 부재**: 랜덤 시드가 없으면 매번 다른 결과
+
+### 재현성을 높이는 방법
+
+#### 1. 모델별 설정 (지원하는 경우)
+
+**OpenAI:**
+```python
+# 직접 클라이언트 설정 (Ragas 외부 호출 시)
+client = OpenAI(api_key="...")
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[...],
+    temperature=0.0,  # 재현성 향상
+    seed=42,  # 결정론적 결과
+)
+```
+
+**Ollama:**
+```bash
+# Ollama API 직접 호출 시
+curl http://localhost:11434/api/generate -d '{
+  "model": "gemma3:1b",
+  "prompt": "...",
+  "options": {
+    "temperature": 0.0,
+    "seed": 42
+  }
+}'
+```
+
+**주의사항:**
+- 일부 모델에서는 `temperature=0`이 오류를 발생시킬 수 있음
+- RAGAS 메트릭이 InstructorLLM을 통해 호출하므로, 직접 설정이 적용되지 않을 수 있음
+- 모델별 API 명세를 확인하여 지원 여부 확인 필요
+
+#### 2. 결과 비교 시 주의사항
+
+동일한 데이터셋을 여러 번 평가할 때:
+
+- **점수 차이**: ±0.05 (5%) 이내는 정상 범위로 간주
+- **상대적 순서**: 개별 점수보다는 전체적인 순서가 일관되는지 확인
+- **평균 점수**: 여러 실행의 평균을 사용하여 변동성 완화
+
+#### 3. 재현 가능한 평가를 위한 권장사항
+
+1. **동일 환경 사용**
+   - 같은 Python/ragas 버전
+   - 같은 모델 및 설정
+   - 같은 데이터셋
+
+2. **결과 문서화**
+   - 사용한 모델 및 버전 기록
+   - 평가 시점 기록
+   - 환경 정보 기록
+
+3. **여러 실행 평균**
+   - 중요한 평가는 3회 이상 실행
+   - 평균 점수 사용
+   - 표준편차 기록
+
+### 모델별 지원 현황
+
+| 모델 | Temperature | Seed | 비고 |
+|------|-------------|------|------|
+| OpenAI | ✅ | ✅ | 완전 지원 |
+| Anthropic | ✅ | ⚠️ | Seed 제한적 |
+| Ollama | ✅ | ✅ | 모델별 차이 |
+| vLLM | ✅ | ✅ | 완전 지원 |
+| Azure | ✅ | ✅ | OpenAI와 동일 |
+
+**참고:** RAGAS 메트릭 평가는 InstructorLLM을 통해 내부적으로 처리되므로, 직접 설정한 파라미터가 항상 적용되는 것은 아닙니다. 재현성이 중요한 경우, 여러 실행의 평균을 사용하거나 모델별 API를 직접 호출하는 것을 고려하세요.
+
+---
+
 ## 참고
 
 - 병렬 실행 로직: `src/evalvault/domain/services/batch_executor.py`
 - 적응형 배치 실행기: `src/evalvault/domain/services/async_batch_executor.py`
 - 평가 핵심 루프: `src/evalvault/domain/services/evaluator.py`
+- 재현성 분석: `docs/internal/reports/TEMPERATURE_SEED_ANALYSIS.md`

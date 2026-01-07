@@ -4,6 +4,14 @@
 
 이 문서는 EvalVault 프로젝트의 모든 클래스를 체계적으로 분류하고 정리한 카탈로그입니다. 각 클래스의 역할, 책임, 그리고 아키텍처 관점에서의 위치를 명확히 정의합니다.
 
+## 📚 관련 문서
+
+| 문서 | 역할 |
+|------|------|
+| [PROJECT_MAP.md](./PROJECT_MAP.md) | 데이터 흐름 Mermaid 다이어그램 포함 |
+| [ARCHITECTURE_C4.md](./ARCHITECTURE_C4.md) | C4 Model 기반 아키텍처 |
+| [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) | 개발 환경 및 가이드 |
+
 ---
 
 ## 목차
@@ -121,6 +129,20 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | `BenchmarkResult` | `benchmark.py` | 벤치마크 결과 | Aggregate |
 | `BenchmarkSuite` | `benchmark.py` | 벤치마크 스위트 | Aggregate Root |
 | `BenchmarkConfig` | `benchmark.py` | 벤치마크 설정 | Value Object |
+| `DebugReport` | `debug.py` | 디버그 리포트 | Entity |
+| `MethodInput` | `method.py` | 메서드 입력 데이터 | Value Object |
+| `MethodOutput` | `method.py` | 메서드 출력 데이터 | Value Object |
+| `MethodInputDataset` | `method.py` | 메서드 입력 데이터셋 | Aggregate |
+| `RAGTraceData` | `rag_trace.py` | RAG 추적 데이터 | Aggregate Root |
+| `RetrievalData` | `rag_trace.py` | 검색 데이터 | Entity |
+| `GenerationData` | `rag_trace.py` | 생성 데이터 | Entity |
+| `RetrievedDocument` | `rag_trace.py` | 검색된 문서 | Value Object |
+| `RetrievalMethod` | `rag_trace.py` | 검색 방법 열거형 | Value Object |
+| `RerankMethod` | `rag_trace.py` | 재순위 방법 열거형 | Value Object |
+| `StageEvent` | `stage.py` | 스테이지 이벤트 | Entity |
+| `StageMetric` | `stage.py` | 스테이지 메트릭 | Entity |
+| `StageSummary` | `stage.py` | 스테이지 요약 | Aggregate |
+| `StagePayloadRef` | `stage.py` | 스테이지 페이로드 참조 | Value Object |
 
 #### 2.1.2 Domain Services (도메인 서비스)
 
@@ -159,6 +181,24 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | `MemoryBasedAnalysis` | `memory_based_analysis.py` | 메모리 기반 분석 | Domain Memory를 활용한 트렌드 분석 및 행동 패턴 재사용 |
 | `AsyncBatchExecutor` | `async_batch_executor.py` | 비동기 배치 실행기 | 적응형 배치 크기 조절, 레이트 리밋 처리, 재시도 메커니즘 |
 | `BatchExecutor` | `batch_executor.py` | 배치 실행기 | 동기 배치 처리 |
+| `ExperimentComparator` | `experiment_comparator.py` | 실험 비교기 | 실험 결과 비교 분석 |
+| `ExperimentStatisticsCalculator` | `experiment_statistics.py` | 실험 통계 계산기 | 실험 통계 계산 |
+| `ExperimentReportGenerator` | `experiment_reporter.py` | 실험 리포트 생성기 | 실험 비교 리포트 생성 |
+| `ExperimentRepository` | `experiment_repository.py` | 실험 저장소 | 실험 데이터 영속화 |
+| `MethodRunner` | `method_runner.py` | 메서드 실행기 | 평가 메서드 실행 |
+| `StageMetricService` | `stage_metric_service.py` | 스테이지 메트릭 서비스 | 단계별 메트릭 수집/관리 |
+| `StageSummaryService` | `stage_summary_service.py` | 스테이지 요약 서비스 | 단계별 요약 생성 |
+| `StageEventBuilder` | `stage_event_builder.py` | 스테이지 이벤트 빌더 | 스테이지 이벤트 생성 |
+| `StageMetricGuideService` | `stage_metric_guide_service.py` | 스테이지 메트릭 가이드 서비스 | 메트릭 기반 개선 가이드 |
+| `EmbeddingOverlay` | `embedding_overlay.py` | 임베딩 오버레이 | 임베딩 레이어 관리 |
+| `CacheMetrics` | `cache_metrics.py` | 캐시 메트릭 | 캐시 성능 메트릭 관리 |
+| `DatasetPreprocessor` | `dataset_preprocessor.py` | 데이터셋 전처리기 | 데이터셋 정규화/전처리 |
+| `DebugReportService` | `debug_report_service.py` | 디버그 리포트 서비스 | 디버그 리포트 생성 |
+| `PromptManifest` | `prompt_manifest.py` | 프롬프트 매니페스트 | 프롬프트 버전 관리 |
+| `PromptStatus` | `prompt_status.py` | 프롬프트 상태 | 프롬프트 상태 추적 |
+| `RetrievalMetrics` | `retrieval_metrics.py` | 검색 메트릭 | 검색 품질 메트릭 계산 |
+| `RetrieverContext` | `retriever_context.py` | 검색기 컨텍스트 | 검색 컨텍스트 관리 |
+| `ThresholdProfiles` | `threshold_profiles.py` | 임계값 프로파일 | 메트릭 임계값 관리 |
 
 ### 2.2 Ports Layer (포트 계층)
 
@@ -190,9 +230,9 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | 클래스명 | 파일 | 역할 | 구현 어댑터 |
 |---------|------|------|------------|
 | `DatasetPort` | `dataset_port.py` | 데이터셋 로딩 인터페이스 | `JSONDatasetLoader`, `CSVDatasetLoader`, `ExcelDatasetLoader` |
-| `LLMPort` | `llm_port.py` | LLM 인터페이스 | `OpenAIAdapter`, `AnthropicAdapter`, `OllamaAdapter`, `AzureOpenAIAdapter` |
+| `LLMPort` | `llm_port.py` | LLM 인터페이스 | `OpenAIAdapter`, `AnthropicAdapter`, `OllamaAdapter`, `AzureOpenAIAdapter`, `vLLMAdapter` |
 | `StoragePort` | `storage_port.py` | 저장소 인터페이스 | `SQLiteStorageAdapter`, `PostgreSQLStorageAdapter` |
-| `TrackerPort` | `tracker_port.py` | 추적 인터페이스 | `LangfuseAdapter`, `MLflowAdapter` |
+| `TrackerPort` | `tracker_port.py` | 추적 인터페이스 | `LangfuseAdapter`, `MLflowAdapter`, `PhoenixAdapter` |
 | `AnalysisPort` | `analysis_port.py` | 분석 인터페이스 | `StatisticalAnalysisAdapter`, `NLPAnalysisAdapter`, `CausalAnalysisAdapter` |
 | `AnalysisModulePort` | `analysis_module_port.py` | 분석 모듈 인터페이스 | `BaseAnalysisModule` 구현체들 |
 | `AnalysisCachePort` | `analysis_cache_port.py` | 분석 캐시 인터페이스 | `MemoryCacheAdapter` |
@@ -218,6 +258,9 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | `RelationAugmenterPort` | `relation_augmenter_port.py` | 관계 보강 인터페이스 | `LLMRelationAugmenter` |
 | `IntentClassifierPort` | `intent_classifier_port.py` | 의도 분류기 인터페이스 | `KeywordIntentClassifier` |
 | `IntentClassificationResult` | `intent_classifier_port.py` | 의도 분류 결과 데이터 모델 | - |
+| `TracerPort` | `tracer_port.py` | 추적 인터페이스 (Langfuse) | `LangfuseTracerAdapter` |
+| `MethodPort` | `method_port.py` | 메서드 실행 인터페이스 | `MethodRunner` |
+| `StageStoragePort` | `stage_storage_port.py` | 스테이지 저장소 인터페이스 | `StageStorageAdapter` |
 | `ThinkingConfig` | `llm_port.py` | 사고 설정 데이터 모델 | - |
 
 ### 2.3 Adapters Layer (어댑터 계층)
@@ -292,7 +335,9 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | `AnthropicAdapter` | `llm/anthropic_adapter.py` | Anthropic API 어댑터 |
 | `OllamaAdapter` | `llm/ollama_adapter.py` | Ollama API 어댑터 |
 | `AzureOpenAIAdapter` | `llm/azure_adapter.py` | Azure OpenAI API 어댑터 |
+| `vLLMAdapter` | `llm/vllm_adapter.py` | vLLM API 어댑터 |
 | `LLMRelationAugmenter` | `llm/llm_relation_augmenter.py` | LLM 기반 관계 보강기 |
+| `InstructorFactory` | `llm/instructor_factory.py` | Instructor 기반 구조화된 출력 팩토리 |
 | `TokenTrackingAsyncOpenAI` | `llm/openai_adapter.py` | 토큰 추적 OpenAI 래퍼 |
 | `ThinkingTokenTrackingAsyncOpenAI` | `llm/token_aware_chat.py` | Ollama용 토큰 추적 OpenAI 클라이언트 |
 | `ThinkingTokenTrackingAsyncAnthropic` | `llm/anthropic_adapter.py` | 사고 토큰 추적 Anthropic 래퍼 |
@@ -314,6 +359,7 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 |---------|------|------|
 | `LangfuseAdapter` | `tracker/langfuse_adapter.py` | Langfuse 추적 어댑터 |
 | `MLflowAdapter` | `tracker/mlflow_adapter.py` | MLflow 추적 어댑터 |
+| `PhoenixAdapter` | `tracker/phoenix_adapter.py` | Phoenix 추적 어댑터 |
 
 ##### Analysis Adapters
 
@@ -396,6 +442,15 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 | 클래스명 | 파일 | 역할 |
 |---------|------|------|
 | `SQLiteDomainMemoryAdapter` | `domain_memory/sqlite_adapter.py` | SQLite 도메인 메모리 어댑터 |
+
+##### Knowledge Graph Adapters
+
+| 클래스명 | 파일 | 역할 |
+|---------|------|------|
+| `NetworkXKGAdapter` | `kg/networkx_adapter.py` | NetworkX 기반 KG 어댑터 |
+| `GraphRAGRetriever` | `kg/graph_rag_retriever.py` | Graph-RAG 검색기 |
+| `ParallelKGBuilder` | `kg/parallel_kg_builder.py` | 병렬 KG 빌더 |
+| `QueryStrategies` | `kg/query_strategies.py` | KG 쿼리 전략 |
 
 ---
 

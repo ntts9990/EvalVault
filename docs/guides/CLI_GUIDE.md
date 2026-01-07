@@ -65,6 +65,7 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 - Web UI(Evaluation Studio/Reports)도 동일한 모드 토글/Pill을 사용해 UI와 CLI가 같은 메타데이터(`tracker_metadata.run_mode`)를 공유합니다.
 
 - 임계값은 데이터셋 `thresholds`(없으면 0.7 기본값)를 사용하며, Domain Memory 또는 API 요청에서만 오버라이드됩니다.
+- `--threshold-profile summary|qa`로 요약/QA 권장 임계값을 선택 적용할 수 있습니다(선택된 메트릭에만 덮어쓰기).
 - Domain Memory 연동:
   - `--use-domain-memory`: 학습된 신뢰도로 임계값을 자동 보정합니다.
   - `--memory-domain` / `--memory-language`: 도메인·언어를 강제 지정합니다.
@@ -99,6 +100,14 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 예시:
 
 ```bash
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --summary \
+  --threshold-profile summary
+
+uv run evalvault run tests/fixtures/e2e/summary_eval_minimal.json \
+  --metrics faithfulness,answer_relevancy \
+  --threshold-profile qa
+
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --retriever hybrid \
   --retriever-docs tests/fixtures/e2e/graphrag_retriever_docs.json \
