@@ -582,7 +582,7 @@ class LLMReportGenerator:
         metrics_to_analyze: list[str] | None = None,
         thresholds: dict[str, float] | None = None,
     ) -> LLMReport:
-        """동기 방식 보고서 생성 (Streamlit 호환)."""
+        """동기 방식 보고서 생성."""
         return asyncio.run(
             self.generate_report(
                 run,

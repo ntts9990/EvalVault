@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import importlib
-from typing import Final
 
 _KIWI_STATE: tuple[bool, str] | None = None
 _BM25_STATE: tuple[bool, str] | None = None
-_WEB_STATE: tuple[bool, str] | None = None
 _SKLEARN_STATE: tuple[bool, str] | None = None
-
-_WEB_REQUIRED_MODULES: Final[tuple[str, ...]] = ("streamlit", "plotly", "pandas")
 
 
 def _module_available(module_name: str) -> bool:
@@ -52,18 +48,6 @@ def rank_bm25_ready() -> tuple[bool, str]:
     return _BM25_STATE
 
 
-def web_ready() -> tuple[bool, str]:
-    """Check if web UI optional dependencies are installed."""
-    global _WEB_STATE
-    if _WEB_STATE is not None:
-        return _WEB_STATE
-
-    missing = [name for name in _WEB_REQUIRED_MODULES if not _module_available(name)]
-    _WEB_STATE = (False, f"web deps missing: {', '.join(missing)}") if missing else (True, "")
-
-    return _WEB_STATE
-
-
 def sklearn_ready() -> tuple[bool, str]:
     """Check if scikit-learn is installed."""
     global _SKLEARN_STATE
@@ -76,12 +60,3 @@ def sklearn_ready() -> tuple[bool, str]:
         _SKLEARN_STATE = (False, "scikit-learn not installed")
 
     return _SKLEARN_STATE
-
-
-def skip_if_missing_web() -> None:
-    ok, reason = web_ready()
-    if ok:
-        return
-    import pytest
-
-    pytest.skip(reason, allow_module_level=True)

@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from evalvault.adapters.inbound.web.adapter import WebUIAdapter, create_adapter
+from evalvault.adapters.inbound.api.adapter import WebUIAdapter, create_adapter
 from evalvault.config.settings import get_settings
 
 

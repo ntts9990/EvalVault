@@ -80,7 +80,7 @@ dev = [
     "ruff",
     "pydeps>=3.0.1",
     "python-multipart",
-    # Full feature extras (analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs)
+    # Full feature extras (analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs)
     "scikit-learn>=1.8.0",
     "anthropic",
     "langchain-anthropic",
@@ -94,9 +94,6 @@ dev = [
     "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
     "rank-bm25>=0.2.2",               # BM25 검색
     "sentence-transformers>=5.2.0",
-    "streamlit>=1.40.0",
-    "plotly>=5.18.0",
-    "watchdog>=3.0.0",                # Hot reload for Streamlit
     "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)
     "ijson>=3.3.0",                   # JSON 스트리밍 파싱 (대용량 데이터셋)
     "mkdocs>=1.5.0",
@@ -135,12 +132,6 @@ korean = [
     "rank-bm25>=0.2.2",               # BM25 검색
     "sentence-transformers>=5.2.0",
 ]
-web = [
-    "streamlit>=1.40.0",
-    "plotly>=5.18.0",
-    "watchdog>=3.0.0",                # Hot reload for Streamlit
-    "python-multipart",
-]
 perf = [
     "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)
     "ijson>=3.3.0",                   # JSON 스트리밍 파싱 (대용량 데이터셋)
@@ -148,7 +139,6 @@ perf = [
 
 [project.scripts]
 evalvault = "evalvault.adapters.inbound.cli:app"
-evalvault-web = "evalvault.adapters.inbound.web.app:main"
 
 [build-system]
 requires = ["hatchling"]

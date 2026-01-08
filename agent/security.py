@@ -60,7 +60,6 @@ ALLOWED_COMMANDS = {
     "init.sh",
     # Testing tools
     "ruff",
-    "streamlit",
     "coverage",
     # Misc
     "echo",
