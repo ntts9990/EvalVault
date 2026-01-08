@@ -65,7 +65,6 @@ docs/
 | [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
 | [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
 | [guides/RELEASE_CHECKLIST.md](guides/RELEASE_CHECKLIST.md) | 운영/개발 | 배포 체크리스트, 릴리즈 노트 템플릿 |
-| [guides/STREAMLIT_UI.md](guides/STREAMLIT_UI.md) | 참고 | Streamlit UI(레거시) 간단 미리보기 |
 
 ### 튜토리얼
 

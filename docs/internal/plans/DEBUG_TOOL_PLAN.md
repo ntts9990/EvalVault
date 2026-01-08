@@ -225,7 +225,7 @@ class DebugReportService:
 
 ### 수정 금지 영역
 
-- `adapters/inbound/web/` (P2.2 작업 중)
+- `adapters/inbound/api/` (P2.2 작업 중)
 - `domain/services/evaluator.py` (P3 작업 중)
 - `adapters/inbound/cli/commands/run.py` (P4.1 작업 중)
 - `tests/` (P5 작업 중, 읽기만)

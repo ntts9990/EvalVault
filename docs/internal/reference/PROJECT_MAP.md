@@ -34,7 +34,7 @@
 
 **핵심 가치:**
 - ✅ **표준화된 평가**: Ragas 기반 메트릭으로 일관된 평가
-- ✅ **다양한 인터페이스**: CLI, Web UI(React + FastAPI), Streamlit
+- ✅ **다양한 인터페이스**: CLI, Web UI(React + FastAPI)
 - ✅ **확장 가능한 아키텍처**: Hexagonal Architecture 기반
 - ✅ **지속적 학습**: Domain Memory를 통한 평가 결과 축적 및 활용
 - ✅ **한국어 최적화**: 한국어 RAG 평가 특화 기능
@@ -46,7 +46,6 @@
 | **언어** | Python 3.12+ |
 | **CLI** | Typer |
 | **Web UI** | React (Vite) + FastAPI |
-| **Streamlit UI** | Streamlit (옵션) |
 | **평가 프레임워크** | Ragas 0.4.x |
 | **데이터베이스** | SQLite (기본), PostgreSQL (선택) |
 | **추적 시스템** | Langfuse, Phoenix, MLflow |
@@ -325,11 +324,8 @@ adapters/inbound/cli/
 adapters/inbound/
 ├── api/                         # FastAPI
 │   ├── main.py                 # FastAPI 앱
+│   ├── adapter.py              # WebUIAdapter
 │   └── routers/                # API 라우터
-└── web/                         # Streamlit
-    ├── adapter.py              # WebUIAdapter
-    ├── app.py                  # Streamlit 앱
-    └── components/             # UI 컴포넌트
 ```
 
 #### 3.3.2 Outbound Adapters (출력 어댑터)
@@ -518,7 +514,7 @@ adapters/outbound/domain_memory/
 ```mermaid
 flowchart TD
     Start([사용자 입력<br/>CLI/Web]) --> CLI[CLI Adapter<br/>adapters/inbound/cli/commands/run.py]
-    Start --> Web[Web Adapter<br/>adapters/inbound/web/adapter.py]
+    Start --> Web[Web Adapter<br/>adapters/inbound/api/adapter.py]
 
     CLI --> Parse[명령 파싱 및 검증]
     Web --> Parse
@@ -638,7 +634,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     Start([사용자 쿼리<br/>요약해줘/비교해줘 등]) --> CLI[CLI Adapter<br/>adapters/inbound/cli/commands/pipeline.py]
-    Start --> Web[Web Adapter<br/>adapters/inbound/web/adapter.py]
+    Start --> Web[Web Adapter<br/>adapters/inbound/api/adapter.py]
 
     CLI --> PipelineOrch[PipelineOrchestrator<br/>domain/services/pipeline_orchestrator.py]
     Web --> PipelineOrch

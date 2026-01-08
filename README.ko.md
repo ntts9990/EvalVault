@@ -1,6 +1,6 @@
 # EvalVault (한국어)
 
-> RAG(Retrieval-Augmented Generation) 시스템 평가 자동화를 위한 CLI + Web UI 도구
+> RAG(Retrieval-Augmented Generation) 시스템의 **품질 측정 · 관측 · 개선**을 한 번에 처리하는 평가 플랫폼
 
 [![PyPI](https://img.shields.io/pypi/v/evalvault.svg)](https://pypi.org/project/evalvault/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -11,7 +11,21 @@ English version? See the [root README](README.md).
 
 ---
 
-## 가장 빠르게 Ragas 결과 보는 방법 (Web -> CLI)
+## EvalVault 한눈에 보기
+
+EvalVault의 목표는 **“RAG 시스템의 품질을 데이터셋/메트릭/트레이싱 관점에서 일관되게 관리하는 운영 콘솔”**입니다.
+단순 점수 계산기가 아니라, 아래 네 가지 축을 모두 다룹니다.
+
+- **평가(Evaluation)**: 데이터셋 기반으로 다양한 LLM/리트리버/프롬프트 조합을 실험하고 점수/threshold 관리
+- **관측(Observability)**: Stage 단위 이벤트와 메트릭, Langfuse/Phoenix 트레이스를 한 Run ID로 연결
+- **학습(Domain Memory)**: 과거 실행으로부터 도메인 지식/패턴을 축적해 threshold, 컨텍스트, 리포트를 자동 보정
+- **분석(Analysis Pipelines)**: 통계·NLP·인과 모듈이 포함된 DAG 파이프라인으로 결과를 다각도로 해석
+
+EvalVault는 **RAGAS 메트릭과 도메인 맞춤형 메트릭, KG/GraphRAG, Stage-level 트레이싱, 분석 파이프라인까지 아우르는 평가/분석 허브**를 지향합니다.
+
+---
+
+## 가장 빠르게 Web + CLI로 시작하기
 
 **Web (React + FastAPI)**
 ```bash
@@ -24,8 +38,6 @@ npm run dev
 ```
 브라우저에서 `http://localhost:5173`에 접속한 뒤 Evaluation Studio에서 평가를 실행하고
 Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `tests/fixtures/e2e/insurance_qa_korean.json` 업로드)
-
-> Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시로 유지되며 점진적 페이드아웃 예정입니다.
 
 **CLI (터미널)**
 ```bash
@@ -106,27 +118,31 @@ uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
 
 ---
 
-## 개요
+## 왜 EvalVault인가?
 
-EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 **FastAPI + React Web UI**를 제공하여 RAG 품질을 일관되게 측정하고 저장합니다. OpenAI, Ollama, Azure, Anthropic 등 프로필 기반으로 모델을 교체할 수 있으며, Langfuse · Phoenix · Domain Memory · DAG 분석 파이프라인을 통해 추적 및 개선 업무를 자동화합니다.
+**우리가 풀고 싶은 문제**
 
-**주요 특징**
-- Typer CLI 한 번으로 평가/비교/내보내기/저장 실행
-- OpenAI/Ollama/vLLM/폐쇄망을 아우르는 프로필 기반 모델 구성
-- **FastAPI + React Web UI**에서 Evaluation Studio/Analysis Lab 결과 저장 및 재조회
-- Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
-- Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
-- 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
+- “모델/프롬프트/리트리버를 바꿨을 때 **정말 좋아진 건지** 수치로 설명하기 어렵다.”
+- LLM 로그, 검색 로그, 트레이스가 여러 곳에 흩어져 있고 **한 눈에 병목·품질 이슈를 잡기 힘들다.**
+- 팀/프로젝트마다 ad-hoc 스크립트가 늘어나 **재현성과 회귀 테스트가 깨지기 쉽다.**
 
-**현재 상태**
-- Web UI 보고서는 기본/상세 템플릿과 LLM 분석에 집중하며, 비교 템플릿은 개발 중입니다.
-- Domain Memory 인사이트는 CLI 우선이며, Web UI 패널은 예정되어 있습니다.
+EvalVault는 이 문제를 위해 다음과 같은 축으로 설계되었습니다.
 
-**개선 필요**
-- Web UI에서 GraphRAG/`--kg` 입력과 KG 파일 검증 흐름 추가
-- `kg build`/Web UI 산출물과 `--kg` 로더 포맷 통일
-- Knowledge Base의 KG 통계/파일 목록/문서 매핑 UI 보강
-- `doc_id` 정합성 검증 및 자동 매핑 도구 제공
+- **데이터셋 중심 평가**
+  - JSON/CSV/XLSX 데이터셋에 메트릭/threshold/도메인 정보를 함께 정의
+  - 동일 데이터셋으로 모델/리트리버/프롬프트 실험을 반복 가능하게 관리
+- **LLM/리트리버 프로필 시스템**
+  - OpenAI, Ollama, vLLM, Azure, Anthropic 등을 `config/models.yaml` 프로필로 선언
+  - 로컬/클라우드/폐쇄망 환경 간에도 동일한 CLI·Web 흐름 유지
+- **Stage 단위 트레이싱 & 디버깅**
+  - `StageEvent`/`StageMetric`/DebugReport로 입력 → 검색 → 리랭크 → 최종 답변까지 단계별로 기록
+  - Langfuse·Phoenix 트레이서와 연동해 외부 관측 시스템과 바로 연결
+- **Domain Memory & 분석 파이프라인**
+  - 과거 실행에서 fact/behavior를 추출해 threshold 튜닝, 컨텍스트 보강, 개선 가이드 자동화
+  - 통계·NLP·인과 분석 모듈이 포함된 DAG 파이프라인으로 성능 저하 원인 추적
+- **Web UI + CLI 일관성**
+  - Typer CLI와 **FastAPI + React Web UI**가 동일한 DB/트레이스 위에서 동작
+  - 로컬 실험 → 팀 공유 → CI/CD 게이트까지 하나의 도구 체인으로 연결
 
 상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](docs/guides/USER_GUIDE.md)를 참고하세요.
 
@@ -146,7 +162,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-`dev`는 analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs를 포함합니다. 필요하면 extras로 확장합니다.
+`dev`는 analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs를 포함합니다. 필요하면 extras로 확장합니다.
 
 | Extra | 패키지 | 용도 |
 |-------|--------|------|
@@ -157,7 +173,6 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
-| `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
 | `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
@@ -221,7 +236,6 @@ uv sync --extra dev
    npm run dev
    ```
    브라우저에서 `http://localhost:5173`를 열어 확인합니다.
-   참고: Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시입니다.
 
 3. **평가 실행**
    ```bash
@@ -238,7 +252,7 @@ uv sync --extra dev
    uv run evalvault history --db data/db/evalvault.db
    ```
 
-Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [USER_GUIDE.md](docs/guides/USER_GUIDE.md)에 정리되어 있습니다.
+Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Prompt snapshot(System/Ragas), Streaming dataset 처리 등 고급 시나리오는 [USER_GUIDE.md](docs/guides/USER_GUIDE.md)에 정리되어 있습니다.
 
 ---
 
@@ -269,18 +283,26 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 ---
 
-## 지원 메트릭 (Ragas 0.4.x)
+## 지원 메트릭
+
+EvalVault는 RAG 평가에 널리 쓰이는 Ragas 0.4.x 계열 메트릭을 기본으로 제공하면서,
+도메인 특화 메트릭과 Stage-level 메트릭을 함께 다루도록 설계되어 있습니다.
 
 | 메트릭 | 설명 |
 |--------|------|
-| `faithfulness` | 답변이 제공된 컨텍스트에 충실한 정도 |
-| `answer_relevancy` | 답변이 질문과 관련있는 정도 |
-| `context_precision` | 검색된 컨텍스트의 정밀도 |
-| `context_recall` | 필요한 정보가 검색되었는지 여부 |
+| `faithfulness` | 답변이 제공된 컨텍스트에 얼마나 충실한지 |
+| `answer_relevancy` | 답변이 질문 의도와 얼마나 잘 맞는지 |
+| `context_precision` | 검색된 컨텍스트가 얼마나 불필요한 내용을 적게 포함하는지 |
+| `context_recall` | 필요한 정보가 컨텍스트에 충분히 포함되었는지 |
 | `factual_correctness` | ground_truth 대비 사실적 정확성 |
 | `semantic_similarity` | 답변과 ground_truth 간 의미적 유사도 |
+| `insurance_term_accuracy` | 보험 도메인 용어 정합성 (예시 도메인 메트릭) |
 
-커스텀 메트릭 예시: `insurance_term_accuracy` (보험 용어 정확도).
+또한 `StageMetricService`를 통해 다음과 같은 **파이프라인 단계 메트릭**을 함께 다룹니다.
+
+- `retrieval.precision_at_k`, `retrieval.recall_at_k`, `retrieval.result_count`, `retrieval.latency_ms`
+- `rerank.keep_rate`, `rerank.avg_score`, `rerank.latency_ms`
+- `output.citation_count`, `output.token_ratio`, `input.query_length` 등
 
 ---
 

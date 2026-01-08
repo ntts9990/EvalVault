@@ -21,7 +21,6 @@ uv sync --extra dev
 - `--extra mlflow`: MLflow tracker
 - `--extra phoenix`: Phoenix 트레이싱
 - `--extra docs`: MkDocs 문서 빌드
-- `--extra web`: Streamlit Web UI (레거시/미리보기)
 - `--extra anthropic`: Anthropic LLM 어댑터
 - `--extra perf`: FAISS/JSON 스트리밍 등 성능 보조
 

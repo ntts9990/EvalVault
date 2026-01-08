@@ -283,33 +283,9 @@ EvalVault는 다음 아키텍처 원칙을 따릅니다:
 
 | 클래스명 | 파일 | 역할 |
 |---------|------|------|
-| `WebUIAdapter` | `web/adapter.py` | FastAPI 기반 Web API 어댑터 |
-| `GateResult` | `web/adapter.py` | 게이트 결과 데이터 모델 |
-| `GateReport` | `web/adapter.py` | 게이트 보고서 데이터 모델 |
-| `WebSession` | `web/session.py` | 웹 세션 데이터 모델 |
-| `EvaluationConfig` | `web/components/evaluate.py` | 평가 설정 데이터 모델 |
-| `EvaluationResult` | `web/components/evaluate.py` | 평가 결과 데이터 모델 |
-| `EvaluationProgress` | `web/components/progress.py` | 평가 진행 상황 데이터 모델 |
-| `ProgressStep` | `web/components/progress.py` | 진행 단계 데이터 모델 |
-| `DashboardStats` | `web/components/stats.py` | 대시보드 통계 데이터 모델 |
-| `MetricSummaryCard` | `web/components/cards.py` | 메트릭 요약 카드 데이터 모델 |
-| `StatCard` | `web/components/cards.py` | 통계 카드 데이터 모델 |
-| `RecentRunsList` | `web/components/lists.py` | 최근 실행 목록 데이터 모델 |
-| `RunFilter` | `web/components/history.py` | 실행 필터 데이터 모델 |
-| `RunTable` | `web/components/history.py` | 실행 테이블 데이터 모델 |
-| `RunDetailPanel` | `web/components/history.py` | 실행 상세 패널 데이터 모델 |
-| `HistoryExporter` | `web/components/history.py` | 히스토리 내보내기 데이터 모델 |
-| `RunSearch` | `web/components/history.py` | 실행 검색 데이터 모델 |
-| `FileUploadHandler` | `web/components/upload.py` | 파일 업로드 핸들러 |
-| `ValidationResult` | `web/components/upload.py` | 검증 결과 데이터 모델 |
-| `MetricSelector` | `web/components/metrics.py` | 메트릭 선택기 |
-| `ReportConfig` | `web/components/reports.py` | 보고서 설정 데이터 모델 |
-| `ReportResult` | `web/components/reports.py` | 보고서 결과 데이터 모델 |
-| `ReportTemplate` | `web/components/reports.py` | 보고서 템플릿 데이터 모델 |
-| `ReportGenerator` | `web/components/reports.py` | 보고서 생성기 |
-| `ReportDownloader` | `web/components/reports.py` | 보고서 다운로더 |
-| `RunSelector` | `web/components/reports.py` | 실행 선택기 |
-| `ReportPreview` | `web/components/reports.py` | 보고서 미리보기 |
+| `WebUIAdapter` | `api/adapter.py` | FastAPI 기반 Web API 어댑터 |
+| `GateResult` | `api/adapter.py` | 게이트 결과 데이터 모델 |
+| `GateReport` | `api/adapter.py` | 게이트 보고서 데이터 모델 |
 
 #### 2.3.2 Outbound Adapters (출력 어댑터)
 
@@ -769,7 +745,7 @@ DDD는 **Entities**, **Value Objects**, **Aggregates**, **Domain Services**, **R
 | 클래스명 | 패키지 | 책임 | 의존성 |
 |---------|--------|------|--------|
 | CLI 명령어들 | `adapters.inbound.cli.commands` | CLI 명령어 구현 | `EvaluatorPort`, `AnalysisPipelinePort` 등 |
-| `WebUIAdapter` | `adapters.inbound.web.adapter` | FastAPI Web API | `WebUIPort` |
+| `WebUIAdapter` | `adapters.inbound.api.adapter` | FastAPI Web API | `WebUIPort` |
 
 #### 7.4.2 Outbound Adapters (출력 어댑터)
 

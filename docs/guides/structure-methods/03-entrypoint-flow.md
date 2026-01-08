@@ -66,6 +66,6 @@ sequenceDiagram
 ## EvalVault 적용 포인트
 
 - `src/evalvault/adapters/inbound/cli`
-- `src/evalvault/adapters/inbound/web`
+- `src/evalvault/adapters/inbound/api`
 - `src/evalvault/domain/services`
 - `src/evalvault/ports/outbound`

@@ -481,7 +481,7 @@ Context Recall ──→ Faithfulness ──→ Factual Correctness
 - [ ] P0 메트릭 4종 파이프라인 구현
 - [ ] Claim 분해 로직 구현 (LLM 기반)
 - [ ] 플래그 자동 부착 시스템 구축
-- [ ] 리뷰 큐 인터페이스 구축 (간단한 스프레드시트 또는 Streamlit)
+- [ ] 리뷰 큐 인터페이스 구축 (간단한 스프레드시트 또는 Web UI)
 
 ### 9.2 Phase 2: 평가 실행 (2주 ~ 4주)
 

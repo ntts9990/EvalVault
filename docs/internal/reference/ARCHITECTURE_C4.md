@@ -1244,7 +1244,7 @@ Adapters → Ports → Domain
 |------|------|
 | **언어** | Python 3.12+ |
 | **CLI 프레임워크** | Typer |
-| **Web UI** | React + FastAPI (메인) + Streamlit(옵션) |
+| **Web UI** | React + FastAPI |
 | **평가 프레임워크** | Ragas 0.4.x |
 | **데이터베이스** | SQLite (기본), PostgreSQL (선택) |
 | **추적 시스템** | Langfuse, Phoenix, MLflow |

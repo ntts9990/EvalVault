@@ -194,9 +194,6 @@ nav:
       - Qwen3 Embedding Integration: internal/archive/QWEN3_EMBEDDING_INTEGRATION.md
       - RAG Performance Data Strategy Final: internal/archive/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md
       - Ticket Streamlit Prompt Preview: internal/archive/TICKET_STREAMLIT_PROMPT_PREVIEW.md
-  - Legacy:
-    - Streamlit UI (Legacy): guides/STREAMLIT_UI.md
-
 extra:
   social:
     - icon: fontawesome/brands/github

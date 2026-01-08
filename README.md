@@ -1,6 +1,6 @@
 # EvalVault
 
-> Evaluation tooling for Retrieval-Augmented Generation (RAG) systems.
+> A full-stack evaluation & observability platform for Retrieval-Augmented Generation (RAG) systems.
 
 [![PyPI](https://img.shields.io/pypi/v/evalvault.svg)](https://pypi.org/project/evalvault/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -11,7 +11,22 @@ Prefer Korean docs? Read the [한국어 README](README.ko.md).
 
 ---
 
-## Fastest Way to See Ragas Results (Web -> CLI)
+## What is EvalVault?
+
+EvalVault aims to be **“the operations console where you can measure, compare, trace, and improve RAG systems in one place.”**
+It is not just a scoring script, but a full **evaluation, observability, and analysis layer** for RAG workloads.
+
+- **Dataset‑centric evaluation**: datasets carry metrics, thresholds, and domain knowledge together
+- **Decoupled retrievers/LLMs/profiles**: switch OpenAI, Ollama, vLLM, Azure, Anthropic via `config/models.yaml` profiles
+- **Stage‑level tracing**: capture fine‑grained `StageEvent`/`StageMetric` across input → retrieval → rerank → generation
+- **Domain Memory & analysis pipelines**: learn from past runs to auto‑tune thresholds, enrich context, and generate improvement guides
+- **Web UI + CLI**: FastAPI + React Evaluation Studio / Analysis Lab and Typer CLI all operate on the same DB and traces
+
+EvalVault is **an evaluation and analysis hub that spans RAGAS metrics, domain-specific metrics, KG/GraphRAG, stage-level tracing, and analysis pipelines.**
+
+---
+
+## Quickstart (Web & CLI)
 
 **Web (React + FastAPI)**
 ```bash
@@ -72,23 +87,33 @@ adjust them when `--use-domain-memory` is enabled.
 
 ---
 
-## Overview
+## Why teams use EvalVault
 
-EvalVault measures RAG quality with Ragas 0.4.x metrics, provides a Typer CLI and a FastAPI + React Web UI, and logs every run to SQLite/PostgreSQL, Langfuse, or Phoenix. It targets teams that need reproducible scoring across OpenAI, Ollama, or fully air-gapped profiles without wiring new scripts for each dataset.
+**Core problems we solve**
 
-**Highlights**
-- One CLI for running, comparing, exporting, and storing evaluation runs
-- Profile-driven LLM wiring (OpenAI, Ollama, vLLM, Azure, Anthropic)
-- **FastAPI + React Web UI** for Evaluation Studio and Analysis Lab (save & reload analysis results)
-- Langfuse + Phoenix trackers for traces, datasets, experiments, prompt manifests, and embedding exports
-- Domain Memory layer that learns from past runs (auto thresholds, context boosts, trend insights)
-- DAG-based analysis pipeline with statistical/NLP/causal modules
+- **“이 RAG 시스템이 좋아졌나?”**를 데이터셋·메트릭·threshold 기준으로 명확하게 답하고 싶을 때
+- 리트리버/LLM/프롬프트/파라미터가 섞인 복잡한 변경을 **단일 Run ID와 리포트**로 관리하고 싶을 때
+- Langfuse·Phoenix·자체 DB에 흩어진 로그를 **Stage 단위로 재구성해 병목과 품질 이슈를 찾고 싶을 때**
 
-**Status notes**
-- Web UI reports focus on basic/detailed templates and LLM analysis; comparison templates are in progress.
-- Domain Memory insights are CLI-first today; a Web UI panel is planned.
+**Key capabilities**
 
-See the [User Guide](docs/guides/USER_GUIDE.md) for full workflows, Phoenix automation, and troubleshooting.
+- **Unified evaluation CLI**
+  - 한 번의 명령으로 실행 → 점수 계산 → DB 저장 → 트레이싱까지 처리
+  - Simple/Full 모드로 온보딩과 파워 유저 모두 지원
+- **Multi-LLM & profile system**
+  - OpenAI / Ollama / vLLM / Azure / Anthropic 등을 `config/models.yaml` 프로필로 스위칭
+  - 온프레미스/폐쇄망 환경에서도 동일한 CLI·Web UI 사용 가능
+- **Web UI for investigations**
+  - Evaluation Studio: 데이터셋 업로드, 실행, 결과 확인
+  - Analysis Lab & Reports: 메트릭/히스토리/비교 뷰
+- **Stage-level tracing & debugging**
+  - `StageEvent` / `StageMetric` / DebugReport로 입력·검색·리랭크·생성 단계를 모두 기록
+  - Langfuse / Phoenix 연동으로 외부 트레이싱 시스템과도 연결
+- **Domain Memory & analysis pipelines**
+  - 도메인 메모리로 과거 실행에서 fact/behavior를 학습해 threshold 보정 및 컨텍스트 보강
+  - 통계·NLP·인과 모듈이 포함된 DAG 분석 파이프라인으로 결과를 다각도로 해석
+
+See the [User Guide](docs/guides/USER_GUIDE.md) for end-to-end workflows, Phoenix/Langfuse integration, and troubleshooting.
 
 ---
 
@@ -106,7 +131,7 @@ cd EvalVault
 uv sync --extra dev
 ```
 
-`dev` now bundles analysis/korean/web/postgres/mlflow/phoenix/perf/anthropic/docs. Add extras as needed:
+`dev` now bundles analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs. Add extras as needed:
 
 | Extra | Packages | Purpose |
 |-------|----------|---------|
@@ -117,7 +142,6 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | Docs build |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix tracing, dataset/experiment sync |
 | `anthropic` | anthropic | Anthropic LLM adapter |
-| `web` | streamlit, plotly | Streamlit Web UI |
 | `perf` | faiss-cpu, ijson | Large dataset performance helpers |
 
 `uv` automatically downloads Python 3.12 based on `.python-version`.
@@ -242,7 +266,10 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 ---
 
-## Supported Metrics (Ragas 0.4.x)
+## Supported Metrics
+
+EvalVault ships with a set of RAG-focused metrics, including the Ragas 0.4.x family,
+and is designed to host additional domain-specific and stage-level metrics.
 
 | Metric | Description |
 |--------|-------------|
@@ -252,8 +279,13 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 | `context_recall` | Recall of the retrieved context |
 | `factual_correctness` | Factual accuracy compared to ground truth |
 | `semantic_similarity` | Semantic similarity between answer and ground truth |
+| `insurance_term_accuracy` | Domain-specific metric for insurance terminology grounding |
 
-Custom metric example: `insurance_term_accuracy` (domain-specific term grounding).
+On top of these, `StageMetricService` derives **pipeline-stage metrics** such as:
+
+- `retrieval.precision_at_k`, `retrieval.recall_at_k`, `retrieval.result_count`, `retrieval.latency_ms`
+- `rerank.keep_rate`, `rerank.avg_score`, `rerank.latency_ms`
+- `output.citation_count`, `output.token_ratio`, `input.query_length`, and more.
 
 ---
 

@@ -67,7 +67,7 @@
 
 | Track | React 수정 범위 | FastAPI/Backend 범위 | 충돌 주의 |
 | --- | --- | --- | --- |
-| A | `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/CustomerReport.tsx`, `frontend/src/pages/RunDetails.tsx` | `src/evalvault/adapters/inbound/api/routers/runs.py`, `src/evalvault/adapters/inbound/web/adapter.py`, `src/evalvault/ports/inbound/web_port.py` | RunSummary 스키마 충돌 주의 |
+| A | `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/CustomerReport.tsx`, `frontend/src/pages/RunDetails.tsx` | `src/evalvault/adapters/inbound/api/routers/runs.py`, `src/evalvault/adapters/inbound/api/adapter.py`, `src/evalvault/ports/inbound/web_port.py` | RunSummary 스키마 충돌 주의 |
 | B | `frontend/src/pages/EvaluationStudio.tsx`, `frontend/src/components/` | `src/evalvault/adapters/inbound/api/routers/config.py`, `src/evalvault/config/` | 모델/데이터셋 API 변경 시 동기화 필요 |
 | C | `frontend/src/pages/AnalysisLab.tsx`, `frontend/src/pages/AnalysisResultView.tsx`, `frontend/src/components/` | `src/evalvault/adapters/inbound/api/routers/pipeline.py` | Analysis 결과 스키마 변경 주의 |
 | D | `frontend/src/pages/` 신규 화면 | `src/evalvault/adapters/inbound/api/routers/` 신규 | router 등록 충돌 가능 |

@@ -77,7 +77,6 @@ uv sync --extra dev                              # 전체 기능 개발 환경 (
 
 # Optional extras:
 #   --extra korean  : 한국어 NLP (kiwipiepy, rank-bm25)
-#   --extra web     : Streamlit Web UI (streamlit, plotly)
 #   --extra postgres: PostgreSQL 지원
 #   --extra mlflow  : MLflow 트래커
 #   --extra anthropic: Anthropic LLM
@@ -243,11 +242,11 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | LLM Adapters | ✅ Complete | OpenAI, Ollama, Azure, Anthropic |
 | Storage Adapters | ✅ Complete | SQLite, PostgreSQL |
 | Tracker Adapters | ✅ Complete | Langfuse, MLflow |
-| CLI | ✅ Complete | run, metrics, config, history, compare, export, generate, web, pipeline, benchmark |
+| CLI | ✅ Complete | run, metrics, config, history, compare, export, generate, pipeline, benchmark |
 | Testset Generation | ✅ Complete | Basic + Knowledge Graph |
 | Experiment Management | ✅ Complete | A/B testing, comparison |
 | Korean NLP | ✅ Complete | KiwiTokenizer, BM25, Dense/Hybrid Retrieval |
-| Web UI | ✅ Complete | Streamlit Dashboard, Evaluate, History, Reports |
+| Web UI | ✅ Complete | React + FastAPI Evaluation Studio/Analysis Lab |
 | Analysis Pipeline | ✅ Complete | DAG-based query analysis, Intent classification |
 
 **Test Summary:**

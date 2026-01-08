@@ -25,8 +25,6 @@ npm run dev
 브라우저에서 `http://localhost:5173`에 접속한 뒤 Evaluation Studio에서 평가를 실행하고
 Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `tests/fixtures/e2e/insurance_qa_korean.json` 업로드)
 
-> Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시로 유지되며 점진적 페이드아웃 예정입니다.
-
 **CLI (터미널)**
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
@@ -157,7 +155,6 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
-| `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
 | `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
@@ -231,7 +228,6 @@ uv sync --extra dev
    npm run dev
    ```
    브라우저에서 `http://localhost:5173`를 열어 확인합니다.
-   참고: Streamlit UI(`evalvault web`)는 간단 미리보기용 레거시입니다.
 
 3. **평가 실행**
    ```bash
@@ -248,7 +244,7 @@ uv sync --extra dev
    uv run evalvault history --db data/db/evalvault.db
    ```
 
-Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
+Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Prompt snapshot(System/Ragas), Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
 
 ## 실행 모드 (Simple / Full)
 

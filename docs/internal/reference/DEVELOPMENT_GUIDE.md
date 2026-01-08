@@ -61,7 +61,6 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix, opentelemetry | Phoenix 트레이싱 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
-| `web` | streamlit, plotly, watchdog | Streamlit Web UI |
 | `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 ### 1.4 환경 변수
@@ -624,7 +623,7 @@ Code: storage = SQLiteStorageAdapter(db_path=db_path)
 
 #### V3: Web Adapter Business Logic Mixing
 ```
-File: src/evalvault/adapters/inbound/web/adapter.py:559-638
+File: src/evalvault/adapters/inbound/api/adapter.py:559-638
 Code: ImprovementGuideService creation in adapter
 ```
 - **Issue**: Domain service creation in presentation layer
@@ -635,8 +634,7 @@ Code: ImprovementGuideService creation in adapter
 | File | Lines | Status |
 |------|-------|--------|
 | run.py | 1,784 | CRITICAL |
-| web/app.py | 887 | HIGH |
-| web/adapter.py | 791 | HIGH |
+| api/adapter.py | 791 | HIGH |
 | analyze.py | 680 | MODERATE |
 
 ---

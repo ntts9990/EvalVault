@@ -185,8 +185,8 @@
 **작업 범위**
 - `src/evalvault/adapters/inbound/cli/commands/run.py`
 - `src/evalvault/adapters/inbound/cli/utils/presets.py`
-- `src/evalvault/adapters/inbound/web/components/metrics.py`
-- `src/evalvault/adapters/inbound/web/adapter.py`
+- `frontend/src/components/`
+- `src/evalvault/adapters/inbound/api/adapter.py`
 - `src/evalvault/adapters/outbound/report/llm_report_generator.py`
 
 **주요 작업**

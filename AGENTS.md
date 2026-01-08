@@ -5,14 +5,12 @@ EvalVault uses a hexagonal layout: `src/evalvault/domain` hosts entities, servic
 
 ## Build, Test, and Development Commands
 - `uv sync --extra dev`: install full development environment (dev tools + all feature extras) on Python 3.12.
-- `uv sync --extra <analysis|korean|web|postgres|mlflow|phoenix|docs|anthropic|perf>`: install only selected feature extras (omit dev tooling).
+- `uv sync --extra <analysis|korean|postgres|mlflow|phoenix|docs|anthropic|perf>`: install only selected feature extras (omit dev tooling).
   - `--extra korean`: Korean NLP (kiwipiepy, rank-bm25, sentence-transformers)
   - `--extra analysis`: Statistical/NLP analysis helpers (scikit-learn)
-  - `--extra web`: Streamlit Web UI (streamlit, plotly)
   - `--extra postgres`: PostgreSQL storage support
   - `--extra mlflow`: MLflow tracker integration
 - `uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness`: smoke-test the CLI; extend with `--profile dev` or `--langfuse`.
-- `uv run evalvault web`: launch Streamlit Web UI (requires `--extra web`).
 - `uv run evalvault serve-api --reload`: launch the FastAPI backend for the React UI.
 - `cd frontend && npm install && npm run dev`: launch the Vite React frontend (API must be running).
 - `uv run evalvault pipeline analyze "요약해줘"`: run query-based analysis pipeline (requires `--extra korean`).

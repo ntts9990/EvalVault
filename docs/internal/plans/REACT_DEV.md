@@ -130,7 +130,7 @@ CustomerReport.tsx,
     메트릭 매핑 없음
   - src/evalvault/adapters/inbound/api/
     routers/runs.py와 src/evalvault/
-    adapters/inbound/web/adapter.py는 옵션/
+    adapters/inbound/api/adapter.py는 옵션/
     요약 제공, run_mode·언어 혼용 메타가 UI
     로 전달되지 않음
 
@@ -157,7 +157,7 @@ CustomerReport.tsx,
 
   API/데이터 요구사항
 
-  - src/evalvault/adapters/inbound/web/
+  - src/evalvault/adapters/inbound/api/
     adapter.py의 AVAILABLE_METRICS에 3개 요
     약 메트릭 추가
   - StartEvaluationRequest에 run_mode 또는
@@ -328,7 +328,7 @@ CustomerReport.tsx,
      엔드포인트 추가,
      StartEvaluationRequest/
      RunSummaryResponse 스키마 확장, src/
-     evalvault/adapters/inbound/web/
+     evalvault/adapters/inbound/api/
      adapter.py에서
      evaluation_task·language_mix 저장
   3. D(테스트/문서, B 완료 직후 병렬):

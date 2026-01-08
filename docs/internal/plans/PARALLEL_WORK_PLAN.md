@@ -207,7 +207,7 @@ git worktree add ../evalvault-r4 -b feat/r4-benchmark wip/parallel-base
 
 | ID | 작업 | 담당 영역 | 예상 규모 |
 |----|------|----------|----------|
-| P2.2 | Web UI 재구조화 | `adapters/inbound/web/` | ~1,800 LOC 리팩토링 |
+| P2.2 | Web UI 재구조화 | `adapters/inbound/api/` | ~1,800 LOC 리팩토링 |
 | P3 | 성능 최적화 | `domain/services/`, `adapters/outbound/cache/` | 신규 + 개선 |
 | P4.1 | CLI UX 개선 | `adapters/inbound/cli/` | ~5,700 LOC 개선 |
 | P5 | 테스트 개선 | `tests/` | 1,655 tests → 최적화 |
@@ -221,9 +221,9 @@ git worktree add ../evalvault-r4 -b feat/r4-benchmark wip/parallel-base
 
 | 작업 | 수정 가능 | 수정 금지 |
 |------|----------|----------|
-| **P2.2** | `adapters/inbound/web/**` | `cli/`, `domain/`, `outbound/` |
+| **P2.2** | `adapters/inbound/api/**` | `cli/`, `domain/`, `outbound/` |
 | **P3** | `domain/services/cache*.py`, `adapters/outbound/cache/`, `domain/services/batch*.py` | `inbound/`, `entities/` |
-| **P4.1** | `adapters/inbound/cli/**` | `web/`, `domain/`, `outbound/` |
+| **P4.1** | `adapters/inbound/cli/**` | `api/`, `domain/`, `outbound/` |
 | **P5** | `tests/**`, `conftest.py` | `src/evalvault/` (읽기만) |
 | **P6** | `docs/**` | `src/`, `tests/` |
 

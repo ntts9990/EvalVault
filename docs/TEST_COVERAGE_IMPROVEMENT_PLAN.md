@@ -120,7 +120,7 @@ class TestBenchmarkComparison:
 
 새로 개발된 Web UI의 테스트 커버리지 확보가 필요합니다.
 
-#### 2.2.1 `adapters/inbound/web/adapter.py` (현재 일부 테스트됨)
+#### 2.2.1 `adapters/inbound/api/adapter.py` (현재 일부 테스트됨)
 
 **총 라인 수**: 1,285 lines
 **누락된 테스트 영역**:
@@ -133,7 +133,7 @@ class TestBenchmarkComparison:
 
 **필요한 테스트**:
 ```python
-# tests/unit/adapters/inbound/web/test_adapter_retriever.py
+# tests/unit/adapters/inbound/api/test_adapter_retriever.py
 
 class TestWebUIAdapterRetriever:
     """리트리버 관련 테스트."""
@@ -171,113 +171,6 @@ class TestWebUIAdapterModels:
 ```
 
 **예상 작업량**: 4-5시간
-
-#### 2.2.2 `adapters/inbound/web/app.py` (0% → 50%)
-
-**총 라인 수**: 890 lines
-**특이사항**: Streamlit 의존성으로 인해 직접 테스트 어려움
-
-**테스트 전략**:
-1. **렌더링 함수 분리 테스트**: 데이터 처리 로직을 별도 함수로 분리하여 테스트
-2. **Mock Streamlit**: `unittest.mock`으로 st 객체 모킹
-3. **컴포넌트 단위 테스트**: 각 페이지 렌더링 함수의 핵심 로직만 테스트
-
-**필요한 테스트**:
-```python
-# tests/unit/adapters/inbound/web/test_app_pages.py
-
-class TestHomePageLogic:
-    """홈 페이지 로직 테스트."""
-
-    def test_dashboard_stats_calculation(self):
-        """대시보드 통계 계산."""
-        pass
-
-    def test_quality_gate_display_logic(self):
-        """품질 게이트 표시 로직."""
-        pass
-
-class TestEvaluatePageLogic:
-    """평가 페이지 로직 테스트."""
-
-    def test_metric_selection_logic(self):
-        """메트릭 선택 로직."""
-        pass
-
-    def test_run_mode_switching(self):
-        """실행 모드 전환."""
-        pass
-
-class TestImprovementPageLogic:
-    """개선 가이드 페이지 로직 테스트."""
-
-    def test_analysis_type_selection(self):
-        """분석 유형 선택."""
-        pass
-```
-
-**예상 작업량**: 3-4시간
-
-#### 2.2.3 Web Components (70% 목표)
-
-| 파일 | 라인 수 | 현재 테스트 | 필요한 추가 테스트 |
-|------|---------|------------|------------------|
-| `charts.py` | 226 | 없음 | 차트 데이터 생성 로직 |
-| `reports.py` | 535 | 일부 | 리포트 생성/다운로드 |
-| `model_selector.py` | 149 | 없음 | 모델 선택 로직 |
-| `prompt_panel.py` | 56 | 없음 | 프롬프트 패널 로직 |
-
-**필요한 테스트**:
-```python
-# tests/unit/adapters/inbound/web/test_components_charts.py
-
-class TestChartCreation:
-    """차트 생성 테스트."""
-
-    def test_create_pass_rate_chart_data(self):
-        """통과율 차트 데이터 생성."""
-        pass
-
-    def test_create_trend_chart_data(self):
-        """트렌드 차트 데이터 생성."""
-        pass
-
-    def test_create_metric_breakdown_chart_data(self):
-        """메트릭 분석 차트 데이터 생성."""
-        pass
-
-# tests/unit/adapters/inbound/web/test_components_model_selector.py
-
-class TestModelSelector:
-    """모델 선택기 테스트."""
-
-    def test_get_available_models(self):
-        """사용 가능한 모델 목록."""
-        pass
-
-    def test_get_model_by_id(self):
-        """ID로 모델 조회."""
-        pass
-
-    def test_model_option_structure(self):
-        """ModelOption 구조 확인."""
-        pass
-```
-
-**예상 작업량**: 4-5시간
-
-#### 2.2.4 Web Pages (50% 목표)
-
-| 파일 | 라인 수 | 설명 |
-|------|---------|------|
-| `pages/history.py` | 199 | 히스토리 페이지 |
-| `pages/reports.py` | 357 | 리포트 페이지 |
-
-**테스트 전략**: 페이지 렌더링은 Streamlit 의존성으로 직접 테스트 어려움. 데이터 처리 로직 위주로 테스트.
-
-**예상 작업량**: 2-3시간
-
----
 
 ### 2.3 P2: 트래커 및 설정 (Medium Priority)
 
@@ -368,10 +261,6 @@ omit =
 | 작업 | 대상 파일 | 예상 시간 | 담당 |
 |------|----------|----------|------|
 | 2.1 | adapter.py 테스트 확장 | 5h | - |
-| 2.2 | app.py 로직 테스트 | 4h | - |
-| 2.3 | charts.py 테스트 | 2h | - |
-| 2.4 | model_selector.py 테스트 | 2h | - |
-| 2.5 | reports.py 테스트 확장 | 3h | - |
 
 **예상 결과**: 커버리지 73% → 80%
 
@@ -400,23 +289,7 @@ def test_with_mocked_api(mock_openai):
     mock_openai.return_value.chat.completions.create.return_value = ...
 ```
 
-### 4.2 Streamlit 테스트 패턴
-
-```python
-# Streamlit 컴포넌트 테스트 시 st 객체 모킹
-from unittest.mock import MagicMock
-
-def test_with_mocked_streamlit():
-    import sys
-    mock_st = MagicMock()
-    sys.modules['streamlit'] = mock_st
-
-    # 테스트 코드
-    from evalvault.adapters.inbound.web.app import render_home_page
-    ...
-```
-
-### 4.3 비동기 테스트 패턴
+### 4.2 비동기 테스트 패턴
 
 ```python
 import pytest
@@ -427,7 +300,7 @@ async def test_async_function():
     assert result is not None
 ```
 
-### 4.4 Fixture 활용
+### 4.3 Fixture 활용
 
 ```python
 @pytest.fixture
@@ -449,7 +322,7 @@ def sample_evaluation_run():
 |------|------|------|----------|
 | 전체 커버리지 | 68% | 85% | `pytest --cov` |
 | 핵심 도메인 커버리지 | 50% | 85% | evaluator, benchmark 등 |
-| Web UI 커버리지 | 15% | 70% | web 패키지 |
+| Web API 커버리지 | 15% | 70% | api 어댑터 |
 | 테스트 실행 시간 | 3분 | 4분 이내 | CI 파이프라인 |
 
 ---
@@ -458,7 +331,6 @@ def sample_evaluation_run():
 
 | 리스크 | 영향 | 대응 방안 |
 |--------|------|----------|
-| Streamlit 의존성 테스트 어려움 | 중 | 로직 분리, Mock 활용 |
 | 외부 API 테스트 불안정 | 중 | Mock 우선, 통합 테스트 분리 |
 | 테스트 실행 시간 증가 | 낮 | 병렬 실행, 마커 분리 |
 
@@ -469,13 +341,7 @@ def sample_evaluation_run():
 ### A. 현재 커버리지가 낮은 파일 전체 목록
 
 ```
-src/evalvault/adapters/inbound/web/adapter.py          - 부분 테스트됨
-src/evalvault/adapters/inbound/web/app.py              - 0%
-src/evalvault/adapters/inbound/web/components/charts.py - 0%
-src/evalvault/adapters/inbound/web/components/model_selector.py - 0%
-src/evalvault/adapters/inbound/web/components/prompt_panel.py - 0%
-src/evalvault/adapters/inbound/web/pages/history.py    - 0%
-src/evalvault/adapters/inbound/web/pages/reports.py    - 0%
+src/evalvault/adapters/inbound/api/adapter.py          - 부분 테스트됨
 src/evalvault/adapters/outbound/tracker/phoenix_adapter.py - 37%
 src/evalvault/config/instrumentation.py                - 45%
 src/evalvault/config/langfuse_support.py               - 21%
@@ -512,4 +378,3 @@ tests/
 
 - [pytest 공식 문서](https://docs.pytest.org/)
 - [pytest-cov 사용법](https://pytest-cov.readthedocs.io/)
-- [Streamlit 테스트 가이드](https://docs.streamlit.io/library/advanced-features/testing)

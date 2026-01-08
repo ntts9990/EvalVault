@@ -468,7 +468,7 @@
 |------|------|---------------|
 | `src/evalvault/domain` | 핵심 도메인 엔티티·서비스 | Dataset/Result/Analysis/Memory/Improvement 엔티티, `RagasEvaluator`, `MemoryAwareEvaluator`, `MemoryBasedAnalysis`, `DomainLearningHook`, `PipelineOrchestrator`, `ImprovementGuideService`, `ExperimentManager`, `BenchmarkRunner`, `PromptManifest` 등 |
 | `src/evalvault/ports` | 도메인이 외부와 통신하기 위해 정의한 계약 | Inbound 포트(평가, 파이프라인, 웹), Outbound 포트(LLM, Dataset, Storage, Tracker, DomainMemory, Analysis*, Embedding, Korean NLP, Report, Relation Augmenter 등) |
-| `src/evalvault/adapters/inbound` | 사용자 인터페이스 계층 | Typer CLI(`commands/run.py`, `commands/gate.py`, `commands/pipeline.py`, `commands/agent.py` 등), FastAPI Web API(`api/routers/*`), Streamlit Web UI(`web/adapter.py`, `web/app.py`) |
+| `src/evalvault/adapters/inbound` | 사용자 인터페이스 계층 | Typer CLI(`commands/run.py`, `commands/gate.py`, `commands/pipeline.py`, `commands/agent.py` 등), FastAPI Web API(`api/routers/*`, `api/adapter.py`) |
 | `src/evalvault/adapters/outbound` | 외부 시스템 구현체 | Dataset 로더(정적+스트리밍), LLM/Token-aware Chat, Storage(SQLite/Postgres), Domain Memory(SQLite+FTS5), Tracker(Langfuse/MLflow/Phoenix), Analysis 모듈, Korean NLP, Cache, KG, Report, Improvement, Phoenix Sync |
 | `src/evalvault/config` | 실행 설정/계측/에이전트 정의 | `settings.py`, `model_config.py`, `domain_config.py`, `agent_types.py`, `phoenix_support.py`, `instrumentation.py`, `playbooks/` |
 | `src/evalvault/reports` | CLI/PR 보고서 템플릿 | `release_notes.py` |
@@ -1185,7 +1185,7 @@ def run(
 
 **Web API Adapter**
 - `api/main.py`와 `api/routers/*`가 FastAPI 엔드포인트를 구성해 React UI와 통신합니다.
-- `web/adapter.py`는 Streamlit Web UI(`evalvault web`)용 WebUIPort 구현체로 평가 실행/저장 흐름을 캡슐화합니다.
+- `api/adapter.py`는 Web UI용 WebUIPort 구현체로 평가 실행/저장 흐름을 캡슐화합니다.
 
 #### 3.3.2 Outbound Adapters (출력 어댑터)
 

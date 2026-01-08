@@ -365,17 +365,6 @@ npm run dev
 - Analysis Lab에서 “결과 저장”을 누르면 SQLite/PostgreSQL의 `pipeline_results`에 저장되며,
   저장된 결과는 좌측 목록에서 즉시 불러옵니다 (`/api/v1/pipeline/results`).
 
-### Streamlit Web UI (레거시/미리보기)
-Streamlit UI는 간단 미리보기용으로만 유지되며 점진적 페이드아웃 예정입니다.
-
-```bash
-uv run evalvault web --db data/db/evalvault.db
-```
-
-- `--extra web` 설치가 필요합니다.
-- React UI와 별도이며, 로컬 DB를 빠르게 조회할 때만 권장합니다.
-- 자세한 내용은 [Streamlit Web UI (Legacy)](STREAMLIT_UI.md)를 참고하세요.
-
 ### 단계별 성능 평가 (stage)
 단계별 실행 이벤트를 JSON/JSONL로 수집해 저장하고, 단계별 지표를 계산합니다.
 
@@ -484,6 +473,41 @@ Prompt Playground와 EvalVault 실행을 동기화하려면 `agent/prompts/promp
 `tracker_metadata["phoenix"]["prompts"]` 에 파일 상태/체크섬/diff가 기록되어 Slack 릴리즈 노트, 히스토리, Web UI에 그대로 노출됩니다.
 
 > **Tip**: Prompt Playground 연동 시에는 Phoenix tool-calling을 지원하는 `prod` 프로필(`gpt-oss-safeguard:20b`)을 사용하면 "does not support tools" 오류 없이 메타데이터가 기록됩니다.
+
+### Prompt Snapshot (System/Ragas)
+평가 시점의 **시스템 프롬프트**와 **Ragas 메트릭 프롬프트**를 DB에 저장하고, 실행 간 비교할 수 있습니다.
+
+```bash
+# 시스템 프롬프트 + Ragas 프롬프트 오버라이드 저장
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --system-prompt-file agent/prompts/system.txt \
+  --system-prompt-name sys-v2 \
+  --ragas-prompts config/ragas_prompts.yaml \
+  --prompt-set-name "prod-sys-v2" \
+  --db data/db/evalvault.db
+
+# Prompt snapshot 확인
+uv run evalvault prompts show RUN_ID --db data/db/evalvault.db
+
+# Prompt diff (run 간 비교)
+uv run evalvault prompts diff RUN_ID_A RUN_ID_B --db data/db/evalvault.db
+
+# 통계 비교 (점수/유의미성/효과크기)
+uv run evalvault analyze-compare RUN_ID_A RUN_ID_B --db data/db/evalvault.db
+```
+
+YAML 예시:
+```yaml
+metrics:
+  faithfulness: |
+    ... custom prompt ...
+  answer_relevancy: |
+    ... custom prompt ...
+```
+
+Web UI Run Details에서 Prompt Snapshot이 함께 표시됩니다.
+> **Note**: Ragas 버전/메트릭 구현에 따라 일부 프롬프트 오버라이드가 적용되지 않을 수 있습니다. 적용 여부는 `tracker_metadata["ragas_prompt_overrides"]`에 기록됩니다.
 
 ### 드리프트 감시 & 릴리스 노트
 - `scripts/ops/phoenix_watch.py` : Phoenix Dataset을 주기적으로 조회하여 `embedding_drift_score` 초과 시 Slack 알림 또는 `uv run evalvault gate <run_id>`/회귀 테스트 실행

@@ -32,7 +32,7 @@ The web UI provides:
 - **Analysis Lab**: Save and reload analysis results
 - **Settings**: Configure LLM providers and trackers
 
-The FastAPI routes live in `src/evalvault/adapters/inbound/api/`, and the web adapter implementation is in `src/evalvault/adapters/inbound/web/adapter.py`. The React frontend is under `frontend/`.
+The FastAPI routes live in `src/evalvault/adapters/inbound/api/`, and the web adapter implementation is in `src/evalvault/adapters/inbound/api/adapter.py`. The React frontend is under `frontend/`.
 
 ## Usage Examples
 

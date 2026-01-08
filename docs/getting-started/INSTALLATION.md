@@ -30,7 +30,6 @@ uv sync --extra dev
 | `docs` | mkdocs, mkdocs-material, mkdocstrings | 문서 빌드 |
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 추적/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
-| `web` | streamlit, plotly | Streamlit Web UI (레거시/미리보기) |
 | `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.

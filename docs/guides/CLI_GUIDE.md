@@ -188,15 +188,6 @@ uv run evalvault serve-api --reload
 - React Web UI가 호출하는 FastAPI 백엔드를 실행합니다.
 - 기본 주소: `http://127.0.0.1:8000`
 
-### 3.9 `web`
-```bash
-uv run evalvault web --db data/db/evalvault.db
-```
-- Streamlit 기반 **간단 미리보기용(레거시)** 대시보드를 실행합니다.
-- `--extra web` 설치가 필요합니다.
-
----
-
 ## 4. Domain Memory 서브커맨드
 
 도메인 메모리 Phase 1 활용을 위해 `evalvault domain memory` 하위 명령이 추가되었습니다. 모든 명령은 `--memory-db/-M` 옵션으로 대상 DB를 바꿀 수 있습니다.
