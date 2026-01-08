@@ -470,6 +470,9 @@ class PatternDetector:
         if len(values1) < 5:
             return {"matched": False, "matched_vectors": [], "correlation": None}
 
+        if max(values1) == min(values1) or max(values2) == min(values2):
+            return {"matched": False, "matched_vectors": [], "correlation": None}
+
         # 상관계수 계산
         try:
             corr, p_value = stats.pearsonr(values1, values2)

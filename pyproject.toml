@@ -173,6 +173,13 @@ markers = [
     "requires_langfuse: marks tests that require Langfuse credentials",
     "requires_phoenix: marks tests that require Phoenix/OpenTelemetry dependencies",
 ]
+filterwarnings = [
+    "ignore:tagMap is deprecated.*",
+    "ignore:typeMap is deprecated.*",
+    "ignore:The phoenix.evals.templating module is deprecated.*",
+    "ignore:The 'lia' package has been renamed.*",
+    "ignore:`json_encoders` is deprecated.*",
+]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
