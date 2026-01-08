@@ -88,7 +88,7 @@ class TestEvaluationFlowWithMock:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -126,7 +126,7 @@ class TestEvaluationFlowWithMock:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -151,7 +151,7 @@ class TestEvaluationFlowWithMock:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,

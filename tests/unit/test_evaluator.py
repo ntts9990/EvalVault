@@ -91,7 +91,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -148,7 +148,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=dataset,
@@ -176,7 +176,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -239,7 +239,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -279,7 +279,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -308,7 +308,7 @@ class TestRagasEvaluator:
         custom_thresholds = {"faithfulness": 0.8}
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -333,7 +333,7 @@ class TestRagasEvaluator:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -428,7 +428,7 @@ class TestRagasEvaluatorParallel:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=large_dataset,
@@ -454,7 +454,7 @@ class TestRagasEvaluatorParallel:
         }
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=large_dataset,
@@ -476,9 +476,13 @@ class TestRagasEvaluatorParallel:
         # Simulate slow evaluation with sleep
         async def slow_eval(*args, **kwargs):
             await asyncio.sleep(0.01)  # 10ms per call
-            return {
-                f"tc-{i:03d}": TestCaseEvalResult(scores={"faithfulness": 0.8}) for i in range(10)
-            }
+            return (
+                {
+                    f"tc-{i:03d}": TestCaseEvalResult(scores={"faithfulness": 0.8})
+                    for i in range(10)
+                },
+                {},
+            )
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
             mock_eval.side_effect = slow_eval

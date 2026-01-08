@@ -234,7 +234,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=1),
                     latency_ms=1000,
                 )
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             run = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -268,7 +268,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=2),
                     latency_ms=2000,
                 )
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             run = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -296,7 +296,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=1),
                     latency_ms=1000,
                 )
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             before = datetime.now()
             run = await evaluator.evaluate(

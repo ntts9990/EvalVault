@@ -639,7 +639,7 @@ class TestThresholdResolution:
         mock_results = {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.85})}
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=dataset,
@@ -668,7 +668,7 @@ class TestThresholdResolution:
         mock_results = {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.85})}
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=dataset,
@@ -697,7 +697,7 @@ class TestThresholdResolution:
         mock_results = {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.85})}
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval:
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=dataset,
@@ -930,7 +930,7 @@ class TestEvaluatorIntegration:
         custom_results = {"tc-001": TestCaseEvalResult(scores={"insurance_term_accuracy": 0.85})}
 
         with patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_ragas:
-            mock_ragas.return_value = ragas_results
+            mock_ragas.return_value = (ragas_results, {})
 
             with patch.object(
                 evaluator, "_evaluate_with_custom_metrics", new_callable=AsyncMock
@@ -978,7 +978,7 @@ class TestEvaluatorIntegration:
             patch.object(evaluator._preprocessor, "apply", return_value=mock_report),
             patch.object(evaluator, "_evaluate_with_ragas", new_callable=AsyncMock) as mock_eval,
         ):
-            mock_eval.return_value = mock_results
+            mock_eval.return_value = (mock_results, {})
 
             result = await evaluator.evaluate(
                 dataset=dataset,
