@@ -57,6 +57,48 @@ CREATE TABLE IF NOT EXISTS metric_scores (
 CREATE INDEX IF NOT EXISTS idx_scores_result_id ON metric_scores(result_id);
 CREATE INDEX IF NOT EXISTS idx_scores_name ON metric_scores(name);
 
+-- Prompt storage tables
+CREATE TABLE IF NOT EXISTS prompts (
+    prompt_id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    kind VARCHAR(50) NOT NULL,
+    content TEXT NOT NULL,
+    checksum VARCHAR(128) NOT NULL,
+    source TEXT,
+    notes TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompts_checksum ON prompts(checksum);
+CREATE INDEX IF NOT EXISTS idx_prompts_kind ON prompts(kind);
+
+CREATE TABLE IF NOT EXISTS prompt_sets (
+    prompt_set_id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS prompt_set_items (
+    id SERIAL PRIMARY KEY,
+    prompt_set_id UUID NOT NULL REFERENCES prompt_sets(prompt_set_id) ON DELETE CASCADE,
+    prompt_id UUID NOT NULL REFERENCES prompts(prompt_id) ON DELETE CASCADE,
+    role VARCHAR(255) NOT NULL,
+    item_order INTEGER DEFAULT 0,
+    metadata JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_set_items_set_id ON prompt_set_items(prompt_set_id);
+
+CREATE TABLE IF NOT EXISTS run_prompt_sets (
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    prompt_set_id UUID NOT NULL REFERENCES prompt_sets(prompt_set_id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, prompt_set_id)
+);
+
 -- Experiments table for A/B testing
 CREATE TABLE IF NOT EXISTS experiments (
     experiment_id UUID PRIMARY KEY,

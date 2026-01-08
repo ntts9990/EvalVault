@@ -2,7 +2,7 @@
 
 from typing import Any, Protocol
 
-from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.entities import EvaluationRun, PromptSetBundle
 from evalvault.domain.entities.experiment import Experiment
 
 
@@ -21,6 +21,22 @@ class StoragePort(Protocol):
         Returns:
             저장된 run의 ID
         """
+        ...
+
+    def save_prompt_set(self, bundle: PromptSetBundle) -> None:
+        """Persist prompt set and prompt items."""
+        ...
+
+    def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
+        """Attach a prompt set to an evaluation run."""
+        ...
+
+    def get_prompt_set(self, prompt_set_id: str) -> PromptSetBundle:
+        """Load a prompt set bundle."""
+        ...
+
+    def get_prompt_set_for_run(self, run_id: str) -> PromptSetBundle | None:
+        """Load the prompt set bundle linked to a run."""
         ...
 
     def get_run(self, run_id: str) -> EvaluationRun:

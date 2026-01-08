@@ -29,6 +29,11 @@ class EvalRequest:
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
     prompt_config: dict[str, Any] | None = None
+    system_prompt: str | None = None
+    system_prompt_name: str | None = None
+    prompt_set_name: str | None = None
+    prompt_set_description: str | None = None
+    ragas_prompt_overrides: dict[str, str] | None = None
 
 
 @dataclass
@@ -41,6 +46,9 @@ class EvalProgress:
     percent: float
     status: str = "running"  # running, completed, failed
     error_message: str | None = None
+    elapsed_seconds: float | None = None
+    eta_seconds: float | None = None
+    rate: float | None = None
 
 
 @dataclass

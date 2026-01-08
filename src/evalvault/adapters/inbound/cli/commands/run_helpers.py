@@ -28,6 +28,7 @@ from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
     GenerationData,
+    PromptSetBundle,
     RAGTraceData,
     RetrievalData,
     RetrievedDocument,
@@ -409,14 +410,27 @@ def _save_to_db(
     console: Console,
     *,
     storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
+    prompt_bundle: PromptSetBundle | None = None,
 ) -> None:
-    """Persist evaluation run to SQLite database."""
+    """Persist evaluation run (and optional prompt set) to SQLite database."""
     with console.status(f"[bold green]Saving to database {db_path}..."):
         try:
             storage = storage_cls(db_path=db_path)
+            if prompt_bundle:
+                storage.save_prompt_set(prompt_bundle)
             storage.save_run(result)
+            if prompt_bundle:
+                storage.link_prompt_set_to_run(
+                    result.run_id,
+                    prompt_bundle.prompt_set.prompt_set_id,
+                )
             console.print(f"[green]Results saved to database: {db_path}[/green]")
             console.print(f"[dim]Run ID: {result.run_id}[/dim]")
+            if prompt_bundle:
+                console.print(
+                    f"[dim]Prompt set saved: {prompt_bundle.prompt_set.name} "
+                    f"({prompt_bundle.prompt_set.prompt_set_id[:8]})[/dim]"
+                )
         except Exception as exc:  # pragma: no cover - persistence errors
             print_cli_error(
                 console,
@@ -851,6 +865,8 @@ async def _evaluate_streaming_run(
     chunk_size: int,
     parallel: bool,
     batch_size: int,
+    prompt_overrides: dict[str, str] | None = None,
+    on_progress: Callable[[int, int | None, str], None] | None = None,
 ) -> EvaluationRun:
     """Evaluate a dataset in streaming mode, chunk by chunk."""
 
@@ -860,10 +876,17 @@ async def _evaluate_streaming_run(
     metadata_template = dict(dataset_template.metadata or {})
     threshold_template = dict(dataset_template.thresholds or {})
     source_file = dataset_template.source_file or str(dataset_path)
+    processed_total = 0
 
-    for chunk in loader.load_chunked(dataset_path, chunk_size=chunk_size):
-        if not chunk:
+    iterator = loader.stream(dataset_path)
+    estimated_total = iterator.stats.estimated_total_rows
+    chunk: list[Any] = []
+
+    for test_case in iterator:
+        chunk.append(test_case)
+        if len(chunk) < chunk_size:
             continue
+        chunk_offset = processed_total
         chunk_dataset = Dataset(
             name=dataset_template.name,
             version=dataset_template.version,
@@ -872,6 +895,23 @@ async def _evaluate_streaming_run(
             source_file=source_file,
             thresholds=dict(threshold_template),
         )
+        if iterator.stats.estimated_total_rows is not None:
+            estimated_total = iterator.stats.estimated_total_rows
+        progress_callback = None
+        if on_progress:
+            offset = chunk_offset
+            total_estimate = estimated_total
+
+            def progress_callback(
+                current: int,
+                _total: int,
+                message: str,
+                *,
+                _offset: int = offset,
+                _total_estimate: int | None = total_estimate,
+            ) -> None:
+                on_progress(_offset + current, _total_estimate, message)
+
         chunk_run = await evaluator.evaluate(
             dataset=chunk_dataset,
             metrics=metrics,
@@ -879,6 +919,8 @@ async def _evaluate_streaming_run(
             thresholds=thresholds,
             parallel=parallel,
             batch_size=batch_size,
+            prompt_overrides=prompt_overrides,
+            on_progress=progress_callback,
         )
         merged_run = _merge_evaluation_runs(
             merged_run,
@@ -888,6 +930,55 @@ async def _evaluate_streaming_run(
             metrics=metrics,
             thresholds=thresholds,
         )
+        processed_total += len(chunk)
+        chunk = []
+
+    if chunk:
+        chunk_offset = processed_total
+        chunk_dataset = Dataset(
+            name=dataset_template.name,
+            version=dataset_template.version,
+            test_cases=list(chunk),
+            metadata=dict(metadata_template),
+            source_file=source_file,
+            thresholds=dict(threshold_template),
+        )
+        if iterator.stats.estimated_total_rows is not None:
+            estimated_total = iterator.stats.estimated_total_rows
+        progress_callback = None
+        if on_progress:
+            offset = chunk_offset
+            total_estimate = estimated_total
+
+            def progress_callback(
+                current: int,
+                _total: int,
+                message: str,
+                *,
+                _offset: int = offset,
+                _total_estimate: int | None = total_estimate,
+            ) -> None:
+                on_progress(_offset + current, _total_estimate, message)
+
+        chunk_run = await evaluator.evaluate(
+            dataset=chunk_dataset,
+            metrics=metrics,
+            llm=llm,
+            thresholds=thresholds,
+            parallel=parallel,
+            batch_size=batch_size,
+            prompt_overrides=prompt_overrides,
+            on_progress=progress_callback,
+        )
+        merged_run = _merge_evaluation_runs(
+            merged_run,
+            chunk_run,
+            dataset_name=dataset_template.name,
+            dataset_version=dataset_template.version,
+            metrics=metrics,
+            thresholds=thresholds,
+        )
+        processed_total += len(chunk)
 
     if merged_run is None:
         empty_dataset = Dataset(
@@ -905,6 +996,7 @@ async def _evaluate_streaming_run(
             thresholds=thresholds,
             parallel=parallel,
             batch_size=batch_size,
+            prompt_overrides=prompt_overrides,
         )
 
     merged_run.thresholds = dict(thresholds)

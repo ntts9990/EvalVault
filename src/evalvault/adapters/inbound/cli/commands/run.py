@@ -28,12 +28,22 @@ from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
+from evalvault.domain.services.prompt_registry import (
+    PromptInput,
+    build_prompt_bundle,
+    build_prompt_summary,
+)
+from evalvault.domain.services.ragas_prompt_overrides import (
+    PromptOverrideError,
+    load_ragas_prompt_overrides,
+)
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 
 from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
 from ..utils.options import db_option, memory_db_option, profile_option
 from ..utils.presets import format_preset_help, get_preset, list_presets
+from ..utils.progress import evaluation_progress, streaming_progress
 from ..utils.validators import parse_csv_option, validate_choice, validate_choices
 from . import run_helpers
 from .run_helpers import (
@@ -266,6 +276,42 @@ def register_run_commands(
             None,
             "--prompt-files",
             help="Comma-separated prompt files to capture in Phoenix metadata.",
+            rich_help_panel="Full mode options",
+        ),
+        prompt_set_name: str | None = typer.Option(
+            None,
+            "--prompt-set-name",
+            help="Name for the prompt set snapshot stored in the DB.",
+            rich_help_panel="Full mode options",
+        ),
+        prompt_set_description: str | None = typer.Option(
+            None,
+            "--prompt-set-description",
+            help="Description for the prompt set snapshot.",
+            rich_help_panel="Full mode options",
+        ),
+        system_prompt: str | None = typer.Option(
+            None,
+            "--system-prompt",
+            help="System prompt text for the target LLM (stored for comparison).",
+            rich_help_panel="Full mode options",
+        ),
+        system_prompt_file: Path | None = typer.Option(
+            None,
+            "--system-prompt-file",
+            help="Path to a system prompt file to store alongside this run.",
+            rich_help_panel="Full mode options",
+        ),
+        system_prompt_name: str | None = typer.Option(
+            None,
+            "--system-prompt-name",
+            help="Optional name for the system prompt snapshot.",
+            rich_help_panel="Full mode options",
+        ),
+        ragas_prompts: Path | None = typer.Option(
+            None,
+            "--ragas-prompts",
+            help="YAML file with Ragas metric prompt overrides.",
             rich_help_panel="Full mode options",
         ),
         mode: str = typer.Option(
@@ -513,6 +559,94 @@ def register_run_commands(
                         "Prompt 파일이 manifest와 다릅니다.",
                         tips=["`uv run evalvault phoenix prompt-diff`로 변경 사항을 확인하세요."],
                     )
+
+        if system_prompt and system_prompt_file:
+            print_cli_error(
+                console,
+                "--system-prompt와 --system-prompt-file은 함께 사용할 수 없습니다.",
+                fixes=["둘 중 하나만 설정하세요."],
+            )
+            raise typer.Exit(1)
+
+        prompt_inputs: list[PromptInput] = []
+        system_prompt_text: str | None = None
+        system_prompt_source: str | None = None
+        if system_prompt_file:
+            try:
+                resolved_prompt_file = system_prompt_file.expanduser()
+                system_prompt_text = resolved_prompt_file.read_text(encoding="utf-8")
+                system_prompt_source = str(resolved_prompt_file)
+            except FileNotFoundError:
+                print_cli_error(
+                    console,
+                    "시스템 프롬프트 파일을 찾을 수 없습니다.",
+                    details=str(system_prompt_file),
+                )
+                raise typer.Exit(1)
+        elif system_prompt:
+            system_prompt_text = system_prompt
+            system_prompt_source = "inline"
+
+        if system_prompt_text:
+            prompt_name = system_prompt_name or (
+                system_prompt_file.stem if system_prompt_file else "system_prompt"
+            )
+            prompt_inputs.append(
+                PromptInput(
+                    content=system_prompt_text,
+                    name=prompt_name,
+                    kind="system",
+                    role="system",
+                    source=system_prompt_source,
+                )
+            )
+
+        ragas_prompt_overrides: dict[str, str] = {}
+        ragas_prompt_source: str | None = None
+        if ragas_prompts:
+            ragas_prompts_path = ragas_prompts.expanduser()
+            ragas_prompt_source = str(ragas_prompts_path)
+            try:
+                ragas_prompt_overrides = load_ragas_prompt_overrides(ragas_prompt_source)
+            except PromptOverrideError as exc:
+                print_cli_error(
+                    console,
+                    "Ragas 프롬프트 YAML을 파싱하지 못했습니다.",
+                    details=str(exc),
+                )
+                raise typer.Exit(1)
+            except FileNotFoundError:
+                print_cli_error(
+                    console,
+                    "Ragas 프롬프트 YAML 파일을 찾을 수 없습니다.",
+                    details=ragas_prompt_source,
+                )
+                raise typer.Exit(1)
+
+        if ragas_prompt_overrides:
+            for metric_name, prompt_text in ragas_prompt_overrides.items():
+                if metric_name not in metric_list:
+                    print_cli_warning(
+                        console,
+                        f"Ragas 프롬프트 오버라이드가 선택된 메트릭에 없습니다: {metric_name}",
+                        tips=["--metrics에 해당 메트릭을 추가하거나 YAML을 정리하세요."],
+                    )
+                prompt_inputs.append(
+                    PromptInput(
+                        content=prompt_text,
+                        name=f"ragas.{metric_name}",
+                        kind="ragas",
+                        role=metric_name,
+                        source=ragas_prompt_source,
+                    )
+                )
+        prompt_bundle = None
+        if prompt_inputs and not db_path:
+            print_cli_warning(
+                console,
+                "Prompt snapshot은 --db 저장 시에만 DB에 기록됩니다.",
+                tips=["--db data/db/evalvault.db 옵션을 추가하세요."],
+            )
 
         if stream_chunk_size <= 0:
             print_cli_error(
@@ -1014,7 +1148,12 @@ def register_run_commands(
                 "평가 시작 "
                 f"(mode={eval_mode_label}, cases={len(ds)}, metrics={', '.join(metric_list)})",
             )
-        with progress_spinner(console, status_msg) as update_progress:
+        progress_context = (
+            streaming_progress(console, description=status_msg)
+            if stream
+            else evaluation_progress(console, len(ds), description=status_msg)
+        )
+        with progress_context as update_progress:
             try:
                 if stream:
                     result = asyncio.run(
@@ -1028,10 +1167,12 @@ def register_run_commands(
                             chunk_size=stream_chunk_size,
                             parallel=final_parallel,
                             batch_size=final_batch_size,
+                            prompt_overrides=ragas_prompt_overrides or None,
+                            on_progress=lambda c, t, msg: update_progress(c, t, msg),
                         )
                     )
                 elif memory_evaluator and use_domain_memory:
-                    update_progress("🔁 Domain Memory와 병렬로 실행 중...")
+                    update_progress(0, "🔁 Domain Memory와 병렬로 실행 중...")
                     result = asyncio.run(
                         memory_evaluator.evaluate_with_memory(
                             dataset=ds,
@@ -1045,6 +1186,8 @@ def register_run_commands(
                             retriever=retriever_instance,
                             retriever_top_k=retriever_top_k,
                             retriever_doc_ids=retriever_doc_ids,
+                            prompt_overrides=ragas_prompt_overrides or None,
+                            on_progress=lambda c, _t, msg: update_progress(c, msg),
                         )
                     )
                 else:
@@ -1059,10 +1202,11 @@ def register_run_commands(
                             retriever=retriever_instance,
                             retriever_top_k=retriever_top_k,
                             retriever_doc_ids=retriever_doc_ids,
+                            prompt_overrides=ragas_prompt_overrides or None,
+                            on_progress=lambda c, _t, msg: update_progress(c, msg),
                         )
                     )
                 _log_duration(console, verbose, "평가 완료", evaluation_started_at)
-                update_progress("📊 결과 집계 중...")
             except Exception as exc:  # pragma: no cover - surfaced to CLI
                 _log_duration(console, verbose, "평가 실패", evaluation_started_at)
                 print_cli_error(
@@ -1079,6 +1223,21 @@ def register_run_commands(
         phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
 
         result.tracker_metadata.setdefault("run_mode", preset.name)
+        if prompt_inputs:
+            prompt_bundle = build_prompt_bundle(
+                run_id=result.run_id,
+                prompt_set_name=prompt_set_name,
+                prompt_set_description=prompt_set_description,
+                prompt_inputs=prompt_inputs,
+                metadata={
+                    "run_id": result.run_id,
+                    "dataset": result.dataset_name,
+                    "model": result.model_name,
+                    "metrics": metric_list,
+                },
+            )
+            if prompt_bundle:
+                result.tracker_metadata["prompt_set"] = build_prompt_summary(prompt_bundle)
 
         preprocess_summary = format_dataset_preprocess_summary(
             result.tracker_metadata.get("dataset_preprocess")
@@ -1246,7 +1405,13 @@ def register_run_commands(
         if db_path:
             db_started_at = datetime.now()
             _log_timestamp(console, verbose, f"DB 저장 시작 ({db_path})")
-            _save_to_db(db_path, result, console, storage_cls=SQLiteStorageAdapter)
+            _save_to_db(
+                db_path,
+                result,
+                console,
+                storage_cls=SQLiteStorageAdapter,
+                prompt_bundle=prompt_bundle,
+            )
             _log_duration(console, verbose, "DB 저장 완료", db_started_at)
         if output:
             output_started_at = datetime.now()
@@ -1376,6 +1541,36 @@ def register_run_commands(
             "--prompt-files",
             help="Comma-separated prompt files to capture in Phoenix metadata.",
         ),
+        prompt_set_name: str | None = typer.Option(
+            None,
+            "--prompt-set-name",
+            help="Name for the prompt set snapshot stored in the DB.",
+        ),
+        prompt_set_description: str | None = typer.Option(
+            None,
+            "--prompt-set-description",
+            help="Description for the prompt set snapshot.",
+        ),
+        system_prompt: str | None = typer.Option(
+            None,
+            "--system-prompt",
+            help="System prompt text for the target LLM (stored for comparison).",
+        ),
+        system_prompt_file: Path | None = typer.Option(
+            None,
+            "--system-prompt-file",
+            help="Path to a system prompt file to store alongside this run.",
+        ),
+        system_prompt_name: str | None = typer.Option(
+            None,
+            "--system-prompt-name",
+            help="Optional name for the system prompt snapshot.",
+        ),
+        ragas_prompts: Path | None = typer.Option(
+            None,
+            "--ragas-prompts",
+            help="YAML file with Ragas metric prompt overrides.",
+        ),
         db_path: Path | None = db_option(
             help_text="Path to SQLite database file for storing results.",
         ),
@@ -1461,6 +1656,12 @@ def register_run_commands(
                 phoenix_experiment_description=phoenix_experiment_description,
                 prompt_manifest=prompt_manifest,
                 prompt_files=prompt_files,
+                prompt_set_name=prompt_set_name,
+                prompt_set_description=prompt_set_description,
+                system_prompt=system_prompt,
+                system_prompt_file=system_prompt_file,
+                system_prompt_name=system_prompt_name,
+                ragas_prompts=ragas_prompts,
                 db_path=db_path,
                 use_domain_memory=use_domain_memory,
                 memory_domain=memory_domain,
@@ -1600,6 +1801,36 @@ def register_run_commands(
             "--prompt-files",
             help="Comma-separated prompt files to capture in Phoenix metadata.",
         ),
+        prompt_set_name: str | None = typer.Option(
+            None,
+            "--prompt-set-name",
+            help="Name for the prompt set snapshot stored in the DB.",
+        ),
+        prompt_set_description: str | None = typer.Option(
+            None,
+            "--prompt-set-description",
+            help="Description for the prompt set snapshot.",
+        ),
+        system_prompt: str | None = typer.Option(
+            None,
+            "--system-prompt",
+            help="System prompt text for the target LLM (stored for comparison).",
+        ),
+        system_prompt_file: Path | None = typer.Option(
+            None,
+            "--system-prompt-file",
+            help="Path to a system prompt file to store alongside this run.",
+        ),
+        system_prompt_name: str | None = typer.Option(
+            None,
+            "--system-prompt-name",
+            help="Optional name for the system prompt snapshot.",
+        ),
+        ragas_prompts: Path | None = typer.Option(
+            None,
+            "--ragas-prompts",
+            help="YAML file with Ragas metric prompt overrides.",
+        ),
         db_path: Path | None = db_option(
             help_text="Path to SQLite database file for storing results.",
         ),
@@ -1685,6 +1916,12 @@ def register_run_commands(
                 phoenix_experiment_description=phoenix_experiment_description,
                 prompt_manifest=prompt_manifest,
                 prompt_files=prompt_files,
+                prompt_set_name=prompt_set_name,
+                prompt_set_description=prompt_set_description,
+                system_prompt=system_prompt,
+                system_prompt_file=system_prompt_file,
+                system_prompt_name=system_prompt_name,
+                ragas_prompts=ragas_prompts,
                 db_path=db_path,
                 use_domain_memory=use_domain_memory,
                 memory_domain=memory_domain,

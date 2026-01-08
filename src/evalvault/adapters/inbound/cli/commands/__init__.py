@@ -26,9 +26,9 @@ from .langfuse import register_langfuse_commands
 from .method import create_method_app
 from .phoenix import create_phoenix_app
 from .pipeline import register_pipeline_commands
+from .prompts import create_prompts_app
 from .run import register_run_commands
 from .stage import create_stage_app
-from .web import register_web_command
 
 CommandFactory = Callable[[Console], typer.Typer]
 
@@ -67,7 +67,6 @@ COMMAND_MODULES: tuple[CommandModule, ...] = (
     CommandModule(register_experiment_commands),
     CommandModule(register_config_commands),
     CommandModule(register_langfuse_commands),
-    CommandModule(register_web_command),
     CommandModule(register_api_command),
 )
 
@@ -78,6 +77,7 @@ SUB_APPLICATIONS: tuple[SubAppModule, ...] = (
     SubAppModule("benchmark", create_benchmark_app),
     SubAppModule("method", create_method_app),
     SubAppModule("phoenix", create_phoenix_app),
+    SubAppModule("prompts", create_prompts_app),
     SubAppModule("stage", create_stage_app),
     SubAppModule("debug", create_debug_app),
 )

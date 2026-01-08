@@ -21,6 +21,10 @@ from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomai
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
+from evalvault.domain.services.ragas_prompt_overrides import (
+    PromptOverrideError,
+    normalize_ragas_prompt_overrides,
+)
 from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
 
 router = APIRouter()
@@ -84,6 +88,12 @@ class StartEvaluationRequest(BaseModel):
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
     prompt_config: dict[str, Any] | None = None
+    system_prompt: str | None = None
+    system_prompt_name: str | None = None
+    prompt_set_name: str | None = None
+    prompt_set_description: str | None = None
+    ragas_prompts: dict[str, str] | None = None
+    ragas_prompts_yaml: str | None = None
 
 
 class DatasetItemResponse(BaseModel):
@@ -100,7 +110,7 @@ class ModelItemResponse(BaseModel):
 
 
 def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
-    return {
+    payload = {
         "summary": run.to_summary_dict(),
         "results": [
             {
@@ -122,6 +132,10 @@ def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
             for result in run.results
         ],
     }
+    prompt_set_detail = (run.tracker_metadata or {}).get("prompt_set_detail")
+    if prompt_set_detail:
+        payload["prompt_set"] = prompt_set_detail
+    return payload
 
 
 def _build_case_counts(base_run: EvaluationRun, target_run: EvaluationRun) -> dict[str, int]:
@@ -310,6 +324,14 @@ async def start_evaluation_endpoint(
     adapter: AdapterDep,
 ):
     """Start evaluation with streaming progress."""
+    ragas_prompt_overrides = None
+    if request.ragas_prompts_yaml or request.ragas_prompts:
+        try:
+            raw = request.ragas_prompts_yaml or request.ragas_prompts
+            ragas_prompt_overrides = normalize_ragas_prompt_overrides(raw)
+        except PromptOverrideError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     eval_req = EvalRequest(
         dataset_path=request.dataset_path,
         metrics=request.metrics,
@@ -324,6 +346,11 @@ async def start_evaluation_endpoint(
         memory_config=request.memory_config,
         tracker_config=request.tracker_config,
         prompt_config=request.prompt_config,
+        system_prompt=request.system_prompt,
+        system_prompt_name=request.system_prompt_name,
+        prompt_set_name=request.prompt_set_name,
+        prompt_set_description=request.prompt_set_description,
+        ragas_prompt_overrides=ragas_prompt_overrides,
     )
 
     queue = asyncio.Queue()
@@ -339,6 +366,9 @@ async def start_evaluation_endpoint(
                     "percent": progress.percent,
                     "status": progress.status,
                     "message": progress.current_metric or progress.error_message or "",
+                    "elapsed_seconds": progress.elapsed_seconds,
+                    "eta_seconds": progress.eta_seconds,
+                    "rate": progress.rate,
                 },
             }
         )

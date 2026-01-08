@@ -159,7 +159,10 @@ def evaluation_progress(
     ) as progress:
         task_id = progress.add_task(description, total=total)
 
-        def update(completed: int) -> None:
+        def update(completed: int, message: str | None = None) -> None:
+            if message:
+                progress.update(task_id, completed=completed, description=message)
+                return
             progress.update(task_id, completed=completed)
 
         yield update
@@ -241,17 +244,24 @@ def streaming_progress(
         BarColumn(bar_width=30),
         MofNCompleteColumn(),
         RateColumn(),
+        ETAColumn(),
         TimeElapsedColumn(),
         console=console,
         transient=False,
     ) as progress:
         task_id = progress.add_task(description, total=None)
 
-        def update(completed: int, total: int | None = None) -> None:
+        def update(
+            completed: int,
+            total: int | None = None,
+            message: str | None = None,
+        ) -> None:
             if total is not None:
                 progress.update(task_id, completed=completed, total=total)
-            else:
+            elif completed is not None:
                 progress.update(task_id, completed=completed)
+            if message:
+                progress.update(task_id, description=message)
 
         yield update
 

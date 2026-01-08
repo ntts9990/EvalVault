@@ -186,6 +186,7 @@ class RagasEvaluator:
         retriever_top_k: int = 5,
         retriever_doc_ids: Sequence[str] | None = None,
         on_progress: Callable[[int, int, str], None] | None = None,
+        prompt_overrides: dict[str, str] | None = None,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -269,14 +270,19 @@ class RagasEvaluator:
         # Evaluate with Ragas (if any Ragas metrics)
         eval_results_by_test_case = {}
         if ragas_metrics:
-            eval_results_by_test_case = await self._evaluate_with_ragas(
+            eval_results_by_test_case, override_status = await self._evaluate_with_ragas(
                 dataset=dataset,
                 metrics=ragas_metrics,
                 llm=llm,
                 parallel=parallel,
                 batch_size=batch_size,
                 on_progress=on_progress,
+                prompt_overrides=prompt_overrides,
             )
+            if override_status:
+                run.tracker_metadata["ragas_prompt_overrides"] = override_status
+        elif prompt_overrides:
+            logger.warning("Ragas prompt overrides provided but no Ragas metrics requested.")
 
         # Evaluate with custom metrics (if any custom metrics)
         if custom_metrics:
@@ -344,7 +350,8 @@ class RagasEvaluator:
         parallel: bool = False,
         batch_size: int = 5,
         on_progress: Callable[[int, int, str], None] | None = None,
-    ) -> dict[str, TestCaseEvalResult]:
+        prompt_overrides: dict[str, str] | None = None,
+    ) -> tuple[dict[str, TestCaseEvalResult], dict[str, str]]:
         """Ragas로 실제 평가 수행.
 
         Args:
@@ -355,8 +362,8 @@ class RagasEvaluator:
             batch_size: 병렬 처리 시 배치 크기
 
         Returns:
-            테스트 케이스 ID별 평가 결과 (토큰 사용량 포함)
-            예: {"tc-001": TestCaseEvalResult(scores={"faithfulness": 0.9}, tokens_used=150)}
+            (테스트 케이스 ID별 평가 결과, 프롬프트 오버라이드 적용 상태)
+            예: {"tc-001": TestCaseEvalResult(...)}
         """
 
         # Convert dataset to Ragas format
@@ -398,24 +405,94 @@ class RagasEvaluator:
                 else:
                     ragas_metrics.append(metric_class(llm=ragas_llm))
 
+        override_status = {}
+        if prompt_overrides:
+            override_status = self._apply_prompt_overrides(ragas_metrics, prompt_overrides)
+
         # 병렬 처리 vs 순차 처리
         if parallel and len(ragas_samples) > 1:
-            return await self._evaluate_parallel(
+            return (
+                await self._evaluate_parallel(
+                    dataset=dataset,
+                    ragas_samples=ragas_samples,
+                    ragas_metrics=ragas_metrics,
+                    llm=llm,
+                    batch_size=batch_size,
+                    on_progress=on_progress,
+                ),
+                override_status,
+            )
+        return (
+            await self._evaluate_sequential(
                 dataset=dataset,
                 ragas_samples=ragas_samples,
                 ragas_metrics=ragas_metrics,
                 llm=llm,
-                batch_size=batch_size,
                 on_progress=on_progress,
-            )
-        else:
-            return await self._evaluate_sequential(
-                dataset=dataset,
-                ragas_samples=ragas_samples,
-                ragas_metrics=ragas_metrics,
-                llm=llm,
-                on_progress=on_progress,
-            )
+            ),
+            override_status,
+        )
+
+    def _apply_prompt_overrides(
+        self,
+        ragas_metrics: list[Any],
+        prompt_overrides: dict[str, str],
+    ) -> dict[str, str]:
+        """Apply prompt overrides to Ragas metric instances."""
+
+        statuses: dict[str, str] = {}
+        for metric in ragas_metrics:
+            metric_name = getattr(metric, "name", None)
+            if not metric_name or metric_name not in prompt_overrides:
+                continue
+            prompt_text = prompt_overrides[metric_name]
+            applied = self._override_metric_prompt(metric, prompt_text)
+            statuses[metric_name] = "applied" if applied else "unsupported"
+            if not applied:
+                logger.warning("Prompt override for metric '%s' could not be applied.", metric_name)
+        return statuses
+
+    @staticmethod
+    def _override_metric_prompt(metric: Any, prompt_text: str) -> bool:
+        """Best-effort override for metric prompt templates."""
+
+        if hasattr(metric, "prompt"):
+            target = metric.prompt
+            if isinstance(target, str):
+                metric.prompt = prompt_text
+                return True
+            if hasattr(target, "template"):
+                target.template = prompt_text
+                return True
+            if hasattr(target, "instruction"):
+                target.instruction = prompt_text
+                return True
+
+        candidates: list[tuple[str, Any]] = []
+        for attr in dir(metric):
+            if not attr.endswith("_prompt") or attr == "prompt":
+                continue
+            try:
+                value = getattr(metric, attr)
+            except Exception:
+                continue
+            if value is None:
+                continue
+            candidates.append((attr, value))
+
+        if len(candidates) == 1:
+            attr, value = candidates[0]
+            if isinstance(value, str):
+                setattr(metric, attr, prompt_text)
+                return True
+            if hasattr(value, "template"):
+                value.template = prompt_text
+                return True
+            if hasattr(value, "instruction"):
+                value.instruction = prompt_text
+                return True
+
+        return False
 
     async def _evaluate_sequential(
         self,

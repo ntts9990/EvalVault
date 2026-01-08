@@ -1,5 +1,6 @@
 """Unit tests for PostgreSQL storage adapter."""
 
+import importlib
 import json
 import sys
 from datetime import datetime
@@ -10,13 +11,36 @@ import pytest
 from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
 from evalvault.domain.entities.experiment import Experiment
 
-# Mock psycopg module before importing PostgreSQLStorageAdapter
-sys.modules["psycopg"] = MagicMock()
-sys.modules["psycopg.rows"] = MagicMock()
+POSTGRES_ADAPTER_MODULE = "evalvault.adapters.outbound.storage.postgres_adapter"
 
 
 @pytest.fixture(autouse=True)
-def patch_pg_migrations():
+def mock_psycopg_modules():
+    """Ensure psycopg is mocked before importing the adapter module."""
+    original_psycopg = sys.modules.get("psycopg")
+    original_psycopg_rows = sys.modules.get("psycopg.rows")
+    sys.modules["psycopg"] = MagicMock()
+    sys.modules["psycopg.rows"] = MagicMock()
+
+    if POSTGRES_ADAPTER_MODULE in sys.modules:
+        del sys.modules[POSTGRES_ADAPTER_MODULE]
+    importlib.import_module(POSTGRES_ADAPTER_MODULE)
+
+    yield
+
+    if original_psycopg is None:
+        sys.modules.pop("psycopg", None)
+    else:
+        sys.modules["psycopg"] = original_psycopg
+
+    if original_psycopg_rows is None:
+        sys.modules.pop("psycopg.rows", None)
+    else:
+        sys.modules["psycopg.rows"] = original_psycopg_rows
+
+
+@pytest.fixture(autouse=True)
+def patch_pg_migrations(mock_psycopg_modules):
     """Skip actual schema migrations during tests."""
     with patch(
         "evalvault.adapters.outbound.storage.postgres_adapter.PostgreSQLStorageAdapter._apply_migrations",

@@ -26,6 +26,7 @@ from evalvault.domain.entities.analysis import (
     TopicCluster,
 )
 from evalvault.domain.entities.experiment import Experiment
+from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
 
 
 class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
@@ -127,6 +128,187 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN tags JSONB")
             if "metadata" not in pipeline_columns:
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata JSONB")
+
+    # Prompt set methods
+
+    def save_prompt_set(self, bundle: PromptSetBundle) -> None:
+        """Save prompt set, prompts, and join items."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO prompt_sets (
+                    prompt_set_id, name, description, metadata, created_at
+                ) VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (prompt_set_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    metadata = EXCLUDED.metadata
+                """,
+                (
+                    bundle.prompt_set.prompt_set_id,
+                    bundle.prompt_set.name,
+                    bundle.prompt_set.description,
+                    json.dumps(bundle.prompt_set.metadata),
+                    bundle.prompt_set.created_at,
+                ),
+            )
+
+            for prompt in bundle.prompts:
+                conn.execute(
+                    """
+                    INSERT INTO prompts (
+                        prompt_id, name, kind, content, checksum,
+                        source, notes, metadata, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (prompt_id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        kind = EXCLUDED.kind,
+                        content = EXCLUDED.content,
+                        checksum = EXCLUDED.checksum,
+                        source = EXCLUDED.source,
+                        notes = EXCLUDED.notes,
+                        metadata = EXCLUDED.metadata
+                    """,
+                    (
+                        prompt.prompt_id,
+                        prompt.name,
+                        prompt.kind,
+                        prompt.content,
+                        prompt.checksum,
+                        prompt.source,
+                        prompt.notes,
+                        json.dumps(prompt.metadata),
+                        prompt.created_at,
+                    ),
+                )
+
+            conn.execute(
+                "DELETE FROM prompt_set_items WHERE prompt_set_id = %s",
+                (bundle.prompt_set.prompt_set_id,),
+            )
+            for item in bundle.items:
+                conn.execute(
+                    """
+                    INSERT INTO prompt_set_items (
+                        prompt_set_id, prompt_id, role, item_order, metadata
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        item.prompt_set_id,
+                        item.prompt_id,
+                        item.role,
+                        item.item_order,
+                        json.dumps(item.metadata),
+                    ),
+                )
+            conn.commit()
+
+    def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
+        """Attach a prompt set to a run."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO run_prompt_sets (
+                    run_id, prompt_set_id, created_at
+                ) VALUES (%s, %s, %s)
+                ON CONFLICT (run_id, prompt_set_id) DO NOTHING
+                """,
+                (
+                    run_id,
+                    prompt_set_id,
+                    datetime.now(UTC),
+                ),
+            )
+            conn.commit()
+
+    def get_prompt_set(self, prompt_set_id: str) -> PromptSetBundle:
+        """Load a prompt set bundle by ID."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT prompt_set_id, name, description, metadata, created_at
+                FROM prompt_sets
+                WHERE prompt_set_id = %s
+                """,
+                (prompt_set_id,),
+            ).fetchone()
+            if not row:
+                raise KeyError(f"Prompt set not found: {prompt_set_id}")
+
+            prompt_set = PromptSet(
+                prompt_set_id=str(row["prompt_set_id"]),
+                name=row["name"],
+                description=row.get("description") or "",
+                metadata=row["metadata"] or {},
+                created_at=row["created_at"],
+            )
+
+            item_rows = conn.execute(
+                """
+                SELECT prompt_id, role, item_order, metadata
+                FROM prompt_set_items
+                WHERE prompt_set_id = %s
+                ORDER BY item_order, id
+                """,
+                (prompt_set_id,),
+            ).fetchall()
+
+            items = [
+                PromptSetItem(
+                    prompt_set_id=str(prompt_set_id),
+                    prompt_id=str(item["prompt_id"]),
+                    role=item["role"],
+                    item_order=item.get("item_order") or 0,
+                    metadata=item.get("metadata") or {},
+                )
+                for item in item_rows
+            ]
+
+            prompt_ids = [item.prompt_id for item in items]
+            prompts: list[Prompt] = []
+            if prompt_ids:
+                prompt_rows = conn.execute(
+                    """
+                    SELECT prompt_id, name, kind, content, checksum,
+                           source, notes, metadata, created_at
+                    FROM prompts
+                    WHERE prompt_id = ANY(%s)
+                    """,
+                    (prompt_ids,),
+                ).fetchall()
+                for prompt_row in prompt_rows:
+                    prompts.append(
+                        Prompt(
+                            prompt_id=str(prompt_row["prompt_id"]),
+                            name=prompt_row["name"],
+                            kind=prompt_row["kind"],
+                            content=prompt_row["content"],
+                            checksum=prompt_row["checksum"],
+                            source=prompt_row.get("source"),
+                            notes=prompt_row.get("notes"),
+                            metadata=prompt_row.get("metadata") or {},
+                            created_at=prompt_row["created_at"],
+                        )
+                    )
+
+            return PromptSetBundle(prompt_set=prompt_set, prompts=prompts, items=items)
+
+    def get_prompt_set_for_run(self, run_id: str) -> PromptSetBundle | None:
+        """Load the prompt set linked to a run."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT prompt_set_id
+                FROM run_prompt_sets
+                WHERE run_id = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (run_id,),
+            ).fetchone()
+            if not row:
+                return None
+        return self.get_prompt_set(str(row["prompt_set_id"]))
 
     # Experiment 관련 메서드
 

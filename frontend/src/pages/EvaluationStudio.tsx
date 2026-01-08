@@ -22,6 +22,14 @@ const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
+const formatEta = (seconds: number | null) => {
+    if (seconds == null || !Number.isFinite(seconds)) return "--:--";
+    const total = Math.max(0, Math.floor(seconds));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
 export function EvaluationStudio() {
     const navigate = useNavigate();
 
@@ -50,6 +58,11 @@ export function EvaluationStudio() {
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [batchSize, setBatchSize] = useState<number>(1);
     const [thresholdProfile, setThresholdProfile] = useState<"none" | "summary" | "qa">("none");
+    const [systemPrompt, setSystemPrompt] = useState<string>("");
+    const [systemPromptName, setSystemPromptName] = useState<string>("");
+    const [promptSetName, setPromptSetName] = useState<string>("");
+    const [promptSetDescription, setPromptSetDescription] = useState<string>("");
+    const [ragasPromptsYaml, setRagasPromptsYaml] = useState<string>("");
 
     // Upload Modal State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -66,6 +79,12 @@ export function EvaluationStudio() {
     const [progress, setProgress] = useState(0);
     const [progressMessage, setProgressMessage] = useState("Initializing...");
     const [logs, setLogs] = useState<string[]>([]);
+    const [progressStats, setProgressStats] = useState({
+        current: 0,
+        total: 0,
+        etaSeconds: null as number | null,
+        rate: null as number | null,
+    });
 
     const handleUpload = async () => {
         if (!uploadFile) return;
@@ -244,8 +263,11 @@ export function EvaluationStudio() {
         setProgress(0);
         setLogs([]);
         setProgressMessage("Initializing...");
+        setProgressStats({ current: 0, total: 0, etaSeconds: null, rate: null });
 
         try {
+            const systemPromptValue = systemPrompt.trim();
+            const ragasPromptValue = ragasPromptsYaml.trim();
             const result = await startEvaluation({
                 dataset_path: selectedDataset,
                 model: selectedModel,
@@ -259,14 +281,28 @@ export function EvaluationStudio() {
                     ? { mode: retrieverMode, docs_path: docsPath.trim(), top_k: 5 }
                     : undefined,
                 memory_config: enableMemory ? { enabled: true, augment_context: true } : undefined,
-                tracker_config: tracker !== "none" ? { provider: tracker } : undefined
+                tracker_config: tracker !== "none" ? { provider: tracker } : undefined,
+                system_prompt: systemPromptValue ? systemPrompt : undefined,
+                system_prompt_name: systemPromptName.trim() || undefined,
+                prompt_set_name: promptSetName.trim() || undefined,
+                prompt_set_description: promptSetDescription.trim() || undefined,
+                ragas_prompts_yaml: ragasPromptValue ? ragasPromptsYaml : undefined,
             }, (event) => {
                 if (event.type === "progress") {
                     const data = isRecord(event.data) ? event.data : {};
                     const percent = typeof data.percent === "number" ? data.percent : 0;
                     const message = typeof data.message === "string" ? data.message : "Processing...";
+                    const current = typeof data.current === "number" ? data.current : 0;
+                    const total = typeof data.total === "number" ? data.total : 0;
+                    const etaSeconds = typeof data.eta_seconds === "number" && Number.isFinite(data.eta_seconds)
+                        ? data.eta_seconds
+                        : null;
+                    const rate = typeof data.rate === "number" && Number.isFinite(data.rate)
+                        ? data.rate
+                        : null;
                     setProgress(percent);
                     setProgressMessage(message);
+                    setProgressStats({ current, total, etaSeconds, rate });
                 } else if (event.type === "info" || event.type === "warning" || event.type === "step") {
                     const msg = event.message || "";
                     setLogs(prev => [...prev, msg]);
@@ -668,6 +704,66 @@ export function EvaluationStudio() {
                                     </div>
                                 </div>
 
+                                {/* Prompt Snapshot */}
+                                <div>
+                                    <h3 className="text-sm font-medium mb-3">Prompt Snapshot</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Prompt Set Name</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g., prod-sys-v3"
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                value={promptSetName}
+                                                onChange={(e) => setPromptSetName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Prompt Set Description</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Optional description for this prompt set"
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                value={promptSetDescription}
+                                                onChange={(e) => setPromptSetDescription(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-xs text-muted-foreground mb-1 block">System Prompt (target LLM)</label>
+                                            <textarea
+                                                rows={4}
+                                                placeholder="Paste the system prompt used in your production LLM"
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                value={systemPrompt}
+                                                onChange={(e) => setSystemPrompt(e.target.value)}
+                                            />
+                                            <div className="mt-2">
+                                                <label className="text-xs text-muted-foreground mb-1 block">System Prompt Name</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Optional label (e.g., sys-v2)"
+                                                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                                                    value={systemPromptName}
+                                                    onChange={(e) => setSystemPromptName(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-xs text-muted-foreground mb-1 block">Ragas Prompt Overrides (YAML)</label>
+                                            <textarea
+                                                rows={6}
+                                                placeholder={"metrics:\n  faithfulness: |\n    ...\n  answer_relevancy: |\n    ..."}
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm font-mono"
+                                                value={ragasPromptsYaml}
+                                                onChange={(e) => setRagasPromptsYaml(e.target.value)}
+                                            />
+                                            <p className="text-xs text-muted-foreground mt-2">
+                                                Provide metric prompt templates to override Ragas defaults. Leave empty to skip.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Domain Memory */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Domain Memory</h3>
@@ -760,6 +856,17 @@ export function EvaluationStudio() {
                         <div>
                             <h2 className="text-2xl font-semibold mb-2">Evaluating...</h2>
                             <p className="text-muted-foreground animate-pulse">{progressMessage}</p>
+                            <div className="mt-2 text-xs text-muted-foreground flex items-center justify-center gap-2">
+                                <span>{progressStats.total > 0 ? `${progressStats.current}/${progressStats.total}` : `${progressStats.current}`}</span>
+                                <span>•</span>
+                                <span>ETA {formatEta(progressStats.etaSeconds)}</span>
+                                {progressStats.rate != null && (
+                                    <>
+                                        <span>•</span>
+                                        <span>{progressStats.rate.toFixed(2)}/s</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">

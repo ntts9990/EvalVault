@@ -41,6 +41,7 @@ class MemoryAwareEvaluator:
         retriever_top_k: int = 5,
         retriever_doc_ids: Sequence[str] | None = None,
         on_progress: Callable[[int, int, str], None] | None = None,
+        prompt_overrides: dict[str, str] | None = None,
     ) -> EvaluationRun:
         """Run evaluation after adjusting thresholds with memory reliability."""
 
@@ -65,6 +66,7 @@ class MemoryAwareEvaluator:
             retriever_top_k=retriever_top_k,
             retriever_doc_ids=retriever_doc_ids,
             on_progress=on_progress,
+            prompt_overrides=prompt_overrides,
         )
 
     def augment_context_with_facts(

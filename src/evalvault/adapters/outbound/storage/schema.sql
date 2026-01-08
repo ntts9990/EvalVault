@@ -59,6 +59,52 @@ CREATE TABLE IF NOT EXISTS metric_scores (
 CREATE INDEX IF NOT EXISTS idx_scores_result_id ON metric_scores(result_id);
 CREATE INDEX IF NOT EXISTS idx_scores_metric_name ON metric_scores(metric_name);
 
+-- Prompt storage tables
+CREATE TABLE IF NOT EXISTS prompts (
+    prompt_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    content TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    source TEXT,
+    notes TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompts_checksum ON prompts(checksum);
+CREATE INDEX IF NOT EXISTS idx_prompts_kind ON prompts(kind);
+
+CREATE TABLE IF NOT EXISTS prompt_sets (
+    prompt_set_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS prompt_set_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prompt_set_id TEXT NOT NULL,
+    prompt_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    item_order INTEGER DEFAULT 0,
+    metadata TEXT,
+    FOREIGN KEY (prompt_set_id) REFERENCES prompt_sets(prompt_set_id) ON DELETE CASCADE,
+    FOREIGN KEY (prompt_id) REFERENCES prompts(prompt_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_set_items_set_id ON prompt_set_items(prompt_set_id);
+
+CREATE TABLE IF NOT EXISTS run_prompt_sets (
+    run_id TEXT NOT NULL,
+    prompt_set_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, prompt_set_id),
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    FOREIGN KEY (prompt_set_id) REFERENCES prompt_sets(prompt_set_id) ON DELETE CASCADE
+);
+
 -- Experiments table for A/B testing
 CREATE TABLE IF NOT EXISTS experiments (
     experiment_id TEXT PRIMARY KEY,

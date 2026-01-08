@@ -22,6 +22,7 @@ from evalvault.domain.entities.analysis import (
     TopicCluster,
 )
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
 from evalvault.domain.entities.stage import StageEvent, StageMetric, StagePayloadRef
 
 
@@ -80,6 +81,179 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN tags TEXT")
             if "metadata" not in pipeline_columns:
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata TEXT")
+
+    # Prompt set methods
+
+    def save_prompt_set(self, bundle: PromptSetBundle) -> None:
+        """Save prompt set, prompts, and join items."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO prompt_sets (
+                    prompt_set_id, name, description, metadata, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    bundle.prompt_set.prompt_set_id,
+                    bundle.prompt_set.name,
+                    bundle.prompt_set.description,
+                    json.dumps(bundle.prompt_set.metadata),
+                    bundle.prompt_set.created_at.isoformat(),
+                ),
+            )
+
+            for prompt in bundle.prompts:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO prompts (
+                        prompt_id, name, kind, content, checksum,
+                        source, notes, metadata, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        prompt.prompt_id,
+                        prompt.name,
+                        prompt.kind,
+                        prompt.content,
+                        prompt.checksum,
+                        prompt.source,
+                        prompt.notes,
+                        json.dumps(prompt.metadata),
+                        prompt.created_at.isoformat(),
+                    ),
+                )
+
+            cursor.execute(
+                "DELETE FROM prompt_set_items WHERE prompt_set_id = ?",
+                (bundle.prompt_set.prompt_set_id,),
+            )
+            for item in bundle.items:
+                cursor.execute(
+                    """
+                    INSERT INTO prompt_set_items (
+                        prompt_set_id, prompt_id, role, item_order, metadata
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        item.prompt_set_id,
+                        item.prompt_id,
+                        item.role,
+                        item.item_order,
+                        json.dumps(item.metadata),
+                    ),
+                )
+            conn.commit()
+
+    def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
+        """Attach a prompt set to a run."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO run_prompt_sets (
+                    run_id, prompt_set_id, created_at
+                ) VALUES (?, ?, ?)
+                """,
+                (
+                    run_id,
+                    prompt_set_id,
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
+
+    def get_prompt_set(self, prompt_set_id: str) -> PromptSetBundle:
+        """Load a prompt set bundle by ID."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT prompt_set_id, name, description, metadata, created_at
+                FROM prompt_sets
+                WHERE prompt_set_id = ?
+                """,
+                (prompt_set_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise KeyError(f"Prompt set not found: {prompt_set_id}")
+
+            prompt_set = PromptSet(
+                prompt_set_id=row["prompt_set_id"],
+                name=row["name"],
+                description=row["description"] or "",
+                metadata=json.loads(row["metadata"]) if row["metadata"] else {},
+                created_at=self._deserialize_datetime(row["created_at"]),
+            )
+
+            item_rows = conn.execute(
+                """
+                SELECT prompt_id, role, item_order, metadata
+                FROM prompt_set_items
+                WHERE prompt_set_id = ?
+                ORDER BY item_order, id
+                """,
+                (prompt_set_id,),
+            ).fetchall()
+
+            items = [
+                PromptSetItem(
+                    prompt_set_id=prompt_set_id,
+                    prompt_id=item["prompt_id"],
+                    role=item["role"],
+                    item_order=item["item_order"] or 0,
+                    metadata=json.loads(item["metadata"]) if item["metadata"] else {},
+                )
+                for item in item_rows
+            ]
+
+            prompt_ids = [item.prompt_id for item in items]
+            prompts: list[Prompt] = []
+            if prompt_ids:
+                placeholders = ", ".join("?" for _ in prompt_ids)
+                prompt_rows = conn.execute(
+                    f"""
+                    SELECT prompt_id, name, kind, content, checksum, source,
+                           notes, metadata, created_at
+                    FROM prompts
+                    WHERE prompt_id IN ({placeholders})
+                    """,
+                    tuple(prompt_ids),
+                ).fetchall()
+                for prompt_row in prompt_rows:
+                    prompts.append(
+                        Prompt(
+                            prompt_id=prompt_row["prompt_id"],
+                            name=prompt_row["name"],
+                            kind=prompt_row["kind"],
+                            content=prompt_row["content"],
+                            checksum=prompt_row["checksum"],
+                            source=prompt_row["source"],
+                            notes=prompt_row["notes"],
+                            metadata=json.loads(prompt_row["metadata"])
+                            if prompt_row["metadata"]
+                            else {},
+                            created_at=self._deserialize_datetime(prompt_row["created_at"]),
+                        )
+                    )
+
+            return PromptSetBundle(prompt_set=prompt_set, prompts=prompts, items=items)
+
+    def get_prompt_set_for_run(self, run_id: str) -> PromptSetBundle | None:
+        """Load the prompt set linked to a run."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT prompt_set_id
+                FROM run_prompt_sets
+                WHERE run_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (run_id,),
+            ).fetchone()
+            if not row:
+                return None
+        return self.get_prompt_set(row["prompt_set_id"])
 
     # Experiment 관련 메서드
 

@@ -39,6 +39,33 @@ export interface TestCase {
 export interface RunDetailsResponse {
     summary: RunSummary;
     results: TestCase[];
+    prompt_set?: PromptSetDetail;
+}
+
+export interface PromptSnapshotItem {
+    role: string;
+    order: number;
+    metadata?: Record<string, unknown>;
+    prompt: {
+        prompt_id: string;
+        name: string;
+        kind: string;
+        checksum: string;
+        source?: string | null;
+        notes?: string | null;
+        metadata?: Record<string, unknown>;
+        created_at: string;
+        content?: string;
+    };
+}
+
+export interface PromptSetDetail {
+    prompt_set_id: string;
+    name: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+    created_at: string;
+    items: PromptSnapshotItem[];
 }
 
 export interface RunComparisonMetric {
@@ -93,6 +120,12 @@ export interface StartEvaluationRequest {
     memory_config?: Record<string, unknown>;
     tracker_config?: Record<string, unknown>;
     prompt_config?: Record<string, unknown>;
+    system_prompt?: string;
+    system_prompt_name?: string;
+    prompt_set_name?: string;
+    prompt_set_description?: string;
+    ragas_prompts?: Record<string, string>;
+    ragas_prompts_yaml?: string;
 }
 
 export interface JobStatusResponse {

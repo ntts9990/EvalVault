@@ -28,6 +28,13 @@ export function RunDetails() {
     const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
     const summaryMetricSet = new Set(SUMMARY_METRICS);
 
+    const previewPrompt = (content?: string) => {
+        if (!content) return "";
+        const lines = content.split("\n");
+        const snippet = lines.slice(0, 4).join("\n");
+        return lines.length > 4 ? `${snippet}\n...` : snippet;
+    };
+
     useEffect(() => {
         async function loadDetails() {
             if (!id) return;
@@ -135,6 +142,7 @@ export function RunDetails() {
     );
 
     const { summary, results } = data;
+    const promptSet = data.prompt_set;
     const summaryThresholds = summary.thresholds || {};
     const summaryMetrics = summary.metrics_evaluated.filter((metric) =>
         summaryMetricSet.has(metric)
@@ -277,8 +285,9 @@ export function RunDetails() {
                 )}
 
                 {activeTab === "overview" ? (
-                    /* Charts & Summary Grid (Overview) */
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <>
+                        {/* Charts & Summary Grid (Overview) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                         {/* Metric Performance Chart */}
                         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm">
                             <h3 className="font-semibold mb-6 flex items-center gap-2">
@@ -328,7 +337,48 @@ export function RunDetails() {
                                 <p className="text-sm font-semibold tracking-wide">{thresholdProfileLabel}</p>
                             </div>
                         </div>
-                    </div>
+                        </div>
+                        {promptSet && (
+                            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-8">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-semibold flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-primary" />
+                                            Prompt Snapshot
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            {promptSet.name || "Unnamed prompt set"}
+                                            {promptSet.description ? ` • ${promptSet.description}` : ""}
+                                        </p>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                        {promptSet.prompt_set_id.slice(0, 8)}
+                                    </span>
+                                </div>
+                                <div className="mt-4 space-y-3">
+                                    {promptSet.items.map((item) => (
+                                        <div key={item.prompt.prompt_id} className="border border-border rounded-lg p-4 bg-background/40">
+                                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                <span className="font-semibold text-foreground">{item.role}</span>
+                                                <span className="px-2 py-0.5 rounded-full border border-border bg-secondary">
+                                                    {item.prompt.kind}
+                                                </span>
+                                                <span className="font-mono">{item.prompt.checksum.slice(0, 12)}</span>
+                                                {item.prompt.source && (
+                                                    <span className="truncate max-w-[200px]">{item.prompt.source}</span>
+                                                )}
+                                            </div>
+                                            {item.prompt.content && (
+                                                <pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                                    {previewPrompt(item.prompt.content)}
+                                                </pre>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     /* Performance Tab Content */
                     /* Performance Tab Content */
