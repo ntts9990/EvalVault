@@ -1,0 +1,514 @@
+{
+  "node_id": "nlp_analysis",
+  "status": "completed",
+  "duration_ms": 273,
+  "error": null,
+  "output": {
+    "analysis": {
+      "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+      "question_stats": {
+        "char_count": 478,
+        "word_count": 116,
+        "sentence_count": 18,
+        "avg_word_length": 2.9310344827586206,
+        "unique_word_ratio": 0.5603448275862069
+      },
+      "answer_stats": {
+        "char_count": 320,
+        "word_count": 62,
+        "sentence_count": 18,
+        "avg_word_length": 3.0806451612903225,
+        "unique_word_ratio": 0.7580645161290323
+      },
+      "context_stats": {
+        "char_count": 1018,
+        "word_count": 232,
+        "sentence_count": 36,
+        "avg_word_length": 2.728448275862069,
+        "unique_word_ratio": 0.5732758620689655
+      },
+      "question_types": [
+        {
+          "question_type": "factual",
+          "count": 14,
+          "percentage": 0.7777777777777778,
+          "avg_scores": {
+            "faithfulness": 0.7857142857142857,
+            "answer_relevancy": 0.41131247780067187
+          }
+        },
+        {
+          "question_type": "reasoning",
+          "count": 4,
+          "percentage": 0.2222222222222222,
+          "avg_scores": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.3066774082212909
+          }
+        }
+      ],
+      "top_keywords": [
+        {
+          "keyword": "얼마인가요",
+          "frequency": 10,
+          "tfidf_score": 0.12184753244385389,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "할인입니다",
+          "frequency": 7,
+          "tfidf_score": 0.11272847870822636,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "할인율은",
+          "frequency": 6,
+          "tfidf_score": 0.10817897818189648,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "되나요",
+          "frequency": 4,
+          "tfidf_score": 0.09826157850254186,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "어떻게",
+          "frequency": 4,
+          "tfidf_score": 0.09826157850254186,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "한정",
+          "frequency": 4,
+          "tfidf_score": 0.08585676484843696,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "특약에서",
+          "frequency": 4,
+          "tfidf_score": 0.07341078630749143,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "대인배상",
+          "frequency": 4,
+          "tfidf_score": 0.072150942694056,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "이하",
+          "frequency": 4,
+          "tfidf_score": 0.06521019087406328,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "운전자",
+          "frequency": 3,
+          "tfidf_score": 0.06367634199545938,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "가입",
+          "frequency": 3,
+          "tfidf_score": 0.05814655921622444,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "이상",
+          "frequency": 2,
+          "tfidf_score": 0.057506427069822064,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "사망",
+          "frequency": 3,
+          "tfidf_score": 0.053195956195828405,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "보장됩니다",
+          "frequency": 3,
+          "tfidf_score": 0.04692324911437527,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "마일리지",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "연간",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "주행",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "차량",
+          "frequency": 3,
+          "tfidf_score": 0.046196555958064295,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "영업용",
+          "frequency": 2,
+          "tfidf_score": 0.0461455712412178,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "등록",
+          "frequency": 3,
+          "tfidf_score": 0.04397255322586066,
+          "avg_metric_scores": null
+        }
+      ],
+      "topic_clusters": [],
+      "insights": [
+        "Questions are short and concise",
+        "Dominant question type: factual (78%)",
+        "Top keywords: 얼마인가요, 할인입니다, 할인율은"
+      ]
+    },
+    "summary": {
+      "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+      "has_text_stats": true,
+      "has_question_type_analysis": true,
+      "has_keyword_analysis": true,
+      "question_stats_preview": 6.444444444444445,
+      "answer_stats_preview": 3.4444444444444446,
+      "context_count": 36,
+      "dominant_question_type": "factual",
+      "top_keywords_preview": [
+        "얼마인가요",
+        "할인입니다",
+        "할인율은",
+        "되나요",
+        "어떻게"
+      ]
+    },
+    "statistics": {
+      "text_stats": {
+        "questions": {
+          "char_count": 478,
+          "word_count": 116,
+          "sentence_count": 18,
+          "avg_word_length": 2.9310344827586206,
+          "unique_word_ratio": 0.5603448275862069
+        },
+        "answers": {
+          "char_count": 320,
+          "word_count": 62,
+          "sentence_count": 18,
+          "avg_word_length": 3.0806451612903225,
+          "unique_word_ratio": 0.7580645161290323
+        },
+        "contexts": {
+          "char_count": 1018,
+          "word_count": 232,
+          "sentence_count": 36,
+          "avg_word_length": 2.728448275862069,
+          "unique_word_ratio": 0.5732758620689655
+        }
+      },
+      "question_type_distribution": [
+        {
+          "question_type": "factual",
+          "count": 14,
+          "percentage": 0.7777777777777778,
+          "avg_scores": {
+            "faithfulness": 0.7857142857142857,
+            "answer_relevancy": 0.41131247780067187
+          }
+        },
+        {
+          "question_type": "reasoning",
+          "count": 4,
+          "percentage": 0.2222222222222222,
+          "avg_scores": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.3066774082212909
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "keyword": "얼마인가요",
+          "frequency": 10,
+          "tfidf_score": 0.12184753244385389,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "할인입니다",
+          "frequency": 7,
+          "tfidf_score": 0.11272847870822636,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "할인율은",
+          "frequency": 6,
+          "tfidf_score": 0.10817897818189648,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "되나요",
+          "frequency": 4,
+          "tfidf_score": 0.09826157850254186,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "어떻게",
+          "frequency": 4,
+          "tfidf_score": 0.09826157850254186,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "한정",
+          "frequency": 4,
+          "tfidf_score": 0.08585676484843696,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "특약에서",
+          "frequency": 4,
+          "tfidf_score": 0.07341078630749143,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "대인배상",
+          "frequency": 4,
+          "tfidf_score": 0.072150942694056,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "이하",
+          "frequency": 4,
+          "tfidf_score": 0.06521019087406328,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "운전자",
+          "frequency": 3,
+          "tfidf_score": 0.06367634199545938,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "가입",
+          "frequency": 3,
+          "tfidf_score": 0.05814655921622444,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "이상",
+          "frequency": 2,
+          "tfidf_score": 0.057506427069822064,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "사망",
+          "frequency": 3,
+          "tfidf_score": 0.053195956195828405,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "보장됩니다",
+          "frequency": 3,
+          "tfidf_score": 0.04692324911437527,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "마일리지",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "연간",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "주행",
+          "frequency": 2,
+          "tfidf_score": 0.046542401131648856,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "차량",
+          "frequency": 3,
+          "tfidf_score": 0.046196555958064295,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "영업용",
+          "frequency": 2,
+          "tfidf_score": 0.0461455712412178,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "등록",
+          "frequency": 3,
+          "tfidf_score": 0.04397255322586066,
+          "avg_metric_scores": null
+        }
+      ]
+    },
+    "insights": [
+      "Questions are short and concise",
+      "Dominant question type: factual (78%)",
+      "Top keywords: 얼마인가요, 할인입니다, 할인율은"
+    ],
+    "analysis_id": null,
+    "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+    "question_types": [
+      {
+        "question_type": "factual",
+        "count": 14,
+        "percentage": 0.7777777777777778,
+        "avg_scores": {
+          "faithfulness": 0.7857142857142857,
+          "answer_relevancy": 0.41131247780067187
+        }
+      },
+      {
+        "question_type": "reasoning",
+        "count": 4,
+        "percentage": 0.2222222222222222,
+        "avg_scores": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.3066774082212909
+        }
+      }
+    ],
+    "top_keywords": [
+      {
+        "keyword": "얼마인가요",
+        "frequency": 10,
+        "tfidf_score": 0.12184753244385389,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "할인입니다",
+        "frequency": 7,
+        "tfidf_score": 0.11272847870822636,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "할인율은",
+        "frequency": 6,
+        "tfidf_score": 0.10817897818189648,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "되나요",
+        "frequency": 4,
+        "tfidf_score": 0.09826157850254186,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "어떻게",
+        "frequency": 4,
+        "tfidf_score": 0.09826157850254186,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "한정",
+        "frequency": 4,
+        "tfidf_score": 0.08585676484843696,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "특약에서",
+        "frequency": 4,
+        "tfidf_score": 0.07341078630749143,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "대인배상",
+        "frequency": 4,
+        "tfidf_score": 0.072150942694056,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "이하",
+        "frequency": 4,
+        "tfidf_score": 0.06521019087406328,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "운전자",
+        "frequency": 3,
+        "tfidf_score": 0.06367634199545938,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "가입",
+        "frequency": 3,
+        "tfidf_score": 0.05814655921622444,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "이상",
+        "frequency": 2,
+        "tfidf_score": 0.057506427069822064,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "사망",
+        "frequency": 3,
+        "tfidf_score": 0.053195956195828405,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "보장됩니다",
+        "frequency": 3,
+        "tfidf_score": 0.04692324911437527,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "마일리지",
+        "frequency": 2,
+        "tfidf_score": 0.046542401131648856,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "연간",
+        "frequency": 2,
+        "tfidf_score": 0.046542401131648856,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "주행",
+        "frequency": 2,
+        "tfidf_score": 0.046542401131648856,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "차량",
+        "frequency": 3,
+        "tfidf_score": 0.046196555958064295,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "영업용",
+        "frequency": 2,
+        "tfidf_score": 0.0461455712412178,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "등록",
+        "frequency": 3,
+        "tfidf_score": 0.04397255322586066,
+        "avg_metric_scores": null
+      }
+    ],
+    "topic_clusters": []
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "node_id": "priority_summary",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "bottom_percentile": 10.0,
+    "impact_count": 3,
+    "total_cases": 4,
+    "bottom_count": 1,
+    "bottom_cases": [
+      {
+        "test_case_id": "test_001",
+        "avg_score": 0.4183,
+        "failed_metrics": [
+          "faithfulness"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "faithfulness": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.616,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "What is Python?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      }
+    ],
+    "impact_cases": [
+      {
+        "test_case_id": "test_001",
+        "avg_score": 0.4183,
+        "failed_metrics": [
+          "faithfulness"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "faithfulness": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.616,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "What is Python?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "test_003",
+        "avg_score": 0.4544,
+        "failed_metrics": [
+          "faithfulness"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "faithfulness": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.616,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "What is RAG?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "test_002",
+        "avg_score": 0.9362,
+        "failed_metrics": [],
+        "failed_metric_count": 0,
+        "gap_by_metric": {},
+        "shortfall": 0.0,
+        "impact_score": 0.1,
+        "worst_metric": null,
+        "worst_score": null,
+        "worst_gap": null,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "What is machine learning?",
+        "analysis_hints": [
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "high_impact"
+        ]
+      }
+    ],
+    "run_metadata": {
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "dataset_name": "test_dataset",
+      "dataset_version": "1.0.0",
+      "model_name": "ollama/gpt-oss-safeguard:20b",
+      "started_at": "2026-01-09T09:47:43.429178",
+      "finished_at": "2026-01-09T09:51:00.132606",
+      "total_test_cases": 4,
+      "passed_test_cases": 2,
+      "pass_rate": 0.5,
+      "total_tokens": 18642,
+      "total_cost_usd": 0.051585,
+      "duration_seconds": 196.703428,
+      "tracker_metadata": {
+        "run_mode": "full"
+      },
+      "metrics_evaluated": [
+        "faithfulness",
+        "answer_relevancy"
+      ],
+      "run_mode": "full",
+      "thresholds": {
+        "faithfulness": 0.7,
+        "answer_relevancy": 0.7
+      },
+      "avg_faithfulness": 0.5,
+      "avg_answer_relevancy": 0.8840076251449925
+    }
+  }
+}

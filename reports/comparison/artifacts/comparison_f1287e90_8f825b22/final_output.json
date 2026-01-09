@@ -1,0 +1,150 @@
+{
+  "output": {
+    "report": {
+      "report": "# RAG 평가 비교 분석 보고서\n\n## 요약  \n두 실행 결과를 비교해 본 결과, **Run A**는 질문에 대한 답변이 대부분 문맥과 일치했으나 신뢰성(faithfulness) 측면에서 부진했으며, **Run B**는 `faithfulness`가 높게 나타났으나 `answer_relevancy`가 크게 감소하였다.  \n- 지표 : `answer_relevancy`가 35 % 감소  \n- 변경 사항 : 데이터셋이 4개 → 18개로 확대, 실제 테스트 케이스 수 적음  \n- 사용자 영향 : 한국어 보험 관련 질문에 대해 정확한 답변 제공이 어려움  \n\n---\n\n## 1. 변경 사항 요약  \n| 항목 | 전 상태 | 후 상태 | 비고 |\n|------|----------|---------|------|\n| dataset_name | test_dataset | e2e‑auto‑insurance‑qa‑korean | 데이터셋 변경 |\n| total_test_cases | 4 | 18 | 샘플 수 확장, 실제 케이스 4개만 제공 |\n| prompt_change_count | 0 | 0 | 프롬프트 변경 없음 (snapshot 미발견) |\n\n---\n\n## 2. 지표 비교 스코어카드  \n| metric | Run A | Run B | diff | p‑value | effect size | 효과 수준 | 승자 | 상태 |\n|--------|-------|-------|------|---------|-------------|------------|------|------|\n| faithfulness | 0.50 | 0.83 | +0.33 | 0.165 | 0.756 | 중간 | — | 비고 : 차이통계 유의미 아님 |\n| answer_relevancy | 0.884 | 0.566 | –0.318 | 7.1e‑07 | –4.99 | 대 | Run A | 유의미 감소 |\n\n> **주의**: 두 실행은 다른 데이터셋을 사용하므로 지표 차이를 해석할 때 반드시 데이터셋 차이를 반영해야 합니다.\n\n---\n\n## 3. 통계적 신뢰도  \n- **표본 수**: Run A는 4건, Run B는 18건 중 4건만 공개 → **표본 수 부족** (quality_checks flagged).  \n- **p‑value**  \n  - `faithfulness`: 0.165 → **비유의미**  \n  - `answer_relevancy`: 7.1 × 10⁻⁷ → **확실히 유의미**  \n\n> *확인 필요*: 추가 사례를 포함해 테스트 집합의 통계적 파워를 증가시키는 것이 권장됩니다.\n\n---\n\n## 4. 원인 분석  \n| 원인 | 증거 | 영향 | 비고 |\n|------|------|------|------|\n| 데이터셋 변화 | `e2e‑auto‑insurance‑qa‑korean` 도입 | `answer_relevancy` 감소 (비한국어 → 한국어 내용이 비일관적) | [B1] |\n| 테스트 케이스 수 부족 | `quality_summary.flags` | 표본 수가 4건 ≤ 10개 → 신뢰도가 낮음 |  |\n| 모델 신뢰성 변동 | `faithfulness` 0.0 → 0.833 (전반) | 특정 문맥에 대한 정확도 개선 | – |\n\n> *핵심*: 한국어 도메인에서는 문맥이 복잡해 `faithfulness`가 개선되었으나, relevancy가 크게 떨어지면서 실제 사용자에게 불리함.\n\n---\n\n## 5. 개선 제안  \n1. **데이터셋 보강**  \n   - `e2e‑auto‑insurance‑qa‑korean`에 포함된 모든 18개 테스트 케이스에 대한 **metrics**를 재측정.  \n   - **증거**: [B2] `answer_relevancy`가 0.632 → 여전히 낮음.\n\n2. **프롬프트 최적화**  \n   - `--db`, `--system-prompt`, `--ragas-prompts` 옵션을 활용해 문맥 명시성 강화.  \n   - 프롬프트 버전 관리가 필요합니다 (snapshot이 없으므로 재생성).\n\n3. **모델 튜닝**  \n   - `faithfulness`는 현재 충분히 높으므로 `answer_relevancy` 향상에 초점을 맞춤.  \n   - retrieval 구성(베이스, 유사도 임계값)을 재설정해 문맥 일관성 보장.\n\n4. **평가 프레임워크 검증**  \n   - `quality_checks.flags`를 토대로, **sample_count**를 10 이상으로 설정하고 재실험.\n\n> **추가 데이터 필요**: 현재 4개 사례만으로는 통계적 유의성 판단이 불충분합니다.\n\n---\n\n## 6. 다음 단계  \n| 단계 | 목표 | 담당 | 비고 |\n|------|------|------|------|\n| 6.1 | 전 데이터셋(18건) 평가 | QA팀 | `run_b` 메트릭 완전 기록 |\n| 6.2 | 프롬프트 재설정 및 재실험 | 엔지니어 | `--system-prompt` 업데이트 |\n| 6.3 | 재실험 결과 비교 | 분석가 | `scorecard` 자동화 |\n| 6.4 | 결과 보고서 업데이트 | 문서팀 | 최신 시각화 & 설명 |\n\n---\n\n## 7. 부록(산출물)  \n\n| 파일명 | 내용 |\n|--------|------|\n| `load_runs.json` | 실행 기록 로드 스크립트 |\n| `run_change_detection.json` | 실행 간 변경 사항 비교 |\n| `run_metric_comparison.json` | 메트릭 비교 결과 |\n\n> **문서 위치**: `/reports/artifact_manifest/`\n\n---\n\n> **마지막 주의**  \n> *데이터셋 변동*과 *표본 수 부족*이 평가 결론에 큰 영향을 미칩니다. 추후 실험 시 이 사변량을 통제해 유의미한 결론 도출을 목표로 두어야 합니다.",
+      "format": "markdown",
+      "llm_used": true,
+      "llm_model": "ollama/gpt-oss-safeguard:20b",
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "summary": {
+        "report_type": "comparison",
+        "total_evidence": 6,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.4183,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.8366828943604284
+          },
+          "evidence_id": "A1",
+          "run_label": "A",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.4544,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.9087545725582776
+          },
+          "evidence_id": "A2",
+          "run_label": "A",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.9362,
+          "failed_metrics": [],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.8724614057329397
+          },
+          "evidence_id": "A3",
+          "run_label": "A",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "auto-007",
+          "avg_score": 0.2473,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+          "answer": "19% 할인입니다.",
+          "contexts": [
+            "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+            "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+          ],
+          "ground_truth": "19%",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.49459554832359515
+          },
+          "evidence_id": "B1",
+          "run_label": "B",
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "auto-010",
+          "avg_score": 0.3161,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+          "answer": "5% 할인입니다.",
+          "contexts": [
+            "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+            "2채널 이상: 5% 할인, 1채널: 3% 할인."
+          ],
+          "ground_truth": "5%",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.6322424139879534
+          },
+          "evidence_id": "B2",
+          "run_label": "B",
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "auto-003",
+          "avg_score": 0.3573,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "대인배상 II는 어떤 보장을 제공하나요?",
+          "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+          "contexts": [
+            "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+            "중상해 사고 시 필수적으로 가입을 권장합니다."
+          ],
+          "ground_truth": "무한 보장",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.7145836968078935
+          },
+          "evidence_id": "B3",
+          "run_label": "B",
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        }
+      ]
+    }
+  }
+}

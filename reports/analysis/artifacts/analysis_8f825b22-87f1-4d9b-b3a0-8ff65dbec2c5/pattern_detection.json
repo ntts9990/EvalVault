@@ -1,0 +1,42 @@
+{
+  "node_id": "pattern_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "patterns": [
+      {
+        "label": "Top keyword",
+        "detail": "얼마인가요 (freq 10)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "할인입니다 (freq 7)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "할인율은 (freq 6)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "되나요 (freq 4)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "어떻게 (freq 4)"
+      },
+      {
+        "label": "Question type",
+        "detail": "factual (0.8%)"
+      },
+      {
+        "label": "Question type",
+        "detail": "reasoning (0.2%)"
+      }
+    ],
+    "summary": {
+      "keyword_count": 20,
+      "question_type_count": 2
+    }
+  }
+}

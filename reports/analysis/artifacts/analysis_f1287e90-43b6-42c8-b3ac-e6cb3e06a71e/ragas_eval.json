@@ -1,0 +1,56 @@
+{
+  "node_id": "ragas_eval",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "summary": {
+      "metric_count": 2,
+      "sample_count": 4,
+      "overall_score": 0.692,
+      "recomputed": false
+    },
+    "metrics": {
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8840076251449925
+    },
+    "per_case": [
+      {
+        "test_case_id": "test_001",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.8366828943604284
+        },
+        "avg_score": 0.4183,
+        "question_preview": "What is Python?"
+      },
+      {
+        "test_case_id": "test_002",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.8724614057329397
+        },
+        "avg_score": 0.9362,
+        "question_preview": "What is machine learning?"
+      },
+      {
+        "test_case_id": "test_003",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.9087545725582776
+        },
+        "avg_score": 0.4544,
+        "question_preview": "What is RAG?"
+      },
+      {
+        "test_case_id": "test_004",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.9181316279283243
+        },
+        "avg_score": 0.9591,
+        "question_preview": "What is TDD?"
+      }
+    ]
+  }
+}

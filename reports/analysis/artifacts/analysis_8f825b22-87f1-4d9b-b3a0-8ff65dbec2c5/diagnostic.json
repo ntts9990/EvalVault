@@ -1,0 +1,21 @@
+{
+  "node_id": "diagnostic",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "threshold": 0.6,
+    "diagnostics": [
+      {
+        "metric": "answer_relevancy",
+        "issue": "answer_relevancy 점수가 기준치 미달입니다 (0.57 < 0.70).",
+        "score": 0.566,
+        "threshold": 0.7,
+        "gap": 0.134
+      }
+    ],
+    "recommendations": [
+      "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+    ]
+  }
+}

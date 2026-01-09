@@ -1,0 +1,146 @@
+{
+  "output": {
+    "report": {
+      "report": "# RAG 평가 분석 보고서  \n**비교 대상**: `run_a (0aa9fab0‑6c2c‑4c1c‑b228‑202a38a2f00c)` vs `run_b (f1287e90‑43b6‑42c8‑b3ac‑e6cb3e06a71e)`  \n**데이터셋**: `test_dataset v1.0.0` (변경 없음)  \n**모델**: `ollama/gpt‑oss‑safeguard:20b`  \n**평가 기간**: 2026‑01‑09\n\n---\n\n## 📌 요약  \n두 실행은 동일한 모델·데이터셋·구성을 사용해 실행된 결과, **Faithfulness** 및 **Answer Relevancy** 지표에서 차이가 없으며(평균 0.5 / 0.884) **지표 변화가 거의 무시 가능**했다.  \n- **지표**: Faithfulness 0.5, Relevancy 0.884, 두 실행 모두 Pass Rate 0.5  \n- **변경 사항**: 데이터셋/구성/프롬프트 변화 없음 → 모델 성과의 차이 없음  \n- **사용자 영향**: 현 시점에서는 사용자에게 추가 benefit이나 리스크가 관측되지 않음(단, 표본 수가 적어 통계적 신뢰도 낮음)\n\n---\n\n## 🔍 변경 사항 요약  \n| 항목 | Run A | Run B | 변화 여부 |\n|------|-------|-------|-----------|\n| 데이터셋 버전 | 1.0.0 | 1.0.0 | **없음** |\n| 설정(옵션) | 동일 | 동일 | **없음** |\n| 프롬프트 | 기록 미존재 | 기록 미존재 | **미검증** |\n\n> **※ 주의**: 프롬프트 스냅샷이 없으므로 프롬프트 차이 해석이 불가능합니다.\n\n---\n\n## 📊 지표 비교 스코어카드  \n\n| metric | mean_A | mean_B | diff | diff_percent | p‑value | effect_size | effect_level | status |\n|--------|--------|--------|------|--------------|---------|-------------|--------------|--------|\n| faithfulness | 0.50 | 0.50 | 0.00 | 0.00% | 1.00 | 0.0 | negligible | flat |\n| answer_relevancy | 0.884 | 0.884 | 0.00 | 0.00% | 1.00 | 0.0 | negligible | flat |\n\n> **설명**: 두 실행 모두 `faithfulness`와 `answer_relevancy`가 동일한 평균을 보였으며, 통계적 차이(`p_value = 1.00`)가 없어 **유의미한 개선·하락**이 관측되지 않습니다.\n\n---\n\n## 📈 통계적 신뢰도  \n- **표본 수**: 4개(또는 3개) 테스트 케이스만 사용 → 통계적 power 부족  \n- **p‑value**: 모든 지표에서 1.00 → 차이가 없음을 의미하지만 작은 표본 때문에 결과의 일반성은 불투명  \n- **효과크기**: 0.0 → 실질적 차이는 없지만 신뢰 구간은 계산 불가  \n\n> **추가 데이터 필요**: 더 많은 케이스(≥30)와 다양한 질문 유형을 통해 신뢰성 확보를 권장합니다.\n\n---\n\n## ⚠️ 원인 분석  \n| 원인 | 증거 | 영향 |\n|------|------|------|\n| 프롬프트 불확정 | `prompt_changes.status` = \"missing\" | 실제 LLM 행동에 영향을 미칠 수 있음 → 결과 해석에 한계 |\n| 표본 수 부족 | `quality_summary.flags`: “표본 수가 적음” | 통계적 검정이 힘듦 |\n| 지표 설정 | `thresholds.faitfulness = 0.7 > 평균` | `faithfulness`가 낮은 케이스(예: A1, A2, B1, B2) |  \n> **예시**: `test_001`(Faithfulness 0.0)[A1]·`test_003`(Faithfulness 0.0)[A2] → 두 실행 모두 저점.\n\n---\n\n## 🛠️ 개선 제안  \n| 분야 | 제안 | 근거 |\n|------|------|------|\n| **데이터 증강** | 30개 이상의 질문‑답변 쌍을 추가하고, 서로 다른 도메인과 문장 구조를 포함 | `quality_checks`가 “추세 분석을 위한 실행 이력 부족”을 지적 |\n| **프롬프트 캡처** | 실행 전후 프롬프트 스냅샷 저장 및 기록 | `prompt_changes.status` = “missing” |\n| **지표 설정 검토** | `faithfulness`와 `answer_relevancy` 임계값을 재검토 (예: 0.6) | `thresholds.faitfulness` 0.7는 평균 0.5에 비해 높은 기준 |\n| **통계 분석** | 표본 크기와 효과 크기에 대한 신뢰 구간 계산 | `stats_summary` 정보 부재 |\n\n---\n\n## 🚀 다음 단계  \n1. **데이터셋 확장**: 5~10배 규모 확보 후 재평가  \n2. **프롬프트 버전 관리**: Prompt 변형 기록을 위해 `--system-prompt` 옵션 사용  \n3. **다중 실행 반복**: 동일 조건에서 5~10번 반복해 실행 이력 확보  \n4. **결과 재분석**: 새로운 데이터와 설정으로 스코어카드 업데이트  \n5. **보고서 업데이트**: 새로운 통계 및 신뢰성 지표 포함\n\n---\n\n## 📎 부록(산출물)  \n| 파일명 | 용도 |\n|--------|------|\n| `load_runs.json` | 라벨링 및 메타데이터 |\n| `run_change_detection.json` | 구조적 차이 확인 |\n| `run_metric_comparison.json` | 현재 보고서 기준 데이터 |\n\n---\n\n> **마무리**  \n현재 비교는 두 실행이 동일한 설정·데이터를 사용한 결과, 지표에 유의한 차이가 없음을 보여줍니다. 다만, 샘플 수가 적고 프롬프트 정보가 부족하므로, 추후 확장과 자세한 기록을 통해 보다 신뢰할 수 있는 평가가 필요합니다.",
+      "format": "markdown",
+      "llm_used": true,
+      "llm_model": "ollama/gpt-oss-safeguard:20b",
+      "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+      "summary": {
+        "report_type": "comparison",
+        "total_evidence": 6,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.4183,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.8366828943604284
+          },
+          "evidence_id": "A1",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.4544,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.9087545725582776
+          },
+          "evidence_id": "A2",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.9362,
+          "failed_metrics": [],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.8724614057329397
+          },
+          "evidence_id": "A3",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.4183,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.8366828943604284
+          },
+          "evidence_id": "B1",
+          "run_label": "B",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.4544,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.9087545725582776
+          },
+          "evidence_id": "B2",
+          "run_label": "B",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.9362,
+          "failed_metrics": [],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.8724614057329397
+          },
+          "evidence_id": "B3",
+          "run_label": "B",
+          "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        }
+      ]
+    }
+  }
+}

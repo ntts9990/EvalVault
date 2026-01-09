@@ -1,0 +1,182 @@
+{
+  "node_id": "ragas_eval",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "summary": {
+      "metric_count": 2,
+      "sample_count": 18,
+      "overall_score": 0.6107,
+      "recomputed": false
+    },
+    "metrics": {
+      "faithfulness": 0.8333333333333334,
+      "answer_relevancy": 0.38806024011636503
+    },
+    "per_case": [
+      {
+        "test_case_id": "auto-001",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.3476899649955348
+        },
+        "avg_score": 0.6738,
+        "question_preview": "대인배상 I에서 사망 시 보상 한도는 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-002",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.3019017957287316
+        },
+        "avg_score": 0.651,
+        "question_preview": "대인배상 I에서 부상 시 보상 한도는 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-003",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.5452289778984035
+        },
+        "avg_score": 0.2726,
+        "question_preview": "대인배상 II는 어떤 보장을 제공하나요?"
+      },
+      {
+        "test_case_id": "auto-004",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.26432844897133145
+        },
+        "avg_score": 0.6322,
+        "question_preview": "대물배상 가입 한도 범위는 어떻게 되나요?"
+      },
+      {
+        "test_case_id": "auto-005",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.3586969721400961
+        },
+        "avg_score": 0.6793,
+        "question_preview": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-006",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4123395684600126
+        },
+        "avg_score": 0.7062,
+        "question_preview": "마일리지 특약에서 연간 3천km 이하 주행 시 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-007",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.4165031541961685
+        },
+        "avg_score": 0.2083,
+        "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-008",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.48230263162430553
+        },
+        "avg_score": 0.7412,
+        "question_preview": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-009",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.44180029163308215
+        },
+        "avg_score": 0.7209,
+        "question_preview": "운전자 한정 특약에서 부부 한정 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-010",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.4300946540576094
+        },
+        "avg_score": 0.215,
+        "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-011",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.36243883852582326
+        },
+        "avg_score": 0.6812,
+        "question_preview": "가입 가능한 운전자 조건은 어떻게 되나요?"
+      },
+      {
+        "test_case_id": "auto-012",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.5497797234706915
+        },
+        "avg_score": 0.7749,
+        "question_preview": "차량 등록 후 몇 년 이하 차량이 가입 가능한가요?"
+      },
+      {
+        "test_case_id": "auto-013",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4108372286375867
+        },
+        "avg_score": 0.7054,
+        "question_preview": "영업용 차량 가입은 어떻게 되나요?"
+      },
+      {
+        "test_case_id": "auto-014",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4913033723273668
+        },
+        "avg_score": 0.7457,
+        "question_preview": "보험료 일시납 시 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-015",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.18910511675042216
+        },
+        "avg_score": 0.5946,
+        "question_preview": "6회 분납 시 보험료는 어떻게 되나요?"
+      },
+      {
+        "test_case_id": "auto-016",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4795855792102159
+        },
+        "avg_score": 0.7398,
+        "question_preview": "자동이체 등록 시 추가 할인은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-017",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.1393400703594424
+        },
+        "avg_score": 0.5697,
+        "question_preview": "사고 접수 콜센터 번호는 무엇인가요?"
+      },
+      {
+        "test_case_id": "auto-018",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.3618079331077455
+        },
+        "avg_score": 0.6809,
+        "question_preview": "보상금 지급은 언제까지 이뤄지나요?"
+      }
+    ]
+  }
+}

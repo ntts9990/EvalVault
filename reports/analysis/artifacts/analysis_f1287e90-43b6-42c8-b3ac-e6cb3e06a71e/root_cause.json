@@ -1,0 +1,18 @@
+{
+  "node_id": "root_cause",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "causes": [
+      {
+        "metric": "faithfulness",
+        "reason": "faithfulness 점수가 기준치 미달입니다 (0.50 < 0.70)."
+      }
+    ],
+    "recommendations": [
+      "답변을 검색 컨텍스트에 더 강하게 고정하고 근거 인용을 강화하세요."
+    ],
+    "low_performer_count": 2
+  }
+}

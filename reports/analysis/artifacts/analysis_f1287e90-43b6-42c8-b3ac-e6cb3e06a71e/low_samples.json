@@ -1,0 +1,30 @@
+{
+  "node_id": "low_samples",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "threshold": 0.5,
+    "low_performers": [
+      {
+        "test_case_id": "test_001",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.8366828943604284
+        },
+        "avg_score": 0.4183,
+        "question_preview": "What is Python?"
+      },
+      {
+        "test_case_id": "test_003",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.9087545725582776
+        },
+        "avg_score": 0.4544,
+        "question_preview": "What is RAG?"
+      }
+    ],
+    "count": 2
+  }
+}

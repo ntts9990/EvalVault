@@ -1,0 +1,38 @@
+{
+  "node_id": "pattern_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "patterns": [
+      {
+        "label": "Top keyword",
+        "detail": "is (freq 6)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "tdd (freq 2)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "what (freq 4)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "python (freq 2)"
+      },
+      {
+        "label": "Top keyword",
+        "detail": "rag (freq 2)"
+      },
+      {
+        "label": "Question type",
+        "detail": "factual (1.0%)"
+      }
+    ],
+    "summary": {
+      "keyword_count": 20,
+      "question_type_count": 1
+    }
+  }
+}

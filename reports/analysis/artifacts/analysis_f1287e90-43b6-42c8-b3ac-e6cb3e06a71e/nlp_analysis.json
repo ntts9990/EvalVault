@@ -1,0 +1,487 @@
+{
+  "node_id": "nlp_analysis",
+  "status": "completed",
+  "duration_ms": 155,
+  "error": null,
+  "output": {
+    "analysis": {
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "question_stats": {
+        "char_count": 67,
+        "word_count": 13,
+        "sentence_count": 4,
+        "avg_word_length": 3.923076923076923,
+        "unique_word_ratio": 0.5384615384615384
+      },
+      "answer_stats": {
+        "char_count": 162,
+        "word_count": 25,
+        "sentence_count": 4,
+        "avg_word_length": 5.36,
+        "unique_word_ratio": 0.92
+      },
+      "context_stats": {
+        "char_count": 258,
+        "word_count": 43,
+        "sentence_count": 1,
+        "avg_word_length": 5.023255813953488,
+        "unique_word_ratio": 0.9069767441860465
+      },
+      "question_types": [
+        {
+          "question_type": "factual",
+          "count": 4,
+          "percentage": 1.0,
+          "avg_scores": {
+            "answer_relevancy": 0.8840076251449925,
+            "faithfulness": 0.5
+          }
+        }
+      ],
+      "top_keywords": [
+        {
+          "keyword": "is",
+          "frequency": 6,
+          "tfidf_score": 0.24634723644073758,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "tdd",
+          "frequency": 2,
+          "tfidf_score": 0.17105004542815092,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "what",
+          "frequency": 4,
+          "tfidf_score": 0.1666027922057938,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "python",
+          "frequency": 2,
+          "tfidf_score": 0.16341620996113213,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "rag",
+          "frequency": 2,
+          "tfidf_score": 0.1618416489767295,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "learning",
+          "frequency": 2,
+          "tfidf_score": 0.14221086885062423,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "machine",
+          "frequency": 2,
+          "tfidf_score": 0.14221086885062423,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "development",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "driven",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "means",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "test",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "high",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "language",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "level",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "programming",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "augmented",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "for",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "generation",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "retrieval",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "stands",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        }
+      ],
+      "topic_clusters": [],
+      "insights": [
+        "Questions are short and concise",
+        "Dominant question type: factual (100%)",
+        "Top keywords: is, tdd, what"
+      ]
+    },
+    "summary": {
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "has_text_stats": true,
+      "has_question_type_analysis": true,
+      "has_keyword_analysis": true,
+      "question_stats_preview": 3.25,
+      "answer_stats_preview": 6.25,
+      "context_count": 1,
+      "dominant_question_type": "factual",
+      "top_keywords_preview": [
+        "is",
+        "tdd",
+        "what",
+        "python",
+        "rag"
+      ]
+    },
+    "statistics": {
+      "text_stats": {
+        "questions": {
+          "char_count": 67,
+          "word_count": 13,
+          "sentence_count": 4,
+          "avg_word_length": 3.923076923076923,
+          "unique_word_ratio": 0.5384615384615384
+        },
+        "answers": {
+          "char_count": 162,
+          "word_count": 25,
+          "sentence_count": 4,
+          "avg_word_length": 5.36,
+          "unique_word_ratio": 0.92
+        },
+        "contexts": {
+          "char_count": 258,
+          "word_count": 43,
+          "sentence_count": 1,
+          "avg_word_length": 5.023255813953488,
+          "unique_word_ratio": 0.9069767441860465
+        }
+      },
+      "question_type_distribution": [
+        {
+          "question_type": "factual",
+          "count": 4,
+          "percentage": 1.0,
+          "avg_scores": {
+            "answer_relevancy": 0.8840076251449925,
+            "faithfulness": 0.5
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "keyword": "is",
+          "frequency": 6,
+          "tfidf_score": 0.24634723644073758,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "tdd",
+          "frequency": 2,
+          "tfidf_score": 0.17105004542815092,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "what",
+          "frequency": 4,
+          "tfidf_score": 0.1666027922057938,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "python",
+          "frequency": 2,
+          "tfidf_score": 0.16341620996113213,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "rag",
+          "frequency": 2,
+          "tfidf_score": 0.1618416489767295,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "learning",
+          "frequency": 2,
+          "tfidf_score": 0.14221086885062423,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "machine",
+          "frequency": 2,
+          "tfidf_score": 0.14221086885062423,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "development",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "driven",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "means",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "test",
+          "frequency": 1,
+          "tfidf_score": 0.08552502271407546,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "high",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "language",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "level",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "programming",
+          "frequency": 1,
+          "tfidf_score": 0.08170810498056606,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "augmented",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "for",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "generation",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "retrieval",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        },
+        {
+          "keyword": "stands",
+          "frequency": 1,
+          "tfidf_score": 0.08092082448836475,
+          "avg_metric_scores": null
+        }
+      ]
+    },
+    "insights": [
+      "Questions are short and concise",
+      "Dominant question type: factual (100%)",
+      "Top keywords: is, tdd, what"
+    ],
+    "analysis_id": null,
+    "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+    "question_types": [
+      {
+        "question_type": "factual",
+        "count": 4,
+        "percentage": 1.0,
+        "avg_scores": {
+          "answer_relevancy": 0.8840076251449925,
+          "faithfulness": 0.5
+        }
+      }
+    ],
+    "top_keywords": [
+      {
+        "keyword": "is",
+        "frequency": 6,
+        "tfidf_score": 0.24634723644073758,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "tdd",
+        "frequency": 2,
+        "tfidf_score": 0.17105004542815092,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "what",
+        "frequency": 4,
+        "tfidf_score": 0.1666027922057938,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "python",
+        "frequency": 2,
+        "tfidf_score": 0.16341620996113213,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "rag",
+        "frequency": 2,
+        "tfidf_score": 0.1618416489767295,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "learning",
+        "frequency": 2,
+        "tfidf_score": 0.14221086885062423,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "machine",
+        "frequency": 2,
+        "tfidf_score": 0.14221086885062423,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "development",
+        "frequency": 1,
+        "tfidf_score": 0.08552502271407546,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "driven",
+        "frequency": 1,
+        "tfidf_score": 0.08552502271407546,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "means",
+        "frequency": 1,
+        "tfidf_score": 0.08552502271407546,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "test",
+        "frequency": 1,
+        "tfidf_score": 0.08552502271407546,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "high",
+        "frequency": 1,
+        "tfidf_score": 0.08170810498056606,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "language",
+        "frequency": 1,
+        "tfidf_score": 0.08170810498056606,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "level",
+        "frequency": 1,
+        "tfidf_score": 0.08170810498056606,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "programming",
+        "frequency": 1,
+        "tfidf_score": 0.08170810498056606,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "augmented",
+        "frequency": 1,
+        "tfidf_score": 0.08092082448836475,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "for",
+        "frequency": 1,
+        "tfidf_score": 0.08092082448836475,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "generation",
+        "frequency": 1,
+        "tfidf_score": 0.08092082448836475,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "retrieval",
+        "frequency": 1,
+        "tfidf_score": 0.08092082448836475,
+        "avg_metric_scores": null
+      },
+      {
+        "keyword": "stands",
+        "frequency": 1,
+        "tfidf_score": 0.08092082448836475,
+        "avg_metric_scores": null
+      }
+    ],
+    "topic_clusters": []
+  }
+}

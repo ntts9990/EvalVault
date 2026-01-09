@@ -1,0 +1,204 @@
+{
+  "node_id": "priority_summary",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "bottom_percentile": 10.0,
+    "impact_count": 3,
+    "total_cases": 18,
+    "bottom_count": 2,
+    "bottom_cases": [
+      {
+        "test_case_id": "auto-007",
+        "avg_score": 0.2083,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 2,
+        "gap_by_metric": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.2835
+        },
+        "shortfall": 0.4917,
+        "impact_score": 0.6732,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "auto-010",
+        "avg_score": 0.215,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 2,
+        "gap_by_metric": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.2699
+        },
+        "shortfall": 0.4849,
+        "impact_score": 0.6689,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      }
+    ],
+    "impact_cases": [
+      {
+        "test_case_id": "auto-007",
+        "avg_score": 0.2083,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 2,
+        "gap_by_metric": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.2835
+        },
+        "shortfall": 0.4917,
+        "impact_score": 0.6732,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "auto-010",
+        "avg_score": 0.215,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 2,
+        "gap_by_metric": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.2699
+        },
+        "shortfall": 0.4849,
+        "impact_score": 0.6689,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "auto-003",
+        "avg_score": 0.2726,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 2,
+        "gap_by_metric": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.1548
+        },
+        "shortfall": 0.4274,
+        "impact_score": 0.6325,
+        "worst_metric": "faithfulness",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "대인배상 II는 어떤 보장을 제공하나요?",
+        "analysis_hints": [
+          "컨텍스트-답변 정합성 점검 필요",
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "high_impact"
+        ]
+      }
+    ],
+    "run_metadata": {
+      "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+      "dataset_name": "e2e-auto-insurance-qa-korean",
+      "dataset_version": "1.0.0",
+      "model_name": "ollama/gpt-oss-safeguard:20b",
+      "started_at": "2026-01-09T12:51:52.270316",
+      "finished_at": "2026-01-09T13:06:29.132084",
+      "total_test_cases": 18,
+      "passed_test_cases": 0,
+      "pass_rate": 0.0,
+      "total_tokens": 91166,
+      "total_cost_usd": 0.25359499999999996,
+      "duration_seconds": 876.861768,
+      "tracker_metadata": {
+        "ragas_config": {
+          "embedding_model": "text-embedding-3-small",
+          "temperature": null
+        },
+        "run_mode": "full",
+        "evaluation_task": "run"
+      },
+      "metrics_evaluated": [
+        "faithfulness",
+        "answer_relevancy"
+      ],
+      "run_mode": "full",
+      "evaluation_task": "run",
+      "thresholds": {
+        "faithfulness": 0.7,
+        "answer_relevancy": 0.7
+      },
+      "avg_faithfulness": 0.8333333333333334,
+      "avg_answer_relevancy": 0.38806024011636503
+    }
+  }
+}
