@@ -81,7 +81,7 @@ test.describe("Analysis Lab", () => {
 
         await page.goto("/analysis");
 
-        await expect(page.getByRole("heading", { name: "Analysis Lab" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "분석 실험실" })).toBeVisible();
         await expect(page.getByText("실행 대상 선택")).toBeVisible();
         await expect(page.getByRole("button", { name: /성능 요약/ })).toBeVisible();
 
@@ -94,7 +94,7 @@ test.describe("Analysis Lab", () => {
             .locator("..");
         await expect(resultOutput).toBeVisible();
         await expect(resultOutput.getByRole("heading", { name: "Summary Report" })).toBeVisible();
-        const statusCard = page.getByText("Status").locator("..");
-        await expect(statusCard.getByText("Complete")).toBeVisible();
+        const statusCard = page.getByText("상태").locator("..");
+        await expect(statusCard.getByText("완료")).toBeVisible();
     });
 });

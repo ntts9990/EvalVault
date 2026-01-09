@@ -300,7 +300,7 @@ export function AnalysisResultView() {
                                 </p>
                             </div>
                             <div className="border border-border rounded-xl p-4 bg-card">
-                                <p className="text-xs text-muted-foreground">Intent</p>
+                                <p className="text-xs text-muted-foreground">분석 유형</p>
                                 <p className="text-lg font-semibold mt-2">{result.intent}</p>
                                 {result.pipeline_id && (
                                     <p className="text-xs text-muted-foreground mt-2">

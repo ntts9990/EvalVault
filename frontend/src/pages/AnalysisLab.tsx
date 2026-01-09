@@ -291,6 +291,20 @@ export function AnalysisLab() {
         sortOrder,
     ]);
 
+    const recentHistory = useMemo(() => {
+        const sorted = [...history].sort(
+            (left, right) =>
+                new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+        );
+        return sorted.slice(0, 3);
+    }, [history]);
+
+    const recentCompareLink = useMemo(() => {
+        if (recentHistory.length < 2) return null;
+        const [left, right] = recentHistory;
+        return `/analysis/compare?left=${encodeURIComponent(left.result_id)}&right=${encodeURIComponent(right.result_id)}`;
+    }, [recentHistory]);
+
     const compareLink = useMemo(() => {
         if (compareSelection.length !== 2) return null;
         const [left, right] = compareSelection;
@@ -552,7 +566,7 @@ export function AnalysisLab() {
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Analysis Lab</h1>
+                    <h1 className="text-3xl font-bold tracking-tight mb-2">분석 실험실</h1>
                     <p className="text-muted-foreground">
                         분석 클래스를 선택해 바로 실행하고 결과를 확인하세요.
                     </p>
@@ -967,9 +981,71 @@ export function AnalysisLab() {
                             )}
 
                             {!result && !loading && !error && (
-                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm">
-                                    <Activity className="w-6 h-6 mb-2" />
-                                    분석 항목을 선택하면 결과가 여기에 표시됩니다.
+                                <div className="space-y-6">
+                                    <div className="border border-border rounded-xl p-4 bg-background">
+                                        <h3 className="text-sm font-semibold">시작 가이드</h3>
+                                        <div className="mt-2 space-y-2 text-xs text-muted-foreground">
+                                            <p>1. 좌측에서 분석 항목을 선택하세요.</p>
+                                            <p>2. Run을 지정하면 실제 데이터 기반으로 분석합니다.</p>
+                                            <p>3. 결과를 저장해 비교/추적할 수 있습니다.</p>
+                                        </div>
+                                    </div>
+                                    <div className="border border-border rounded-xl p-4 bg-background">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <h3 className="text-sm font-semibold">최근 저장 결과</h3>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    최신 {recentHistory.length}건을 요약합니다.
+                                                </p>
+                                            </div>
+                                            {recentCompareLink && (
+                                                <Link
+                                                    to={recentCompareLink}
+                                                    className="text-xs text-primary hover:underline"
+                                                >
+                                                    최근 2개 비교
+                                                </Link>
+                                            )}
+                                        </div>
+                                        {historyError && (
+                                            <p className="text-xs text-destructive mt-2">
+                                                {historyError}
+                                            </p>
+                                        )}
+                                        {recentHistory.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground mt-3">
+                                                저장된 분석 결과가 없습니다.
+                                            </p>
+                                        ) : (
+                                            <div className="mt-3 space-y-3">
+                                                {recentHistory.map((item) => (
+                                                    <div
+                                                        key={`recent-${item.result_id}`}
+                                                        className="flex flex-wrap items-center justify-between gap-3 border border-border rounded-lg px-3 py-2"
+                                                    >
+                                                        <div className="min-w-[12rem]">
+                                                            <p className="text-sm font-medium">{item.label}</p>
+                                                            <p className="text-[11px] text-muted-foreground mt-1">
+                                                                {formatDateTime(item.created_at)} · {formatDurationMs(item.duration_ms)}
+                                                            </p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {item.query || "쿼리 없음"}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <StatusBadge status={item.is_complete ? "completed" : "incomplete"} />
+                                                            <Link
+                                                                to={`/analysis/results/${item.result_id}`}
+                                                                className="text-[11px] text-primary hover:underline"
+                                                            >
+                                                                보기
+                                                            </Link>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -977,16 +1053,18 @@ export function AnalysisLab() {
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div className="border border-border rounded-lg p-3">
-                                            <p className="text-xs text-muted-foreground">Intent</p>
+                                            <p className="text-xs text-muted-foreground">분석 유형</p>
                                             <p className="text-sm font-semibold mt-1">{intentLabel}</p>
                                         </div>
                                         <div className="border border-border rounded-lg p-3">
-                                            <p className="text-xs text-muted-foreground">Duration</p>
+                                            <p className="text-xs text-muted-foreground">처리 시간</p>
                                             <p className="text-sm font-semibold mt-1">{formatDurationMs(result.duration_ms)}</p>
                                         </div>
                                         <div className="border border-border rounded-lg p-3">
-                                            <p className="text-xs text-muted-foreground">Status</p>
-                                            <p className="text-sm font-semibold mt-1">{result.is_complete ? "Complete" : "Partial"}</p>
+                                            <p className="text-xs text-muted-foreground">상태</p>
+                                            <div className="mt-2">
+                                                <StatusBadge status={result.is_complete ? "completed" : "incomplete"} />
+                                            </div>
                                         </div>
                                     </div>
 

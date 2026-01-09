@@ -17,13 +17,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const location = useLocation();
 
     const navItems = [
-        { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-        { icon: PlayCircle, label: "Evaluation Studio", href: "/studio" },
-        { icon: Brain, label: "Domain Memory", href: "/domain" },
-        { icon: Database, label: "Knowledge Base", href: "/knowledge" },
-        { icon: FlaskConical, label: "Analysis Lab", href: "/analysis" },
-        { icon: FileText, label: "Customer Report", href: "/reports" },
-        { icon: Settings, label: "Settings", href: "/settings" },
+        { icon: LayoutDashboard, label: "대시보드", href: "/" },
+        { icon: PlayCircle, label: "평가 스튜디오", href: "/studio" },
+        { icon: Brain, label: "도메인 메모리", href: "/domain" },
+        { icon: Database, label: "지식 베이스", href: "/knowledge" },
+        { icon: FlaskConical, label: "분석 실험실", href: "/analysis" },
+        { icon: FileText, label: "고객 리포트", href: "/reports" },
+        { icon: Settings, label: "설정", href: "/settings" },
     ];
 
     return (
@@ -50,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
                 <nav className="flex-1 p-4 space-y-1">
                     <p className={`px-4 text-xs font-semibold text-muted-foreground mb-4 mt-2 ${!isSidebarOpen && "text-center"}`}>
-                        {isSidebarOpen ? "WORKSPACE" : "..."}
+                        {isSidebarOpen ? "워크스페이스" : "..."}
                     </p>
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.href;
@@ -100,9 +100,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {/* Desktop Header */}
                 <header className="hidden lg:flex h-16 items-center justify-between px-8 border-b border-border/40 bg-background/60 backdrop-blur-sm sticky top-0 z-40">
                     <div className="flex items-center text-sm text-muted-foreground">
-                        <span className="text-foreground font-medium">Workspace</span>
+                        <span className="text-foreground font-medium">워크스페이스</span>
                         <span className="mx-2">/</span>
-                        <span>{navItems.find(i => i.href === location.pathname)?.label || "Page"}</span>
+                        <span>{navItems.find(i => i.href === location.pathname)?.label || "페이지"}</span>
                     </div>
                 </header>
 

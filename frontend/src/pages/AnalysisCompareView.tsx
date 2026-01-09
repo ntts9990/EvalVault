@@ -189,11 +189,11 @@ function ResultCard({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
-                    <p className="text-xs text-muted-foreground">Intent</p>
+                    <p className="text-xs text-muted-foreground">분석 유형</p>
                     <p className="font-medium">{result.intent}</p>
                 </div>
                 <div>
-                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="text-xs text-muted-foreground">처리 시간</p>
                     <p className="font-medium">{formatDurationMs(result.duration_ms)}</p>
                 </div>
                 <div>
