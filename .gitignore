@@ -55,6 +55,7 @@ reports/*.html
 reports/*.xml
 reports/*.json
 reports/assets/
+reports/api-docs/
 !reports/.gitkeep
 !reports/README.md
 
