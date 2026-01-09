@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
@@ -7,6 +7,7 @@ import { PrioritySummaryPanel, type PrioritySummary } from "../components/Priori
 import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
+    fetchConfig,
     fetchAnalysisIntents,
     fetchAnalysisHistory,
     fetchRuns,
@@ -51,6 +52,12 @@ const CATEGORY_META: Record<string, { label: string; description: string }> = {
         label: "벤치마크",
         description: "실제 문서 기반 검색 성능 측정",
     },
+};
+
+const API_STATUS_META: Record<string, { label: string; className: string }> = {
+    loading: { label: "API 확인 중", className: "text-slate-600 bg-slate-100 border-slate-200" },
+    ok: { label: "API 연결됨", className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    error: { label: "API 연결 실패", className: "text-rose-700 bg-rose-50 border-rose-200" },
 };
 
 const PRIORITY_META: Record<string, { label: string; color: string }> = {
@@ -167,6 +174,8 @@ export function AnalysisLab() {
     const [improvementLoading, setImprovementLoading] = useState(false);
     const [improvementError, setImprovementError] = useState<string | null>(null);
     const [includeImprovementLlm, setIncludeImprovementLlm] = useState(false);
+    const [apiStatus, setApiStatus] = useState<"loading" | "ok" | "error">("loading");
+    const [apiError, setApiError] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadCatalog() {
@@ -179,6 +188,33 @@ export function AnalysisLab() {
         }
         loadCatalog();
     }, []);
+
+    const refreshApiStatus = useCallback(async () => {
+        setApiStatus("loading");
+        setApiError(null);
+        try {
+            await fetchConfig();
+            setApiStatus("ok");
+        } catch (err) {
+            setApiStatus("error");
+            setApiError(err instanceof Error ? err.message : "연결 실패");
+        }
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const run = async () => {
+            try {
+                await refreshApiStatus();
+            } finally {
+                if (!active) return;
+            }
+        };
+        run();
+        return () => {
+            active = false;
+        };
+    }, [refreshApiStatus]);
 
     useEffect(() => {
         async function loadRuns() {
@@ -304,6 +340,76 @@ export function AnalysisLab() {
         const [left, right] = recentHistory;
         return `/analysis/compare?left=${encodeURIComponent(left.result_id)}&right=${encodeURIComponent(right.result_id)}`;
     }, [recentHistory]);
+
+    const reportMeta = useMemo(() => {
+        if (!result?.final_output || !isRecord(result.final_output)) return null;
+        let hasReport = false;
+        let llmUsed: boolean | null = null;
+        let llmModel: string | null = null;
+        let llmError: string | null = null;
+
+        const scan = (value: unknown) => {
+            if (!isRecord(value)) return;
+            if (typeof value.report === "string") {
+                hasReport = true;
+            }
+            if (typeof value.llm_used === "boolean") {
+                llmUsed = value.llm_used;
+            }
+            if (typeof value.llm_model === "string") {
+                llmModel = value.llm_model;
+            }
+            if (value.llm_error) {
+                llmError = String(value.llm_error);
+            }
+        };
+
+        Object.values(result.final_output).forEach(scan);
+
+        return {
+            hasReport,
+            llmUsed,
+            llmModel,
+            llmError,
+        };
+    }, [result]);
+
+    const reportBadge = useMemo(() => {
+        if (!reportMeta?.hasReport) {
+            return {
+                label: "보고서 없음",
+                className: "text-slate-600 bg-slate-100 border-slate-200",
+            };
+        }
+        if (reportMeta.llmError) {
+            return {
+                label: "LLM 오류(대체 보고서)",
+                className: "text-rose-700 bg-rose-50 border-rose-200",
+            };
+        }
+        if (reportMeta.llmUsed === true) {
+            return {
+                label: "LLM 보고서 사용",
+                className: "text-emerald-700 bg-emerald-50 border-emerald-200",
+            };
+        }
+        if (reportMeta.llmUsed === false) {
+            return {
+                label: "LLM 보고서 미사용",
+                className: "text-amber-700 bg-amber-50 border-amber-200",
+            };
+        }
+        return {
+            label: "기본 보고서",
+            className: "text-slate-600 bg-slate-100 border-slate-200",
+        };
+    }, [reportMeta]);
+
+    const reportErrorText = useMemo(() => {
+        if (!reportMeta?.llmError) return null;
+        if (reportMeta.llmError.length <= 120) return reportMeta.llmError;
+        return `${reportMeta.llmError.slice(0, 120)}...`;
+    }, [reportMeta]);
 
     const compareLink = useMemo(() => {
         if (compareSelection.length !== 2) return null;
@@ -565,11 +671,36 @@ export function AnalysisLab() {
     return (
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">분석 실험실</h1>
-                    <p className="text-muted-foreground">
-                        분석 클래스를 선택해 바로 실행하고 결과를 확인하세요.
-                    </p>
+                <div className="mb-8 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight mb-2">분석 실험실</h1>
+                            <p className="text-muted-foreground">
+                                분석 클래스를 선택해 바로 실행하고 결과를 확인하세요.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${API_STATUS_META[apiStatus].className}`}
+                            >
+                                {API_STATUS_META[apiStatus].label}
+                            </span>
+                            {apiStatus === "error" && (
+                                <button
+                                    type="button"
+                                    onClick={refreshApiStatus}
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    재시도
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {apiStatus === "error" && apiError && (
+                        <p className="text-xs text-rose-600">
+                            API 연결 실패: {apiError}
+                        </p>
+                    )}
                 </div>
 
                 {catalogError && (
@@ -1051,7 +1182,7 @@ export function AnalysisLab() {
 
                             {result && (
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                                         <div className="border border-border rounded-lg p-3">
                                             <p className="text-xs text-muted-foreground">분석 유형</p>
                                             <p className="text-sm font-semibold mt-1">{intentLabel}</p>
@@ -1066,7 +1197,34 @@ export function AnalysisLab() {
                                                 <StatusBadge status={result.is_complete ? "completed" : "incomplete"} />
                                             </div>
                                         </div>
+                                        <div className="border border-border rounded-lg p-3">
+                                            <p className="text-xs text-muted-foreground">보고서 상태</p>
+                                            <div className="mt-2">
+                                                <span
+                                                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${reportBadge.className}`}
+                                                >
+                                                    {reportBadge.label}
+                                                </span>
+                                            </div>
+                                            {reportMeta?.llmModel && (
+                                                <p className="text-[11px] text-muted-foreground mt-2">
+                                                    모델 {reportMeta.llmModel}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {!analysisRunId && (
+                                        <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs">
+                                            샘플 데이터로 분석 중입니다. Run을 선택하면 실제 평가 결과를 기반으로 분석합니다.
+                                        </div>
+                                    )}
+
+                                    {reportErrorText && (
+                                        <div className="border border-rose-200 bg-rose-50 text-rose-700 rounded-lg p-3 text-xs">
+                                            LLM 오류로 대체 보고서를 사용했습니다: {reportErrorText}
+                                        </div>
+                                    )}
 
                                     <div className="border border-border rounded-lg p-4 space-y-3">
                                         <div className="flex items-center justify-between">

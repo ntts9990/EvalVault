@@ -63,6 +63,9 @@ const mockAnalysisResult = {
 
 test.describe("Analysis Lab", () => {
     test.beforeEach(async ({ page }) => {
+        await page.route("**/api/v1/config/**", async (route) => {
+            await route.fulfill({ json: {} });
+        });
         await page.route("**/api/v1/pipeline/intents", async (route) => {
             await route.fulfill({ json: mockIntents });
         });
