@@ -4,6 +4,7 @@ import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
+import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
@@ -15,14 +16,6 @@ import {
     ExternalLink,
     Link2,
 } from "lucide-react";
-
-const STATUS_META: Record<string, { label: string; color: string }> = {
-    completed: { label: "완료", color: "text-emerald-600" },
-    failed: { label: "실패", color: "text-rose-600" },
-    skipped: { label: "스킵", color: "text-amber-600" },
-    running: { label: "실행 중", color: "text-blue-600" },
-    pending: { label: "대기", color: "text-muted-foreground" },
-};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
@@ -184,6 +177,29 @@ export function AnalysisResultView() {
         return null;
     }, [result]);
 
+    const nodeSummary = useMemo(() => {
+        if (!result?.node_results) return null;
+        const counts = {
+            completed: 0,
+            failed: 0,
+            skipped: 0,
+            running: 0,
+            pending: 0,
+        };
+        let failedCount = 0;
+        Object.values(result.node_results).forEach((node) => {
+            const status = getNodeStatus(node);
+            if (counts[status as keyof typeof counts] !== undefined) {
+                counts[status as keyof typeof counts] += 1;
+            }
+            if (status === "failed" || getNodeError(node)) {
+                failedCount += 1;
+            }
+        });
+        const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+        return { counts, total, failedCount };
+    }, [result]);
+
     return (
         <Layout>
             <div className="max-w-5xl mx-auto pb-20">
@@ -273,35 +289,75 @@ export function AnalysisResultView() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="border border-border rounded-lg p-3">
-                                <p className="text-xs text-muted-foreground">Intent</p>
-                                <p className="text-sm font-semibold mt-1">{result.intent}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">결과 상태</p>
+                                <div className="mt-2">
+                                    <StatusBadge status={result.is_complete ? "completed" : "incomplete"} />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    저장 {formatDateTime(result.created_at)}
+                                </p>
                             </div>
-                            <div className="border border-border rounded-lg p-3">
-                                <p className="text-xs text-muted-foreground">Duration</p>
-                                <p className="text-sm font-semibold mt-1">
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">Intent</p>
+                                <p className="text-lg font-semibold mt-2">{result.intent}</p>
+                                {result.pipeline_id && (
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Pipeline {result.pipeline_id}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">처리 시간</p>
+                                <p className="text-2xl font-semibold mt-2">
                                     {formatDurationMs(result.duration_ms)}
                                 </p>
-                            </div>
-                            <div className="border border-border rounded-lg p-3">
-                                <p className="text-xs text-muted-foreground">Saved At</p>
-                                <p className="text-sm font-semibold mt-1">
-                                    {formatDateTime(result.created_at)}
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    시작 {formatDateTime(result.started_at)}
                                 </p>
+                                <p className="text-xs text-muted-foreground">
+                                    종료 {formatDateTime(result.finished_at)}
+                                </p>
+                            </div>
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">노드 상태</p>
+                                {nodeSummary ? (
+                                    <>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {Object.entries(nodeSummary.counts).map(([status, count]) => {
+                                                if (count === 0) return null;
+                                                return (
+                                                    <StatusBadge
+                                                        key={status}
+                                                        status={status}
+                                                        value={count}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            실패 노드 {nodeSummary.failedCount}개 / 총 {nodeSummary.total}개
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        노드 정보 없음
+                                    </p>
+                                )}
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="border border-border rounded-lg p-3">
+                            <div className="border border-border rounded-xl p-4 bg-card">
                                 <p className="text-xs text-muted-foreground">Query</p>
-                                <p className="text-sm font-medium mt-1">
+                                <p className="text-sm font-medium mt-2">
                                     {result.query || "-"}
                                 </p>
                             </div>
-                            <div className="border border-border rounded-lg p-3">
+                            <div className="border border-border rounded-xl p-4 bg-card">
                                 <p className="text-xs text-muted-foreground">Run ID</p>
-                                <p className="text-sm font-medium mt-1">
+                                <p className="text-sm font-medium mt-2">
                                     {result.run_id || "샘플 데이터"}
                                 </p>
                             </div>
@@ -309,17 +365,24 @@ export function AnalysisResultView() {
                         {(result.profile || (result.tags && result.tags.length > 0)) && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {result.profile && (
-                                    <div className="border border-border rounded-lg p-3">
+                                    <div className="border border-border rounded-xl p-4 bg-card">
                                         <p className="text-xs text-muted-foreground">Profile</p>
-                                        <p className="text-sm font-medium mt-1">{result.profile}</p>
+                                        <p className="text-sm font-medium mt-2">{result.profile}</p>
                                     </div>
                                 )}
                                 {result.tags && result.tags.length > 0 && (
-                                    <div className="border border-border rounded-lg p-3">
+                                    <div className="border border-border rounded-xl p-4 bg-card">
                                         <p className="text-xs text-muted-foreground">Tags</p>
-                                        <p className="text-sm font-medium mt-1">
-                                            {result.tags.join(", ")}
-                                        </p>
+                                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                            {result.tags.map((tag) => (
+                                                <span
+                                                    key={`${result.result_id}-${tag}`}
+                                                    className="px-2 py-0.5 rounded-full bg-secondary border border-border"
+                                                >
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -332,7 +395,6 @@ export function AnalysisResultView() {
                                     {Object.entries(result.node_results).map(([nodeId, node]) => {
                                         const status = getNodeStatus(node);
                                         const errorText = getNodeError(node);
-                                        const meta = STATUS_META[status] || STATUS_META.pending;
                                         return (
                                             <div
                                                 key={nodeId}
@@ -346,9 +408,7 @@ export function AnalysisResultView() {
                                                         </p>
                                                     )}
                                                 </div>
-                                                <div className={`text-xs font-semibold ${meta.color}`}>
-                                                    {meta.label}
-                                                </div>
+                                                <StatusBadge status={status} />
                                             </div>
                                         );
                                     })}

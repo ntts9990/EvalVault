@@ -2,18 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { type PriorityCase, type PrioritySummary } from "../components/PrioritySummaryPanel";
+import { StatusBadge } from "../components/StatusBadge";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import { Activity, AlertCircle, ArrowLeft, GitCompare } from "lucide-react";
-
-const STATUS_META: Record<string, { label: string; className: string }> = {
-    completed: { label: "완료", className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-    failed: { label: "실패", className: "text-rose-700 bg-rose-50 border-rose-200" },
-    skipped: { label: "스킵", className: "text-amber-700 bg-amber-50 border-amber-200" },
-    running: { label: "실행 중", className: "text-blue-700 bg-blue-50 border-blue-200" },
-    pending: { label: "대기", className: "text-slate-600 bg-slate-50 border-slate-200" },
-    missing: { label: "없음", className: "text-slate-500 bg-slate-50 border-slate-200" },
-};
 
 const METRIC_EPSILON = 0.0001;
 
@@ -104,20 +96,6 @@ function formatSignedDelta(value: number | null, digits: number = 4) {
     return `${sign}${value.toFixed(digits)}`;
 }
 
-function formatSignedCount(value: number) {
-    if (!Number.isFinite(value)) return "-";
-    if (value === 0) return "0";
-    return `${value > 0 ? "+" : ""}${value}`;
-}
-
-function formatSignedDuration(value: number | null | undefined) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-        return "-";
-    }
-    const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-    return `${sign}${formatDurationMs(Math.abs(value))}`;
-}
-
 function isPrioritySummary(value: any): value is PrioritySummary {
     if (!value || typeof value !== "object") return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
@@ -164,18 +142,6 @@ function aggregateFailedMetrics(cases: PriorityCase[]) {
         }
     }
     return counts;
-}
-
-function StatusBadge({ prefix, status }: { prefix?: string; status: string }) {
-    const meta = STATUS_META[status] || STATUS_META.pending;
-    return (
-        <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.className}`}
-        >
-            {prefix ? `${prefix} · ` : ""}
-            {meta.label}
-        </span>
-    );
 }
 
 function ResultCard({
@@ -430,6 +396,10 @@ export function AnalysisCompareView() {
             : failureDelta < 0
                 ? "text-emerald-600"
                 : "text-muted-foreground";
+    const failureDeltaLabel =
+        failureDelta > 0 ? "악화" : failureDelta < 0 ? "개선" : "변화 없음";
+    const failureDeltaDisplay =
+        failureDelta === 0 ? "변화 없음" : `${failureDeltaLabel} ${Math.abs(failureDelta)}개`;
 
     const metricStats = useMemo(() => {
         const stats = {
@@ -485,6 +455,20 @@ export function AnalysisCompareView() {
                 : durationDelta < 0
                     ? "text-emerald-600"
                     : "text-muted-foreground";
+    const durationDeltaLabel =
+        durationDelta === null
+            ? "-"
+            : durationDelta > 0
+                ? "지연"
+                : durationDelta < 0
+                    ? "단축"
+                    : "변화 없음";
+    const durationDeltaDisplay =
+        durationDelta === null
+            ? "-"
+            : durationDelta === 0
+                ? "변화 없음"
+                : `${durationDeltaLabel} ${formatDurationMs(Math.abs(durationDelta))}`;
 
     return (
         <Layout>
@@ -540,13 +524,13 @@ export function AnalysisCompareView() {
                                 </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                                A → B 변화 기준
+                                A → B 비교 기준
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                             <div className="border border-border rounded-xl p-4 bg-card">
-                                <p className="text-xs text-muted-foreground">노드 변화</p>
+                                <p className="text-xs text-muted-foreground">노드 상태 변경</p>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-semibold">
                                         {nodeDiffCount}
@@ -559,7 +543,7 @@ export function AnalysisCompareView() {
                                     실패 노드 A {failureCountA} → B {failureCountB}
                                 </p>
                                 <p className={`text-xs mt-1 ${failureDeltaClass}`}>
-                                    Δ {formatSignedCount(failureDelta)}개
+                                    {failureDeltaDisplay}
                                 </p>
                             </div>
                             <div className="border border-border rounded-xl p-4 bg-card">
@@ -573,7 +557,7 @@ export function AnalysisCompareView() {
                                     </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                    상승 {metricStats.increased} · 하락 {metricStats.decreased} · 동일 {metricStats.unchanged}
+                                    증가 {metricStats.increased} · 감소 {metricStats.decreased} · 유지 {metricStats.unchanged}
                                 </p>
                                 {metricStats.missing > 0 && (
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -599,12 +583,12 @@ export function AnalysisCompareView() {
                                 )}
                             </div>
                             <div className="border border-border rounded-xl p-4 bg-card">
-                                <p className="text-xs text-muted-foreground">실행 시간</p>
+                                <p className="text-xs text-muted-foreground">처리 시간</p>
                                 <div className="mt-2 text-sm text-muted-foreground">
                                     A {formatDurationMs(resultA.duration_ms)} → B {formatDurationMs(resultB.duration_ms)}
                                 </div>
                                 <p className={`text-xs mt-2 ${durationDeltaClass}`}>
-                                    Δ {formatSignedDuration(durationDelta)}
+                                    {durationDeltaDisplay}
                                 </p>
                             </div>
                         </div>

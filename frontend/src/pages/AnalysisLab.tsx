@@ -4,6 +4,7 @@ import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { MarkdownContent } from "../components/MarkdownContent";
 import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
+import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
     fetchAnalysisIntents,
@@ -50,14 +51,6 @@ const CATEGORY_META: Record<string, { label: string; description: string }> = {
         label: "벤치마크",
         description: "실제 문서 기반 검색 성능 측정",
     },
-};
-
-const STATUS_META: Record<string, { label: string; color: string }> = {
-    completed: { label: "완료", color: "text-emerald-600" },
-    failed: { label: "실패", color: "text-rose-600" },
-    skipped: { label: "스킵", color: "text-amber-600" },
-    running: { label: "실행 중", color: "text-blue-600" },
-    pending: { label: "대기", color: "text-muted-foreground" },
 };
 
 const PRIORITY_META: Record<string, { label: string; color: string }> = {
@@ -486,6 +479,11 @@ export function AnalysisLab() {
         });
         return counts;
     }, [result]);
+
+    const resultSummaryTotal = useMemo(() => {
+        if (!resultSummary) return 0;
+        return Object.values(resultSummary).reduce((sum, value) => sum + value, 0);
+    }, [resultSummary]);
 
     const reportText = useMemo(() => {
         if (!result?.final_output) return null;
@@ -1068,16 +1066,27 @@ export function AnalysisLab() {
                                     </div>
 
                                     {resultSummary && (
-                                        <div className="flex flex-wrap gap-3 text-xs">
-                                            {Object.entries(resultSummary).map(([status, count]) => {
-                                                if (count === 0) return null;
-                                                const meta = STATUS_META[status] || STATUS_META.pending;
-                                                return (
-                                                    <div key={status} className="px-3 py-1 rounded-full bg-secondary border border-border">
-                                                        <span className={meta.color}>{meta.label}</span> {count}
-                                                    </div>
-                                                );
-                                            })}
+                                        <div className="border border-border rounded-xl p-4 bg-card">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                                <div>
+                                                    <h3 className="text-sm font-semibold">실행 요약</h3>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        총 {resultSummaryTotal}개 노드 상태
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 text-xs">
+                                                {Object.entries(resultSummary).map(([status, count]) => {
+                                                    if (count === 0) return null;
+                                                    return (
+                                                        <StatusBadge
+                                                            key={status}
+                                                            status={status}
+                                                            value={count}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     )}
 
@@ -1271,16 +1280,13 @@ export function AnalysisLab() {
                                             <div className="space-y-2">
                                                 {selectedIntent.nodes.map(node => {
                                                     const status = getNodeStatus(result.node_results?.[node.id]);
-                                                    const meta = STATUS_META[status] || STATUS_META.pending;
                                                     return (
                                                         <div key={node.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2">
                                                             <div>
                                                                 <p className="text-sm font-medium">{node.name}</p>
                                                                 <p className="text-xs text-muted-foreground">{node.module}</p>
                                                             </div>
-                                                            <div className={`text-xs font-semibold ${meta.color}`}>
-                                                                {meta.label}
-                                                            </div>
+                                                            <StatusBadge status={status} />
                                                         </div>
                                                     );
                                                 })}
