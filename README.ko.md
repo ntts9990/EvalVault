@@ -52,6 +52,30 @@ Tip: Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 �
 
 ---
 
+## 분석 아티팩트 (모듈별 원본 결과)
+
+보고서는 요약본이고, 분석 파이프라인에서 생성된 **모듈별 원본 결과**는 자동으로 별도 저장됩니다.
+아래 명령에서 항상 함께 저장됩니다.
+
+- `evalvault run ... --auto-analyze`
+- `evalvault analyze-compare <RUN_A> <RUN_B>`
+
+**단일 실행 자동 분석**
+- 요약 JSON: `reports/analysis/analysis_<RUN_ID>.json`
+- 보고서: `reports/analysis/analysis_<RUN_ID>.md`
+- 아티팩트 인덱스: `reports/analysis/artifacts/analysis_<RUN_ID>/index.json`
+- 노드별 결과: `reports/analysis/artifacts/analysis_<RUN_ID>/<node_id>.json`
+
+**두 실행 비교**
+- 요약 JSON: `reports/comparison/comparison_<RUN_A>_<RUN_B>.json` (파일명은 Run ID 앞 8자리)
+- 보고서: `reports/comparison/comparison_<RUN_A>_<RUN_B>.md`
+- 아티팩트 인덱스: `reports/comparison/artifacts/comparison_<RUN_A>_<RUN_B>/index.json`
+- 노드별 결과: `reports/comparison/artifacts/comparison_<RUN_A>_<RUN_B>/<node_id>.json`
+
+요약 JSON에는 `artifacts.dir`, `artifacts.index`가 함께 들어가므로 경로 조회가 쉽습니다.
+
+---
+
 ## 데이터셋 구성 (threshold는 데이터셋별)
 
 EvalVault는 임계값(threshold)을 **데이터셋에 포함**시켜 데이터셋마다 다른 합격 기준을

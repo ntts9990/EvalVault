@@ -52,6 +52,8 @@ docs/
 |------|------|------|
 | [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 평가 담당자 | 설치, 환경설정, CLI, Web UI, 트러블슈팅 |
 | [guides/CLI_GUIDE.md](guides/CLI_GUIDE.md) | CLI 사용자 | 명령어 참조, 옵션, 예시 |
+| [guides/PROMPT_MANAGEMENT.md](guides/PROMPT_MANAGEMENT.md) | 평가/운영 | 시스템·Ragas 프롬프트 변경 및 스냅샷 관리 |
+| [guides/ANALYSIS_WORKFLOW.md](guides/ANALYSIS_WORKFLOW.md) | 평가 담당자 | 평가 → 자동 분석 → A/B 비교 흐름 |
 | [method_plugins.md](method_plugins.md) | 평가/개발자 | 메서드 플러그인 등록, 실행, 외부 커맨드 가이드 |
 | [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
 | [guides/PROJECT_STRUCTURE_METHODS.md](guides/PROJECT_STRUCTURE_METHODS.md) | 개발자/기여자 | 프로젝트 구조 파악 방법론 모음 |
