@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const now = new Date();
+const dayMs = 24 * 60 * 60 * 1000;
 const mockRuns = [
     {
         "run_id": "run-123",
@@ -8,8 +10,8 @@ const mockRuns = [
         "pass_rate": 0.855,
         "total_test_cases": 20,
         "passed_test_cases": 17,
-        "started_at": "2023-10-27T10:00:00Z",
-        "finished_at": "2023-10-27T10:05:00Z",
+        "started_at": new Date(now.getTime() - dayMs * 2).toISOString(),
+        "finished_at": new Date(now.getTime() - dayMs * 2 + 5 * 60 * 1000).toISOString(),
         "metrics_evaluated": ["accuracy", "relevance"],
         "total_cost_usd": 0.15,
         "phoenix_precision": 0.92,
@@ -23,8 +25,8 @@ const mockRuns = [
         "pass_rate": 0.90,
         "total_test_cases": 20,
         "passed_test_cases": 18,
-        "started_at": "2023-10-28T14:00:00Z",
-        "finished_at": "2023-10-28T14:10:00Z",
+        "started_at": new Date(now.getTime() - dayMs * 5).toISOString(),
+        "finished_at": new Date(now.getTime() - dayMs * 5 + 10 * 60 * 1000).toISOString(),
         "metrics_evaluated": ["accuracy", "faithfulness"],
         "total_cost_usd": 0.25,
         "phoenix_precision": 0.95,

@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Evaluation Studio', () => {
     test.beforeEach(async ({ page }) => {
         // Mock options calls with /api/v1
+        await page.route('**/api/v1/runs/', async route => {
+            await route.fulfill({ json: [] });
+        });
         await page.route('**/api/v1/runs/options/datasets', async route => {
             await route.fulfill({ json: [{ name: 'dataset1', path: '/path/to/d1', type: 'json', size: 100 }] });
         });
@@ -17,6 +20,29 @@ test.describe('Evaluation Studio', () => {
 
         await page.route('**/api/v1/runs/options/metrics', async route => {
             await route.fulfill({ json: ['accuracy', 'relevance'] });
+        });
+
+        await page.route('**/api/v1/runs/new-run-id', async route => {
+            await route.fulfill({
+                json: {
+                    summary: {
+                        run_id: 'new-run-id',
+                        dataset_name: 'dataset1',
+                        model_name: 'gpt-4',
+                        pass_rate: 1.0,
+                        total_test_cases: 1,
+                        passed_test_cases: 1,
+                        started_at: new Date().toISOString(),
+                        finished_at: new Date().toISOString(),
+                        metrics_evaluated: ['accuracy'],
+                        total_cost_usd: 0.01,
+                        phoenix_precision: null,
+                        phoenix_drift: null,
+                        phoenix_experiment_url: null
+                    },
+                    results: []
+                }
+            });
         });
     });
 
