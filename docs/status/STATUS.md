@@ -1,8 +1,8 @@
 # EvalVault 상태 요약 (Status)
 
 > Audience: 개발자 · 운영자 · 리뷰어
-> Purpose: “지금 EvalVault가 어디까지 왔고, 무엇을 하고 있는지”를 1페이지로 공유
-> Last Updated: 2026-01-07
+> Purpose: "지금 EvalVault가 어디까지 왔고, 무엇을 하고 있는지"를 1페이지로 공유
+> Last Updated: 2026-01-09
 
 ---
 
@@ -44,8 +44,9 @@ uv run pytest tests --collect-only -q
 
 - **병렬 리팩토링**: R1~R4 산출물 정합성/경로 최신화
   - 기준 문서: [internal/plans/PARALLEL_WORK_PLAN.md](../internal/plans/PARALLEL_WORK_PLAN.md)
-- **문서 통합/최신화**: 유사 문서 통합 후 최신화 진행
-  - 작업 계획: [internal/plans/DOCS_REFACTOR_PLAN.md](../internal/plans/DOCS_REFACTOR_PLAN.md)
+- **문서 통합/최신화**: ✅ 완료 (2026-01-09)
+  - 통합 문서: `guides/USER_GUIDE.md`, `architecture/ARCHITECTURE.md`
+  - README 언어 변경: `README.md` (한국어), `README.en.md` (영어)
 - **CLI/Web/성능 리팩토링**: P2.2, P4.1 진행 중, P3 완료
   - 로드맵: [ROADMAP.md](ROADMAP.md)
 
@@ -82,7 +83,7 @@ uv run pytest tests --collect-only -q
 
 - P2.2 Web UI 재구조화
 - P3 성능 최적화
-- P6 문서화 개선 (완료)
+- P6 문서화 개선 ✅ (2026-01-09 완료)
 - P8.5 Domain Memory 확장 과제
 - 상세 범위/일정: [internal/plans/PARALLEL_WORK_PLAN.md](../internal/plans/PARALLEL_WORK_PLAN.md)
 
@@ -95,5 +96,5 @@ uv run pytest tests --collect-only -q
 - **문서 허브**: [INDEX.md](../INDEX.md)
 - **계획/백로그**: [ROADMAP.md](ROADMAP.md)
 - **개발 가이드**: [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md)
-- **배포/사용자 문서**: [README.ko.md](../README.ko.md), [USER_GUIDE.md](../guides/USER_GUIDE.md), `tutorials/`
+- **배포/사용자 문서**: [README.md](../../README.md) (한국어), [README.en.md](../../README.en.md) (영어), [USER_GUIDE.md](../guides/USER_GUIDE.md), `tutorials/`
 - **아카이브 (완료 기록)**: `../internal/archive/`

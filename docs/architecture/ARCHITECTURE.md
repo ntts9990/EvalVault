@@ -30,7 +30,38 @@
 
 ## 1. 아키텍처 개요
 
-### 1.1 전체 구조 다이어그램
+### 1.0 프로젝트 미션 및 핵심 기능
+
+EvalVault는 RAG 시스템의 품질을 일관되게 평가하고 비교할 수 있는 표준 워크플로를 제공하는 것을 목표로 합니다. CLI와 FastAPI + React Web UI를 함께 제공해 평가 실행부터 결과 공유까지의 진입 장벽을 낮춥니다. 평가 결과는 SQLite/PostgreSQL에 저장되고 Langfuse·Phoenix·MLflow 같은 추적기와 연결됩니다. 도메인 메모리와 분석 파이프라인을 통해 과거 평가 결과를 재사용하고 개선 방향을 제시하는 데 초점을 둡니다.
+
+**핵심 기능군**:
+- **평가 실행**: Ragas 기반 메트릭과 커스텀 메트릭을 조합해 질문/답변/컨텍스트 품질을 정량화
+- **결과 저장/비교**: 평가 결과를 데이터베이스에 저장하고 실행 간 비교 분석
+- **추적 연동**: Langfuse/Phoenix/MLflow와 연동하여 Stage-level 트레이싱
+- **분석/리포팅**: DAG 분석 파이프라인으로 통계/NLP/인과 분석 수행
+- **Domain Memory**: 사실/행동/학습 레이어를 통해 평가 결과를 축적하고 다음 평가에 반영
+- **한국어 RAG 최적화**: Kiwi 형태소 분석, BM25, Dense, Hybrid 검색기와 한국어 faithfulness 검증
+
+**주요 사용자**:
+- **개발자**: CLI로 평가를 실행하고 history/compare/export로 실행 결과를 분석
+- **평가 담당자**: Web UI에서 평가 실행, 업로드, 히스토리 탐색, 기본 보고서 생성
+- **운영팀**: Phoenix 기반 드리프트 감시와 Gate 실행을 통해 품질 변화를 상시 모니터링
+
+### 1.1 소스 구조 요약
+
+EvalVault의 핵심 패키지는 `src/evalvault/` 아래에 위치하며 domain/ports/adapters/config로 계층이 분리되어 있습니다.
+
+```
+src/evalvault/
+├── domain/          # 핵심 도메인 로직 (엔티티, 서비스, 메트릭)
+├── ports/           # 계약(인터페이스) - inbound/outbound
+├── adapters/        # 외부 통합 (CLI/Web/LLM/스토리지/트레이싱)
+└── config/          # 런타임 설정 (Settings, ModelConfig, DomainConfig)
+```
+
+**의존성 방향**: 어댑터 → 포트 → 도메인 (외부 → 내부)
+
+### 1.2 전체 구조 다이어그램
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -2166,6 +2197,17 @@ result = await evaluator.evaluate(dataset=ds, metrics=metrics, llm=llm)
 
 ## 7. 확장성과 테스트 가능성
 
+### 7.0 확장 지점 요약
+
+EvalVault는 포트 기반 설계를 따르므로 새로운 통합은 포트 인터페이스를 구현하는 어댑터 형태로 추가됩니다.
+
+**주요 확장 지점**:
+- **커스텀 메트릭**: `src/evalvault/domain/metrics/`에 구현하고 `RagasEvaluator`의 매핑 테이블로 등록
+- **리트리버**: CLI 옵션으로 `bm25/dense/hybrid/graphrag`를 선택할 수 있으며, 한국어 BM25 등은 outbound NLP 어댑터로 구현
+- **트래킹/관측**: `TrackerPort` 기반으로 외부 시스템과 연결되며 CLI에서 Phoenix/Langfuse/MLflow 연동 옵션 제공
+- **분석 모듈**: `AnalysisModulePort`를 구현하여 DAG 파이프라인에 추가
+- **저장소**: `StoragePort` 또는 `DomainMemoryPort`를 구현하여 새로운 저장소 추가
+
 ### 7.1 확장성 (Extensibility)
 
 #### 7.1.1 새로운 LLM 제공자 추가
@@ -2405,6 +2447,37 @@ EvalVault는 **Hexagonal Architecture**, **Clean Architecture**, **Domain-Driven
 - **액션 우선순위**: 개선 효과와 구현 난이도 기반 우선순위 결정
 
 이 아키텍처는 소프트웨어의 복잡성을 관리하고, 변경에 유연하게 대응하며, 장기적인 유지보수를 용이하게 합니다. 특히 분석 파이프라인과 도메인 메모리 시스템을 통해 RAG 평가의 지속적인 개선을 지원합니다.
+
+---
+
+## 8. 구조 파악 방법론 요약
+
+프로젝트 구조를 빠르게 이해하기 위한 여러 방법론이 있습니다:
+
+| 방법론 | 핵심 질문 | 산출물 |
+|--------|-----------|--------|
+| 폴더 지형도 + 책임 태깅 | "폴더가 무엇을 책임지나?" | 디렉터리 맵 |
+| 헥사고날 레이어 맵 | "도메인/포트/어댑터 관계는?" | 레이어 다이어그램 |
+| 엔트리포인트 흐름 추적 | "실행 시 어디를 거치나?" | 시퀀스/플로우 |
+| C4/컴포넌트 관점 | "큰 덩어리와 경계는?" | 컨테이너/컴포넌트 맵 |
+| 모듈 의존성 그래프 | "결합이 어디에 몰려 있나?" | 의존성 그래프 |
+| 데이터/설정 플로우 | "입력/설정이 어떻게 흘러가나?" | 데이터 플로우 |
+| 테스트 기반 기능 지도 | "테스트가 말하는 핵심 기능은?" | 테스트-모듈 매핑 |
+
+**주요 실행 플로우**:
+- **CLI**: `run`, `pipeline`, `domain`, `benchmark`, `stage` 등 주요 실행 흐름 제공
+- **평가 입력**: JSON/CSV/XLSX 데이터셋을 받아 테스트 케이스 단위로 변환
+- **평가 실행**: Ragas 기반 메트릭과 커스텀 메트릭을 계산해 `EvaluationRun`으로 집계
+- **Domain Memory**: `--use-domain-memory` 옵션으로 활성화되며 threshold 조정과 컨텍스트 보강
+- **분석 파이프라인**: 사용자 쿼리에서 의도를 분류하고 DAG 파이프라인을 구성
+
+**설정/프로파일/환경 변수**:
+- 모델 프로필: `config/models.yaml`에 정의 (dev/prod/openai 등)
+- `Settings`: `.env`를 기본으로 읽고 API 키, 엔드포인트, 트래커 설정 관리
+- `EVALVAULT_PROFILE`: 프로필 선택을 런타임에 노출
+- `pyproject.toml`: optional-dependencies로 기능 단위 설치 구성 제공
+
+자세한 방법론은 `docs/guides/structure-methods/` 폴더의 개별 문서를 참고하세요.
 
 ---
 

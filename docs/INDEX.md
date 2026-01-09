@@ -1,6 +1,6 @@
 # EvalVault 문서 인덱스
 
-> **Last Updated**: 2026-01-06
+> **Last Updated**: 2026-01-09
 
 이 디렉터리(`docs/`)는 **배포/공개용 문서**와 **개발·운영 내부용 문서**를 분리하여 관리합니다.
 목적, 기능, 시점에 따라 아래 구조를 참고하세요.
@@ -13,15 +13,12 @@
 docs/
 ├── 📖 배포용 문서 (Public)
 │   ├── INDEX.md                     # 문서 허브 (이 문서)
-│   ├── README.ko.md                 # 한국어 README
-│   ├── PROJECT_OVERVIEW.md          # 프로젝트 목표/추상화 문서
-│   ├── PROJECT_SOURCE_GUIDE.md      # 소스 레벨 가이드
 │   ├── getting-started/INSTALLATION.md
-│   ├── guides/                      # USER/CLI/DEV/OBS 가이드
-│   ├── architecture/ARCHITECTURE.md # 아키텍처 가이드
+│   ├── guides/USER_GUIDE.md        # 통합 사용자 가이드
+│   ├── architecture/ARCHITECTURE.md # 통합 아키텍처 가이드
 │   ├── status/                      # STATUS/ROADMAP
 │   ├── templates/                   # 데이터셋/KG/문서 템플릿
-│   └── tutorials/                   # 7개 튜토리얼
+│   └── tutorials/                   # 핵심 튜토리얼 (01, 02, 04, 07)
 │
 └── 🔧 개발용 문서 (Internal)
     └── internal/
@@ -42,7 +39,8 @@ docs/
 
 | 문서 | 대상 | 설명 |
 |------|------|------|
-| [README.ko.md](README.ko.md) | 모든 사용자 | 한국어 README, 빠른 시작 가이드 |
+| [README.md](../../README.md) | 모든 사용자 | 한국어 README, 빠른 시작 가이드 |
+| [README.en.md](../../README.en.md) | 모든 사용자 | 영어 README, Quickstart guide |
 | [getting-started/INSTALLATION.md](getting-started/INSTALLATION.md) | 처음 사용자 | 설치/환경 설정 |
 | [tutorials/01-quickstart.md](tutorials/01-quickstart.md) | 처음 사용자 | 5분 빠른 시작 |
 
@@ -50,23 +48,15 @@ docs/
 
 | 문서 | 대상 | 설명 |
 |------|------|------|
-| [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 평가 담당자 | 설치, 환경설정, CLI, Web UI, 트러블슈팅 |
-| [guides/CLI_GUIDE.md](guides/CLI_GUIDE.md) | CLI 사용자 | 명령어 참조, 옵션, 예시 |
-| [guides/PROMPT_MANAGEMENT.md](guides/PROMPT_MANAGEMENT.md) | 평가/운영 | 시스템·Ragas 프롬프트 변경 및 스냅샷 관리 |
-| [guides/ANALYSIS_WORKFLOW.md](guides/ANALYSIS_WORKFLOW.md) | 평가 담당자 | 평가 → 자동 분석 → A/B 비교 흐름 |
-| [method_plugins.md](method_plugins.md) | 평가/개발자 | 메서드 플러그인 등록, 실행, 외부 커맨드 가이드 |
-| [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md) | 기여자/개발자 | 로컬 개발 루틴 (테스트, 린트) |
-| [guides/PROJECT_STRUCTURE_METHODS.md](guides/PROJECT_STRUCTURE_METHODS.md) | 개발자/기여자 | 프로젝트 구조 파악 방법론 모음 |
-| [guides/structure-methods/01-folder-topology.md](guides/structure-methods/01-folder-topology.md) | 개발자/기여자 | 구조 파악: 폴더 지형도 + 책임 태깅 |
-| [guides/structure-methods/02-hexagonal-layer-map.md](guides/structure-methods/02-hexagonal-layer-map.md) | 개발자/기여자 | 구조 파악: 헥사고날 레이어 맵 |
-| [guides/structure-methods/03-entrypoint-flow.md](guides/structure-methods/03-entrypoint-flow.md) | 개발자/기여자 | 구조 파악: 엔트리포인트 흐름 추적 |
-| [guides/structure-methods/04-c4-component-view.md](guides/structure-methods/04-c4-component-view.md) | 개발자/기여자 | 구조 파악: C4/컴포넌트 관점 |
-| [guides/structure-methods/05-dependency-graph.md](guides/structure-methods/05-dependency-graph.md) | 개발자/기여자 | 구조 파악: 모듈 의존성 그래프 |
-| [guides/structure-methods/06-data-config-flow.md](guides/structure-methods/06-data-config-flow.md) | 개발자/기여자 | 구조 파악: 데이터/설정 플로우 |
-| [guides/structure-methods/07-test-driven-map.md](guides/structure-methods/07-test-driven-map.md) | 개발자/기여자 | 구조 파악: 테스트 기반 기능 지도 |
-| [guides/RAGAS_PERFORMANCE_TUNING.md](guides/RAGAS_PERFORMANCE_TUNING.md) | 개발/운영 | Ragas 평가 속도 최적화 가이드 |
-| [guides/OBSERVABILITY_PLAYBOOK.md](guides/OBSERVABILITY_PLAYBOOK.md) | 운영팀 | Phoenix 드리프트 감시, 릴리스 노트 |
-| [guides/RELEASE_CHECKLIST.md](guides/RELEASE_CHECKLIST.md) | 운영/개발 | 배포 체크리스트, 릴리즈 노트 템플릿 |
+| [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 모든 사용자 | 통합 사용자 가이드 (CLI, Web UI, 분석 워크플로, Domain Memory, 관측성, 프롬프트 관리, 성능 튜닝, 메서드 플러그인, 문제 해결) |
+
+**USER_GUIDE.md에 통합된 내용**:
+- CLI 명령어 참조 (기존 CLI_GUIDE.md)
+- 분석 워크플로 (기존 ANALYSIS_WORKFLOW.md)
+- 프롬프트 관리 (기존 PROMPT_MANAGEMENT.md)
+- 성능 튜닝 (기존 RAGAS_PERFORMANCE_TUNING.md)
+- 관측성 & Phoenix (기존 OBSERVABILITY_PLAYBOOK.md)
+- 메서드 플러그인 (기존 method_plugins.md)
 
 ### 튜토리얼
 
@@ -74,21 +64,26 @@ docs/
 |------|------|------|
 | 01 | [01-quickstart.md](tutorials/01-quickstart.md) | 5분 빠른 시작 |
 | 02 | [02-basic-evaluation.md](tutorials/02-basic-evaluation.md) | 기본 평가 실행 |
-| 03 | [03-custom-metrics.md](tutorials/03-custom-metrics.md) | 커스텀 메트릭 추가 |
 | 04 | [04-phoenix-integration.md](tutorials/04-phoenix-integration.md) | Phoenix 통합 |
-| 05 | [05-korean-rag.md](tutorials/05-korean-rag.md) | 한국어 RAG 최적화 |
-| 06 | [06-production-tips.md](tutorials/06-production-tips.md) | 프로덕션 배포 가이드 |
 | 07 | [07-domain-memory.md](tutorials/07-domain-memory.md) | Domain Memory 활용 |
+
+**통합/삭제된 튜토리얼**:
+- 03-custom-metrics.md → USER_GUIDE.md에 통합
+- 05-korean-rag.md → USER_GUIDE.md에 통합
+- 06-production-tips.md → USER_GUIDE.md에 통합
 
 ### 아키텍처 및 로드맵
 
 | 문서 | 대상 | 설명 |
 |------|------|------|
-| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | 모든 사용자 | 프로젝트 목표, 범위, 상위 구조 요약 |
-| [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 개발자/아키텍트 | Hexagonal Architecture, 컴포넌트, 데이터 플로우 |
-| [PROJECT_SOURCE_GUIDE.md](PROJECT_SOURCE_GUIDE.md) | 개발자/기여자 | 소스 구조, 실행 플로우, 확장 지점 |
+| [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 개발자/아키텍트 | 통합 아키텍처 가이드 (Hexagonal Architecture, 프로젝트 개요, 소스 구조, 확장 지점, 구조 파악 방법론) |
 | [status/ROADMAP.md](status/ROADMAP.md) | 모든 사용자 | 향후 계획, 마일스톤 |
 | [status/STATUS.md](status/STATUS.md) | 모든 사용자 | 현재 상태 요약 (버전, 테스트, 완료 항목) |
+
+**ARCHITECTURE.md에 통합된 내용**:
+- 프로젝트 미션 및 핵심 기능 (기존 PROJECT_OVERVIEW.md)
+- 소스 구조 요약 (기존 PROJECT_SOURCE_GUIDE.md)
+- 구조 파악 방법론 요약 (기존 PROJECT_STRUCTURE_METHODS.md)
 
 ---
 
@@ -112,8 +107,6 @@ docs/
 | [plans/PARALLEL_WORK_PLAN.md](internal/plans/PARALLEL_WORK_PLAN.md) | 병렬 작업 기준/규칙 |
 | [status/O1_PARALLEL_STATUS.md](internal/status/O1_PARALLEL_STATUS.md) | 오케스트레이터 요약 |
 | [status/O1_D1_DEBUG_REPORT_SUMMARY.md](internal/status/O1_D1_DEBUG_REPORT_SUMMARY.md) | DebugReport 요약 |
-| [plans/DOCS_REFACTOR_PLAN.md](internal/plans/DOCS_REFACTOR_PLAN.md) | 문서 통합/최신화 계획 |
-| [plans/ENTERPRISE_METHOD_TESTBED_PLAN.md](internal/plans/ENTERPRISE_METHOD_TESTBED_PLAN.md) | Method Testbed 엔터프라이즈 반영 계획 |
 
 ### 설계 문서
 
@@ -133,12 +126,12 @@ docs/
 
 | 역할 | 권장 문서 순서 |
 |------|---------------|
-| **처음 사용자** | README.ko → tutorials/01 → guides/USER_GUIDE |
-| **평가 담당자** | guides/USER_GUIDE → guides/CLI_GUIDE → tutorials/02-07 |
-| **운영팀** | guides/OBSERVABILITY_PLAYBOOK → tutorials/06 |
-| **개발자** | guides/DEV_GUIDE → architecture/ARCHITECTURE → internal/reference/DEVELOPMENT_GUIDE |
+| **처음 사용자** | README.md → tutorials/01 → guides/USER_GUIDE |
+| **평가 담당자** | guides/USER_GUIDE → tutorials/02, 04, 07 |
+| **운영팀** | guides/USER_GUIDE (관측성 & Phoenix 섹션) → tutorials/04 |
+| **개발자** | architecture/ARCHITECTURE → internal/reference/DEVELOPMENT_GUIDE |
 | **아키텍트** | architecture/ARCHITECTURE → internal/reference/CLASS_CATALOG → internal/reference/ARCHITECTURE_C4 |
-| **기여자** | https://github.com/ntts9990/EvalVault/blob/main/CONTRIBUTING.md → guides/DEV_GUIDE → internal/reference/DEVELOPMENT_GUIDE |
+| **기여자** | [CONTRIBUTING.md](../../CONTRIBUTING.md) → architecture/ARCHITECTURE → internal/reference/DEVELOPMENT_GUIDE |
 
 ---
 
@@ -152,5 +145,29 @@ docs/
 
 ---
 
+## 📝 주요 변경 사항 (2026-01-09)
+
+### 통합된 문서
+- `guides/CLI_GUIDE.md` → `guides/USER_GUIDE.md`에 통합
+- `guides/ANALYSIS_WORKFLOW.md` → `guides/USER_GUIDE.md`에 통합
+- `guides/PROMPT_MANAGEMENT.md` → `guides/USER_GUIDE.md`에 통합
+- `guides/RAGAS_PERFORMANCE_TUNING.md` → `guides/USER_GUIDE.md`에 통합
+- `guides/OBSERVABILITY_PLAYBOOK.md` → `guides/USER_GUIDE.md`에 통합
+- `method_plugins.md` → `guides/USER_GUIDE.md`에 통합
+- `PROJECT_OVERVIEW.md` → `architecture/ARCHITECTURE.md`에 통합
+- `PROJECT_SOURCE_GUIDE.md` → `architecture/ARCHITECTURE.md`에 통합
+- `guides/PROJECT_STRUCTURE_METHODS.md` → `architecture/ARCHITECTURE.md`에 통합
+
+### 삭제된 문서
+- `tutorials/03-custom-metrics.md` (USER_GUIDE에 통합)
+- `tutorials/05-korean-rag.md` (USER_GUIDE에 통합)
+- `tutorials/06-production-tips.md` (USER_GUIDE에 통합)
+
+### 언어 변경
+- `README.md` → 한국어 버전 (기존 `README.ko.md` 내용)
+- `README.en.md` → 영어 버전 (기존 `README.md` 내용)
+
+---
+
 **문서 담당**: EvalVault 팀
-**최종 업데이트**: 2026-01-06
+**최종 업데이트**: 2026-01-09
