@@ -90,6 +90,15 @@ def to_serializable(value: Any) -> Any:
     """Convert nested structures into JSON-serializable data."""
     if value is None:
         return None
+    try:  # Avoid hard dependency on numpy when not installed
+        import numpy as np  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency
+        np = None
+    if np is not None:
+        if isinstance(value, np.generic):
+            return value.item()
+        if isinstance(value, np.ndarray):
+            return value.tolist()
     if isinstance(value, datetime):
         return value.isoformat()
     if is_dataclass(value):

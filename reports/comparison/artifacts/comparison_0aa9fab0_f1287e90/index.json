@@ -1,0 +1,38 @@
+{
+  "pipeline_id": "bb8100e3-ebf6-4243-8241-1ad37115215c",
+  "intent": "generate_comparison",
+  "duration_ms": 92289,
+  "started_at": "2026-01-09T11:24:34.950266",
+  "finished_at": "2026-01-09T11:26:07.239857",
+  "nodes": [
+    {
+      "node_id": "load_runs",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_0aa9fab0_f1287e90/load_runs.json"
+    },
+    {
+      "node_id": "run_metric_comparison",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_0aa9fab0_f1287e90/run_metric_comparison.json"
+    },
+    {
+      "node_id": "run_change_detection",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_0aa9fab0_f1287e90/run_change_detection.json"
+    },
+    {
+      "node_id": "report",
+      "status": "completed",
+      "duration_ms": 92285,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_0aa9fab0_f1287e90/report.json"
+    }
+  ],
+  "final_output_path": "reports/comparison/artifacts/comparison_0aa9fab0_f1287e90/final_output.json"
+}

@@ -1,0 +1,789 @@
+{
+  "node_id": "load_runs",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "runs": [
+      {
+        "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "dataset_name": "test_dataset",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gpt-oss-safeguard:20b",
+        "started_at": "2026-01-09T09:47:43.429178",
+        "finished_at": "2026-01-09T09:51:00.132606",
+        "results": [
+          {
+            "test_case_id": "test_001",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.8366828943604284,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4550,
+            "latency_ms": 54079,
+            "cost_usd": 0.0125825,
+            "trace_id": null,
+            "started_at": "2026-01-09T09:47:43.429338",
+            "finished_at": "2026-01-09T09:48:37.509082",
+            "question": "What is Python?",
+            "answer": "Python is a high-level programming language.",
+            "contexts": [
+              "Python is a programming language",
+              "Python was created by Guido van Rossum"
+            ],
+            "ground_truth": "Python is a high-level interpreted programming language."
+          },
+          {
+            "test_case_id": "test_002",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.8724614057329397,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4524,
+            "latency_ms": 43633,
+            "cost_usd": 0.012547500000000001,
+            "trace_id": null,
+            "started_at": "2026-01-09T09:48:37.509919",
+            "finished_at": "2026-01-09T09:49:21.143545",
+            "question": "What is machine learning?",
+            "answer": "Machine learning is a subset of AI.",
+            "contexts": [
+              "ML is part of AI",
+              "ML uses algorithms to learn from data"
+            ],
+            "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+          },
+          {
+            "test_case_id": "test_003",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.9087545725582776,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4660,
+            "latency_ms": 44261,
+            "cost_usd": 0.012925,
+            "trace_id": null,
+            "started_at": "2026-01-09T09:49:21.143707",
+            "finished_at": "2026-01-09T09:50:05.405462",
+            "question": "What is RAG?",
+            "answer": "RAG stands for Retrieval-Augmented Generation.",
+            "contexts": [
+              "RAG combines retrieval and generation",
+              "RAG improves LLM responses"
+            ],
+            "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+          },
+          {
+            "test_case_id": "test_004",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.9181316279283243,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4908,
+            "latency_ms": 54726,
+            "cost_usd": 0.01353,
+            "trace_id": null,
+            "started_at": "2026-01-09T09:50:05.405693",
+            "finished_at": "2026-01-09T09:51:00.132125",
+            "question": "What is TDD?",
+            "answer": "TDD means Test-Driven Development.",
+            "contexts": [
+              "Test-Driven Development",
+              "Write tests first",
+              "Red-Green-Refactor cycle"
+            ],
+            "ground_truth": "TDD is a software development approach where tests are written before code."
+          }
+        ],
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "total_tokens": 18642,
+        "total_cost_usd": 0.051585,
+        "langfuse_trace_id": null,
+        "tracker_metadata": {
+          "run_mode": "full"
+        },
+        "retrieval_metadata": {}
+      },
+      {
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "dataset_name": "e2e-auto-insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gpt-oss-safeguard:20b",
+        "started_at": "2026-01-09T12:01:20.083691",
+        "finished_at": "2026-01-09T12:19:29.652169",
+        "results": [
+          {
+            "test_case_id": "auto-001",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.5702443358758247,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5108,
+            "latency_ms": 63640,
+            "cost_usd": 0.014195,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:01:20.084112",
+            "finished_at": "2026-01-09T12:02:23.724659",
+            "question": "대인배상 I에서 사망 시 보상 한도는 얼마인가요?",
+            "answer": "사망 시 1억 5천만원까지 보장됩니다.",
+            "contexts": [
+              "대인배상 I은 자동차 사고로 다른 사람을 다치게 하거나 사망하게 한 경우 보상합니다.",
+              "책임보험 한도 내에서 보장되며, 사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+            ],
+            "ground_truth": "1억 5천만원"
+          },
+          {
+            "test_case_id": "auto-002",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.6176038685162338,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5081,
+            "latency_ms": 65406,
+            "cost_usd": 0.014165,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:02:23.724841",
+            "finished_at": "2026-01-09T12:03:29.131206",
+            "question": "대인배상 I에서 부상 시 보상 한도는 얼마인가요?",
+            "answer": "부상 시 3천만원까지 보장됩니다.",
+            "contexts": [
+              "대인배상 I은 책임보험 한도 내에서 보장됩니다.",
+              "사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+            ],
+            "ground_truth": "3천만원"
+          },
+          {
+            "test_case_id": "auto-003",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.7145836968078935,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5669,
+            "latency_ms": 80770,
+            "cost_usd": 0.01586,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:03:29.131326",
+            "finished_at": "2026-01-09T12:04:49.902133",
+            "question": "대인배상 II는 어떤 보장을 제공하나요?",
+            "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+            "contexts": [
+              "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+              "중상해 사고 시 필수적으로 가입을 권장합니다."
+            ],
+            "ground_truth": "무한 보장"
+          },
+          {
+            "test_case_id": "auto-004",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.596903182350706,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5227,
+            "latency_ms": 67534,
+            "cost_usd": 0.0150625,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:04:49.902281",
+            "finished_at": "2026-01-09T12:05:57.437261",
+            "question": "대물배상 가입 한도 범위는 어떻게 되나요?",
+            "answer": "2천만원부터 10억원까지 선택 가능합니다.",
+            "contexts": [
+              "대물배상은 다른 사람의 차량이나 재물을 손괴한 경우 보상합니다.",
+              "보장 한도는 2천만원에서 10억원까지 선택 가능합니다."
+            ],
+            "ground_truth": "2천만원~10억원"
+          },
+          {
+            "test_case_id": "auto-005",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.4424365056726988,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5184,
+            "latency_ms": 65154,
+            "cost_usd": 0.0143925,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:05:57.437325",
+            "finished_at": "2026-01-09T12:07:02.591773",
+            "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+            "answer": "최대 1억원까지 보장됩니다.",
+            "contexts": [
+              "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+              "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+            ],
+            "ground_truth": "1억원"
+          },
+          {
+            "test_case_id": "auto-006",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.504380458152079,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4935,
+            "latency_ms": 61220,
+            "cost_usd": 0.013725000000000001,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:07:02.591868",
+            "finished_at": "2026-01-09T12:08:03.811900",
+            "question": "마일리지 특약에서 연간 3천km 이하 주행 시 할인율은 얼마인가요?",
+            "answer": "47% 할인입니다.",
+            "contexts": [
+              "마일리지 특약은 연간 주행거리에 따라 보험료를 할인해주는 특약입니다.",
+              "3천km 이하: 47% 할인, 5천km 이하: 38% 할인."
+            ],
+            "ground_truth": "47%"
+          },
+          {
+            "test_case_id": "auto-007",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.49459554832359515,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5007,
+            "latency_ms": 60298,
+            "cost_usd": 0.0138825,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:08:03.812154",
+            "finished_at": "2026-01-09T12:09:04.110897",
+            "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "answer": "19% 할인입니다.",
+            "contexts": [
+              "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+              "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+            ],
+            "ground_truth": "19%"
+          },
+          {
+            "test_case_id": "auto-008",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.49056005863215574,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4843,
+            "latency_ms": 54746,
+            "cost_usd": 0.013375000000000001,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:09:04.110952",
+            "finished_at": "2026-01-09T12:09:58.857494",
+            "question": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?",
+            "answer": "10% 할인입니다.",
+            "contexts": [
+              "운전자 범위를 제한하면 보험료를 할인받을 수 있습니다.",
+              "1인 한정: 10% 할인, 부부 한정: 7% 할인."
+            ],
+            "ground_truth": "10%"
+          },
+          {
+            "test_case_id": "auto-009",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.5321899304271877,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4851,
+            "latency_ms": 48298,
+            "cost_usd": 0.01341,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:09:58.857585",
+            "finished_at": "2026-01-09T12:10:47.155599",
+            "question": "운전자 한정 특약에서 부부 한정 할인율은 얼마인가요?",
+            "answer": "7% 할인입니다.",
+            "contexts": [
+              "운전자 한정 특약은 운전자 범위를 제한하여 보험료를 할인받는 특약입니다.",
+              "부부 한정: 7% 할인, 가족 한정: 5% 할인."
+            ],
+            "ground_truth": "7%"
+          },
+          {
+            "test_case_id": "auto-010",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.6322424139879534,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5311,
+            "latency_ms": 67229,
+            "cost_usd": 0.014559999999999998,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:10:47.155637",
+            "finished_at": "2026-01-09T12:11:54.385005",
+            "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+            "answer": "5% 할인입니다.",
+            "contexts": [
+              "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+              "2채널 이상: 5% 할인, 1채널: 3% 할인."
+            ],
+            "ground_truth": "5%"
+          },
+          {
+            "test_case_id": "auto-011",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.5190509737143613,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5509,
+            "latency_ms": 73097,
+            "cost_usd": 0.015745,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:11:54.385091",
+            "finished_at": "2026-01-09T12:13:07.482579",
+            "question": "가입 가능한 운전자 조건은 어떻게 되나요?",
+            "answer": "만 21세 이상이며 면허 취득 후 1년 이상 경과해야 합니다.",
+            "contexts": [
+              "운전자 조건: 만 21세 이상 운전면허 보유자.",
+              "운전면허 취득 후 1년 이상 경과해야 합니다."
+            ],
+            "ground_truth": "만 21세 이상, 면허 취득 후 1년 이상"
+          },
+          {
+            "test_case_id": "auto-012",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.6806393289335615,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 5238,
+            "latency_ms": 61236,
+            "cost_usd": 0.014512499999999998,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:13:07.482783",
+            "finished_at": "2026-01-09T12:14:08.719291",
+            "question": "차량 등록 후 몇 년 이하 차량이 가입 가능한가요?",
+            "answer": "차량 등록 후 15년 이하 차량이 가능합니다.",
+            "contexts": [
+              "차량 조건: 차량 등록 후 15년 이하 차량.",
+              "승용차, SUV, 승합차 가입 가능."
+            ],
+            "ground_truth": "15년 이하"
+          },
+          {
+            "test_case_id": "auto-013",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.5758427473516629,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4810,
+            "latency_ms": 50253,
+            "cost_usd": 0.013195,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:14:08.719369",
+            "finished_at": "2026-01-09T12:14:58.972672",
+            "question": "영업용 차량 가입은 어떻게 되나요?",
+            "answer": "영업용 차량은 별도 상품 가입이 필요합니다.",
+            "contexts": [
+              "승용차, SUV, 승합차 가입 가능.",
+              "영업용 차량은 별도 상품 가입 필요."
+            ],
+            "ground_truth": "별도 상품 필요"
+          },
+          {
+            "test_case_id": "auto-014",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.604441878113286,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4719,
+            "latency_ms": 48294,
+            "cost_usd": 0.0130725,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:14:58.972728",
+            "finished_at": "2026-01-09T12:15:47.267604",
+            "question": "보험료 일시납 시 할인율은 얼마인가요?",
+            "answer": "1% 할인입니다.",
+            "contexts": [
+              "납입 방법: 일시납은 1% 할인.",
+              "2회 분납은 할인 없음."
+            ],
+            "ground_truth": "1% 할인"
+          },
+          {
+            "test_case_id": "auto-015",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.4399445014747145,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4967,
+            "latency_ms": 67343,
+            "cost_usd": 0.013730000000000001,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:15:47.267648",
+            "finished_at": "2026-01-09T12:16:54.611629",
+            "question": "6회 분납 시 보험료는 어떻게 되나요?",
+            "answer": "2% 할증됩니다.",
+            "contexts": [
+              "납입 방법: 6회 분납은 2% 할증.",
+              "일시납은 1% 할인."
+            ],
+            "ground_truth": "2% 할증"
+          },
+          {
+            "test_case_id": "auto-016",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.6756709430034306,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4814,
+            "latency_ms": 53684,
+            "cost_usd": 0.0132125,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:16:54.611979",
+            "finished_at": "2026-01-09T12:17:48.296490",
+            "question": "자동이체 등록 시 추가 할인은 얼마인가요?",
+            "answer": "1% 추가 할인입니다.",
+            "contexts": [
+              "계좌 자동이체 등록 시 1% 추가 할인.",
+              "자동이체는 납입 편의를 제공합니다."
+            ],
+            "ground_truth": "1% 추가 할인"
+          },
+          {
+            "test_case_id": "auto-017",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.4464164242157778,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4997,
+            "latency_ms": 52975,
+            "cost_usd": 0.0137975,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:17:48.296523",
+            "finished_at": "2026-01-09T12:18:41.271637",
+            "question": "사고 접수 콜센터 번호는 무엇인가요?",
+            "answer": "1588-5114입니다.",
+            "contexts": [
+              "사고 접수: 24시간 콜센터 1588-5114.",
+              "모바일 앱: 삼성화재 다이렉트 앱."
+            ],
+            "ground_truth": "1588-5114"
+          },
+          {
+            "test_case_id": "auto-018",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.6506845578232473,
+                "threshold": 0.7,
+                "reason": null
+              }
+            ],
+            "tokens_used": 4896,
+            "latency_ms": 48375,
+            "cost_usd": 0.013702500000000001,
+            "trace_id": null,
+            "started_at": "2026-01-09T12:18:41.271695",
+            "finished_at": "2026-01-09T12:19:29.647320",
+            "question": "보상금 지급은 언제까지 이뤄지나요?",
+            "answer": "서류 완비 시 14일 이내 지급됩니다.",
+            "contexts": [
+              "접수 후 3일 이내 담당자 배정.",
+              "14일 이내 보상금 지급 (서류 완비 시)."
+            ],
+            "ground_truth": "14일 이내"
+          }
+        ],
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "total_tokens": 91166,
+        "total_cost_usd": 0.25359499999999996,
+        "langfuse_trace_id": null,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:8b",
+            "temperature": null
+          },
+          "run_mode": "full"
+        },
+        "retrieval_metadata": {}
+      }
+    ],
+    "summaries": [
+      {
+        "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "dataset_name": "test_dataset",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gpt-oss-safeguard:20b",
+        "started_at": "2026-01-09T09:47:43.429178",
+        "finished_at": "2026-01-09T09:51:00.132606",
+        "total_test_cases": 4,
+        "passed_test_cases": 2,
+        "pass_rate": 0.5,
+        "total_tokens": 18642,
+        "total_cost_usd": 0.051585,
+        "duration_seconds": 196.703428,
+        "tracker_metadata": {
+          "run_mode": "full"
+        },
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "run_mode": "full",
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "avg_faithfulness": 0.5,
+        "avg_answer_relevancy": 0.8840076251449925
+      },
+      {
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "dataset_name": "e2e-auto-insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gpt-oss-safeguard:20b",
+        "started_at": "2026-01-09T12:01:20.083691",
+        "finished_at": "2026-01-09T12:19:29.652169",
+        "total_test_cases": 18,
+        "passed_test_cases": 0,
+        "pass_rate": 0.0,
+        "total_tokens": 91166,
+        "total_cost_usd": 0.25359499999999996,
+        "duration_seconds": 1089.568478,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:8b",
+            "temperature": null
+          },
+          "run_mode": "full"
+        },
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "run_mode": "full",
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "avg_faithfulness": 0.8333333333333334,
+        "avg_answer_relevancy": 0.5660239640764649
+      }
+    ],
+    "count": 2,
+    "missing_run_ids": []
+  }
+}

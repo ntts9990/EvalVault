@@ -1,0 +1,2329 @@
+{
+  "intent": "generate_detailed",
+  "pipeline_id": "cb849f6b-02dd-4ccc-a49f-dd1940da85b3",
+  "is_complete": true,
+  "duration_ms": 1727,
+  "started_at": "2026-01-09T09:24:56.985571",
+  "finished_at": "2026-01-09T09:24:58.712960",
+  "final_output": {
+    "report": {
+      "report": "# 분석 보고서\n\n## 요약\n- 데이터셋: test_dataset\n- 모델: gpt-oss-safeguard:20b\n- 테스트 케이스: 4\n- 통과율: 0.00%\n\n## 증거 샘플\n- [E1] test_001: avg 0.00\n- [E2] test_002: avg 0.00\n- [E3] test_003: avg 0.00\n- [E4] test_004: avg 0.00\n\n## 개선 제안\n- 추가 데이터 및 LLM 분석을 통해 상세 원인을 도출하세요.",
+      "format": "markdown",
+      "llm_used": false,
+      "llm_model": "gpt-oss-safeguard:20b",
+      "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+      "summary": {
+        "report_type": "analysis",
+        "total_evidence": 4,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "E1"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "E2"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "E3"
+        },
+        {
+          "test_case_id": "test_004",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is TDD?",
+          "answer": "TDD means Test-Driven Development.",
+          "contexts": [
+            "Test-Driven Development",
+            "Write tests first",
+            "Red-Green-Refactor cycle"
+          ],
+          "ground_truth": "TDD is a software development approach where tests are written before code.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "E4"
+        }
+      ],
+      "llm_error": "Connection error."
+    }
+  },
+  "node_results": {
+    "load_data": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "loaded": true,
+        "query": "generate_detailed",
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "additional_params": {
+          "evaluation_run": {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 12137,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:21.002915",
+                "finished_at": "2026-01-09T09:24:33.140065",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7959,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:33.140190",
+                "finished_at": "2026-01-09T09:24:41.100049",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7968,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:41.100115",
+                "finished_at": "2026-01-09T09:24:49.068845",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7895,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:49.068887",
+                "finished_at": "2026-01-09T09:24:56.964077",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          "report_type": "analysis",
+          "use_llm_report": true
+        },
+        "run": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "dataset_name": "test_dataset",
+          "dataset_version": "1.0.0",
+          "model_name": "gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T09:24:21.002694",
+          "finished_at": "2026-01-09T09:24:56.964326",
+          "results": [
+            {
+              "test_case_id": "test_001",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 0,
+              "latency_ms": 12137,
+              "cost_usd": null,
+              "trace_id": null,
+              "started_at": "2026-01-09T09:24:21.002915",
+              "finished_at": "2026-01-09T09:24:33.140065",
+              "question": "What is Python?",
+              "answer": "Python is a high-level programming language.",
+              "contexts": [
+                "Python is a programming language",
+                "Python was created by Guido van Rossum"
+              ],
+              "ground_truth": "Python is a high-level interpreted programming language."
+            },
+            {
+              "test_case_id": "test_002",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 0,
+              "latency_ms": 7959,
+              "cost_usd": null,
+              "trace_id": null,
+              "started_at": "2026-01-09T09:24:33.140190",
+              "finished_at": "2026-01-09T09:24:41.100049",
+              "question": "What is machine learning?",
+              "answer": "Machine learning is a subset of AI.",
+              "contexts": [
+                "ML is part of AI",
+                "ML uses algorithms to learn from data"
+              ],
+              "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+            },
+            {
+              "test_case_id": "test_003",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 0,
+              "latency_ms": 7968,
+              "cost_usd": null,
+              "trace_id": null,
+              "started_at": "2026-01-09T09:24:41.100115",
+              "finished_at": "2026-01-09T09:24:49.068845",
+              "question": "What is RAG?",
+              "answer": "RAG stands for Retrieval-Augmented Generation.",
+              "contexts": [
+                "RAG combines retrieval and generation",
+                "RAG improves LLM responses"
+              ],
+              "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+            },
+            {
+              "test_case_id": "test_004",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 0,
+              "latency_ms": 7895,
+              "cost_usd": null,
+              "trace_id": null,
+              "started_at": "2026-01-09T09:24:49.068887",
+              "finished_at": "2026-01-09T09:24:56.964077",
+              "question": "What is TDD?",
+              "answer": "TDD means Test-Driven Development.",
+              "contexts": [
+                "Test-Driven Development",
+                "Write tests first",
+                "Red-Green-Refactor cycle"
+              ],
+              "ground_truth": "TDD is a software development approach where tests are written before code."
+            }
+          ],
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "total_tokens": 0,
+          "total_cost_usd": null,
+          "langfuse_trace_id": null,
+          "tracker_metadata": {
+            "run_mode": "full"
+          },
+          "retrieval_metadata": {}
+        },
+        "metrics": {
+          "faithfulness": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "answer_relevancy": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "summary": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "dataset_name": "test_dataset",
+          "dataset_version": "1.0.0",
+          "model_name": "gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T09:24:21.002694",
+          "finished_at": "2026-01-09T09:24:56.964326",
+          "total_test_cases": 4,
+          "passed_test_cases": 0,
+          "pass_rate": 0.0,
+          "total_tokens": 0,
+          "total_cost_usd": null,
+          "duration_seconds": 35.961632,
+          "tracker_metadata": {
+            "run_mode": "full"
+          },
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "run_mode": "full",
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "avg_faithfulness": 0.0,
+          "avg_answer_relevancy": 0.0
+        }
+      }
+    },
+    "load_runs": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 5,
+      "output": {
+        "runs": [
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 12137,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:21.002915",
+                "finished_at": "2026-01-09T09:24:33.140065",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7959,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:33.140190",
+                "finished_at": "2026-01-09T09:24:41.100049",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7968,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:41.100115",
+                "finished_at": "2026-01-09T09:24:49.068845",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7895,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:49.068887",
+                "finished_at": "2026-01-09T09:24:56.964077",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:14.026053",
+            "finished_at": "2026-01-09T08:14:15.026053",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.938368",
+            "finished_at": "2026-01-09T08:14:14.938368",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "702cb7d4-6b3d-4ec8-9f02-19465c377e52",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.875276",
+            "finished_at": "2026-01-09T08:14:14.875276",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "1d968863-7d66-4327-8a62-a885bab741d4",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.840518",
+            "finished_at": "2026-01-09T08:14:14.840518",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "20fd9759-4099-432a-9b9a-fb85cf866b2f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/llama2",
+            "started_at": "2026-01-09T08:14:13.808859",
+            "finished_at": "2026-01-09T08:14:14.808859",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          }
+        ],
+        "summaries": [
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "total_test_cases": 4,
+            "passed_test_cases": 0,
+            "pass_rate": 0.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 35.961632,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.0,
+            "avg_answer_relevancy": 0.0
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:14.026053",
+            "finished_at": "2026-01-09T08:14:15.026053",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          },
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.938368",
+            "finished_at": "2026-01-09T08:14:14.938368",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          },
+          {
+            "run_id": "702cb7d4-6b3d-4ec8-9f02-19465c377e52",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.875276",
+            "finished_at": "2026-01-09T08:14:14.875276",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          },
+          {
+            "run_id": "1d968863-7d66-4327-8a62-a885bab741d4",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.840518",
+            "finished_at": "2026-01-09T08:14:14.840518",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          },
+          {
+            "run_id": "20fd9759-4099-432a-9b9a-fb85cf866b2f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/llama2",
+            "started_at": "2026-01-09T08:14:13.808859",
+            "finished_at": "2026-01-09T08:14:14.808859",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          }
+        ],
+        "count": 6,
+        "missing_run_ids": []
+      }
+    },
+    "statistics": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 3,
+      "output": {
+        "analysis": {
+          "analysis_id": "79e29f50-b597-439f-b8cd-11990099707e",
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "analysis_type": "statistical",
+          "created_at": "2026-01-09T09:24:56.994974",
+          "metadata": {},
+          "metrics_summary": {
+            "faithfulness": {
+              "mean": 0.0,
+              "std": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "median": 0.0,
+              "percentile_25": 0.0,
+              "percentile_75": 0.0,
+              "count": 4
+            },
+            "answer_relevancy": {
+              "mean": 0.0,
+              "std": 0.0,
+              "min": 0.0,
+              "max": 0.0,
+              "median": 0.0,
+              "percentile_25": 0.0,
+              "percentile_75": 0.0,
+              "count": 4
+            }
+          },
+          "correlation_matrix": [
+            [
+              1.0,
+              NaN
+            ],
+            [
+              NaN,
+              1.0
+            ]
+          ],
+          "correlation_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "significant_correlations": [],
+          "low_performers": [
+            {
+              "test_case_id": "test_001",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is Python?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "test_001",
+              "metric_name": "answer_relevancy",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is Python?",
+              "potential_causes": [
+                "Answer does not address the question"
+              ]
+            },
+            {
+              "test_case_id": "test_002",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is machine learning?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "test_002",
+              "metric_name": "answer_relevancy",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is machine learning?",
+              "potential_causes": [
+                "Answer does not address the question"
+              ]
+            },
+            {
+              "test_case_id": "test_003",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is RAG?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "test_003",
+              "metric_name": "answer_relevancy",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is RAG?",
+              "potential_causes": [
+                "Answer does not address the question"
+              ]
+            },
+            {
+              "test_case_id": "test_004",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is TDD?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "test_004",
+              "metric_name": "answer_relevancy",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "What is TDD?",
+              "potential_causes": [
+                "Answer does not address the question"
+              ]
+            }
+          ],
+          "insights": [
+            "Low pass rate requires attention: 0.0%",
+            "Best performing metric: faithfulness (mean: 0.000)",
+            "Worst performing metric: faithfulness (mean: 0.000)",
+            "Found 8 low-performing test cases (score < threshold)",
+            "Most problematic metric: faithfulness (4 low performers)"
+          ],
+          "overall_pass_rate": 0.0,
+          "metric_pass_rates": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          }
+        },
+        "summary": {
+          "total_metrics": 2,
+          "average_score": 0.0,
+          "overall_pass_rate": 0.0
+        },
+        "statistics": {
+          "faithfulness": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "median": 0.0,
+            "percentile_25": 0.0,
+            "percentile_75": 0.0,
+            "count": 4
+          },
+          "answer_relevancy": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "median": 0.0,
+            "percentile_25": 0.0,
+            "percentile_75": 0.0,
+            "count": 4
+          }
+        },
+        "insights": [
+          "Low pass rate requires attention: 0.0%",
+          "Best performing metric: faithfulness (mean: 0.000)",
+          "Worst performing metric: faithfulness (mean: 0.000)",
+          "Found 8 low-performing test cases (score < threshold)",
+          "Most problematic metric: faithfulness (4 low performers)"
+        ],
+        "analysis_id": "79e29f50-b597-439f-b8cd-11990099707e",
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "correlation_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "correlation_matrix": [
+          [
+            1.0,
+            NaN
+          ],
+          [
+            NaN,
+            1.0
+          ]
+        ],
+        "significant_correlations": [],
+        "low_performers": [
+          {
+            "test_case_id": "test_001",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is Python?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "test_001",
+            "metric_name": "answer_relevancy",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is Python?",
+            "potential_causes": [
+              "Answer does not address the question"
+            ]
+          },
+          {
+            "test_case_id": "test_002",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is machine learning?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "test_002",
+            "metric_name": "answer_relevancy",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is machine learning?",
+            "potential_causes": [
+              "Answer does not address the question"
+            ]
+          },
+          {
+            "test_case_id": "test_003",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is RAG?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "test_003",
+            "metric_name": "answer_relevancy",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is RAG?",
+            "potential_causes": [
+              "Answer does not address the question"
+            ]
+          },
+          {
+            "test_case_id": "test_004",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is TDD?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "test_004",
+            "metric_name": "answer_relevancy",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "What is TDD?",
+            "potential_causes": [
+              "Answer does not address the question"
+            ]
+          }
+        ],
+        "metric_pass_rates": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.0
+        }
+      }
+    },
+    "ragas_eval": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "summary": {
+          "metric_count": 2,
+          "sample_count": 4,
+          "overall_score": 0.0,
+          "recomputed": false
+        },
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.0
+        },
+        "per_case": [
+          {
+            "test_case_id": "test_001",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is Python?"
+          },
+          {
+            "test_case_id": "test_002",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is machine learning?"
+          },
+          {
+            "test_case_id": "test_003",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is RAG?"
+          },
+          {
+            "test_case_id": "test_004",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is TDD?"
+          }
+        ]
+      }
+    },
+    "nlp_analysis": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 186,
+      "output": {
+        "analysis": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "question_stats": {
+            "char_count": 67,
+            "word_count": 13,
+            "sentence_count": 4,
+            "avg_word_length": 3.923076923076923,
+            "unique_word_ratio": 0.5384615384615384
+          },
+          "answer_stats": {
+            "char_count": 162,
+            "word_count": 25,
+            "sentence_count": 4,
+            "avg_word_length": 5.36,
+            "unique_word_ratio": 0.92
+          },
+          "context_stats": {
+            "char_count": 258,
+            "word_count": 43,
+            "sentence_count": 1,
+            "avg_word_length": 5.023255813953488,
+            "unique_word_ratio": 0.9069767441860465
+          },
+          "question_types": [
+            {
+              "question_type": "factual",
+              "count": 4,
+              "percentage": 1.0,
+              "avg_scores": {
+                "faithfulness": 0.0,
+                "answer_relevancy": 0.0
+              }
+            }
+          ],
+          "top_keywords": [
+            {
+              "keyword": "is",
+              "frequency": 6,
+              "tfidf_score": 0.24634723644073758,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "tdd",
+              "frequency": 2,
+              "tfidf_score": 0.17105004542815092,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "what",
+              "frequency": 4,
+              "tfidf_score": 0.1666027922057938,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "python",
+              "frequency": 2,
+              "tfidf_score": 0.16341620996113213,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "rag",
+              "frequency": 2,
+              "tfidf_score": 0.1618416489767295,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "learning",
+              "frequency": 2,
+              "tfidf_score": 0.14221086885062423,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "machine",
+              "frequency": 2,
+              "tfidf_score": 0.14221086885062423,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "development",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "driven",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "means",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "test",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "high",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "language",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "level",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "programming",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "augmented",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "for",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "generation",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "retrieval",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "stands",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            }
+          ],
+          "topic_clusters": [],
+          "insights": [
+            "Questions are short and concise",
+            "Dominant question type: factual (100%)",
+            "Top keywords: is, tdd, what"
+          ]
+        },
+        "summary": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "has_text_stats": true,
+          "has_question_type_analysis": true,
+          "has_keyword_analysis": true,
+          "question_stats_preview": 3.25,
+          "answer_stats_preview": 6.25,
+          "context_count": 1,
+          "dominant_question_type": "factual",
+          "top_keywords_preview": [
+            "is",
+            "tdd",
+            "what",
+            "python",
+            "rag"
+          ]
+        },
+        "statistics": {
+          "text_stats": {
+            "questions": {
+              "char_count": 67,
+              "word_count": 13,
+              "sentence_count": 4,
+              "avg_word_length": 3.923076923076923,
+              "unique_word_ratio": 0.5384615384615384
+            },
+            "answers": {
+              "char_count": 162,
+              "word_count": 25,
+              "sentence_count": 4,
+              "avg_word_length": 5.36,
+              "unique_word_ratio": 0.92
+            },
+            "contexts": {
+              "char_count": 258,
+              "word_count": 43,
+              "sentence_count": 1,
+              "avg_word_length": 5.023255813953488,
+              "unique_word_ratio": 0.9069767441860465
+            }
+          },
+          "question_type_distribution": [
+            {
+              "question_type": "factual",
+              "count": 4,
+              "percentage": 1.0,
+              "avg_scores": {
+                "faithfulness": 0.0,
+                "answer_relevancy": 0.0
+              }
+            }
+          ],
+          "keywords": [
+            {
+              "keyword": "is",
+              "frequency": 6,
+              "tfidf_score": 0.24634723644073758,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "tdd",
+              "frequency": 2,
+              "tfidf_score": 0.17105004542815092,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "what",
+              "frequency": 4,
+              "tfidf_score": 0.1666027922057938,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "python",
+              "frequency": 2,
+              "tfidf_score": 0.16341620996113213,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "rag",
+              "frequency": 2,
+              "tfidf_score": 0.1618416489767295,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "learning",
+              "frequency": 2,
+              "tfidf_score": 0.14221086885062423,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "machine",
+              "frequency": 2,
+              "tfidf_score": 0.14221086885062423,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "development",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "driven",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "means",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "test",
+              "frequency": 1,
+              "tfidf_score": 0.08552502271407546,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "high",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "language",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "level",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "programming",
+              "frequency": 1,
+              "tfidf_score": 0.08170810498056606,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "augmented",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "for",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "generation",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "retrieval",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "stands",
+              "frequency": 1,
+              "tfidf_score": 0.08092082448836475,
+              "avg_metric_scores": null
+            }
+          ]
+        },
+        "insights": [
+          "Questions are short and concise",
+          "Dominant question type: factual (100%)",
+          "Top keywords: is, tdd, what"
+        ],
+        "analysis_id": null,
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "question_types": [
+          {
+            "question_type": "factual",
+            "count": 4,
+            "percentage": 1.0,
+            "avg_scores": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            }
+          }
+        ],
+        "top_keywords": [
+          {
+            "keyword": "is",
+            "frequency": 6,
+            "tfidf_score": 0.24634723644073758,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "tdd",
+            "frequency": 2,
+            "tfidf_score": 0.17105004542815092,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "what",
+            "frequency": 4,
+            "tfidf_score": 0.1666027922057938,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "python",
+            "frequency": 2,
+            "tfidf_score": 0.16341620996113213,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "rag",
+            "frequency": 2,
+            "tfidf_score": 0.1618416489767295,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "learning",
+            "frequency": 2,
+            "tfidf_score": 0.14221086885062423,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "machine",
+            "frequency": 2,
+            "tfidf_score": 0.14221086885062423,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "development",
+            "frequency": 1,
+            "tfidf_score": 0.08552502271407546,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "driven",
+            "frequency": 1,
+            "tfidf_score": 0.08552502271407546,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "means",
+            "frequency": 1,
+            "tfidf_score": 0.08552502271407546,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "test",
+            "frequency": 1,
+            "tfidf_score": 0.08552502271407546,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "high",
+            "frequency": 1,
+            "tfidf_score": 0.08170810498056606,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "language",
+            "frequency": 1,
+            "tfidf_score": 0.08170810498056606,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "level",
+            "frequency": 1,
+            "tfidf_score": 0.08170810498056606,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "programming",
+            "frequency": 1,
+            "tfidf_score": 0.08170810498056606,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "augmented",
+            "frequency": 1,
+            "tfidf_score": 0.08092082448836475,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "for",
+            "frequency": 1,
+            "tfidf_score": 0.08092082448836475,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "generation",
+            "frequency": 1,
+            "tfidf_score": 0.08092082448836475,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "retrieval",
+            "frequency": 1,
+            "tfidf_score": 0.08092082448836475,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "stands",
+            "frequency": 1,
+            "tfidf_score": 0.08092082448836475,
+            "avg_metric_scores": null
+          }
+        ],
+        "topic_clusters": []
+      }
+    },
+    "time_series": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "series": [
+          {
+            "run_id": "20fd9759-4099-432a-9b9a-fb85cf866b2f",
+            "timestamp": "2026-01-09T08:14:13.808859",
+            "pass_rate": 1.0,
+            "model_name": "ollama/llama2"
+          },
+          {
+            "run_id": "1d968863-7d66-4327-8a62-a885bab741d4",
+            "timestamp": "2026-01-09T08:14:13.840518",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "702cb7d4-6b3d-4ec8-9f02-19465c377e52",
+            "timestamp": "2026-01-09T08:14:13.875276",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "timestamp": "2026-01-09T08:14:13.938368",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "timestamp": "2026-01-09T08:14:14.026053",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "timestamp": "2026-01-09T09:24:21.002694",
+            "pass_rate": 0.0,
+            "model_name": "gpt-oss-safeguard:20b"
+          }
+        ],
+        "summary": {
+          "run_count": 6,
+          "avg_pass_rate": 0.8333,
+          "start": "2026-01-09T08:14:13.808859",
+          "end": "2026-01-09T09:24:21.002694"
+        }
+      }
+    },
+    "causal_analysis": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "analysis": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "analysis_id": "eca47cdf-ccd8-4bdd-86b7-0f12817f1d77",
+          "created_at": "2026-01-09T09:24:57.181825",
+          "factor_stats": {},
+          "factor_impacts": [],
+          "causal_relationships": [],
+          "root_causes": [],
+          "interventions": [],
+          "insights": [
+            "Insufficient samples for causal analysis (4 < 10)"
+          ]
+        },
+        "summary": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "factor_count": 0,
+          "significant_impact_count": 0,
+          "root_cause_count": 0
+        },
+        "statistics": {},
+        "insights": [
+          "Insufficient samples for causal analysis (4 < 10)"
+        ],
+        "analysis_id": "eca47cdf-ccd8-4bdd-86b7-0f12817f1d77",
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "factor_stats": {},
+        "significant_impacts": [],
+        "root_causes": [],
+        "interventions": []
+      }
+    },
+    "low_samples": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "threshold": 0.5,
+        "low_performers": [
+          {
+            "test_case_id": "test_001",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is Python?"
+          },
+          {
+            "test_case_id": "test_002",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is machine learning?"
+          },
+          {
+            "test_case_id": "test_003",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is RAG?"
+          },
+          {
+            "test_case_id": "test_004",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "avg_score": 0.0,
+            "question_preview": "What is TDD?"
+          }
+        ],
+        "count": 4
+      }
+    },
+    "diagnostic": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "threshold": 0.6,
+        "diagnostics": [
+          {
+            "metric": "faithfulness",
+            "issue": "faithfulness 점수가 기준치 미달입니다 (0.00 < 0.70).",
+            "score": 0.0,
+            "threshold": 0.7,
+            "gap": 0.7
+          },
+          {
+            "metric": "answer_relevancy",
+            "issue": "answer_relevancy 점수가 기준치 미달입니다 (0.00 < 0.70).",
+            "score": 0.0,
+            "threshold": 0.7,
+            "gap": 0.7
+          }
+        ],
+        "recommendations": [
+          "답변을 검색 컨텍스트에 더 강하게 고정하고 근거 인용을 강화하세요.",
+          "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+        ]
+      }
+    },
+    "priority_summary": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "bottom_percentile": 10.0,
+        "impact_count": 3,
+        "total_cases": 4,
+        "bottom_count": 1,
+        "bottom_cases": [
+          {
+            "test_case_id": "test_001",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "shortfall": 0.7,
+            "impact_score": 0.805,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "What is Python?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          }
+        ],
+        "impact_cases": [
+          {
+            "test_case_id": "test_001",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "shortfall": 0.7,
+            "impact_score": 0.805,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "What is Python?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          },
+          {
+            "test_case_id": "test_002",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "shortfall": 0.7,
+            "impact_score": 0.805,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "What is machine learning?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "high_impact"
+            ]
+          },
+          {
+            "test_case_id": "test_003",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "shortfall": 0.7,
+            "impact_score": 0.805,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "What is RAG?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "high_impact"
+            ]
+          }
+        ],
+        "run_metadata": {
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "dataset_name": "test_dataset",
+          "dataset_version": "1.0.0",
+          "model_name": "gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T09:24:21.002694",
+          "finished_at": "2026-01-09T09:24:56.964326",
+          "total_test_cases": 4,
+          "passed_test_cases": 0,
+          "pass_rate": 0.0,
+          "total_tokens": 0,
+          "total_cost_usd": null,
+          "duration_seconds": 35.961632,
+          "tracker_metadata": {
+            "run_mode": "full"
+          },
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "run_mode": "full",
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "avg_faithfulness": 0.0,
+          "avg_answer_relevancy": 0.0
+        }
+      }
+    },
+    "pattern_detection": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "patterns": [
+          {
+            "label": "Top keyword",
+            "detail": "is (freq 6)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "tdd (freq 2)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "what (freq 4)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "python (freq 2)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "rag (freq 2)"
+          },
+          {
+            "label": "Question type",
+            "detail": "factual (1.0%)"
+          }
+        ],
+        "summary": {
+          "keyword_count": 20,
+          "question_type_count": 1
+        }
+      }
+    },
+    "trend_detection": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "trends": [
+          {
+            "metric": "pass_rate",
+            "direction": "down",
+            "delta": -1.0
+          }
+        ],
+        "summary": {
+          "start": 1.0,
+          "end": 0.0,
+          "delta": -1.0
+        },
+        "recommendations": [
+          "Performance is trending down; investigate changes."
+        ]
+      }
+    },
+    "root_cause": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "causes": [
+          {
+            "metric": "faithfulness",
+            "reason": "faithfulness 점수가 기준치 미달입니다 (0.00 < 0.70)."
+          },
+          {
+            "metric": "answer_relevancy",
+            "reason": "answer_relevancy 점수가 기준치 미달입니다 (0.00 < 0.70)."
+          }
+        ],
+        "recommendations": [
+          "답변을 검색 컨텍스트에 더 강하게 고정하고 근거 인용을 강화하세요.",
+          "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+        ],
+        "low_performer_count": 4
+      }
+    },
+    "report": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 1530,
+      "output": {
+        "report": "# 분석 보고서\n\n## 요약\n- 데이터셋: test_dataset\n- 모델: gpt-oss-safeguard:20b\n- 테스트 케이스: 4\n- 통과율: 0.00%\n\n## 증거 샘플\n- [E1] test_001: avg 0.00\n- [E2] test_002: avg 0.00\n- [E3] test_003: avg 0.00\n- [E4] test_004: avg 0.00\n\n## 개선 제안\n- 추가 데이터 및 LLM 분석을 통해 상세 원인을 도출하세요.",
+        "format": "markdown",
+        "llm_used": false,
+        "llm_model": "gpt-oss-safeguard:20b",
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "summary": {
+          "report_type": "analysis",
+          "total_evidence": 4,
+          "has_run": true
+        },
+        "evidence": [
+          {
+            "test_case_id": "test_001",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is Python?",
+            "answer": "Python is a high-level programming language.",
+            "contexts": [
+              "Python is a programming language",
+              "Python was created by Guido van Rossum"
+            ],
+            "ground_truth": "Python is a high-level interpreted programming language.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "E1"
+          },
+          {
+            "test_case_id": "test_002",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is machine learning?",
+            "answer": "Machine learning is a subset of AI.",
+            "contexts": [
+              "ML is part of AI",
+              "ML uses algorithms to learn from data"
+            ],
+            "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "E2"
+          },
+          {
+            "test_case_id": "test_003",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is RAG?",
+            "answer": "RAG stands for Retrieval-Augmented Generation.",
+            "contexts": [
+              "RAG combines retrieval and generation",
+              "RAG improves LLM responses"
+            ],
+            "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "E3"
+          },
+          {
+            "test_case_id": "test_004",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is TDD?",
+            "answer": "TDD means Test-Driven Development.",
+            "contexts": [
+              "Test-Driven Development",
+              "Write tests first",
+              "Red-Green-Refactor cycle"
+            ],
+            "ground_truth": "TDD is a software development approach where tests are written before code.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "E4"
+          }
+        ],
+        "llm_error": "Connection error."
+      }
+    }
+  },
+  "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86"
+}

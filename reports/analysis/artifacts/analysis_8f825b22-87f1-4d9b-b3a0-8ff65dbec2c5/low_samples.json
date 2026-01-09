@@ -1,0 +1,39 @@
+{
+  "node_id": "low_samples",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "threshold": 0.5,
+    "low_performers": [
+      {
+        "test_case_id": "auto-003",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.7145836968078935
+        },
+        "avg_score": 0.3573,
+        "question_preview": "대인배상 II는 어떤 보장을 제공하나요?"
+      },
+      {
+        "test_case_id": "auto-007",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.49459554832359515
+        },
+        "avg_score": 0.2473,
+        "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?"
+      },
+      {
+        "test_case_id": "auto-010",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.6322424139879534
+        },
+        "avg_score": 0.3161,
+        "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?"
+      }
+    ],
+    "count": 3
+  }
+}

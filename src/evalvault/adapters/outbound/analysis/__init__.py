@@ -77,8 +77,14 @@ from evalvault.adapters.outbound.analysis.root_cause_analyzer_module import (
     RootCauseAnalyzerModule,
 )
 from evalvault.adapters.outbound.analysis.run_analyzer_module import RunAnalyzerModule
+from evalvault.adapters.outbound.analysis.run_change_detector_module import (
+    RunChangeDetectorModule,
+)
 from evalvault.adapters.outbound.analysis.run_comparator_module import RunComparatorModule
 from evalvault.adapters.outbound.analysis.run_loader_module import RunLoaderModule
+from evalvault.adapters.outbound.analysis.run_metric_comparator_module import (
+    RunMetricComparatorModule,
+)
 from evalvault.adapters.outbound.analysis.search_comparator_module import (
     SearchComparatorModule,
 )
@@ -139,8 +145,10 @@ __all__ = [
     "RetrievalQualityCheckerModule",
     "RootCauseAnalyzerModule",
     "RunAnalyzerModule",
+    "RunChangeDetectorModule",
     "RunComparatorModule",
     "RunLoaderModule",
+    "RunMetricComparatorModule",
     "SearchComparatorModule",
     "StatisticalAnalyzerModule",
     "StatisticalComparatorModule",

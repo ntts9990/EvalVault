@@ -1,0 +1,31 @@
+{
+  "node_id": "run_change_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "summary": {
+      "run_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+      "run_b": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "dataset_changed": false,
+      "config_change_count": 0,
+      "prompt_change_count": 0,
+      "missing_run_ids": []
+    },
+    "dataset_changes": [],
+    "config_changes": [],
+    "prompt_changes": {
+      "status": "missing",
+      "changes": [],
+      "summary": {},
+      "prompt_sets": {
+        "run_a": null,
+        "run_b": null
+      },
+      "notes": [
+        "Prompt snapshot을 찾을 수 없습니다.",
+        "평가 시 --db와 --system-prompt/--ragas-prompts 옵션을 사용하세요."
+      ]
+    }
+  }
+}

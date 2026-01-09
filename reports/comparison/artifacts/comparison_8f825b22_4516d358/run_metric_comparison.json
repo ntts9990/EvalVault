@@ -1,0 +1,76 @@
+{
+  "node_id": "run_metric_comparison",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "summary": {
+      "run_a": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+      "run_b": "4516d358-2797-4c46-9f14-c1d975588025",
+      "total_metrics": 2,
+      "significant_metrics": 1,
+      "wins": {
+        "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5": 1,
+        "4516d358-2797-4c46-9f14-c1d975588025": 0
+      },
+      "pass_rate_a": 0.0,
+      "pass_rate_b": 0.0,
+      "pass_rate_diff": 0.0,
+      "avg_score_a": 0.6997,
+      "avg_score_b": 0.6107,
+      "avg_score_diff": -0.089
+    },
+    "comparisons": [
+      {
+        "run_id_a": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "run_id_b": "4516d358-2797-4c46-9f14-c1d975588025",
+        "metric": "faithfulness",
+        "mean_a": 0.8333333333333334,
+        "mean_b": 0.8333333333333334,
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "is_significant": false,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null,
+        "direction": "flat"
+      },
+      {
+        "run_id_a": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "run_id_b": "4516d358-2797-4c46-9f14-c1d975588025",
+        "metric": "answer_relevancy",
+        "mean_a": 0.566023964076465,
+        "mean_b": 0.38806024011636503,
+        "diff": -0.17796372396010002,
+        "diff_percent": -31.441022863840907,
+        "p_value": 6.3483212476925e-06,
+        "is_significant": true,
+        "effect_size": -1.8291622597933919,
+        "effect_level": "large",
+        "winner": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "direction": "down"
+      }
+    ],
+    "notable_changes": [
+      {
+        "metric": "answer_relevancy",
+        "diff": -0.178,
+        "diff_percent": -31.44,
+        "p_value": 0.0,
+        "effect_size": -1.829,
+        "effect_level": "large",
+        "winner": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5"
+      },
+      {
+        "metric": "faithfulness",
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null
+      }
+    ]
+  }
+}

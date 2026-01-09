@@ -1,0 +1,4439 @@
+{
+  "intent": "generate_detailed",
+  "pipeline_id": "e2c4a1e6-7a97-42c0-8b6a-5eca0a0aaae9",
+  "is_complete": true,
+  "duration_ms": 106375,
+  "started_at": "2026-01-09T12:23:48.573598",
+  "finished_at": "2026-01-09T12:25:34.948864",
+  "final_output": {
+    "report": {
+      "report": "# RAG 평가 분석 보고서  \n### run_id: **8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5**\n\n---\n\n## 1. 요약  \n모델 **ollama/gpt-oss-safeguard:20b** 가 **e2e-auto-insurance-qa-korean** 데이터셋에서 18개의 테스트를 수행했지만 전체 **pass rate** 는 0%로, 가장 낮은 지표인 **answer_relevancy**(평균 0.566) 가 기준 0.7을 크게 하회했습니다.  \n\n- **지표**: Faithfulness는 평균 0.833(통과) / Answer Relevancy는 평균 0.566(위험)  \n- **원인**: 답변과 문맥이 불일치하여 관련성 저하 → “컨텍스트‑답변 정합성”에 대한 품질 저하 (E1, E2, E3)  \n- **사용자 영향**: 실질적으로 요구되는 정보를 반영하지 못해 사용자에게 신뢰도 손실과 인지부하가 증가  \n\n---\n\n## 2. 지표 스코어카드  \n\n| Metric | 평균 | Threshold | Pass Rate | 상태 |\n|--------|-------|-----------|------------|------|\n| Faithfulness | 0.833 | 0.700 | 0.833 | ✅ Pass |\n| Answer Relevancy | 0.566 | 0.700 | 0.055 | ⚠️ Risk |\n\n> **주요 사항**  \n> - Faithfulness 0.833 > 0.7 → 대부분의 경우 참고 문맥이 충분히 반영됨.  \n> - Answer Relevancy 0.566 < 0.7 → 단 1개의 테스트(“auto‑015”) 를 제외하면 대부분 < 0.7 (특히 *E1*, *E2*, *E3*).\n\n---\n\n## 3. 데이터 품질 / 신뢰도  \n| 항목 | 결론 |\n|------|------|\n| 샘플 수 | **18**(표본 수가 적음). 분석 결과를 일반화하기 어려움. |\n| 커버리지 | 1.0(모든 문서에 대해 테스트)   |\n| 경고 | “추가 데이터 필요” 및 “실행 이력 부족”으로 인해 추세 분석 불가. |\n| 결함 | None (미리 정의된 품질 체크는 전혀 실패하지 않음). |\n\n> **결론**: 샘플이 제한적이며, 추세/장기 개선을 위한 과거 실행 기록이 없으므로, **추가 데이터와 반복 실행**이 필요합니다.\n\n---\n\n## 4. 증거 기반 인사이트  \n\n| Priority Highlight | Test Case | Metric(s) | 분석 힌트 | 증거 |\n|---------------------|-----------|-----------|-----------|------|\n| **high‑impact** | *auto‑007* | Faithfulness 0.0, Relevancy 0.495 | “컨텍스트‑답변 정합성 체크 필요” | [E1] |\n| **high‑impact** | *auto‑010* | Faithfulness 0.0, Relevancy 0.632 | “컨텍스트‑답변 정합성 체크 필요” | [E2] |\n| **high‑impact** | *auto‑003* | Faithfulness 0.0, Relevancy 0.715 | “보장 내용을 과장” | [E3] |\n| **가중치 위기** | *auto‑015* | Faithfulness 1.0, Relevancy 0.440 | “정답이 올바르지만 문맥이 부정확” | [E4] |\n| **가중치 위기** | *auto‑005* | Faithfulness 1.0, Relevancy 0.442 | “정답은 1억 원이지만 문맥이 과도한 상세 설명에 시맨틱 가려짐” | [E5] |\n| **가중치 위기** | *auto‑017* | Faithfulness 1.0, Relevancy 0.446 | “전화 번호가 정정리된 정답이지만 문맥이 불명확” | [E6] |\n\n> **내비게이션**: 가장 불량한 사례를 모두 “사실형” 질문으로 식별했으며, 각 응답이 주어진 문맥에서 핵심정보를 정확히 반영하거나 문맥과 일치하는지 확인이 필수적입니다.  \n\n---\n\n## 5. 원인 가설  \n\n1. **컨텍스트‑답변 정합성 부족**  \n   - *E1* 및 *E2*에서 모델이 문맥 일부를 잘못 해석해 정답을 제공하였지만 **Faithfulness 0.0** 으로 실제 문장을 인용할 수 없었다.  \n2. **Prompt‑Alignment 이슈**  \n   - “보험료 할증/할인”에 대한 질문(예: *auto‑015*)에서는 정답이 문맥에 존재하지만 **Answer Relevancy** 가 0.44 아래로 낮아, Prompt에 문맥 활용이 미흡한 것으로 추정.  \n3. **Embedding 모델 성능**  \n   - **qwen3‑embedding:8b** 를 사용했으나, 한 문장 정도의 문맥을 제대로 연계하지 못해 중요 정보를 끌어오지 못했을 가능성이 있음.  \n\n> **근거**: Root cause 데이터에서 “answer_relevancy” 가 기준 이하라는 명시가 있으며, 상세 사례 E1–E6 가 이를 뒷받침합니다.\n\n---\n\n## 6. 개선 제안  \n\n| 개선 방향 | 구체적 조치 | 기대 효과 |\n|-----------|------------|-----------|\n| **Context enrichment** | 문맥 제공 시, 가장 관련성 높은 문장 우선 선택 및 길이 제한 → *E1*, *E2* 오류 방지 | Relevancy 0.7 이상 달성 |\n| **Prompt re‑engineering** | “정답이 무엇인가요?” 등 사실형 질문에 대한 명확 지시어 삽입 | Faithfulness 1.0 유지, 불필요 정보 배제 |\n| **Dataset augmentation** | “자기신체사고 보상액”, “결제 옵션 할증” 같은 예시를 확대 | 다양성 증가, 높은 스코어일수 확장 |\n| **Evaluation‑feedback loop** | 각 테스트 케이스에 대한 상세 정규화 및 재평가 자동 트리거 | 지속적 개선 추적 |\n| **Model fine‑tuning** | qwen‑3‑embedding 모델 파인튜닝 → 문맥-정답 매핑 향상 | Relevancy 개선 가능 |\n\n> **유의**: 초기 개선 단계에서 10~20% 비용(≈$0.25) 내부에서 재실행해 피드백 루프를 검증합니다.\n\n---\n\n## 7. 다음 단계  \n\n1. **추가 테스트 케이스 도입** – 50+ 질문으로 샘플 확장.  \n2. **과거 실행 기록 수집** – 트렌드·성능 변화를 분석하기 위한 메타데이터 확보.  \n3. **문맥 추출 알고리즘 재설계** – 문서 수동으로 선별된 핵심 문장과 비슷한 임베딩 우선순위 적용.  \n4. **품질 체크 도입** – 각 테스트 케이스에 대해 “정확성”, “불일치 스코어”등 추가 검증.  \n5. **사용자 피드백 수집** – 실제 사용자 시나리오에서 인지부하 및 신뢰 지표를 평가.  \n\n---\n\n## 8. 부록 (산출물 목록)\n\n| 파일 | 용도 |\n|------|------|\n| `causal_analysis.json` | 원인 분석 결과 |\n| `load_data.json` | 데이터 로드 로그 |\n| `nlp_analysis.json` | 토큰/어휘 통계 |\n| `pattern_detection.json` | 패턴/루트 원인 목록 |\n| `priority_summary.json` | 높은 영향 케이스 요약 |\n| `ragas_eval.json` | 전반적 평가 |\n| `root_cause.json` | 근본 원인 리포트 |\n| `statistics.json` | 통계 수치 |\n| `trend_detection.json` | 추세 분석 |\n| `statistics.json` | 기타 통계 |\n| `trend_detection.json` | 트렌드 분석 |\n\n> **Note**: 현재 테스트 시나리오는 짧고 표본 수가 18개에 불과하므로, 추후 **추가 데이터** 확보와 장기 실행 경로 설계가 필수입니다.  \n\n---",
+      "format": "markdown",
+      "llm_used": true,
+      "llm_model": "ollama/gpt-oss-safeguard:20b",
+      "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+      "summary": {
+        "report_type": "analysis",
+        "total_evidence": 6,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "auto-007",
+          "avg_score": 0.2473,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+          "answer": "19% 할인입니다.",
+          "contexts": [
+            "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+            "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+          ],
+          "ground_truth": "19%",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.49459554832359515
+          },
+          "evidence_id": "E1"
+        },
+        {
+          "test_case_id": "auto-010",
+          "avg_score": 0.3161,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+          "answer": "5% 할인입니다.",
+          "contexts": [
+            "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+            "2채널 이상: 5% 할인, 1채널: 3% 할인."
+          ],
+          "ground_truth": "5%",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.6322424139879534
+          },
+          "evidence_id": "E2"
+        },
+        {
+          "test_case_id": "auto-003",
+          "avg_score": 0.3573,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "대인배상 II는 어떤 보장을 제공하나요?",
+          "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+          "contexts": [
+            "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+            "중상해 사고 시 필수적으로 가입을 권장합니다."
+          ],
+          "ground_truth": "무한 보장",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.7145836968078935
+          },
+          "evidence_id": "E3"
+        },
+        {
+          "test_case_id": "auto-015",
+          "avg_score": 0.72,
+          "failed_metrics": [
+            "answer_relevancy"
+          ],
+          "question": "6회 분납 시 보험료는 어떻게 되나요?",
+          "answer": "2% 할증됩니다.",
+          "contexts": [
+            "납입 방법: 6회 분납은 2% 할증.",
+            "일시납은 1% 할인."
+          ],
+          "ground_truth": "2% 할증",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.4399445014747145
+          },
+          "evidence_id": "E4"
+        },
+        {
+          "test_case_id": "auto-005",
+          "avg_score": 0.7212,
+          "failed_metrics": [
+            "answer_relevancy"
+          ],
+          "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+          "answer": "최대 1억원까지 보장됩니다.",
+          "contexts": [
+            "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+            "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+          ],
+          "ground_truth": "1억원",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.4424365056726988
+          },
+          "evidence_id": "E5"
+        },
+        {
+          "test_case_id": "auto-017",
+          "avg_score": 0.7232,
+          "failed_metrics": [
+            "answer_relevancy"
+          ],
+          "question": "사고 접수 콜센터 번호는 무엇인가요?",
+          "answer": "1588-5114입니다.",
+          "contexts": [
+            "사고 접수: 24시간 콜센터 1588-5114.",
+            "모바일 앱: 삼성화재 다이렉트 앱."
+          ],
+          "ground_truth": "1588-5114",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.4464164242157778
+          },
+          "evidence_id": "E6"
+        }
+      ]
+    }
+  },
+  "node_results": {
+    "load_data": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 2,
+      "output": {
+        "loaded": true,
+        "query": "generate_detailed",
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "additional_params": {
+          "report_type": "analysis",
+          "use_llm_report": true
+        },
+        "run": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "dataset_name": "e2e-auto-insurance-qa-korean",
+          "dataset_version": "1.0.0",
+          "model_name": "ollama/gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T12:01:20.083691",
+          "finished_at": "2026-01-09T12:19:29.652169",
+          "results": [
+            {
+              "test_case_id": "auto-001",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.5702443358758247,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5108,
+              "latency_ms": 63640,
+              "cost_usd": 0.014195,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:01:20.084112",
+              "finished_at": "2026-01-09T12:02:23.724659",
+              "question": "대인배상 I에서 사망 시 보상 한도는 얼마인가요?",
+              "answer": "사망 시 1억 5천만원까지 보장됩니다.",
+              "contexts": [
+                "대인배상 I은 자동차 사고로 다른 사람을 다치게 하거나 사망하게 한 경우 보상합니다.",
+                "책임보험 한도 내에서 보장되며, 사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+              ],
+              "ground_truth": "1억 5천만원"
+            },
+            {
+              "test_case_id": "auto-002",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.6176038685162338,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5081,
+              "latency_ms": 65406,
+              "cost_usd": 0.014165,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:02:23.724841",
+              "finished_at": "2026-01-09T12:03:29.131206",
+              "question": "대인배상 I에서 부상 시 보상 한도는 얼마인가요?",
+              "answer": "부상 시 3천만원까지 보장됩니다.",
+              "contexts": [
+                "대인배상 I은 책임보험 한도 내에서 보장됩니다.",
+                "사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+              ],
+              "ground_truth": "3천만원"
+            },
+            {
+              "test_case_id": "auto-003",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.7145836968078935,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5669,
+              "latency_ms": 80770,
+              "cost_usd": 0.01586,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:03:29.131326",
+              "finished_at": "2026-01-09T12:04:49.902133",
+              "question": "대인배상 II는 어떤 보장을 제공하나요?",
+              "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+              "contexts": [
+                "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+                "중상해 사고 시 필수적으로 가입을 권장합니다."
+              ],
+              "ground_truth": "무한 보장"
+            },
+            {
+              "test_case_id": "auto-004",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.596903182350706,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5227,
+              "latency_ms": 67534,
+              "cost_usd": 0.0150625,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:04:49.902281",
+              "finished_at": "2026-01-09T12:05:57.437261",
+              "question": "대물배상 가입 한도 범위는 어떻게 되나요?",
+              "answer": "2천만원부터 10억원까지 선택 가능합니다.",
+              "contexts": [
+                "대물배상은 다른 사람의 차량이나 재물을 손괴한 경우 보상합니다.",
+                "보장 한도는 2천만원에서 10억원까지 선택 가능합니다."
+              ],
+              "ground_truth": "2천만원~10억원"
+            },
+            {
+              "test_case_id": "auto-005",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.4424365056726988,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5184,
+              "latency_ms": 65154,
+              "cost_usd": 0.0143925,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:05:57.437325",
+              "finished_at": "2026-01-09T12:07:02.591773",
+              "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+              "answer": "최대 1억원까지 보장됩니다.",
+              "contexts": [
+                "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+                "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+              ],
+              "ground_truth": "1억원"
+            },
+            {
+              "test_case_id": "auto-006",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.504380458152079,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4935,
+              "latency_ms": 61220,
+              "cost_usd": 0.013725000000000001,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:07:02.591868",
+              "finished_at": "2026-01-09T12:08:03.811900",
+              "question": "마일리지 특약에서 연간 3천km 이하 주행 시 할인율은 얼마인가요?",
+              "answer": "47% 할인입니다.",
+              "contexts": [
+                "마일리지 특약은 연간 주행거리에 따라 보험료를 할인해주는 특약입니다.",
+                "3천km 이하: 47% 할인, 5천km 이하: 38% 할인."
+              ],
+              "ground_truth": "47%"
+            },
+            {
+              "test_case_id": "auto-007",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.49459554832359515,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5007,
+              "latency_ms": 60298,
+              "cost_usd": 0.0138825,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:08:03.812154",
+              "finished_at": "2026-01-09T12:09:04.110897",
+              "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+              "answer": "19% 할인입니다.",
+              "contexts": [
+                "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+                "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+              ],
+              "ground_truth": "19%"
+            },
+            {
+              "test_case_id": "auto-008",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.49056005863215574,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4843,
+              "latency_ms": 54746,
+              "cost_usd": 0.013375000000000001,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:09:04.110952",
+              "finished_at": "2026-01-09T12:09:58.857494",
+              "question": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?",
+              "answer": "10% 할인입니다.",
+              "contexts": [
+                "운전자 범위를 제한하면 보험료를 할인받을 수 있습니다.",
+                "1인 한정: 10% 할인, 부부 한정: 7% 할인."
+              ],
+              "ground_truth": "10%"
+            },
+            {
+              "test_case_id": "auto-009",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.5321899304271877,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4851,
+              "latency_ms": 48298,
+              "cost_usd": 0.01341,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:09:58.857585",
+              "finished_at": "2026-01-09T12:10:47.155599",
+              "question": "운전자 한정 특약에서 부부 한정 할인율은 얼마인가요?",
+              "answer": "7% 할인입니다.",
+              "contexts": [
+                "운전자 한정 특약은 운전자 범위를 제한하여 보험료를 할인받는 특약입니다.",
+                "부부 한정: 7% 할인, 가족 한정: 5% 할인."
+              ],
+              "ground_truth": "7%"
+            },
+            {
+              "test_case_id": "auto-010",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 0.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.6322424139879534,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5311,
+              "latency_ms": 67229,
+              "cost_usd": 0.014559999999999998,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:10:47.155637",
+              "finished_at": "2026-01-09T12:11:54.385005",
+              "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+              "answer": "5% 할인입니다.",
+              "contexts": [
+                "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+                "2채널 이상: 5% 할인, 1채널: 3% 할인."
+              ],
+              "ground_truth": "5%"
+            },
+            {
+              "test_case_id": "auto-011",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.5190509737143613,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5509,
+              "latency_ms": 73097,
+              "cost_usd": 0.015745,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:11:54.385091",
+              "finished_at": "2026-01-09T12:13:07.482579",
+              "question": "가입 가능한 운전자 조건은 어떻게 되나요?",
+              "answer": "만 21세 이상이며 면허 취득 후 1년 이상 경과해야 합니다.",
+              "contexts": [
+                "운전자 조건: 만 21세 이상 운전면허 보유자.",
+                "운전면허 취득 후 1년 이상 경과해야 합니다."
+              ],
+              "ground_truth": "만 21세 이상, 면허 취득 후 1년 이상"
+            },
+            {
+              "test_case_id": "auto-012",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.6806393289335615,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 5238,
+              "latency_ms": 61236,
+              "cost_usd": 0.014512499999999998,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:13:07.482783",
+              "finished_at": "2026-01-09T12:14:08.719291",
+              "question": "차량 등록 후 몇 년 이하 차량이 가입 가능한가요?",
+              "answer": "차량 등록 후 15년 이하 차량이 가능합니다.",
+              "contexts": [
+                "차량 조건: 차량 등록 후 15년 이하 차량.",
+                "승용차, SUV, 승합차 가입 가능."
+              ],
+              "ground_truth": "15년 이하"
+            },
+            {
+              "test_case_id": "auto-013",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.5758427473516629,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4810,
+              "latency_ms": 50253,
+              "cost_usd": 0.013195,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:14:08.719369",
+              "finished_at": "2026-01-09T12:14:58.972672",
+              "question": "영업용 차량 가입은 어떻게 되나요?",
+              "answer": "영업용 차량은 별도 상품 가입이 필요합니다.",
+              "contexts": [
+                "승용차, SUV, 승합차 가입 가능.",
+                "영업용 차량은 별도 상품 가입 필요."
+              ],
+              "ground_truth": "별도 상품 필요"
+            },
+            {
+              "test_case_id": "auto-014",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.604441878113286,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4719,
+              "latency_ms": 48294,
+              "cost_usd": 0.0130725,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:14:58.972728",
+              "finished_at": "2026-01-09T12:15:47.267604",
+              "question": "보험료 일시납 시 할인율은 얼마인가요?",
+              "answer": "1% 할인입니다.",
+              "contexts": [
+                "납입 방법: 일시납은 1% 할인.",
+                "2회 분납은 할인 없음."
+              ],
+              "ground_truth": "1% 할인"
+            },
+            {
+              "test_case_id": "auto-015",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.4399445014747145,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4967,
+              "latency_ms": 67343,
+              "cost_usd": 0.013730000000000001,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:15:47.267648",
+              "finished_at": "2026-01-09T12:16:54.611629",
+              "question": "6회 분납 시 보험료는 어떻게 되나요?",
+              "answer": "2% 할증됩니다.",
+              "contexts": [
+                "납입 방법: 6회 분납은 2% 할증.",
+                "일시납은 1% 할인."
+              ],
+              "ground_truth": "2% 할증"
+            },
+            {
+              "test_case_id": "auto-016",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.6756709430034306,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4814,
+              "latency_ms": 53684,
+              "cost_usd": 0.0132125,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:16:54.611979",
+              "finished_at": "2026-01-09T12:17:48.296490",
+              "question": "자동이체 등록 시 추가 할인은 얼마인가요?",
+              "answer": "1% 추가 할인입니다.",
+              "contexts": [
+                "계좌 자동이체 등록 시 1% 추가 할인.",
+                "자동이체는 납입 편의를 제공합니다."
+              ],
+              "ground_truth": "1% 추가 할인"
+            },
+            {
+              "test_case_id": "auto-017",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.4464164242157778,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4997,
+              "latency_ms": 52975,
+              "cost_usd": 0.0137975,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:17:48.296523",
+              "finished_at": "2026-01-09T12:18:41.271637",
+              "question": "사고 접수 콜센터 번호는 무엇인가요?",
+              "answer": "1588-5114입니다.",
+              "contexts": [
+                "사고 접수: 24시간 콜센터 1588-5114.",
+                "모바일 앱: 삼성화재 다이렉트 앱."
+              ],
+              "ground_truth": "1588-5114"
+            },
+            {
+              "test_case_id": "auto-018",
+              "metrics": [
+                {
+                  "name": "faithfulness",
+                  "score": 1.0,
+                  "threshold": 0.7,
+                  "reason": null
+                },
+                {
+                  "name": "answer_relevancy",
+                  "score": 0.6506845578232473,
+                  "threshold": 0.7,
+                  "reason": null
+                }
+              ],
+              "tokens_used": 4896,
+              "latency_ms": 48375,
+              "cost_usd": 0.013702500000000001,
+              "trace_id": null,
+              "started_at": "2026-01-09T12:18:41.271695",
+              "finished_at": "2026-01-09T12:19:29.647320",
+              "question": "보상금 지급은 언제까지 이뤄지나요?",
+              "answer": "서류 완비 시 14일 이내 지급됩니다.",
+              "contexts": [
+                "접수 후 3일 이내 담당자 배정.",
+                "14일 이내 보상금 지급 (서류 완비 시)."
+              ],
+              "ground_truth": "14일 이내"
+            }
+          ],
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "total_tokens": 91166,
+          "total_cost_usd": 0.25359499999999996,
+          "langfuse_trace_id": null,
+          "tracker_metadata": {
+            "ragas_config": {
+              "embedding_model": "qwen3-embedding:8b",
+              "temperature": null
+            },
+            "run_mode": "full"
+          },
+          "retrieval_metadata": {}
+        },
+        "metrics": {
+          "faithfulness": [
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "answer_relevancy": [
+            0.5702443358758247,
+            0.6176038685162338,
+            0.7145836968078935,
+            0.596903182350706,
+            0.4424365056726988,
+            0.504380458152079,
+            0.49459554832359515,
+            0.49056005863215574,
+            0.5321899304271877,
+            0.6322424139879534,
+            0.5190509737143613,
+            0.6806393289335615,
+            0.5758427473516629,
+            0.604441878113286,
+            0.4399445014747145,
+            0.6756709430034306,
+            0.4464164242157778,
+            0.6506845578232473
+          ]
+        },
+        "summary": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "dataset_name": "e2e-auto-insurance-qa-korean",
+          "dataset_version": "1.0.0",
+          "model_name": "ollama/gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T12:01:20.083691",
+          "finished_at": "2026-01-09T12:19:29.652169",
+          "total_test_cases": 18,
+          "passed_test_cases": 0,
+          "pass_rate": 0.0,
+          "total_tokens": 91166,
+          "total_cost_usd": 0.25359499999999996,
+          "duration_seconds": 1089.568478,
+          "tracker_metadata": {
+            "ragas_config": {
+              "embedding_model": "qwen3-embedding:8b",
+              "temperature": null
+            },
+            "run_mode": "full"
+          },
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "run_mode": "full",
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "avg_faithfulness": 0.8333333333333334,
+          "avg_answer_relevancy": 0.5660239640764649
+        }
+      }
+    },
+    "load_runs": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 5,
+      "output": {
+        "runs": [
+          {
+            "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+            "dataset_name": "e2e-auto-insurance-qa-korean",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T12:01:20.083691",
+            "finished_at": "2026-01-09T12:19:29.652169",
+            "results": [
+              {
+                "test_case_id": "auto-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.5702443358758247,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5108,
+                "latency_ms": 63640,
+                "cost_usd": 0.014195,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:01:20.084112",
+                "finished_at": "2026-01-09T12:02:23.724659",
+                "question": "대인배상 I에서 사망 시 보상 한도는 얼마인가요?",
+                "answer": "사망 시 1억 5천만원까지 보장됩니다.",
+                "contexts": [
+                  "대인배상 I은 자동차 사고로 다른 사람을 다치게 하거나 사망하게 한 경우 보상합니다.",
+                  "책임보험 한도 내에서 보장되며, 사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+                ],
+                "ground_truth": "1억 5천만원"
+              },
+              {
+                "test_case_id": "auto-002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.6176038685162338,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5081,
+                "latency_ms": 65406,
+                "cost_usd": 0.014165,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:02:23.724841",
+                "finished_at": "2026-01-09T12:03:29.131206",
+                "question": "대인배상 I에서 부상 시 보상 한도는 얼마인가요?",
+                "answer": "부상 시 3천만원까지 보장됩니다.",
+                "contexts": [
+                  "대인배상 I은 책임보험 한도 내에서 보장됩니다.",
+                  "사망 시 1억 5천만원, 부상 시 3천만원까지 보장합니다."
+                ],
+                "ground_truth": "3천만원"
+              },
+              {
+                "test_case_id": "auto-003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.7145836968078935,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5669,
+                "latency_ms": 80770,
+                "cost_usd": 0.01586,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:03:29.131326",
+                "finished_at": "2026-01-09T12:04:49.902133",
+                "question": "대인배상 II는 어떤 보장을 제공하나요?",
+                "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+                "contexts": [
+                  "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+                  "중상해 사고 시 필수적으로 가입을 권장합니다."
+                ],
+                "ground_truth": "무한 보장"
+              },
+              {
+                "test_case_id": "auto-004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.596903182350706,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5227,
+                "latency_ms": 67534,
+                "cost_usd": 0.0150625,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:04:49.902281",
+                "finished_at": "2026-01-09T12:05:57.437261",
+                "question": "대물배상 가입 한도 범위는 어떻게 되나요?",
+                "answer": "2천만원부터 10억원까지 선택 가능합니다.",
+                "contexts": [
+                  "대물배상은 다른 사람의 차량이나 재물을 손괴한 경우 보상합니다.",
+                  "보장 한도는 2천만원에서 10억원까지 선택 가능합니다."
+                ],
+                "ground_truth": "2천만원~10억원"
+              },
+              {
+                "test_case_id": "auto-005",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.4424365056726988,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5184,
+                "latency_ms": 65154,
+                "cost_usd": 0.0143925,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:05:57.437325",
+                "finished_at": "2026-01-09T12:07:02.591773",
+                "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+                "answer": "최대 1억원까지 보장됩니다.",
+                "contexts": [
+                  "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+                  "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+                ],
+                "ground_truth": "1억원"
+              },
+              {
+                "test_case_id": "auto-006",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.504380458152079,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4935,
+                "latency_ms": 61220,
+                "cost_usd": 0.013725000000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:07:02.591868",
+                "finished_at": "2026-01-09T12:08:03.811900",
+                "question": "마일리지 특약에서 연간 3천km 이하 주행 시 할인율은 얼마인가요?",
+                "answer": "47% 할인입니다.",
+                "contexts": [
+                  "마일리지 특약은 연간 주행거리에 따라 보험료를 할인해주는 특약입니다.",
+                  "3천km 이하: 47% 할인, 5천km 이하: 38% 할인."
+                ],
+                "ground_truth": "47%"
+              },
+              {
+                "test_case_id": "auto-007",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.49459554832359515,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5007,
+                "latency_ms": 60298,
+                "cost_usd": 0.0138825,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:08:03.812154",
+                "finished_at": "2026-01-09T12:09:04.110897",
+                "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+                "answer": "19% 할인입니다.",
+                "contexts": [
+                  "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+                  "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+                ],
+                "ground_truth": "19%"
+              },
+              {
+                "test_case_id": "auto-008",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.49056005863215574,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4843,
+                "latency_ms": 54746,
+                "cost_usd": 0.013375000000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:09:04.110952",
+                "finished_at": "2026-01-09T12:09:58.857494",
+                "question": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?",
+                "answer": "10% 할인입니다.",
+                "contexts": [
+                  "운전자 범위를 제한하면 보험료를 할인받을 수 있습니다.",
+                  "1인 한정: 10% 할인, 부부 한정: 7% 할인."
+                ],
+                "ground_truth": "10%"
+              },
+              {
+                "test_case_id": "auto-009",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.5321899304271877,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4851,
+                "latency_ms": 48298,
+                "cost_usd": 0.01341,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:09:58.857585",
+                "finished_at": "2026-01-09T12:10:47.155599",
+                "question": "운전자 한정 특약에서 부부 한정 할인율은 얼마인가요?",
+                "answer": "7% 할인입니다.",
+                "contexts": [
+                  "운전자 한정 특약은 운전자 범위를 제한하여 보험료를 할인받는 특약입니다.",
+                  "부부 한정: 7% 할인, 가족 한정: 5% 할인."
+                ],
+                "ground_truth": "7%"
+              },
+              {
+                "test_case_id": "auto-010",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.6322424139879534,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5311,
+                "latency_ms": 67229,
+                "cost_usd": 0.014559999999999998,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:10:47.155637",
+                "finished_at": "2026-01-09T12:11:54.385005",
+                "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+                "answer": "5% 할인입니다.",
+                "contexts": [
+                  "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+                  "2채널 이상: 5% 할인, 1채널: 3% 할인."
+                ],
+                "ground_truth": "5%"
+              },
+              {
+                "test_case_id": "auto-011",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.5190509737143613,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5509,
+                "latency_ms": 73097,
+                "cost_usd": 0.015745,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:11:54.385091",
+                "finished_at": "2026-01-09T12:13:07.482579",
+                "question": "가입 가능한 운전자 조건은 어떻게 되나요?",
+                "answer": "만 21세 이상이며 면허 취득 후 1년 이상 경과해야 합니다.",
+                "contexts": [
+                  "운전자 조건: 만 21세 이상 운전면허 보유자.",
+                  "운전면허 취득 후 1년 이상 경과해야 합니다."
+                ],
+                "ground_truth": "만 21세 이상, 면허 취득 후 1년 이상"
+              },
+              {
+                "test_case_id": "auto-012",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.6806393289335615,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 5238,
+                "latency_ms": 61236,
+                "cost_usd": 0.014512499999999998,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:13:07.482783",
+                "finished_at": "2026-01-09T12:14:08.719291",
+                "question": "차량 등록 후 몇 년 이하 차량이 가입 가능한가요?",
+                "answer": "차량 등록 후 15년 이하 차량이 가능합니다.",
+                "contexts": [
+                  "차량 조건: 차량 등록 후 15년 이하 차량.",
+                  "승용차, SUV, 승합차 가입 가능."
+                ],
+                "ground_truth": "15년 이하"
+              },
+              {
+                "test_case_id": "auto-013",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.5758427473516629,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4810,
+                "latency_ms": 50253,
+                "cost_usd": 0.013195,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:14:08.719369",
+                "finished_at": "2026-01-09T12:14:58.972672",
+                "question": "영업용 차량 가입은 어떻게 되나요?",
+                "answer": "영업용 차량은 별도 상품 가입이 필요합니다.",
+                "contexts": [
+                  "승용차, SUV, 승합차 가입 가능.",
+                  "영업용 차량은 별도 상품 가입 필요."
+                ],
+                "ground_truth": "별도 상품 필요"
+              },
+              {
+                "test_case_id": "auto-014",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.604441878113286,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4719,
+                "latency_ms": 48294,
+                "cost_usd": 0.0130725,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:14:58.972728",
+                "finished_at": "2026-01-09T12:15:47.267604",
+                "question": "보험료 일시납 시 할인율은 얼마인가요?",
+                "answer": "1% 할인입니다.",
+                "contexts": [
+                  "납입 방법: 일시납은 1% 할인.",
+                  "2회 분납은 할인 없음."
+                ],
+                "ground_truth": "1% 할인"
+              },
+              {
+                "test_case_id": "auto-015",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.4399445014747145,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4967,
+                "latency_ms": 67343,
+                "cost_usd": 0.013730000000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:15:47.267648",
+                "finished_at": "2026-01-09T12:16:54.611629",
+                "question": "6회 분납 시 보험료는 어떻게 되나요?",
+                "answer": "2% 할증됩니다.",
+                "contexts": [
+                  "납입 방법: 6회 분납은 2% 할증.",
+                  "일시납은 1% 할인."
+                ],
+                "ground_truth": "2% 할증"
+              },
+              {
+                "test_case_id": "auto-016",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.6756709430034306,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4814,
+                "latency_ms": 53684,
+                "cost_usd": 0.0132125,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:16:54.611979",
+                "finished_at": "2026-01-09T12:17:48.296490",
+                "question": "자동이체 등록 시 추가 할인은 얼마인가요?",
+                "answer": "1% 추가 할인입니다.",
+                "contexts": [
+                  "계좌 자동이체 등록 시 1% 추가 할인.",
+                  "자동이체는 납입 편의를 제공합니다."
+                ],
+                "ground_truth": "1% 추가 할인"
+              },
+              {
+                "test_case_id": "auto-017",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.4464164242157778,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4997,
+                "latency_ms": 52975,
+                "cost_usd": 0.0137975,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:17:48.296523",
+                "finished_at": "2026-01-09T12:18:41.271637",
+                "question": "사고 접수 콜센터 번호는 무엇인가요?",
+                "answer": "1588-5114입니다.",
+                "contexts": [
+                  "사고 접수: 24시간 콜센터 1588-5114.",
+                  "모바일 앱: 삼성화재 다이렉트 앱."
+                ],
+                "ground_truth": "1588-5114"
+              },
+              {
+                "test_case_id": "auto-018",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.6506845578232473,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4896,
+                "latency_ms": 48375,
+                "cost_usd": 0.013702500000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T12:18:41.271695",
+                "finished_at": "2026-01-09T12:19:29.647320",
+                "question": "보상금 지급은 언제까지 이뤄지나요?",
+                "answer": "서류 완비 시 14일 이내 지급됩니다.",
+                "contexts": [
+                  "접수 후 3일 이내 담당자 배정.",
+                  "14일 이내 보상금 지급 (서류 완비 시)."
+                ],
+                "ground_truth": "14일 이내"
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 91166,
+            "total_cost_usd": 0.25359499999999996,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "ragas_config": {
+                "embedding_model": "qwen3-embedding:8b",
+                "temperature": null
+              },
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:47:43.429178",
+            "finished_at": "2026-01-09T09:51:00.132606",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8366828943604284,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4550,
+                "latency_ms": 54079,
+                "cost_usd": 0.0125825,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:47:43.429338",
+                "finished_at": "2026-01-09T09:48:37.509082",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8724614057329397,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4524,
+                "latency_ms": 43633,
+                "cost_usd": 0.012547500000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:48:37.509919",
+                "finished_at": "2026-01-09T09:49:21.143545",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9087545725582776,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4660,
+                "latency_ms": 44261,
+                "cost_usd": 0.012925,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:49:21.143707",
+                "finished_at": "2026-01-09T09:50:05.405462",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9181316279283243,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4908,
+                "latency_ms": 54726,
+                "cost_usd": 0.01353,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:50:05.405693",
+                "finished_at": "2026-01-09T09:51:00.132125",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:27:38.337182",
+            "finished_at": "2026-01-09T09:30:49.992680",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8366828943604284,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4550,
+                "latency_ms": 55617,
+                "cost_usd": 0.0125825,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:27:38.337382",
+                "finished_at": "2026-01-09T09:28:33.954776",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8724614057329397,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4524,
+                "latency_ms": 43321,
+                "cost_usd": 0.012547500000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:28:33.954978",
+                "finished_at": "2026-01-09T09:29:17.276445",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9087545725582776,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4660,
+                "latency_ms": 41342,
+                "cost_usd": 0.012925,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:29:17.276532",
+                "finished_at": "2026-01-09T09:29:58.619119",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9181316279283243,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4908,
+                "latency_ms": 51373,
+                "cost_usd": 0.01353,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:29:58.619185",
+                "finished_at": "2026-01-09T09:30:49.992357",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 12137,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:21.002915",
+                "finished_at": "2026-01-09T09:24:33.140065",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7959,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:33.140190",
+                "finished_at": "2026-01-09T09:24:41.100049",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7968,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:41.100115",
+                "finished_at": "2026-01-09T09:24:49.068845",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7895,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:49.068887",
+                "finished_at": "2026-01-09T09:24:56.964077",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:14.026053",
+            "finished_at": "2026-01-09T08:14:15.026053",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.938368",
+            "finished_at": "2026-01-09T08:14:14.938368",
+            "results": [
+              {
+                "test_case_id": "tc-001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.9,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 0,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": null,
+                "finished_at": null,
+                "question": null,
+                "answer": null,
+                "contexts": null,
+                "ground_truth": null
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          }
+        ],
+        "summaries": [
+          {
+            "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+            "dataset_name": "e2e-auto-insurance-qa-korean",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T12:01:20.083691",
+            "finished_at": "2026-01-09T12:19:29.652169",
+            "total_test_cases": 18,
+            "passed_test_cases": 0,
+            "pass_rate": 0.0,
+            "total_tokens": 91166,
+            "total_cost_usd": 0.25359499999999996,
+            "duration_seconds": 1089.568478,
+            "tracker_metadata": {
+              "ragas_config": {
+                "embedding_model": "qwen3-embedding:8b",
+                "temperature": null
+              },
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.8333333333333334,
+            "avg_answer_relevancy": 0.5660239640764649
+          },
+          {
+            "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:47:43.429178",
+            "finished_at": "2026-01-09T09:51:00.132606",
+            "total_test_cases": 4,
+            "passed_test_cases": 2,
+            "pass_rate": 0.5,
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "duration_seconds": 196.703428,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.5,
+            "avg_answer_relevancy": 0.8840076251449925
+          },
+          {
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:27:38.337182",
+            "finished_at": "2026-01-09T09:30:49.992680",
+            "total_test_cases": 4,
+            "passed_test_cases": 2,
+            "pass_rate": 0.5,
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "duration_seconds": 191.655498,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.5,
+            "avg_answer_relevancy": 0.8840076251449925
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "total_test_cases": 4,
+            "passed_test_cases": 0,
+            "pass_rate": 0.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 35.961632,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.0,
+            "avg_answer_relevancy": 0.0
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:14.026053",
+            "finished_at": "2026-01-09T08:14:15.026053",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          },
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "dataset_name": "test",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-5-nano",
+            "started_at": "2026-01-09T08:14:13.938368",
+            "finished_at": "2026-01-09T08:14:14.938368",
+            "total_test_cases": 1,
+            "passed_test_cases": 1,
+            "pass_rate": 1.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 1.0,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7
+            },
+            "avg_faithfulness": 0.9
+          }
+        ],
+        "count": 6,
+        "missing_run_ids": []
+      }
+    },
+    "statistics": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 1,
+      "output": {
+        "analysis": {
+          "analysis_id": "471d1102-601e-4e58-af5c-1d675e49c9c2",
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "analysis_type": "statistical",
+          "created_at": "2026-01-09T12:23:48.583164",
+          "metadata": {},
+          "metrics_summary": {
+            "faithfulness": {
+              "mean": 0.8333333333333334,
+              "std": 0.37267799624996495,
+              "min": 0.0,
+              "max": 1.0,
+              "median": 1.0,
+              "percentile_25": 1.0,
+              "percentile_75": 1.0,
+              "count": 18
+            },
+            "answer_relevancy": {
+              "mean": 0.566023964076465,
+              "std": 0.08413263455307987,
+              "min": 0.4399445014747145,
+              "max": 0.7145836968078935,
+              "median": 0.5730435416137438,
+              "percentile_25": 0.4970417757807161,
+              "percentile_75": 0.6285827776200236,
+              "count": 18
+            }
+          },
+          "correlation_matrix": [
+            [
+              1.0,
+              -0.2539956304531374
+            ],
+            [
+              -0.2539956304531374,
+              1.0
+            ]
+          ],
+          "correlation_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "significant_correlations": [],
+          "low_performers": [
+            {
+              "test_case_id": "auto-003",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "대인배상 II는 어떤 보장을 제공하나요?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "auto-007",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "auto-010",
+              "metric_name": "faithfulness",
+              "score": 0.0,
+              "threshold": 0.7,
+              "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+              "potential_causes": [
+                "Answer contains information not in context",
+                "Possible hallucination"
+              ]
+            },
+            {
+              "test_case_id": "auto-015",
+              "metric_name": "answer_relevancy",
+              "score": 0.4399445014747145,
+              "threshold": 0.7,
+              "question_preview": "6회 분납 시 보험료는 어떻게 되나요?",
+              "potential_causes": [
+                "Answer partially addresses the question"
+              ]
+            },
+            {
+              "test_case_id": "auto-005",
+              "metric_name": "answer_relevancy",
+              "score": 0.4424365056726988,
+              "threshold": 0.7,
+              "question_preview": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+              "potential_causes": [
+                "Answer partially addresses the question"
+              ]
+            },
+            {
+              "test_case_id": "auto-017",
+              "metric_name": "answer_relevancy",
+              "score": 0.4464164242157778,
+              "threshold": 0.7,
+              "question_preview": "사고 접수 콜센터 번호는 무엇인가요?",
+              "potential_causes": [
+                "Answer partially addresses the question"
+              ]
+            },
+            {
+              "test_case_id": "auto-008",
+              "metric_name": "answer_relevancy",
+              "score": 0.49056005863215574,
+              "threshold": 0.7,
+              "question_preview": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?",
+              "potential_causes": [
+                "Answer partially addresses the question"
+              ]
+            },
+            {
+              "test_case_id": "auto-007",
+              "metric_name": "answer_relevancy",
+              "score": 0.49459554832359515,
+              "threshold": 0.7,
+              "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+              "potential_causes": [
+                "Answer partially addresses the question"
+              ]
+            }
+          ],
+          "insights": [
+            "Low pass rate requires attention: 0.0%",
+            "Best performing metric: faithfulness (mean: 0.833)",
+            "Worst performing metric: answer_relevancy (mean: 0.566)",
+            "High variance metrics (std > 0.2): faithfulness",
+            "Found 8 low-performing test cases (score < threshold)",
+            "Most problematic metric: answer_relevancy (5 low performers)"
+          ],
+          "overall_pass_rate": 0.0,
+          "metric_pass_rates": {
+            "faithfulness": 0.8333333333333334,
+            "answer_relevancy": 0.05555555555555555
+          }
+        },
+        "summary": {
+          "total_metrics": 2,
+          "average_score": 0.6997,
+          "overall_pass_rate": 0.0
+        },
+        "statistics": {
+          "faithfulness": {
+            "mean": 0.8333333333333334,
+            "std": 0.37267799624996495,
+            "min": 0.0,
+            "max": 1.0,
+            "median": 1.0,
+            "percentile_25": 1.0,
+            "percentile_75": 1.0,
+            "count": 18
+          },
+          "answer_relevancy": {
+            "mean": 0.566023964076465,
+            "std": 0.08413263455307987,
+            "min": 0.4399445014747145,
+            "max": 0.7145836968078935,
+            "median": 0.5730435416137438,
+            "percentile_25": 0.4970417757807161,
+            "percentile_75": 0.6285827776200236,
+            "count": 18
+          }
+        },
+        "insights": [
+          "Low pass rate requires attention: 0.0%",
+          "Best performing metric: faithfulness (mean: 0.833)",
+          "Worst performing metric: answer_relevancy (mean: 0.566)",
+          "High variance metrics (std > 0.2): faithfulness",
+          "Found 8 low-performing test cases (score < threshold)",
+          "Most problematic metric: answer_relevancy (5 low performers)"
+        ],
+        "analysis_id": "471d1102-601e-4e58-af5c-1d675e49c9c2",
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "correlation_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "correlation_matrix": [
+          [
+            1.0,
+            -0.2539956304531374
+          ],
+          [
+            -0.2539956304531374,
+            1.0
+          ]
+        ],
+        "significant_correlations": [],
+        "low_performers": [
+          {
+            "test_case_id": "auto-003",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "대인배상 II는 어떤 보장을 제공하나요?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "auto-007",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "auto-010",
+            "metric_name": "faithfulness",
+            "score": 0.0,
+            "threshold": 0.7,
+            "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+            "potential_causes": [
+              "Answer contains information not in context",
+              "Possible hallucination"
+            ]
+          },
+          {
+            "test_case_id": "auto-015",
+            "metric_name": "answer_relevancy",
+            "score": 0.4399445014747145,
+            "threshold": 0.7,
+            "question_preview": "6회 분납 시 보험료는 어떻게 되나요?",
+            "potential_causes": [
+              "Answer partially addresses the question"
+            ]
+          },
+          {
+            "test_case_id": "auto-005",
+            "metric_name": "answer_relevancy",
+            "score": 0.4424365056726988,
+            "threshold": 0.7,
+            "question_preview": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+            "potential_causes": [
+              "Answer partially addresses the question"
+            ]
+          },
+          {
+            "test_case_id": "auto-017",
+            "metric_name": "answer_relevancy",
+            "score": 0.4464164242157778,
+            "threshold": 0.7,
+            "question_preview": "사고 접수 콜센터 번호는 무엇인가요?",
+            "potential_causes": [
+              "Answer partially addresses the question"
+            ]
+          },
+          {
+            "test_case_id": "auto-008",
+            "metric_name": "answer_relevancy",
+            "score": 0.49056005863215574,
+            "threshold": 0.7,
+            "question_preview": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?",
+            "potential_causes": [
+              "Answer partially addresses the question"
+            ]
+          },
+          {
+            "test_case_id": "auto-007",
+            "metric_name": "answer_relevancy",
+            "score": 0.49459554832359515,
+            "threshold": 0.7,
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "potential_causes": [
+              "Answer partially addresses the question"
+            ]
+          }
+        ],
+        "metric_pass_rates": {
+          "faithfulness": 0.8333333333333334,
+          "answer_relevancy": 0.05555555555555555
+        }
+      }
+    },
+    "ragas_eval": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "summary": {
+          "metric_count": 2,
+          "sample_count": 18,
+          "overall_score": 0.6997,
+          "recomputed": false
+        },
+        "metrics": {
+          "faithfulness": 0.8333333333333334,
+          "answer_relevancy": 0.5660239640764649
+        },
+        "per_case": [
+          {
+            "test_case_id": "auto-001",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.5702443358758247
+            },
+            "avg_score": 0.7851,
+            "question_preview": "대인배상 I에서 사망 시 보상 한도는 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-002",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.6176038685162338
+            },
+            "avg_score": 0.8088,
+            "question_preview": "대인배상 I에서 부상 시 보상 한도는 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-003",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.7145836968078935
+            },
+            "avg_score": 0.3573,
+            "question_preview": "대인배상 II는 어떤 보장을 제공하나요?"
+          },
+          {
+            "test_case_id": "auto-004",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.596903182350706
+            },
+            "avg_score": 0.7985,
+            "question_preview": "대물배상 가입 한도 범위는 어떻게 되나요?"
+          },
+          {
+            "test_case_id": "auto-005",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4424365056726988
+            },
+            "avg_score": 0.7212,
+            "question_preview": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-006",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.504380458152079
+            },
+            "avg_score": 0.7522,
+            "question_preview": "마일리지 특약에서 연간 3천km 이하 주행 시 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-007",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.49459554832359515
+            },
+            "avg_score": 0.2473,
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-008",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.49056005863215574
+            },
+            "avg_score": 0.7453,
+            "question_preview": "운전자 한정 특약에서 1인 한정 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-009",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.5321899304271877
+            },
+            "avg_score": 0.7661,
+            "question_preview": "운전자 한정 특약에서 부부 한정 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-010",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.6322424139879534
+            },
+            "avg_score": 0.3161,
+            "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-011",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.5190509737143613
+            },
+            "avg_score": 0.7595,
+            "question_preview": "가입 가능한 운전자 조건은 어떻게 되나요?"
+          },
+          {
+            "test_case_id": "auto-012",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.6806393289335615
+            },
+            "avg_score": 0.8403,
+            "question_preview": "차량 등록 후 몇 년 이하 차량이 가입 가능한가요?"
+          },
+          {
+            "test_case_id": "auto-013",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.5758427473516629
+            },
+            "avg_score": 0.7879,
+            "question_preview": "영업용 차량 가입은 어떻게 되나요?"
+          },
+          {
+            "test_case_id": "auto-014",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.604441878113286
+            },
+            "avg_score": 0.8022,
+            "question_preview": "보험료 일시납 시 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-015",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4399445014747145
+            },
+            "avg_score": 0.72,
+            "question_preview": "6회 분납 시 보험료는 어떻게 되나요?"
+          },
+          {
+            "test_case_id": "auto-016",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.6756709430034306
+            },
+            "avg_score": 0.8378,
+            "question_preview": "자동이체 등록 시 추가 할인은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-017",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4464164242157778
+            },
+            "avg_score": 0.7232,
+            "question_preview": "사고 접수 콜센터 번호는 무엇인가요?"
+          },
+          {
+            "test_case_id": "auto-018",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.6506845578232473
+            },
+            "avg_score": 0.8253,
+            "question_preview": "보상금 지급은 언제까지 이뤄지나요?"
+          }
+        ]
+      }
+    },
+    "nlp_analysis": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 146,
+      "output": {
+        "analysis": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "question_stats": {
+            "char_count": 478,
+            "word_count": 116,
+            "sentence_count": 18,
+            "avg_word_length": 2.9310344827586206,
+            "unique_word_ratio": 0.5603448275862069
+          },
+          "answer_stats": {
+            "char_count": 320,
+            "word_count": 62,
+            "sentence_count": 18,
+            "avg_word_length": 3.0806451612903225,
+            "unique_word_ratio": 0.7580645161290323
+          },
+          "context_stats": {
+            "char_count": 1018,
+            "word_count": 232,
+            "sentence_count": 36,
+            "avg_word_length": 2.728448275862069,
+            "unique_word_ratio": 0.5732758620689655
+          },
+          "question_types": [
+            {
+              "question_type": "factual",
+              "count": 14,
+              "percentage": 0.7777777777777778,
+              "avg_scores": {
+                "faithfulness": 0.7857142857142857,
+                "answer_relevancy": 0.5754778534632089
+              }
+            },
+            {
+              "question_type": "reasoning",
+              "count": 4,
+              "percentage": 0.2222222222222222,
+              "avg_scores": {
+                "faithfulness": 1.0,
+                "answer_relevancy": 0.5329353512228612
+              }
+            }
+          ],
+          "top_keywords": [
+            {
+              "keyword": "얼마인가요",
+              "frequency": 10,
+              "tfidf_score": 0.12184753244385389,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "할인입니다",
+              "frequency": 7,
+              "tfidf_score": 0.11272847870822636,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "할인율은",
+              "frequency": 6,
+              "tfidf_score": 0.10817897818189648,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "되나요",
+              "frequency": 4,
+              "tfidf_score": 0.09826157850254186,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "어떻게",
+              "frequency": 4,
+              "tfidf_score": 0.09826157850254186,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "한정",
+              "frequency": 4,
+              "tfidf_score": 0.08585676484843696,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "특약에서",
+              "frequency": 4,
+              "tfidf_score": 0.07341078630749143,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "대인배상",
+              "frequency": 4,
+              "tfidf_score": 0.072150942694056,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "이하",
+              "frequency": 4,
+              "tfidf_score": 0.06521019087406328,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "운전자",
+              "frequency": 3,
+              "tfidf_score": 0.06367634199545938,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "가입",
+              "frequency": 3,
+              "tfidf_score": 0.05814655921622444,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "이상",
+              "frequency": 2,
+              "tfidf_score": 0.057506427069822064,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "사망",
+              "frequency": 3,
+              "tfidf_score": 0.053195956195828405,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "보장됩니다",
+              "frequency": 3,
+              "tfidf_score": 0.04692324911437527,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "마일리지",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "연간",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "주행",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "차량",
+              "frequency": 3,
+              "tfidf_score": 0.046196555958064295,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "영업용",
+              "frequency": 2,
+              "tfidf_score": 0.0461455712412178,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "등록",
+              "frequency": 3,
+              "tfidf_score": 0.04397255322586066,
+              "avg_metric_scores": null
+            }
+          ],
+          "topic_clusters": [],
+          "insights": [
+            "Questions are short and concise",
+            "Dominant question type: factual (78%)",
+            "Top keywords: 얼마인가요, 할인입니다, 할인율은"
+          ]
+        },
+        "summary": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "has_text_stats": true,
+          "has_question_type_analysis": true,
+          "has_keyword_analysis": true,
+          "question_stats_preview": 6.444444444444445,
+          "answer_stats_preview": 3.4444444444444446,
+          "context_count": 36,
+          "dominant_question_type": "factual",
+          "top_keywords_preview": [
+            "얼마인가요",
+            "할인입니다",
+            "할인율은",
+            "되나요",
+            "어떻게"
+          ]
+        },
+        "statistics": {
+          "text_stats": {
+            "questions": {
+              "char_count": 478,
+              "word_count": 116,
+              "sentence_count": 18,
+              "avg_word_length": 2.9310344827586206,
+              "unique_word_ratio": 0.5603448275862069
+            },
+            "answers": {
+              "char_count": 320,
+              "word_count": 62,
+              "sentence_count": 18,
+              "avg_word_length": 3.0806451612903225,
+              "unique_word_ratio": 0.7580645161290323
+            },
+            "contexts": {
+              "char_count": 1018,
+              "word_count": 232,
+              "sentence_count": 36,
+              "avg_word_length": 2.728448275862069,
+              "unique_word_ratio": 0.5732758620689655
+            }
+          },
+          "question_type_distribution": [
+            {
+              "question_type": "factual",
+              "count": 14,
+              "percentage": 0.7777777777777778,
+              "avg_scores": {
+                "faithfulness": 0.7857142857142857,
+                "answer_relevancy": 0.5754778534632089
+              }
+            },
+            {
+              "question_type": "reasoning",
+              "count": 4,
+              "percentage": 0.2222222222222222,
+              "avg_scores": {
+                "faithfulness": 1.0,
+                "answer_relevancy": 0.5329353512228612
+              }
+            }
+          ],
+          "keywords": [
+            {
+              "keyword": "얼마인가요",
+              "frequency": 10,
+              "tfidf_score": 0.12184753244385389,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "할인입니다",
+              "frequency": 7,
+              "tfidf_score": 0.11272847870822636,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "할인율은",
+              "frequency": 6,
+              "tfidf_score": 0.10817897818189648,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "되나요",
+              "frequency": 4,
+              "tfidf_score": 0.09826157850254186,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "어떻게",
+              "frequency": 4,
+              "tfidf_score": 0.09826157850254186,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "한정",
+              "frequency": 4,
+              "tfidf_score": 0.08585676484843696,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "특약에서",
+              "frequency": 4,
+              "tfidf_score": 0.07341078630749143,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "대인배상",
+              "frequency": 4,
+              "tfidf_score": 0.072150942694056,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "이하",
+              "frequency": 4,
+              "tfidf_score": 0.06521019087406328,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "운전자",
+              "frequency": 3,
+              "tfidf_score": 0.06367634199545938,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "가입",
+              "frequency": 3,
+              "tfidf_score": 0.05814655921622444,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "이상",
+              "frequency": 2,
+              "tfidf_score": 0.057506427069822064,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "사망",
+              "frequency": 3,
+              "tfidf_score": 0.053195956195828405,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "보장됩니다",
+              "frequency": 3,
+              "tfidf_score": 0.04692324911437527,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "마일리지",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "연간",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "주행",
+              "frequency": 2,
+              "tfidf_score": 0.046542401131648856,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "차량",
+              "frequency": 3,
+              "tfidf_score": 0.046196555958064295,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "영업용",
+              "frequency": 2,
+              "tfidf_score": 0.0461455712412178,
+              "avg_metric_scores": null
+            },
+            {
+              "keyword": "등록",
+              "frequency": 3,
+              "tfidf_score": 0.04397255322586066,
+              "avg_metric_scores": null
+            }
+          ]
+        },
+        "insights": [
+          "Questions are short and concise",
+          "Dominant question type: factual (78%)",
+          "Top keywords: 얼마인가요, 할인입니다, 할인율은"
+        ],
+        "analysis_id": null,
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "question_types": [
+          {
+            "question_type": "factual",
+            "count": 14,
+            "percentage": 0.7777777777777778,
+            "avg_scores": {
+              "faithfulness": 0.7857142857142857,
+              "answer_relevancy": 0.5754778534632089
+            }
+          },
+          {
+            "question_type": "reasoning",
+            "count": 4,
+            "percentage": 0.2222222222222222,
+            "avg_scores": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.5329353512228612
+            }
+          }
+        ],
+        "top_keywords": [
+          {
+            "keyword": "얼마인가요",
+            "frequency": 10,
+            "tfidf_score": 0.12184753244385389,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "할인입니다",
+            "frequency": 7,
+            "tfidf_score": 0.11272847870822636,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "할인율은",
+            "frequency": 6,
+            "tfidf_score": 0.10817897818189648,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "되나요",
+            "frequency": 4,
+            "tfidf_score": 0.09826157850254186,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "어떻게",
+            "frequency": 4,
+            "tfidf_score": 0.09826157850254186,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "한정",
+            "frequency": 4,
+            "tfidf_score": 0.08585676484843696,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "특약에서",
+            "frequency": 4,
+            "tfidf_score": 0.07341078630749143,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "대인배상",
+            "frequency": 4,
+            "tfidf_score": 0.072150942694056,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "이하",
+            "frequency": 4,
+            "tfidf_score": 0.06521019087406328,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "운전자",
+            "frequency": 3,
+            "tfidf_score": 0.06367634199545938,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "가입",
+            "frequency": 3,
+            "tfidf_score": 0.05814655921622444,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "이상",
+            "frequency": 2,
+            "tfidf_score": 0.057506427069822064,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "사망",
+            "frequency": 3,
+            "tfidf_score": 0.053195956195828405,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "보장됩니다",
+            "frequency": 3,
+            "tfidf_score": 0.04692324911437527,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "마일리지",
+            "frequency": 2,
+            "tfidf_score": 0.046542401131648856,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "연간",
+            "frequency": 2,
+            "tfidf_score": 0.046542401131648856,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "주행",
+            "frequency": 2,
+            "tfidf_score": 0.046542401131648856,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "차량",
+            "frequency": 3,
+            "tfidf_score": 0.046196555958064295,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "영업용",
+            "frequency": 2,
+            "tfidf_score": 0.0461455712412178,
+            "avg_metric_scores": null
+          },
+          {
+            "keyword": "등록",
+            "frequency": 3,
+            "tfidf_score": 0.04397255322586066,
+            "avg_metric_scores": null
+          }
+        ],
+        "topic_clusters": []
+      }
+    },
+    "time_series": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "series": [
+          {
+            "run_id": "f042196b-1c77-463c-b695-3a5b938e349f",
+            "timestamp": "2026-01-09T08:14:13.938368",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+            "timestamp": "2026-01-09T08:14:14.026053",
+            "pass_rate": 1.0,
+            "model_name": "gpt-5-nano"
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "timestamp": "2026-01-09T09:24:21.002694",
+            "pass_rate": 0.0,
+            "model_name": "gpt-oss-safeguard:20b"
+          },
+          {
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "timestamp": "2026-01-09T09:27:38.337182",
+            "pass_rate": 0.5,
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          },
+          {
+            "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+            "timestamp": "2026-01-09T09:47:43.429178",
+            "pass_rate": 0.5,
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          },
+          {
+            "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+            "timestamp": "2026-01-09T12:01:20.083691",
+            "pass_rate": 0.0,
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          }
+        ],
+        "summary": {
+          "run_count": 6,
+          "avg_pass_rate": 0.5,
+          "start": "2026-01-09T08:14:13.938368",
+          "end": "2026-01-09T12:01:20.083691"
+        }
+      }
+    },
+    "causal_analysis": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 3,
+      "output": {
+        "analysis": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "analysis_id": "a412eff5-2474-4507-8f23-a946d42f717a",
+          "created_at": "2026-01-09T12:23:48.733369",
+          "factor_stats": {
+            "question_length": {
+              "factor_type": "question_length",
+              "mean": 6.444444444444445,
+              "std": 1.4229164972072998,
+              "min": 4.0,
+              "max": 9.0,
+              "median": 6.0
+            },
+            "answer_length": {
+              "factor_type": "answer_length",
+              "mean": 3.888888888888889,
+              "std": 2.3778816176702997,
+              "min": 1.0,
+              "max": 10.0,
+              "median": 3.0
+            },
+            "context_count": {
+              "factor_type": "context_count",
+              "mean": 2.0,
+              "std": 0.0,
+              "min": 2.0,
+              "max": 2.0,
+              "median": 2.0
+            },
+            "context_length": {
+              "factor_type": "context_length",
+              "mean": 13.722222222222221,
+              "std": 3.3467323292953406,
+              "min": 9.0,
+              "max": 24.0,
+              "median": 14.0
+            },
+            "question_complexity": {
+              "factor_type": "question_complexity",
+              "mean": 0.7666762797660726,
+              "std": 0.019710481257000822,
+              "min": 0.7182539682539683,
+              "max": 0.8105263157894738,
+              "median": 0.7654011154011153
+            },
+            "has_ground_truth": {
+              "factor_type": "has_ground_truth",
+              "mean": 1.0,
+              "std": 0.0,
+              "min": 1.0,
+              "max": 1.0,
+              "median": 1.0
+            },
+            "keyword_overlap": {
+              "factor_type": "keyword_overlap",
+              "mean": 0.23148148148148145,
+              "std": 0.16544822106808926,
+              "min": 0.0,
+              "max": 0.5,
+              "median": 0.25
+            }
+          },
+          "factor_impacts": [
+            {
+              "factor_type": "question_length",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "weak",
+              "correlation": -0.17460757394239457,
+              "p_value": 0.48833016305065435,
+              "is_significant": false,
+              "effect_size": 0.34921514788478913,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 4.0,
+                  "upper_bound": 6.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "faithfulness": 0.8
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 6.0,
+                  "upper_bound": 7.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 7.0,
+                  "upper_bound": 9.0,
+                  "count": 8,
+                  "avg_scores": {
+                    "faithfulness": 0.75
+                  }
+                }
+              ],
+              "interpretation": "Question length has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "question_length",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "weak",
+              "correlation": -0.1341900291590712,
+              "p_value": 0.5955164133461641,
+              "is_significant": false,
+              "effect_size": 0.2683800583181424,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 4.0,
+                  "upper_bound": 6.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5983938608623735
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 6.0,
+                  "upper_bound": 7.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5348012212431822
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 7.0,
+                  "upper_bound": 9.0,
+                  "count": 8,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5653069928560739
+                  }
+                }
+              ],
+              "interpretation": "Question length has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "answer_length",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.041793837952857314,
+              "p_value": 0.8692135467152319,
+              "is_significant": false,
+              "effect_size": 0.08358767590571463,
+              "stratified_groups": [
+                {
+                  "group_name": "medium",
+                  "lower_bound": 2.0,
+                  "upper_bound": 4.333333333333334,
+                  "count": 11,
+                  "avg_scores": {
+                    "faithfulness": 0.8181818181818182
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 4.333333333333334,
+                  "upper_bound": 10.0,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 0.8333333333333334
+                  }
+                }
+              ],
+              "interpretation": "Answer length has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "answer_length",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "moderate",
+              "correlation": 0.4446654734992552,
+              "p_value": 0.06446783892414823,
+              "is_significant": false,
+              "effect_size": 0.8893309469985105,
+              "stratified_groups": [
+                {
+                  "group_name": "medium",
+                  "lower_bound": 2.0,
+                  "upper_bound": 4.333333333333334,
+                  "count": 11,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5482699353321855
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 4.333333333333334,
+                  "upper_bound": 10.0,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.6185076067510918
+                  }
+                }
+              ],
+              "interpretation": "Answer length has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "context_count",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.0,
+              "p_value": 1.0,
+              "is_significant": false,
+              "effect_size": 0.0,
+              "stratified_groups": [
+                {
+                  "group_name": "high",
+                  "lower_bound": 2.0,
+                  "upper_bound": 2.0,
+                  "count": 18,
+                  "avg_scores": {
+                    "faithfulness": 0.8333333333333334
+                  }
+                }
+              ],
+              "interpretation": "Number of contexts has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "context_count",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.0,
+              "p_value": 1.0,
+              "is_significant": false,
+              "effect_size": 0.0,
+              "stratified_groups": [
+                {
+                  "group_name": "high",
+                  "lower_bound": 2.0,
+                  "upper_bound": 2.0,
+                  "count": 18,
+                  "avg_scores": {
+                    "answer_relevancy": 0.566023964076465
+                  }
+                }
+              ],
+              "interpretation": "Number of contexts has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "context_length",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": -0.0816609069263443,
+              "p_value": 0.7473589859190684,
+              "is_significant": false,
+              "effect_size": 0.1633218138526886,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 9.0,
+                  "upper_bound": 13.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 13.0,
+                  "upper_bound": 14.333333333333334,
+                  "count": 7,
+                  "avg_scores": {
+                    "faithfulness": 0.8571428571428571
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 14.333333333333334,
+                  "upper_bound": 24.0,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 0.6666666666666666
+                  }
+                }
+              ],
+              "interpretation": "Total context length has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "context_length",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.022084198364524438,
+              "p_value": 0.9306883613585283,
+              "is_significant": false,
+              "effect_size": 0.044168396729048875,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 9.0,
+                  "upper_bound": 13.0,
+                  "count": 5,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5484632988317744
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 13.0,
+                  "upper_bound": 14.333333333333334,
+                  "count": 7,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5913658329998233
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 14.333333333333334,
+                  "upper_bound": 24.0,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.551092338036456
+                  }
+                }
+              ],
+              "interpretation": "Total context length has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "question_complexity",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "weak",
+              "correlation": -0.15023454062022246,
+              "p_value": 0.5518264614082102,
+              "is_significant": false,
+              "effect_size": 0.3004690812404449,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 0.7182539682539683,
+                  "upper_bound": 0.758695652173913,
+                  "count": 4,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 0.758695652173913,
+                  "upper_bound": 0.7703940886699507,
+                  "count": 8,
+                  "avg_scores": {
+                    "faithfulness": 0.75
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 0.7703940886699507,
+                  "upper_bound": 0.8105263157894738,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 0.8333333333333334
+                  }
+                }
+              ],
+              "interpretation": "Question complexity has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "question_complexity",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": -0.044675305463396014,
+              "p_value": 0.8602775627665087,
+              "is_significant": false,
+              "effect_size": 0.08935061092679203,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 0.7182539682539683,
+                  "upper_bound": 0.758695652173913,
+                  "count": 4,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5771080087000836
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 0.758695652173913,
+                  "upper_bound": 0.7703940886699507,
+                  "count": 8,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5556378363874457
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 0.7703940886699507,
+                  "upper_bound": 0.8105263157894738,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.5724827712460782
+                  }
+                }
+              ],
+              "interpretation": "Question complexity has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "has_ground_truth",
+              "metric_name": "faithfulness",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.0,
+              "p_value": 1.0,
+              "is_significant": false,
+              "effect_size": 0.0,
+              "stratified_groups": [
+                {
+                  "group_name": "high",
+                  "lower_bound": 1.0,
+                  "upper_bound": 1.0,
+                  "count": 18,
+                  "avg_scores": {
+                    "faithfulness": 0.8333333333333334
+                  }
+                }
+              ],
+              "interpretation": "Ground truth availability has no significant effect on faithfulness"
+            },
+            {
+              "factor_type": "has_ground_truth",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "negligible",
+              "correlation": 0.0,
+              "p_value": 1.0,
+              "is_significant": false,
+              "effect_size": 0.0,
+              "stratified_groups": [
+                {
+                  "group_name": "high",
+                  "lower_bound": 1.0,
+                  "upper_bound": 1.0,
+                  "count": 18,
+                  "avg_scores": {
+                    "answer_relevancy": 0.566023964076465
+                  }
+                }
+              ],
+              "interpretation": "Ground truth availability has no significant effect on answer_relevancy"
+            },
+            {
+              "factor_type": "keyword_overlap",
+              "metric_name": "faithfulness",
+              "direction": "negative",
+              "strength": "strong",
+              "correlation": -0.6357155827725987,
+              "p_value": 0.004574952337352029,
+              "is_significant": true,
+              "effect_size": 1.2714311655451973,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 0.0,
+                  "upper_bound": 0.23333333333333334,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 0.23333333333333334,
+                  "upper_bound": 0.27777777777777785,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 0.27777777777777785,
+                  "upper_bound": 0.5,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 0.5
+                  }
+                }
+              ],
+              "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+            },
+            {
+              "factor_type": "keyword_overlap",
+              "metric_name": "answer_relevancy",
+              "direction": "neutral",
+              "strength": "weak",
+              "correlation": 0.20630775528131684,
+              "p_value": 0.41145073296482493,
+              "is_significant": false,
+              "effect_size": 0.4126155105626337,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 0.0,
+                  "upper_bound": 0.23333333333333334,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.547236061709888
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 0.23333333333333334,
+                  "upper_bound": 0.27777777777777785,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.572854249771052
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 0.27777777777777785,
+                  "upper_bound": 0.5,
+                  "count": 6,
+                  "avg_scores": {
+                    "answer_relevancy": 0.577981580748455
+                  }
+                }
+              ],
+              "interpretation": "Question-context keyword overlap has no significant effect on answer_relevancy"
+            }
+          ],
+          "causal_relationships": [
+            {
+              "cause": "keyword_overlap",
+              "effect_metric": "faithfulness",
+              "direction": "negative",
+              "confidence": 0.9343430970713931,
+              "evidence": "Stratified analysis shows low=1.00 > medium=1.00 > high=0.50. Correlation: -0.64, p-value: 0.0046",
+              "sample_size": 18
+            }
+          ],
+          "root_causes": [
+            {
+              "metric_name": "faithfulness",
+              "primary_causes": [
+                "keyword_overlap"
+              ],
+              "contributing_factors": [],
+              "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+            }
+          ],
+          "interventions": [
+            {
+              "target_metric": "faithfulness",
+              "intervention": "Diversify context vocabulary beyond question keywords",
+              "expected_impact": "Broader context coverage may improve faithfulness",
+              "priority": 1,
+              "related_factors": [
+                "keyword_overlap"
+              ]
+            }
+          ],
+          "insights": [
+            "Found 1 significant factor-metric relationships out of 14 analyzed",
+            "Identified 1 strong causal relationships with confidence > 0.7",
+            "Most impactful factor: keyword_overlap on faithfulness (r=-0.64)",
+            "Most common root cause across metrics: keyword_overlap (appears in 1 metrics)",
+            "Factors with no significant impact: context_count, context_length, question_length"
+          ]
+        },
+        "summary": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "factor_count": 7,
+          "significant_impact_count": 1,
+          "root_cause_count": 1,
+          "top_metrics": [
+            "faithfulness"
+          ],
+          "recommended_interventions": [
+            "Diversify context vocabulary beyond question keywords"
+          ]
+        },
+        "statistics": {
+          "factor_stats": {
+            "question_length": {
+              "factor_type": "question_length",
+              "mean": 6.444444444444445,
+              "std": 1.4229164972072998,
+              "min": 4.0,
+              "max": 9.0,
+              "median": 6.0
+            },
+            "answer_length": {
+              "factor_type": "answer_length",
+              "mean": 3.888888888888889,
+              "std": 2.3778816176702997,
+              "min": 1.0,
+              "max": 10.0,
+              "median": 3.0
+            },
+            "context_count": {
+              "factor_type": "context_count",
+              "mean": 2.0,
+              "std": 0.0,
+              "min": 2.0,
+              "max": 2.0,
+              "median": 2.0
+            },
+            "context_length": {
+              "factor_type": "context_length",
+              "mean": 13.722222222222221,
+              "std": 3.3467323292953406,
+              "min": 9.0,
+              "max": 24.0,
+              "median": 14.0
+            },
+            "question_complexity": {
+              "factor_type": "question_complexity",
+              "mean": 0.7666762797660726,
+              "std": 0.019710481257000822,
+              "min": 0.7182539682539683,
+              "max": 0.8105263157894738,
+              "median": 0.7654011154011153
+            },
+            "has_ground_truth": {
+              "factor_type": "has_ground_truth",
+              "mean": 1.0,
+              "std": 0.0,
+              "min": 1.0,
+              "max": 1.0,
+              "median": 1.0
+            },
+            "keyword_overlap": {
+              "factor_type": "keyword_overlap",
+              "mean": 0.23148148148148145,
+              "std": 0.16544822106808926,
+              "min": 0.0,
+              "max": 0.5,
+              "median": 0.25
+            }
+          },
+          "significant_impacts": [
+            {
+              "factor_type": "keyword_overlap",
+              "metric_name": "faithfulness",
+              "direction": "negative",
+              "strength": "strong",
+              "correlation": -0.6357155827725987,
+              "p_value": 0.004574952337352029,
+              "is_significant": true,
+              "effect_size": 1.2714311655451973,
+              "stratified_groups": [
+                {
+                  "group_name": "low",
+                  "lower_bound": 0.0,
+                  "upper_bound": 0.23333333333333334,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "medium",
+                  "lower_bound": 0.23333333333333334,
+                  "upper_bound": 0.27777777777777785,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 1.0
+                  }
+                },
+                {
+                  "group_name": "high",
+                  "lower_bound": 0.27777777777777785,
+                  "upper_bound": 0.5,
+                  "count": 6,
+                  "avg_scores": {
+                    "faithfulness": 0.5
+                  }
+                }
+              ],
+              "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+            }
+          ],
+          "causal_relationships": [
+            {
+              "cause": "keyword_overlap",
+              "effect_metric": "faithfulness",
+              "direction": "negative",
+              "confidence": 0.9343430970713931,
+              "evidence": "Stratified analysis shows low=1.00 > medium=1.00 > high=0.50. Correlation: -0.64, p-value: 0.0046",
+              "sample_size": 18
+            }
+          ],
+          "root_causes": [
+            {
+              "metric_name": "faithfulness",
+              "primary_causes": [
+                "keyword_overlap"
+              ],
+              "contributing_factors": [],
+              "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+            }
+          ],
+          "interventions": [
+            {
+              "target_metric": "faithfulness",
+              "intervention": "Diversify context vocabulary beyond question keywords",
+              "expected_impact": "Broader context coverage may improve faithfulness",
+              "priority": 1,
+              "related_factors": [
+                "keyword_overlap"
+              ]
+            }
+          ]
+        },
+        "insights": [
+          "Found 1 significant factor-metric relationships out of 14 analyzed",
+          "Identified 1 strong causal relationships with confidence > 0.7",
+          "Most impactful factor: keyword_overlap on faithfulness (r=-0.64)",
+          "Most common root cause across metrics: keyword_overlap (appears in 1 metrics)",
+          "Factors with no significant impact: context_count, context_length, question_length"
+        ],
+        "analysis_id": "a412eff5-2474-4507-8f23-a946d42f717a",
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "factor_stats": {
+          "question_length": {
+            "factor_type": "question_length",
+            "mean": 6.444444444444445,
+            "std": 1.4229164972072998,
+            "min": 4.0,
+            "max": 9.0,
+            "median": 6.0
+          },
+          "answer_length": {
+            "factor_type": "answer_length",
+            "mean": 3.888888888888889,
+            "std": 2.3778816176702997,
+            "min": 1.0,
+            "max": 10.0,
+            "median": 3.0
+          },
+          "context_count": {
+            "factor_type": "context_count",
+            "mean": 2.0,
+            "std": 0.0,
+            "min": 2.0,
+            "max": 2.0,
+            "median": 2.0
+          },
+          "context_length": {
+            "factor_type": "context_length",
+            "mean": 13.722222222222221,
+            "std": 3.3467323292953406,
+            "min": 9.0,
+            "max": 24.0,
+            "median": 14.0
+          },
+          "question_complexity": {
+            "factor_type": "question_complexity",
+            "mean": 0.7666762797660726,
+            "std": 0.019710481257000822,
+            "min": 0.7182539682539683,
+            "max": 0.8105263157894738,
+            "median": 0.7654011154011153
+          },
+          "has_ground_truth": {
+            "factor_type": "has_ground_truth",
+            "mean": 1.0,
+            "std": 0.0,
+            "min": 1.0,
+            "max": 1.0,
+            "median": 1.0
+          },
+          "keyword_overlap": {
+            "factor_type": "keyword_overlap",
+            "mean": 0.23148148148148145,
+            "std": 0.16544822106808926,
+            "min": 0.0,
+            "max": 0.5,
+            "median": 0.25
+          }
+        },
+        "significant_impacts": [
+          {
+            "factor_type": "keyword_overlap",
+            "metric_name": "faithfulness",
+            "direction": "negative",
+            "strength": "strong",
+            "correlation": -0.6357155827725987,
+            "p_value": 0.004574952337352029,
+            "is_significant": true,
+            "effect_size": 1.2714311655451973,
+            "stratified_groups": [
+              {
+                "group_name": "low",
+                "lower_bound": 0.0,
+                "upper_bound": 0.23333333333333334,
+                "count": 6,
+                "avg_scores": {
+                  "faithfulness": 1.0
+                }
+              },
+              {
+                "group_name": "medium",
+                "lower_bound": 0.23333333333333334,
+                "upper_bound": 0.27777777777777785,
+                "count": 6,
+                "avg_scores": {
+                  "faithfulness": 1.0
+                }
+              },
+              {
+                "group_name": "high",
+                "lower_bound": 0.27777777777777785,
+                "upper_bound": 0.5,
+                "count": 6,
+                "avg_scores": {
+                  "faithfulness": 0.5
+                }
+              }
+            ],
+            "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+          }
+        ],
+        "root_causes": [
+          {
+            "metric_name": "faithfulness",
+            "primary_causes": [
+              "keyword_overlap"
+            ],
+            "contributing_factors": [],
+            "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+          }
+        ],
+        "interventions": [
+          {
+            "target_metric": "faithfulness",
+            "intervention": "Diversify context vocabulary beyond question keywords",
+            "expected_impact": "Broader context coverage may improve faithfulness",
+            "priority": 1,
+            "related_factors": [
+              "keyword_overlap"
+            ]
+          }
+        ]
+      }
+    },
+    "low_samples": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "threshold": 0.5,
+        "low_performers": [
+          {
+            "test_case_id": "auto-003",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.7145836968078935
+            },
+            "avg_score": 0.3573,
+            "question_preview": "대인배상 II는 어떤 보장을 제공하나요?"
+          },
+          {
+            "test_case_id": "auto-007",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.49459554832359515
+            },
+            "avg_score": 0.2473,
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?"
+          },
+          {
+            "test_case_id": "auto-010",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.6322424139879534
+            },
+            "avg_score": 0.3161,
+            "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?"
+          }
+        ],
+        "count": 3
+      }
+    },
+    "diagnostic": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "threshold": 0.6,
+        "diagnostics": [
+          {
+            "metric": "answer_relevancy",
+            "issue": "answer_relevancy 점수가 기준치 미달입니다 (0.57 < 0.70).",
+            "score": 0.566,
+            "threshold": 0.7,
+            "gap": 0.134
+          }
+        ],
+        "recommendations": [
+          "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+        ]
+      }
+    },
+    "priority_summary": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "bottom_percentile": 10.0,
+        "impact_count": 3,
+        "total_cases": 18,
+        "bottom_count": 2,
+        "bottom_cases": [
+          {
+            "test_case_id": "auto-007",
+            "avg_score": 0.2473,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.2054
+            },
+            "shortfall": 0.4527,
+            "impact_score": 0.6485,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          },
+          {
+            "test_case_id": "auto-010",
+            "avg_score": 0.3161,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.0678
+            },
+            "shortfall": 0.3839,
+            "impact_score": 0.6049,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          }
+        ],
+        "impact_cases": [
+          {
+            "test_case_id": "auto-007",
+            "avg_score": 0.2473,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.2054
+            },
+            "shortfall": 0.4527,
+            "impact_score": 0.6485,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          },
+          {
+            "test_case_id": "auto-003",
+            "avg_score": 0.3573,
+            "failed_metrics": [
+              "faithfulness"
+            ],
+            "failed_metric_count": 1,
+            "gap_by_metric": {
+              "faithfulness": 0.7
+            },
+            "shortfall": 0.7,
+            "impact_score": 0.616,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "대인배상 II는 어떤 보장을 제공하나요?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "high_impact"
+            ]
+          },
+          {
+            "test_case_id": "auto-010",
+            "avg_score": 0.3161,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "failed_metric_count": 2,
+            "gap_by_metric": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.0678
+            },
+            "shortfall": 0.3839,
+            "impact_score": 0.6049,
+            "worst_metric": "faithfulness",
+            "worst_score": 0.0,
+            "worst_gap": 0.7,
+            "question_type": "factual",
+            "question_type_label": "사실",
+            "question_preview": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+            "analysis_hints": [
+              "컨텍스트-답변 정합성 점검 필요",
+              "질문 의도와 답변 불일치 가능성",
+              "질문 유형: 사실"
+            ],
+            "metadata": null,
+            "tags": [
+              "bottom_percentile",
+              "high_impact"
+            ]
+          }
+        ],
+        "run_metadata": {
+          "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+          "dataset_name": "e2e-auto-insurance-qa-korean",
+          "dataset_version": "1.0.0",
+          "model_name": "ollama/gpt-oss-safeguard:20b",
+          "started_at": "2026-01-09T12:01:20.083691",
+          "finished_at": "2026-01-09T12:19:29.652169",
+          "total_test_cases": 18,
+          "passed_test_cases": 0,
+          "pass_rate": 0.0,
+          "total_tokens": 91166,
+          "total_cost_usd": 0.25359499999999996,
+          "duration_seconds": 1089.568478,
+          "tracker_metadata": {
+            "ragas_config": {
+              "embedding_model": "qwen3-embedding:8b",
+              "temperature": null
+            },
+            "run_mode": "full"
+          },
+          "metrics_evaluated": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "run_mode": "full",
+          "thresholds": {
+            "faithfulness": 0.7,
+            "answer_relevancy": 0.7
+          },
+          "avg_faithfulness": 0.8333333333333334,
+          "avg_answer_relevancy": 0.5660239640764649
+        }
+      }
+    },
+    "pattern_detection": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "patterns": [
+          {
+            "label": "Top keyword",
+            "detail": "얼마인가요 (freq 10)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "할인입니다 (freq 7)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "할인율은 (freq 6)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "되나요 (freq 4)"
+          },
+          {
+            "label": "Top keyword",
+            "detail": "어떻게 (freq 4)"
+          },
+          {
+            "label": "Question type",
+            "detail": "factual (0.8%)"
+          },
+          {
+            "label": "Question type",
+            "detail": "reasoning (0.2%)"
+          }
+        ],
+        "summary": {
+          "keyword_count": 20,
+          "question_type_count": 2
+        }
+      }
+    },
+    "trend_detection": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "trends": [
+          {
+            "metric": "pass_rate",
+            "direction": "down",
+            "delta": -1.0
+          }
+        ],
+        "summary": {
+          "start": 1.0,
+          "end": 0.0,
+          "delta": -1.0
+        },
+        "recommendations": [
+          "Performance is trending down; investigate changes."
+        ]
+      }
+    },
+    "root_cause": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 0,
+      "output": {
+        "causes": [
+          {
+            "metric": "answer_relevancy",
+            "reason": "answer_relevancy 점수가 기준치 미달입니다 (0.57 < 0.70)."
+          }
+        ],
+        "recommendations": [
+          "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+        ],
+        "low_performer_count": 3
+      }
+    },
+    "report": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 106214,
+      "output": {
+        "report": "# RAG 평가 분석 보고서  \n### run_id: **8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5**\n\n---\n\n## 1. 요약  \n모델 **ollama/gpt-oss-safeguard:20b** 가 **e2e-auto-insurance-qa-korean** 데이터셋에서 18개의 테스트를 수행했지만 전체 **pass rate** 는 0%로, 가장 낮은 지표인 **answer_relevancy**(평균 0.566) 가 기준 0.7을 크게 하회했습니다.  \n\n- **지표**: Faithfulness는 평균 0.833(통과) / Answer Relevancy는 평균 0.566(위험)  \n- **원인**: 답변과 문맥이 불일치하여 관련성 저하 → “컨텍스트‑답변 정합성”에 대한 품질 저하 (E1, E2, E3)  \n- **사용자 영향**: 실질적으로 요구되는 정보를 반영하지 못해 사용자에게 신뢰도 손실과 인지부하가 증가  \n\n---\n\n## 2. 지표 스코어카드  \n\n| Metric | 평균 | Threshold | Pass Rate | 상태 |\n|--------|-------|-----------|------------|------|\n| Faithfulness | 0.833 | 0.700 | 0.833 | ✅ Pass |\n| Answer Relevancy | 0.566 | 0.700 | 0.055 | ⚠️ Risk |\n\n> **주요 사항**  \n> - Faithfulness 0.833 > 0.7 → 대부분의 경우 참고 문맥이 충분히 반영됨.  \n> - Answer Relevancy 0.566 < 0.7 → 단 1개의 테스트(“auto‑015”) 를 제외하면 대부분 < 0.7 (특히 *E1*, *E2*, *E3*).\n\n---\n\n## 3. 데이터 품질 / 신뢰도  \n| 항목 | 결론 |\n|------|------|\n| 샘플 수 | **18**(표본 수가 적음). 분석 결과를 일반화하기 어려움. |\n| 커버리지 | 1.0(모든 문서에 대해 테스트)   |\n| 경고 | “추가 데이터 필요” 및 “실행 이력 부족”으로 인해 추세 분석 불가. |\n| 결함 | None (미리 정의된 품질 체크는 전혀 실패하지 않음). |\n\n> **결론**: 샘플이 제한적이며, 추세/장기 개선을 위한 과거 실행 기록이 없으므로, **추가 데이터와 반복 실행**이 필요합니다.\n\n---\n\n## 4. 증거 기반 인사이트  \n\n| Priority Highlight | Test Case | Metric(s) | 분석 힌트 | 증거 |\n|---------------------|-----------|-----------|-----------|------|\n| **high‑impact** | *auto‑007* | Faithfulness 0.0, Relevancy 0.495 | “컨텍스트‑답변 정합성 체크 필요” | [E1] |\n| **high‑impact** | *auto‑010* | Faithfulness 0.0, Relevancy 0.632 | “컨텍스트‑답변 정합성 체크 필요” | [E2] |\n| **high‑impact** | *auto‑003* | Faithfulness 0.0, Relevancy 0.715 | “보장 내용을 과장” | [E3] |\n| **가중치 위기** | *auto‑015* | Faithfulness 1.0, Relevancy 0.440 | “정답이 올바르지만 문맥이 부정확” | [E4] |\n| **가중치 위기** | *auto‑005* | Faithfulness 1.0, Relevancy 0.442 | “정답은 1억 원이지만 문맥이 과도한 상세 설명에 시맨틱 가려짐” | [E5] |\n| **가중치 위기** | *auto‑017* | Faithfulness 1.0, Relevancy 0.446 | “전화 번호가 정정리된 정답이지만 문맥이 불명확” | [E6] |\n\n> **내비게이션**: 가장 불량한 사례를 모두 “사실형” 질문으로 식별했으며, 각 응답이 주어진 문맥에서 핵심정보를 정확히 반영하거나 문맥과 일치하는지 확인이 필수적입니다.  \n\n---\n\n## 5. 원인 가설  \n\n1. **컨텍스트‑답변 정합성 부족**  \n   - *E1* 및 *E2*에서 모델이 문맥 일부를 잘못 해석해 정답을 제공하였지만 **Faithfulness 0.0** 으로 실제 문장을 인용할 수 없었다.  \n2. **Prompt‑Alignment 이슈**  \n   - “보험료 할증/할인”에 대한 질문(예: *auto‑015*)에서는 정답이 문맥에 존재하지만 **Answer Relevancy** 가 0.44 아래로 낮아, Prompt에 문맥 활용이 미흡한 것으로 추정.  \n3. **Embedding 모델 성능**  \n   - **qwen3‑embedding:8b** 를 사용했으나, 한 문장 정도의 문맥을 제대로 연계하지 못해 중요 정보를 끌어오지 못했을 가능성이 있음.  \n\n> **근거**: Root cause 데이터에서 “answer_relevancy” 가 기준 이하라는 명시가 있으며, 상세 사례 E1–E6 가 이를 뒷받침합니다.\n\n---\n\n## 6. 개선 제안  \n\n| 개선 방향 | 구체적 조치 | 기대 효과 |\n|-----------|------------|-----------|\n| **Context enrichment** | 문맥 제공 시, 가장 관련성 높은 문장 우선 선택 및 길이 제한 → *E1*, *E2* 오류 방지 | Relevancy 0.7 이상 달성 |\n| **Prompt re‑engineering** | “정답이 무엇인가요?” 등 사실형 질문에 대한 명확 지시어 삽입 | Faithfulness 1.0 유지, 불필요 정보 배제 |\n| **Dataset augmentation** | “자기신체사고 보상액”, “결제 옵션 할증” 같은 예시를 확대 | 다양성 증가, 높은 스코어일수 확장 |\n| **Evaluation‑feedback loop** | 각 테스트 케이스에 대한 상세 정규화 및 재평가 자동 트리거 | 지속적 개선 추적 |\n| **Model fine‑tuning** | qwen‑3‑embedding 모델 파인튜닝 → 문맥-정답 매핑 향상 | Relevancy 개선 가능 |\n\n> **유의**: 초기 개선 단계에서 10~20% 비용(≈$0.25) 내부에서 재실행해 피드백 루프를 검증합니다.\n\n---\n\n## 7. 다음 단계  \n\n1. **추가 테스트 케이스 도입** – 50+ 질문으로 샘플 확장.  \n2. **과거 실행 기록 수집** – 트렌드·성능 변화를 분석하기 위한 메타데이터 확보.  \n3. **문맥 추출 알고리즘 재설계** – 문서 수동으로 선별된 핵심 문장과 비슷한 임베딩 우선순위 적용.  \n4. **품질 체크 도입** – 각 테스트 케이스에 대해 “정확성”, “불일치 스코어”등 추가 검증.  \n5. **사용자 피드백 수집** – 실제 사용자 시나리오에서 인지부하 및 신뢰 지표를 평가.  \n\n---\n\n## 8. 부록 (산출물 목록)\n\n| 파일 | 용도 |\n|------|------|\n| `causal_analysis.json` | 원인 분석 결과 |\n| `load_data.json` | 데이터 로드 로그 |\n| `nlp_analysis.json` | 토큰/어휘 통계 |\n| `pattern_detection.json` | 패턴/루트 원인 목록 |\n| `priority_summary.json` | 높은 영향 케이스 요약 |\n| `ragas_eval.json` | 전반적 평가 |\n| `root_cause.json` | 근본 원인 리포트 |\n| `statistics.json` | 통계 수치 |\n| `trend_detection.json` | 추세 분석 |\n| `statistics.json` | 기타 통계 |\n| `trend_detection.json` | 트렌드 분석 |\n\n> **Note**: 현재 테스트 시나리오는 짧고 표본 수가 18개에 불과하므로, 추후 **추가 데이터** 확보와 장기 실행 경로 설계가 필수입니다.  \n\n---",
+        "format": "markdown",
+        "llm_used": true,
+        "llm_model": "ollama/gpt-oss-safeguard:20b",
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "summary": {
+          "report_type": "analysis",
+          "total_evidence": 6,
+          "has_run": true
+        },
+        "evidence": [
+          {
+            "test_case_id": "auto-007",
+            "avg_score": 0.2473,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+            "answer": "19% 할인입니다.",
+            "contexts": [
+              "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+              "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+            ],
+            "ground_truth": "19%",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.49459554832359515
+            },
+            "evidence_id": "E1"
+          },
+          {
+            "test_case_id": "auto-010",
+            "avg_score": 0.3161,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+            "answer": "5% 할인입니다.",
+            "contexts": [
+              "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+              "2채널 이상: 5% 할인, 1채널: 3% 할인."
+            ],
+            "ground_truth": "5%",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.6322424139879534
+            },
+            "evidence_id": "E2"
+          },
+          {
+            "test_case_id": "auto-003",
+            "avg_score": 0.3573,
+            "failed_metrics": [
+              "faithfulness"
+            ],
+            "question": "대인배상 II는 어떤 보장을 제공하나요?",
+            "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+            "contexts": [
+              "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+              "중상해 사고 시 필수적으로 가입을 권장합니다."
+            ],
+            "ground_truth": "무한 보장",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.7145836968078935
+            },
+            "evidence_id": "E3"
+          },
+          {
+            "test_case_id": "auto-015",
+            "avg_score": 0.72,
+            "failed_metrics": [
+              "answer_relevancy"
+            ],
+            "question": "6회 분납 시 보험료는 어떻게 되나요?",
+            "answer": "2% 할증됩니다.",
+            "contexts": [
+              "납입 방법: 6회 분납은 2% 할증.",
+              "일시납은 1% 할인."
+            ],
+            "ground_truth": "2% 할증",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4399445014747145
+            },
+            "evidence_id": "E4"
+          },
+          {
+            "test_case_id": "auto-005",
+            "avg_score": 0.7212,
+            "failed_metrics": [
+              "answer_relevancy"
+            ],
+            "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+            "answer": "최대 1억원까지 보장됩니다.",
+            "contexts": [
+              "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+              "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+            ],
+            "ground_truth": "1억원",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4424365056726988
+            },
+            "evidence_id": "E5"
+          },
+          {
+            "test_case_id": "auto-017",
+            "avg_score": 0.7232,
+            "failed_metrics": [
+              "answer_relevancy"
+            ],
+            "question": "사고 접수 콜센터 번호는 무엇인가요?",
+            "answer": "1588-5114입니다.",
+            "contexts": [
+              "사고 접수: 24시간 콜센터 1588-5114.",
+              "모바일 앱: 삼성화재 다이렉트 앱."
+            ],
+            "ground_truth": "1588-5114",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.4464164242157778
+            },
+            "evidence_id": "E6"
+          }
+        ]
+      }
+    }
+  },
+  "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+  "artifacts": {
+    "dir": "reports/analysis/artifacts/analysis_8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+    "index": "reports/analysis/artifacts/analysis_8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5/index.json"
+  }
+}

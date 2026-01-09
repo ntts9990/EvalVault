@@ -1,0 +1,52 @@
+{
+  "node_id": "time_series",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "series": [
+      {
+        "run_id": "a491fa0e-208d-4a34-acc6-2aba629dd0c3",
+        "timestamp": "2026-01-09T08:14:14.026053",
+        "pass_rate": 1.0,
+        "model_name": "gpt-5-nano"
+      },
+      {
+        "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+        "timestamp": "2026-01-09T09:24:21.002694",
+        "pass_rate": 0.0,
+        "model_name": "gpt-oss-safeguard:20b"
+      },
+      {
+        "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+        "timestamp": "2026-01-09T09:27:38.337182",
+        "pass_rate": 0.5,
+        "model_name": "ollama/gpt-oss-safeguard:20b"
+      },
+      {
+        "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "timestamp": "2026-01-09T09:47:43.429178",
+        "pass_rate": 0.5,
+        "model_name": "ollama/gpt-oss-safeguard:20b"
+      },
+      {
+        "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "timestamp": "2026-01-09T12:01:20.083691",
+        "pass_rate": 0.0,
+        "model_name": "ollama/gpt-oss-safeguard:20b"
+      },
+      {
+        "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+        "timestamp": "2026-01-09T12:51:52.270316",
+        "pass_rate": 0.0,
+        "model_name": "ollama/gpt-oss-safeguard:20b"
+      }
+    ],
+    "summary": {
+      "run_count": 6,
+      "avg_pass_rate": 0.3333,
+      "start": "2026-01-09T08:14:14.026053",
+      "end": "2026-01-09T12:51:52.270316"
+    }
+  }
+}

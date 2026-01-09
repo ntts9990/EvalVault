@@ -54,6 +54,30 @@ Tip: keep the same `--db` (or `EVALVAULT_DB_PATH`) so the Web UI can read the ru
 
 ---
 
+## Analysis Artifacts (Raw Module Outputs)
+
+Reports summarize the analysis, but the raw module outputs are saved separately for easy reuse.
+This happens automatically when you run:
+
+- `evalvault run ... --auto-analyze`
+- `evalvault analyze-compare <RUN_A> <RUN_B>`
+
+**Single-run analysis (auto)**
+- Summary JSON: `reports/analysis/analysis_<RUN_ID>.json`
+- Report: `reports/analysis/analysis_<RUN_ID>.md`
+- Artifacts index: `reports/analysis/artifacts/analysis_<RUN_ID>/index.json`
+- Per-node outputs: `reports/analysis/artifacts/analysis_<RUN_ID>/<node_id>.json`
+
+**Run comparison**
+- Summary JSON: `reports/comparison/comparison_<RUN_A>_<RUN_B>.json` (IDs are truncated to 8 chars)
+- Report: `reports/comparison/comparison_<RUN_A>_<RUN_B>.md`
+- Artifacts index: `reports/comparison/artifacts/comparison_<RUN_A>_<RUN_B>/index.json`
+- Per-node outputs: `reports/comparison/artifacts/comparison_<RUN_A>_<RUN_B>/<node_id>.json`
+
+The summary JSON also includes `artifacts.dir` and `artifacts.index` for quick lookup.
+
+---
+
 ## Dataset Format (thresholds live in the dataset)
 
 EvalVault treats thresholds as part of the dataset, so each dataset can carry its own

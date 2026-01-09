@@ -107,6 +107,7 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
     "pymdown-extensions>=10.7.0",
 ]
+web = []
 analysis = [
     "scikit-learn>=1.8.0",
 ]

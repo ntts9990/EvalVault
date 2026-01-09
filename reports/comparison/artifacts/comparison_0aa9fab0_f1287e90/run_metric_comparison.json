@@ -1,0 +1,76 @@
+{
+  "node_id": "run_metric_comparison",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "summary": {
+      "run_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+      "run_b": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "total_metrics": 2,
+      "significant_metrics": 0,
+      "wins": {
+        "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c": 0,
+        "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e": 0
+      },
+      "pass_rate_a": 0.5,
+      "pass_rate_b": 0.5,
+      "pass_rate_diff": 0.0,
+      "avg_score_a": 0.692,
+      "avg_score_b": 0.692,
+      "avg_score_diff": 0.0
+    },
+    "comparisons": [
+      {
+        "run_id_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+        "run_id_b": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "metric": "faithfulness",
+        "mean_a": 0.5,
+        "mean_b": 0.5,
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "is_significant": false,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null,
+        "direction": "flat"
+      },
+      {
+        "run_id_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+        "run_id_b": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "metric": "answer_relevancy",
+        "mean_a": 0.8840076251449925,
+        "mean_b": 0.8840076251449925,
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "is_significant": false,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null,
+        "direction": "flat"
+      }
+    ],
+    "notable_changes": [
+      {
+        "metric": "faithfulness",
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null
+      },
+      {
+        "metric": "answer_relevancy",
+        "diff": 0.0,
+        "diff_percent": 0.0,
+        "p_value": 1.0,
+        "effect_size": 0.0,
+        "effect_level": "negligible",
+        "winner": null
+      }
+    ]
+  }
+}

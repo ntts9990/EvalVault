@@ -1,0 +1,856 @@
+{
+  "node_id": "causal_analysis",
+  "status": "completed",
+  "duration_ms": 3,
+  "error": null,
+  "output": {
+    "analysis": {
+      "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+      "analysis_id": "9dde6c9a-36c4-427e-8b63-6d1c134c9fa9",
+      "created_at": "2026-01-09T13:09:02.818707",
+      "factor_stats": {
+        "question_length": {
+          "factor_type": "question_length",
+          "mean": 6.444444444444445,
+          "std": 1.4229164972072998,
+          "min": 4.0,
+          "max": 9.0,
+          "median": 6.0
+        },
+        "answer_length": {
+          "factor_type": "answer_length",
+          "mean": 3.888888888888889,
+          "std": 2.3778816176702997,
+          "min": 1.0,
+          "max": 10.0,
+          "median": 3.0
+        },
+        "context_count": {
+          "factor_type": "context_count",
+          "mean": 2.0,
+          "std": 0.0,
+          "min": 2.0,
+          "max": 2.0,
+          "median": 2.0
+        },
+        "context_length": {
+          "factor_type": "context_length",
+          "mean": 13.722222222222221,
+          "std": 3.3467323292953406,
+          "min": 9.0,
+          "max": 24.0,
+          "median": 14.0
+        },
+        "question_complexity": {
+          "factor_type": "question_complexity",
+          "mean": 0.7666762797660726,
+          "std": 0.019710481257000822,
+          "min": 0.7182539682539683,
+          "max": 0.8105263157894738,
+          "median": 0.7654011154011153
+        },
+        "has_ground_truth": {
+          "factor_type": "has_ground_truth",
+          "mean": 1.0,
+          "std": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "median": 1.0
+        },
+        "keyword_overlap": {
+          "factor_type": "keyword_overlap",
+          "mean": 0.23148148148148145,
+          "std": 0.16544822106808926,
+          "min": 0.0,
+          "max": 0.5,
+          "median": 0.25
+        }
+      },
+      "factor_impacts": [
+        {
+          "factor_type": "question_length",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": -0.17460757394239457,
+          "p_value": 0.48833016305065435,
+          "is_significant": false,
+          "effect_size": 0.34921514788478913,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 4.0,
+              "upper_bound": 6.0,
+              "count": 5,
+              "avg_scores": {
+                "faithfulness": 0.8
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 6.0,
+              "upper_bound": 7.0,
+              "count": 5,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 7.0,
+              "upper_bound": 9.0,
+              "count": 8,
+              "avg_scores": {
+                "faithfulness": 0.75
+              }
+            }
+          ],
+          "interpretation": "Question length has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "question_length",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": 0.2599412423934404,
+          "p_value": 0.29754702391838816,
+          "is_significant": false,
+          "effect_size": 0.5198824847868808,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 4.0,
+              "upper_bound": 6.0,
+              "count": 5,
+              "avg_scores": {
+                "answer_relevancy": 0.389703516466109
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 6.0,
+              "upper_bound": 7.0,
+              "count": 5,
+              "avg_scores": {
+                "answer_relevancy": 0.3308309911195778
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 7.0,
+              "upper_bound": 9.0,
+              "count": 8,
+              "avg_scores": {
+                "answer_relevancy": 0.422801473020767
+              }
+            }
+          ],
+          "interpretation": "Question length has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "answer_length",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.041793837952857314,
+          "p_value": 0.8692135467152319,
+          "is_significant": false,
+          "effect_size": 0.08358767590571463,
+          "stratified_groups": [
+            {
+              "group_name": "medium",
+              "lower_bound": 2.0,
+              "upper_bound": 4.333333333333334,
+              "count": 11,
+              "avg_scores": {
+                "faithfulness": 0.8181818181818182
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 4.333333333333334,
+              "upper_bound": 10.0,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 0.8333333333333334
+              }
+            }
+          ],
+          "interpretation": "Answer length has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "answer_length",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": 0.245829706540746,
+          "p_value": 0.3254643006592213,
+          "is_significant": false,
+          "effect_size": 0.491659413081492,
+          "stratified_groups": [
+            {
+              "group_name": "medium",
+              "lower_bound": 2.0,
+              "upper_bound": 4.333333333333334,
+              "count": 11,
+              "avg_scores": {
+                "answer_relevancy": 0.38799650773630384
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 4.333333333333334,
+              "upper_bound": 10.0,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.42963044443929754
+              }
+            }
+          ],
+          "interpretation": "Answer length has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "context_count",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.0,
+          "p_value": 1.0,
+          "is_significant": false,
+          "effect_size": 0.0,
+          "stratified_groups": [
+            {
+              "group_name": "high",
+              "lower_bound": 2.0,
+              "upper_bound": 2.0,
+              "count": 18,
+              "avg_scores": {
+                "faithfulness": 0.8333333333333334
+              }
+            }
+          ],
+          "interpretation": "Number of contexts has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "context_count",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.0,
+          "p_value": 1.0,
+          "is_significant": false,
+          "effect_size": 0.0,
+          "stratified_groups": [
+            {
+              "group_name": "high",
+              "lower_bound": 2.0,
+              "upper_bound": 2.0,
+              "count": 18,
+              "avg_scores": {
+                "answer_relevancy": 0.38806024011636503
+              }
+            }
+          ],
+          "interpretation": "Number of contexts has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "context_length",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": -0.0816609069263443,
+          "p_value": 0.7473589859190684,
+          "is_significant": false,
+          "effect_size": 0.1633218138526886,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 9.0,
+              "upper_bound": 13.0,
+              "count": 5,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 13.0,
+              "upper_bound": 14.333333333333334,
+              "count": 7,
+              "avg_scores": {
+                "faithfulness": 0.8571428571428571
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 14.333333333333334,
+              "upper_bound": 24.0,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 0.6666666666666666
+              }
+            }
+          ],
+          "interpretation": "Total context length has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "context_length",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": 0.15841112218887188,
+          "p_value": 0.5301243823279569,
+          "is_significant": false,
+          "effect_size": 0.31682224437774376,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 9.0,
+              "upper_bound": 13.0,
+              "count": 5,
+              "avg_scores": {
+                "answer_relevancy": 0.34203427345700677
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 13.0,
+              "upper_bound": 14.333333333333334,
+              "count": 7,
+              "avg_scores": {
+                "answer_relevancy": 0.37557833800028984
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 14.333333333333334,
+              "upper_bound": 24.0,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.44097743146791796
+              }
+            }
+          ],
+          "interpretation": "Total context length has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "question_complexity",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": -0.15023454062022246,
+          "p_value": 0.5518264614082102,
+          "is_significant": false,
+          "effect_size": 0.3004690812404449,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 0.7182539682539683,
+              "upper_bound": 0.758695652173913,
+              "count": 4,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 0.758695652173913,
+              "upper_bound": 0.7703940886699507,
+              "count": 8,
+              "avg_scores": {
+                "faithfulness": 0.75
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 0.7703940886699507,
+              "upper_bound": 0.8105263157894738,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 0.8333333333333334
+              }
+            }
+          ],
+          "interpretation": "Question complexity has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "question_complexity",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.022992492014484694,
+          "p_value": 0.9278445551669025,
+          "is_significant": false,
+          "effect_size": 0.04598498402896939,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 0.7182539682539683,
+              "upper_bound": 0.758695652173913,
+              "count": 4,
+              "avg_scores": {
+                "answer_relevancy": 0.347119150236345
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 0.758695652173913,
+              "upper_bound": 0.7703940886699507,
+              "count": 8,
+              "avg_scores": {
+                "answer_relevancy": 0.36443344280227374
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 0.7703940886699507,
+              "upper_bound": 0.8105263157894738,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.44685669645516657
+              }
+            }
+          ],
+          "interpretation": "Question complexity has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "has_ground_truth",
+          "metric_name": "faithfulness",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.0,
+          "p_value": 1.0,
+          "is_significant": false,
+          "effect_size": 0.0,
+          "stratified_groups": [
+            {
+              "group_name": "high",
+              "lower_bound": 1.0,
+              "upper_bound": 1.0,
+              "count": 18,
+              "avg_scores": {
+                "faithfulness": 0.8333333333333334
+              }
+            }
+          ],
+          "interpretation": "Ground truth availability has no significant effect on faithfulness"
+        },
+        {
+          "factor_type": "has_ground_truth",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "negligible",
+          "correlation": 0.0,
+          "p_value": 1.0,
+          "is_significant": false,
+          "effect_size": 0.0,
+          "stratified_groups": [
+            {
+              "group_name": "high",
+              "lower_bound": 1.0,
+              "upper_bound": 1.0,
+              "count": 18,
+              "avg_scores": {
+                "answer_relevancy": 0.38806024011636503
+              }
+            }
+          ],
+          "interpretation": "Ground truth availability has no significant effect on answer_relevancy"
+        },
+        {
+          "factor_type": "keyword_overlap",
+          "metric_name": "faithfulness",
+          "direction": "negative",
+          "strength": "strong",
+          "correlation": -0.6357155827725987,
+          "p_value": 0.004574952337352029,
+          "is_significant": true,
+          "effect_size": 1.2714311655451973,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 0.0,
+              "upper_bound": 0.23333333333333334,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 0.23333333333333334,
+              "upper_bound": 0.27777777777777785,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 0.27777777777777785,
+              "upper_bound": 0.5,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 0.5
+              }
+            }
+          ],
+          "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+        },
+        {
+          "factor_type": "keyword_overlap",
+          "metric_name": "answer_relevancy",
+          "direction": "neutral",
+          "strength": "weak",
+          "correlation": 0.20868583123001816,
+          "p_value": 0.4059597166941745,
+          "is_significant": false,
+          "effect_size": 0.4173716624600363,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 0.0,
+              "upper_bound": 0.23333333333333334,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.3692754120309552
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 0.23333333333333334,
+              "upper_bound": 0.27777777777777785,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.3910566409544977
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 0.27777777777777785,
+              "upper_bound": 0.5,
+              "count": 6,
+              "avg_scores": {
+                "answer_relevancy": 0.40384866736364206
+              }
+            }
+          ],
+          "interpretation": "Question-context keyword overlap has no significant effect on answer_relevancy"
+        }
+      ],
+      "causal_relationships": [
+        {
+          "cause": "keyword_overlap",
+          "effect_metric": "faithfulness",
+          "direction": "negative",
+          "confidence": 0.9343430970713931,
+          "evidence": "Stratified analysis shows low=1.00 > medium=1.00 > high=0.50. Correlation: -0.64, p-value: 0.0046",
+          "sample_size": 18
+        }
+      ],
+      "root_causes": [
+        {
+          "metric_name": "faithfulness",
+          "primary_causes": [
+            "keyword_overlap"
+          ],
+          "contributing_factors": [],
+          "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+        }
+      ],
+      "interventions": [
+        {
+          "target_metric": "faithfulness",
+          "intervention": "Diversify context vocabulary beyond question keywords",
+          "expected_impact": "Broader context coverage may improve faithfulness",
+          "priority": 1,
+          "related_factors": [
+            "keyword_overlap"
+          ]
+        }
+      ],
+      "insights": [
+        "Found 1 significant factor-metric relationships out of 14 analyzed",
+        "Identified 1 strong causal relationships with confidence > 0.7",
+        "Most impactful factor: keyword_overlap on faithfulness (r=-0.64)",
+        "Most common root cause across metrics: keyword_overlap (appears in 1 metrics)",
+        "Factors with no significant impact: question_complexity, has_ground_truth, question_length"
+      ]
+    },
+    "summary": {
+      "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+      "factor_count": 7,
+      "significant_impact_count": 1,
+      "root_cause_count": 1,
+      "top_metrics": [
+        "faithfulness"
+      ],
+      "recommended_interventions": [
+        "Diversify context vocabulary beyond question keywords"
+      ]
+    },
+    "statistics": {
+      "factor_stats": {
+        "question_length": {
+          "factor_type": "question_length",
+          "mean": 6.444444444444445,
+          "std": 1.4229164972072998,
+          "min": 4.0,
+          "max": 9.0,
+          "median": 6.0
+        },
+        "answer_length": {
+          "factor_type": "answer_length",
+          "mean": 3.888888888888889,
+          "std": 2.3778816176702997,
+          "min": 1.0,
+          "max": 10.0,
+          "median": 3.0
+        },
+        "context_count": {
+          "factor_type": "context_count",
+          "mean": 2.0,
+          "std": 0.0,
+          "min": 2.0,
+          "max": 2.0,
+          "median": 2.0
+        },
+        "context_length": {
+          "factor_type": "context_length",
+          "mean": 13.722222222222221,
+          "std": 3.3467323292953406,
+          "min": 9.0,
+          "max": 24.0,
+          "median": 14.0
+        },
+        "question_complexity": {
+          "factor_type": "question_complexity",
+          "mean": 0.7666762797660726,
+          "std": 0.019710481257000822,
+          "min": 0.7182539682539683,
+          "max": 0.8105263157894738,
+          "median": 0.7654011154011153
+        },
+        "has_ground_truth": {
+          "factor_type": "has_ground_truth",
+          "mean": 1.0,
+          "std": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "median": 1.0
+        },
+        "keyword_overlap": {
+          "factor_type": "keyword_overlap",
+          "mean": 0.23148148148148145,
+          "std": 0.16544822106808926,
+          "min": 0.0,
+          "max": 0.5,
+          "median": 0.25
+        }
+      },
+      "significant_impacts": [
+        {
+          "factor_type": "keyword_overlap",
+          "metric_name": "faithfulness",
+          "direction": "negative",
+          "strength": "strong",
+          "correlation": -0.6357155827725987,
+          "p_value": 0.004574952337352029,
+          "is_significant": true,
+          "effect_size": 1.2714311655451973,
+          "stratified_groups": [
+            {
+              "group_name": "low",
+              "lower_bound": 0.0,
+              "upper_bound": 0.23333333333333334,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "medium",
+              "lower_bound": 0.23333333333333334,
+              "upper_bound": 0.27777777777777785,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 1.0
+              }
+            },
+            {
+              "group_name": "high",
+              "lower_bound": 0.27777777777777785,
+              "upper_bound": 0.5,
+              "count": 6,
+              "avg_scores": {
+                "faithfulness": 0.5
+              }
+            }
+          ],
+          "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+        }
+      ],
+      "causal_relationships": [
+        {
+          "cause": "keyword_overlap",
+          "effect_metric": "faithfulness",
+          "direction": "negative",
+          "confidence": 0.9343430970713931,
+          "evidence": "Stratified analysis shows low=1.00 > medium=1.00 > high=0.50. Correlation: -0.64, p-value: 0.0046",
+          "sample_size": 18
+        }
+      ],
+      "root_causes": [
+        {
+          "metric_name": "faithfulness",
+          "primary_causes": [
+            "keyword_overlap"
+          ],
+          "contributing_factors": [],
+          "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+        }
+      ],
+      "interventions": [
+        {
+          "target_metric": "faithfulness",
+          "intervention": "Diversify context vocabulary beyond question keywords",
+          "expected_impact": "Broader context coverage may improve faithfulness",
+          "priority": 1,
+          "related_factors": [
+            "keyword_overlap"
+          ]
+        }
+      ]
+    },
+    "insights": [
+      "Found 1 significant factor-metric relationships out of 14 analyzed",
+      "Identified 1 strong causal relationships with confidence > 0.7",
+      "Most impactful factor: keyword_overlap on faithfulness (r=-0.64)",
+      "Most common root cause across metrics: keyword_overlap (appears in 1 metrics)",
+      "Factors with no significant impact: question_complexity, has_ground_truth, question_length"
+    ],
+    "analysis_id": "9dde6c9a-36c4-427e-8b63-6d1c134c9fa9",
+    "run_id": "4516d358-2797-4c46-9f14-c1d975588025",
+    "factor_stats": {
+      "question_length": {
+        "factor_type": "question_length",
+        "mean": 6.444444444444445,
+        "std": 1.4229164972072998,
+        "min": 4.0,
+        "max": 9.0,
+        "median": 6.0
+      },
+      "answer_length": {
+        "factor_type": "answer_length",
+        "mean": 3.888888888888889,
+        "std": 2.3778816176702997,
+        "min": 1.0,
+        "max": 10.0,
+        "median": 3.0
+      },
+      "context_count": {
+        "factor_type": "context_count",
+        "mean": 2.0,
+        "std": 0.0,
+        "min": 2.0,
+        "max": 2.0,
+        "median": 2.0
+      },
+      "context_length": {
+        "factor_type": "context_length",
+        "mean": 13.722222222222221,
+        "std": 3.3467323292953406,
+        "min": 9.0,
+        "max": 24.0,
+        "median": 14.0
+      },
+      "question_complexity": {
+        "factor_type": "question_complexity",
+        "mean": 0.7666762797660726,
+        "std": 0.019710481257000822,
+        "min": 0.7182539682539683,
+        "max": 0.8105263157894738,
+        "median": 0.7654011154011153
+      },
+      "has_ground_truth": {
+        "factor_type": "has_ground_truth",
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0,
+        "median": 1.0
+      },
+      "keyword_overlap": {
+        "factor_type": "keyword_overlap",
+        "mean": 0.23148148148148145,
+        "std": 0.16544822106808926,
+        "min": 0.0,
+        "max": 0.5,
+        "median": 0.25
+      }
+    },
+    "significant_impacts": [
+      {
+        "factor_type": "keyword_overlap",
+        "metric_name": "faithfulness",
+        "direction": "negative",
+        "strength": "strong",
+        "correlation": -0.6357155827725987,
+        "p_value": 0.004574952337352029,
+        "is_significant": true,
+        "effect_size": 1.2714311655451973,
+        "stratified_groups": [
+          {
+            "group_name": "low",
+            "lower_bound": 0.0,
+            "upper_bound": 0.23333333333333334,
+            "count": 6,
+            "avg_scores": {
+              "faithfulness": 1.0
+            }
+          },
+          {
+            "group_name": "medium",
+            "lower_bound": 0.23333333333333334,
+            "upper_bound": 0.27777777777777785,
+            "count": 6,
+            "avg_scores": {
+              "faithfulness": 1.0
+            }
+          },
+          {
+            "group_name": "high",
+            "lower_bound": 0.27777777777777785,
+            "upper_bound": 0.5,
+            "count": 6,
+            "avg_scores": {
+              "faithfulness": 0.5
+            }
+          }
+        ],
+        "interpretation": "Question-context keyword overlap has a strong negative effect on faithfulness (r=-0.64): Higher question-context keyword overlap decreases faithfulness"
+      }
+    ],
+    "root_causes": [
+      {
+        "metric_name": "faithfulness",
+        "primary_causes": [
+          "keyword_overlap"
+        ],
+        "contributing_factors": [],
+        "explanation": "keyword_overlap negatively affects faithfulness (r=-0.64)"
+      }
+    ],
+    "interventions": [
+      {
+        "target_metric": "faithfulness",
+        "intervention": "Diversify context vocabulary beyond question keywords",
+        "expected_impact": "Broader context coverage may improve faithfulness",
+        "priority": 1,
+        "related_factors": [
+          "keyword_overlap"
+        ]
+      }
+    ]
+  }
+}

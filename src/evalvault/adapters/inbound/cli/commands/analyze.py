@@ -15,14 +15,29 @@ from evalvault.adapters.outbound.analysis import (
     NLPAnalysisAdapter,
     StatisticalAnalysisAdapter,
 )
+from evalvault.adapters.outbound.analysis.pipeline_factory import (
+    build_analysis_pipeline_service,
+)
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.phoenix_support import get_phoenix_trace_url
 from evalvault.config.settings import Settings, apply_profile
+from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.analysis_service import AnalysisService
 
+from ..utils.analysis_io import (
+    build_comparison_scorecard,
+    extract_markdown_report,
+    get_node_output,
+    resolve_artifact_dir,
+    resolve_output_paths,
+    serialize_pipeline_result,
+    write_json,
+    write_pipeline_artifacts,
+)
 from ..utils.options import db_option, profile_option
 from ..utils.validators import parse_csv_option
 
@@ -163,7 +178,19 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         test: str = typer.Option(
             "t-test", "--test", "-t", help="Statistical test (t-test, mann-whitney)"
         ),
+        output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
+        report: Path | None = typer.Option(
+            None, "--report", "-r", help="Output report file (*.md)"
+        ),
+        output_dir: Path | None = typer.Option(
+            None,
+            "--output-dir",
+            help="Output directory for comparison artifacts (default: reports/comparison).",
+        ),
         db_path: Path = db_option(help_text="Database path"),
+        profile: str | None = profile_option(
+            help_text="Model profile for comparison report LLM (dev, prod, openai).",
+        ),
     ) -> None:
         """Compare two evaluation runs statistically."""
 
@@ -228,6 +255,69 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         _console.print(table)
         _console.print()
 
+        comparison_prefix = f"comparison_{run_id1[:8]}_{run_id2[:8]}"
+        base_dir = output_dir or Path("reports/comparison")
+        output_path, report_path = resolve_output_paths(
+            base_dir=base_dir,
+            output_path=output,
+            report_path=report,
+            prefix=comparison_prefix,
+        )
+
+        settings = Settings()
+        profile_name = profile or settings.evalvault_profile
+        if profile_name:
+            settings = apply_profile(settings, profile_name)
+        llm_adapter = None
+        try:
+            llm_adapter = get_llm_adapter(settings)
+        except Exception as exc:
+            _console.print(f"[yellow]Warning: LLM adapter initialization failed ({exc})[/yellow]")
+
+        pipeline_service = build_analysis_pipeline_service(
+            storage=storage,
+            llm_adapter=llm_adapter,
+        )
+        with _console.status("[bold green]비교 분석 파이프라인 실행 중..."):
+            pipeline_result = pipeline_service.analyze_intent(
+                AnalysisIntent.GENERATE_COMPARISON,
+                run_id=run_id1,
+                run_ids=[run_id1, run_id2],
+                compare_metrics=metric_list,
+                test_type=test,
+                report_type="comparison",
+                use_llm_report=True,
+            )
+
+        artifacts_dir = resolve_artifact_dir(
+            base_dir=output_dir,
+            output_path=output_path,
+            report_path=report_path,
+            prefix=comparison_prefix,
+        )
+        artifact_index = write_pipeline_artifacts(
+            pipeline_result,
+            artifacts_dir=artifacts_dir,
+        )
+        payload = serialize_pipeline_result(pipeline_result)
+        payload["run_ids"] = [run_id1, run_id2]
+        payload["artifacts"] = artifact_index
+        write_json(output_path, payload)
+
+        report_text = extract_markdown_report(pipeline_result.final_output)
+        if not report_text:
+            report_text = "# 비교 분석 보고서\n\n보고서 본문을 찾지 못했습니다.\n"
+        report_path.write_text(report_text, encoding="utf-8")
+
+        _display_pipeline_comparison_summary(pipeline_result, run_id1, run_id2)
+
+        _console.print(f"[green]비교 분석 결과 저장:[/green] {output_path}")
+        _console.print(f"[green]비교 분석 보고서 저장:[/green] {report_path}\n")
+        _console.print(
+            "[green]비교 분석 상세 결과 저장:[/green] "
+            f"{artifact_index['dir']} (index: {artifact_index['index']})\n"
+        )
+
 
 def _display_analysis_summary(analysis) -> None:
     """Display analysis summary panel."""
@@ -278,6 +368,101 @@ def _display_metric_stats(analysis) -> None:
         )
 
     _console.print(table)
+
+
+def _display_pipeline_comparison_summary(pipeline_result, run_id1: str, run_id2: str) -> None:
+    """Display a concise comparison summary for pipeline reports."""
+
+    comparison_output = get_node_output(pipeline_result, "run_metric_comparison")
+    change_output = get_node_output(pipeline_result, "run_change_detection")
+    run_output = get_node_output(pipeline_result, "load_runs")
+
+    runs = run_output.get("runs", []) if isinstance(run_output, dict) else []
+    run_a = runs[0] if len(runs) > 0 else None
+    run_b = runs[1] if len(runs) > 1 else None
+
+    model_a = run_a.model_name if isinstance(run_a, EvaluationRun) else "-"
+    model_b = run_b.model_name if isinstance(run_b, EvaluationRun) else "-"
+    dataset_a = run_a.dataset_name if isinstance(run_a, EvaluationRun) else "-"
+    dataset_b = run_b.dataset_name if isinstance(run_b, EvaluationRun) else "-"
+
+    summary = comparison_output.get("summary", {}) if isinstance(comparison_output, dict) else {}
+    pass_rate_diff = summary.get("pass_rate_diff")
+    avg_score_diff = summary.get("avg_score_diff")
+
+    dataset_changes = change_output.get("dataset_changes", [])
+    config_changes = change_output.get("config_changes", [])
+    prompt_changes = change_output.get("prompt_changes", {})
+    prompt_summary = prompt_changes.get("summary", {}) if isinstance(prompt_changes, dict) else {}
+
+    _console.print("\n[bold]비교 분석 요약[/bold]")
+    _console.print(f"- Run A: {run_id1} ({model_a}, {dataset_a})")
+    _console.print(f"- Run B: {run_id2} ({model_b}, {dataset_b})")
+    _console.print(f"- 통과율 변화: {_format_percent(pass_rate_diff, signed=True)}")
+    _console.print(f"- 평균 점수 변화: {_format_float(avg_score_diff, signed=True)}")
+    _console.print(
+        f"- 데이터셋 변경: {len(dataset_changes) if isinstance(dataset_changes, list) else 0}건"
+    )
+    _console.print(
+        f"- 설정 변경: {len(config_changes) if isinstance(config_changes, list) else 0}건"
+    )
+    _console.print(
+        "- 프롬프트 변경: "
+        f"{prompt_summary.get('changed', 0)}건 (상태: {prompt_changes.get('status', 'unknown')})"
+    )
+
+    scorecard = build_comparison_scorecard(comparison_output)
+    if not scorecard:
+        _console.print("[yellow]비교 스코어카드 데이터가 없습니다.[/yellow]\n")
+        return
+
+    table = Table(title="비교 스코어카드", show_header=True, header_style="bold cyan")
+    table.add_column("Metric")
+    table.add_column("A", justify="right")
+    table.add_column("B", justify="right")
+    table.add_column("Diff", justify="right")
+    table.add_column("p-value", justify="right")
+    table.add_column("Effect", justify="right")
+    table.add_column("Significant")
+
+    for row in scorecard:
+        effect_size = _format_float(row.get("effect_size"), precision=2)
+        effect_level = row.get("effect_level")
+        effect_text = f"{effect_size} ({effect_level})" if effect_level else f"{effect_size}"
+        significant = "Yes" if row.get("is_significant") else "No"
+        table.add_row(
+            str(row.get("metric") or "-"),
+            _format_float(row.get("mean_a")),
+            _format_float(row.get("mean_b")),
+            _format_float(row.get("diff"), signed=True),
+            _format_float(row.get("p_value")),
+            effect_text,
+            significant,
+        )
+
+    _console.print(table)
+
+
+def _format_float(value: float | None, precision: int = 3, *, signed: bool = False) -> str:
+    if value is None:
+        return "-"
+    try:
+        if signed:
+            return f"{float(value):+.{precision}f}"
+        return f"{float(value):.{precision}f}"
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _format_percent(value: float | None, precision: int = 1, *, signed: bool = False) -> str:
+    if value is None:
+        return "-"
+    try:
+        if signed:
+            return f"{float(value):+.{precision}%}"
+        return f"{float(value):.{precision}%}"
+    except (TypeError, ValueError):
+        return "-"
     _console.print()
 
 

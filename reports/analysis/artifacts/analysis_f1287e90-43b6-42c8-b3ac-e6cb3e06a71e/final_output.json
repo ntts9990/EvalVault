@@ -1,0 +1,91 @@
+{
+  "output": {
+    "report": {
+      "report": "# RAG 평가 분석 보고서  \n**Run ID**: f1287e90-43b6-42c8-b3ac-e6cb3e06a71e | **Dataset**: test_dataset v1.0.0 | **모델**: ollama/gpt‑oss‑safeguard:20b  \n\n---\n\n## 1. 요약  \n**주요 결론**: 전체 합계 0.692의 과반자(50 %)가 기준치를 초과하지 않으며, 신뢰성(faithfulness) 부족이 가장 큰 문제입니다.  \n\n- **지표**: 대다수 테스트에서 answer_relevancy는 0.884 이상인 반면 faithfulness는 평균 0.5(위험 수준)입니다.  \n- **원인**: 답변이 컨텍스트와 충분히 정합되지 않아 근거 인용이 미흡한 점이 크게 영향을 끼칩니다.  \n- **사용자 영향**: 신뢰가 낮아 사용자는 정보의 정확성에 의문을 가질 수 있고, 이해와 인지부하가 증가합니다.  \n\n---\n\n## 2. 지표 스코어카드  \n\n| metric | 평균 | threshold | pass_rate | 상태 |\n|--------|------|-----------|-----------|------|\n| answer_relevancy | 0.884 | 0.7 | 1.00 | Pass |\n| faithfulness | 0.500 | 0.7 | 0.50 | Risk |\n\n> **전체 pass_rate**: 0.50 (4개 테스트 중 2개만 성공)  \n\n---\n\n## 3. 데이터 품질/신뢰도\n\n| 항목 | 상태 |\n|------|------|\n| 샘플 수 | 4(표본 수가 소수) |\n| coverage | 1.0 (모든 테스트에 필수 메트릭 적용) |\n| 추세 분석 | 부족 (데이터가 한 번에 한 실행) |\n\n> *표시된 경고*: `표본 수가 적음`, `추세 분석을 위한 실행 이력 부족`. 작은 샘플로 인해 통계 해석에 주의 필요.  \n\n---\n\n## 4. 증거 기반 인사이트  \n\n| 테스트 ID | 질문 | answer_relevancy | faithfulness | 주요 문제 포인트 | evidence_id |\n|-----------|------|------------------|--------------|------------------|-------------|\n| test_001 | What is Python? | 0.837 | 0.0 | 컨텍스트와 불일치 | [E1] |\n| test_003 | What is RAG? | 0.909 | 0.0 | 근거 없이 정리된 정의 | [E2] |\n| test_002 | What is machine learning? | 0.872 | 1.0 | 컨텍스트와 일치 | [E3] |\n| test_004 | What is TDD? | 0.918 | 1.0 | 정확히 정정 | [E4] |\n\n- **패턴**: 핵심 키워드 `is`, `tdd`, `what`, `python`, `rag` 순위 하위.  \n- **대부분의 사례**(test_001, test_003)에서 faithfulness가 0으로 떨어져 **위험 요인**이 두 번 발생.  \n\n**사용자 인식**  \n- *신뢰성* 낮은 답변은 사용자에게 부정확한 정보를 제공함으로써 **신뢰 저하**를 초래.  \n- 사실 질문에서 신뢰성이 보장되지 않을 경우 **인지부하**가 증가해 추론이 필요.\n\n---\n\n## 5. 원인 가설  \n\n1. **컨텍스트 정합성 부재**  \n   - 테스트 E1, E2에서 답변이 제공된 컨텍스트와 크게 차이나며 핵심 사실이 누락.  \n2. **근거 인용 미흡**  \n   - 모델이 답변을 생성할 때 외부 정보(컨텍스트) 참조를 불충분히 활용.  \n3. **지문 길이 및 복잡성**  \n   - 질문이 짧고 단순(`factual`)이어서 모델이 외부 정보에 대한 의존도를 낮춤.  \n\n> **root_cause**: faithfulness 징후가 0.5 미달 → **비판적 근거 부재**.\n\n---\n\n## 6. 개선 제안  \n\n| 영역 | 제안 | 근거 |\n|------|------|------|\n| **컨텍스트 활용** | 문맥 매칭 알고리즘(예: BM25 또는 DPR)으로 가장 관련 있는 문장을 선택 후 강조 표시 | E1, E2 에서 낮은 faithfulness |\n| **근거 기반 인용** | 답변에 인용 부호 또는 링크 삽입 → 사용자가 직접 컨텍스트 확인 가능 | *제안* 메트릭 |\n| **데이터 보강** | 테스트 샘플 증가 및 다양한 질문 유형 추가 | “표본 수가 적음” 경고 |\n| **모델 튜닝** | `faithfulness` 목표치를 0.7 이상으로 강제하도록 파인튜닝 또는 후처리 기준 적용 | `thresholds.fai­l­ty­ness = 0.7` |\n| **평가 프레임워크 보강** | 실시간 추세 및 시계열 분석 추가 | “추세 분석 부족” |\n\n---\n\n## 7. 다음 단계  \n\n1. **샘플 확장** – 10~20개 추가 테스트 수행, 다양한 질문 유형(문법, 개념, 인용 등).  \n2. **컨텍스트 매핑 재설계** – 더 정밀한 맥락 연관성 스코어링 도입.  \n3. **사후 검증** – 자동화된 근거 인용 검증 스크립트 개발.  \n4. **A/B 테스트** – 두 버전(현재 vs. 개선) 비교하여 `faithfulness` 향상 여부 확인.  \n\n---\n\n## 8. 부록(산출물)\n\n| 파일 | 내용 |\n|------|------|\n| causal_analysis.json | 원인 분석 결과 |\n| load_data.json | 데이터 로딩 스크립트 |\n| nlp_analysis.json | 키워드, 문장 통계 |\n| pattern_detection.json | Top keyword, question type 패턴 |\n| priority_summary.json | 위험 및 우선순위 평가 |\n| ragas_eval.json | 평가 메트릭 결과 |\n| root_cause.json | root_cause 및 추천 |\n| statistics.json | 전체 통계 |\n| trend_detection.json | 추세 및 변화 |\n\n---\n\n> **추가 데이터 필요**: 현 시점에서 샘플 수가 적어 추세 파악이 어려우며, 다른 모델 간 비교 분석이 필요하면 추가 run data 수집을 권장합니다.",
+      "format": "markdown",
+      "llm_used": true,
+      "llm_model": "ollama/gpt-oss-safeguard:20b",
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "summary": {
+        "report_type": "analysis",
+        "total_evidence": 4,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.4183,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.8366828943604284
+          },
+          "evidence_id": "E1"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.4544,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.9087545725582776
+          },
+          "evidence_id": "E2"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.9362,
+          "failed_metrics": [],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.8724614057329397
+          },
+          "evidence_id": "E3"
+        },
+        {
+          "test_case_id": "test_004",
+          "avg_score": 0.9591,
+          "failed_metrics": [],
+          "question": "What is TDD?",
+          "answer": "TDD means Test-Driven Development.",
+          "contexts": [
+            "Test-Driven Development",
+            "Write tests first",
+            "Red-Green-Refactor cycle"
+          ],
+          "ground_truth": "TDD is a software development approach where tests are written before code.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.9181316279283243
+          },
+          "evidence_id": "E4"
+        }
+      ]
+    }
+  }
+}

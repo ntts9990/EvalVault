@@ -1,0 +1,787 @@
+{
+  "intent": "generate_comparison",
+  "pipeline_id": "b76b6b46-1577-4341-89f6-34bcf4621fcf",
+  "is_complete": true,
+  "duration_ms": 85262,
+  "started_at": "2026-01-09T09:33:26.127201",
+  "finished_at": "2026-01-09T09:34:51.389787",
+  "final_output": {
+    "report": {
+      "report": "# RAG 평가 분석 보고서\n\n## 요약  \n* **비교 대상** – `ollama/gpt-oss-safeguard:20b` (Run A) vs `gpt-oss-safeguard:20b` (Run B)  \n* **데이터셋** – `test_dataset v1.0.0` (변경 없음)  \n* **총 테스트 케이스** – 4  \n* **Pass‑Rate** – Run A: 50 % (2/4), Run B: 0 % (0/4) – **차이: –50 %**  \n* **평균 점수** – Run A: 0.692, Run B: 0.000 – 차이: –0.692  \n* **주요 차이** – `answer_relevancy`는 대규모 감소(100 % 저하, p = 5.8 × 10⁻⁹), `faithfulness`는 비선형적(불충분한 증거 → “추가 데이터 필요”).  \n\n---\n\n## 변경 사항 요약  \n| 항목 | 설명 | 영향 |\n|------|------|------|\n| **모델 명** | `ollama/gpt-oss-safeguard:20b` → `gpt-oss-safeguard:20b` | 모델 사양이 달라질 가능성(오픈소스 vs. 로컬 람다) |\n| **데이터셋** | 동일 (`test_dataset v1.0.0`) | 없음 |\n| **프롬프트 스냅샷** | 없어서 추적 불가 | **추가 데이터 필요** |\n| **기타 구성** | 없음 | — |\n\n*프롬프트 스냅샷이 없다는 것은 Run B에서 실제 프롬프트가 달라졌을 가능성을 시사한다. “Prompt snapshot을 찾을 수 없습니다.”라는 메시지가 기록돼 있다.*  \n\n---\n\n## 지표 비교  \n\n| Metric | Run A | Run B | Diff | Significance | Effect Size |\n|--------|-------|-------|------|--------------|-------------|\n| Faithfulness | 0.50 | 0.00 | –0.50 | ❌ (p = 0.134) | Large (−1.41) |\n| Answer Relevancy | 0.88 | 0.00 | –0.88 | ✅ (p = 5.81 × 10⁻⁹) | Large (−38.8) |\n\n**주요 통계**  \n* `answer_relevancy`은 Run B에서 100 % 저하가 관찰되었다.  \n* `faithfulness`는 차이가 크지만 통계적으로 유의미하지 않아 “추가 데이터 필요”이다.  \n\n**증거 예시**  \n* **Run A** – `A1`, `A2`, `A3`에서 relevancy가 0.83 ~ 0.91, faithfulness는 0 ~ 1로 분포.  \n* **Run B** – `B1`, `B2`, `B3`에서는 모든 측정값이 0.0.  \n\n---\n\n## 원인 분석  \n\n1. **모델 구버전/버전 불일치**  \n   * `gpt-oss-safeguard:20b`는 Ollama에서 제공하는 버전이 아닌 독립 실행형이라 파라미터 세팅이 달라질 수 있다.  \n   * Model name 차이가 존재함으로써, 내부 엔진, 토크나이저 혹은 사전 학습 파라미터가 다를 가능성이 높다. `[A1/A2/A3]` vs `[B1/B2/B3]`에서 동일한 컨텍스트를 사용했음에도 불구하고, Run B의 출력이 전혀 일치하지 않음.  \n\n2. **프롬프트 불일치**  \n   * Prompt snapshot이 없다는 경고가 발생해 Run B가 사용한 실제 프롬프트를 파악할 수 없으며, 이는 결과 차이의 주요 원천일 수 있다.  \n\n3. **시스템 환경/파이프라인 오류**  \n   * Run B에서 평균 점수가 0점인 것으로 보면, 추출 단계(리트리버) 혹은 응답 생성 단계에서 완전히 실패한 것처럼 보인다.  \n   * 예시 `B1`–`B3`의 `answer_relevancy`이 0.0으로 표시된 것은 RAG가 전혀 동작하지 않았음을 의미한다.  \n\n---\n\n## 개선 제안  \n\n| 영역 | 제안 내용 | 근거 |\n|------|----------|------|\n| **모델 일관성** | `ollama/gpt-oss-safeguard:20b`와 동일한 이미지를 재배포 또는 복사해 사용 | `config_changes`에서 모델명이 변경됨 `[A1]` |\n| **프롬프트 스냅샷 확보** | `--db`, `--system-prompt`, `--ragas-prompts` 옵션 사용 후 저장 | `prompt_changes`에서 “missing” 경고 |\n| **다중 테스트 케이스** | 4개 대신 10~20개의 케이스를 추가, `faithfulness`의 통계적 유의성을 확보 | `faithfulness` 차이가 통계적으로 미미 |\n| **RAG 파이프라인 점검** | Retriever와 Vector Store 설정 재검토, 성능 로깅 | `B1`–`B3`에서 0.0 점수 발생 |\n| **환경 인프라** | Docker/LLM 실행 환경 재구성, GPU/CPU 설정과 메모리 한도 확인 | Run B에서 비정상 종료 가능성 |\n\n---\n\n## 다음 단계  \n\n1. **Run B를 동일한 구성과 프롬프트로 재실행**  \n   * 프롬프트 스냅샷을 확보하고, `ollama/gpt-oss-safeguard:20b`와 동일한 이미지 사용.  \n2. **데이터셋 확대**  \n   * `test_dataset`에 추가 질문·정답을 삽입해 `faithfulness`와 `answer_relevancy`의 분산을 확인.  \n3. **분석 리포트 자동화**  \n   * `comparison_details`와 `change_summary`를 파이프라인에 내장해 변동사항을 쉽게 추적.  \n4. **통계 검증**  \n   * `p_value`가 중요한 메트릭(`answer_relevancy`)에 대해 유의수준 0.05 이하 확인, `faithfulness`를 위해 T‑검정으로 효과 크기 재계산.  \n\n> **추가 데이터 필요**: 현재 `faithfulness` 변동이 통계적으로 유의미하지 않으므로, 더 많은 케이스와 재실행을 통해 신뢰도를 높여야 한다.  \n\n---",
+      "format": "markdown",
+      "llm_used": true,
+      "llm_model": "ollama/gpt-oss-safeguard:20b",
+      "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+      "summary": {
+        "report_type": "comparison",
+        "total_evidence": 6,
+        "has_run": true
+      },
+      "evidence": [
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.4183,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.8366828943604284
+          },
+          "evidence_id": "A1",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.4544,
+          "failed_metrics": [
+            "faithfulness"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.9087545725582776
+          },
+          "evidence_id": "A2",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.9362,
+          "failed_metrics": [],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.8724614057329397
+          },
+          "evidence_id": "A3",
+          "run_label": "A",
+          "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "model_name": "ollama/gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_001",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is Python?",
+          "answer": "Python is a high-level programming language.",
+          "contexts": [
+            "Python is a programming language",
+            "Python was created by Guido van Rossum"
+          ],
+          "ground_truth": "Python is a high-level interpreted programming language.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "B1",
+          "run_label": "B",
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "model_name": "gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_002",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is machine learning?",
+          "answer": "Machine learning is a subset of AI.",
+          "contexts": [
+            "ML is part of AI",
+            "ML uses algorithms to learn from data"
+          ],
+          "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "B2",
+          "run_label": "B",
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "model_name": "gpt-oss-safeguard:20b"
+        },
+        {
+          "test_case_id": "test_003",
+          "avg_score": 0.0,
+          "failed_metrics": [
+            "faithfulness",
+            "answer_relevancy"
+          ],
+          "question": "What is RAG?",
+          "answer": "RAG stands for Retrieval-Augmented Generation.",
+          "contexts": [
+            "RAG combines retrieval and generation",
+            "RAG improves LLM responses"
+          ],
+          "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+          "metrics": {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0
+          },
+          "evidence_id": "B3",
+          "run_label": "B",
+          "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "model_name": "gpt-oss-safeguard:20b"
+        }
+      ]
+    }
+  },
+  "node_results": {
+    "load_runs": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 1,
+      "output": {
+        "runs": [
+          {
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:27:38.337182",
+            "finished_at": "2026-01-09T09:30:49.992680",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8366828943604284,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4550,
+                "latency_ms": 55617,
+                "cost_usd": 0.0125825,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:27:38.337382",
+                "finished_at": "2026-01-09T09:28:33.954776",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.8724614057329397,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4524,
+                "latency_ms": 43321,
+                "cost_usd": 0.012547500000000001,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:28:33.954978",
+                "finished_at": "2026-01-09T09:29:17.276445",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9087545725582776,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4660,
+                "latency_ms": 41342,
+                "cost_usd": 0.012925,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:29:17.276532",
+                "finished_at": "2026-01-09T09:29:58.619119",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 1.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.9181316279283243,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 4908,
+                "latency_ms": 51373,
+                "cost_usd": 0.01353,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:29:58.619185",
+                "finished_at": "2026-01-09T09:30:49.992357",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "results": [
+              {
+                "test_case_id": "test_001",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 12137,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:21.002915",
+                "finished_at": "2026-01-09T09:24:33.140065",
+                "question": "What is Python?",
+                "answer": "Python is a high-level programming language.",
+                "contexts": [
+                  "Python is a programming language",
+                  "Python was created by Guido van Rossum"
+                ],
+                "ground_truth": "Python is a high-level interpreted programming language."
+              },
+              {
+                "test_case_id": "test_002",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7959,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:33.140190",
+                "finished_at": "2026-01-09T09:24:41.100049",
+                "question": "What is machine learning?",
+                "answer": "Machine learning is a subset of AI.",
+                "contexts": [
+                  "ML is part of AI",
+                  "ML uses algorithms to learn from data"
+                ],
+                "ground_truth": "Machine learning is a method of data analysis that automates analytical model building."
+              },
+              {
+                "test_case_id": "test_003",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7968,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:41.100115",
+                "finished_at": "2026-01-09T09:24:49.068845",
+                "question": "What is RAG?",
+                "answer": "RAG stands for Retrieval-Augmented Generation.",
+                "contexts": [
+                  "RAG combines retrieval and generation",
+                  "RAG improves LLM responses"
+                ],
+                "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information."
+              },
+              {
+                "test_case_id": "test_004",
+                "metrics": [
+                  {
+                    "name": "faithfulness",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  },
+                  {
+                    "name": "answer_relevancy",
+                    "score": 0.0,
+                    "threshold": 0.7,
+                    "reason": null
+                  }
+                ],
+                "tokens_used": 0,
+                "latency_ms": 7895,
+                "cost_usd": null,
+                "trace_id": null,
+                "started_at": "2026-01-09T09:24:49.068887",
+                "finished_at": "2026-01-09T09:24:56.964077",
+                "question": "What is TDD?",
+                "answer": "TDD means Test-Driven Development.",
+                "contexts": [
+                  "Test-Driven Development",
+                  "Write tests first",
+                  "Red-Green-Refactor cycle"
+                ],
+                "ground_truth": "TDD is a software development approach where tests are written before code."
+              }
+            ],
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "langfuse_trace_id": null,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "retrieval_metadata": {}
+          }
+        ],
+        "summaries": [
+          {
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "ollama/gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:27:38.337182",
+            "finished_at": "2026-01-09T09:30:49.992680",
+            "total_test_cases": 4,
+            "passed_test_cases": 2,
+            "pass_rate": 0.5,
+            "total_tokens": 18642,
+            "total_cost_usd": 0.051585,
+            "duration_seconds": 191.655498,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.5,
+            "avg_answer_relevancy": 0.8840076251449925
+          },
+          {
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "dataset_name": "test_dataset",
+            "dataset_version": "1.0.0",
+            "model_name": "gpt-oss-safeguard:20b",
+            "started_at": "2026-01-09T09:24:21.002694",
+            "finished_at": "2026-01-09T09:24:56.964326",
+            "total_test_cases": 4,
+            "passed_test_cases": 0,
+            "pass_rate": 0.0,
+            "total_tokens": 0,
+            "total_cost_usd": null,
+            "duration_seconds": 35.961632,
+            "tracker_metadata": {
+              "run_mode": "full"
+            },
+            "metrics_evaluated": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "run_mode": "full",
+            "thresholds": {
+              "faithfulness": 0.7,
+              "answer_relevancy": 0.7
+            },
+            "avg_faithfulness": 0.0,
+            "avg_answer_relevancy": 0.0
+          }
+        ],
+        "count": 2,
+        "missing_run_ids": []
+      }
+    },
+    "run_metric_comparison": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 1,
+      "output": {
+        "summary": {
+          "run_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "run_b": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "total_metrics": 2,
+          "significant_metrics": 1,
+          "wins": {
+            "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c": 1,
+            "9fbf4776-9f5b-4c4b-ba08-c556032cee86": 0
+          },
+          "pass_rate_a": 0.5,
+          "pass_rate_b": 0.0,
+          "pass_rate_diff": -0.5,
+          "avg_score_a": 0.692,
+          "avg_score_b": 0.0,
+          "avg_score_diff": -0.692
+        },
+        "comparisons": [
+          {
+            "run_id_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "run_id_b": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "metric": "answer_relevancy",
+            "mean_a": 0.8840076251449925,
+            "mean_b": 0.0,
+            "diff": -0.8840076251449925,
+            "diff_percent": -100.0,
+            "p_value": 5.808765173054933e-09,
+            "is_significant": true,
+            "effect_size": -38.81389230234056,
+            "effect_level": "large",
+            "winner": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "direction": "down"
+          },
+          {
+            "run_id_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "run_id_b": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "metric": "faithfulness",
+            "mean_a": 0.5,
+            "mean_b": 0.0,
+            "diff": -0.5,
+            "diff_percent": -100.0,
+            "p_value": 0.1339745962155612,
+            "is_significant": false,
+            "effect_size": -1.414213562373095,
+            "effect_level": "large",
+            "winner": null,
+            "direction": "down"
+          }
+        ],
+        "notable_changes": [
+          {
+            "metric": "answer_relevancy",
+            "diff": -0.884,
+            "diff_percent": -100.0,
+            "p_value": 0.0,
+            "effect_size": -38.814,
+            "effect_level": "large",
+            "winner": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c"
+          },
+          {
+            "metric": "faithfulness",
+            "diff": -0.5,
+            "diff_percent": -100.0,
+            "p_value": 0.134,
+            "effect_size": -1.414,
+            "effect_level": "large",
+            "winner": null
+          }
+        ]
+      }
+    },
+    "run_change_detection": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 1,
+      "output": {
+        "summary": {
+          "run_a": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+          "run_b": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+          "dataset_changed": false,
+          "config_change_count": 1,
+          "prompt_change_count": 0,
+          "missing_run_ids": []
+        },
+        "dataset_changes": [],
+        "config_changes": [
+          {
+            "field": "model_name",
+            "before": "ollama/gpt-oss-safeguard:20b",
+            "after": "gpt-oss-safeguard:20b"
+          }
+        ],
+        "prompt_changes": {
+          "status": "missing",
+          "changes": [],
+          "summary": {},
+          "prompt_sets": {
+            "run_a": null,
+            "run_b": null
+          },
+          "notes": [
+            "Prompt snapshot을 찾을 수 없습니다.",
+            "평가 시 --db와 --system-prompt/--ragas-prompts 옵션을 사용하세요."
+          ]
+        }
+      }
+    },
+    "report": {
+      "status": "completed",
+      "error": null,
+      "duration_ms": 85258,
+      "output": {
+        "report": "# RAG 평가 분석 보고서\n\n## 요약  \n* **비교 대상** – `ollama/gpt-oss-safeguard:20b` (Run A) vs `gpt-oss-safeguard:20b` (Run B)  \n* **데이터셋** – `test_dataset v1.0.0` (변경 없음)  \n* **총 테스트 케이스** – 4  \n* **Pass‑Rate** – Run A: 50 % (2/4), Run B: 0 % (0/4) – **차이: –50 %**  \n* **평균 점수** – Run A: 0.692, Run B: 0.000 – 차이: –0.692  \n* **주요 차이** – `answer_relevancy`는 대규모 감소(100 % 저하, p = 5.8 × 10⁻⁹), `faithfulness`는 비선형적(불충분한 증거 → “추가 데이터 필요”).  \n\n---\n\n## 변경 사항 요약  \n| 항목 | 설명 | 영향 |\n|------|------|------|\n| **모델 명** | `ollama/gpt-oss-safeguard:20b` → `gpt-oss-safeguard:20b` | 모델 사양이 달라질 가능성(오픈소스 vs. 로컬 람다) |\n| **데이터셋** | 동일 (`test_dataset v1.0.0`) | 없음 |\n| **프롬프트 스냅샷** | 없어서 추적 불가 | **추가 데이터 필요** |\n| **기타 구성** | 없음 | — |\n\n*프롬프트 스냅샷이 없다는 것은 Run B에서 실제 프롬프트가 달라졌을 가능성을 시사한다. “Prompt snapshot을 찾을 수 없습니다.”라는 메시지가 기록돼 있다.*  \n\n---\n\n## 지표 비교  \n\n| Metric | Run A | Run B | Diff | Significance | Effect Size |\n|--------|-------|-------|------|--------------|-------------|\n| Faithfulness | 0.50 | 0.00 | –0.50 | ❌ (p = 0.134) | Large (−1.41) |\n| Answer Relevancy | 0.88 | 0.00 | –0.88 | ✅ (p = 5.81 × 10⁻⁹) | Large (−38.8) |\n\n**주요 통계**  \n* `answer_relevancy`은 Run B에서 100 % 저하가 관찰되었다.  \n* `faithfulness`는 차이가 크지만 통계적으로 유의미하지 않아 “추가 데이터 필요”이다.  \n\n**증거 예시**  \n* **Run A** – `A1`, `A2`, `A3`에서 relevancy가 0.83 ~ 0.91, faithfulness는 0 ~ 1로 분포.  \n* **Run B** – `B1`, `B2`, `B3`에서는 모든 측정값이 0.0.  \n\n---\n\n## 원인 분석  \n\n1. **모델 구버전/버전 불일치**  \n   * `gpt-oss-safeguard:20b`는 Ollama에서 제공하는 버전이 아닌 독립 실행형이라 파라미터 세팅이 달라질 수 있다.  \n   * Model name 차이가 존재함으로써, 내부 엔진, 토크나이저 혹은 사전 학습 파라미터가 다를 가능성이 높다. `[A1/A2/A3]` vs `[B1/B2/B3]`에서 동일한 컨텍스트를 사용했음에도 불구하고, Run B의 출력이 전혀 일치하지 않음.  \n\n2. **프롬프트 불일치**  \n   * Prompt snapshot이 없다는 경고가 발생해 Run B가 사용한 실제 프롬프트를 파악할 수 없으며, 이는 결과 차이의 주요 원천일 수 있다.  \n\n3. **시스템 환경/파이프라인 오류**  \n   * Run B에서 평균 점수가 0점인 것으로 보면, 추출 단계(리트리버) 혹은 응답 생성 단계에서 완전히 실패한 것처럼 보인다.  \n   * 예시 `B1`–`B3`의 `answer_relevancy`이 0.0으로 표시된 것은 RAG가 전혀 동작하지 않았음을 의미한다.  \n\n---\n\n## 개선 제안  \n\n| 영역 | 제안 내용 | 근거 |\n|------|----------|------|\n| **모델 일관성** | `ollama/gpt-oss-safeguard:20b`와 동일한 이미지를 재배포 또는 복사해 사용 | `config_changes`에서 모델명이 변경됨 `[A1]` |\n| **프롬프트 스냅샷 확보** | `--db`, `--system-prompt`, `--ragas-prompts` 옵션 사용 후 저장 | `prompt_changes`에서 “missing” 경고 |\n| **다중 테스트 케이스** | 4개 대신 10~20개의 케이스를 추가, `faithfulness`의 통계적 유의성을 확보 | `faithfulness` 차이가 통계적으로 미미 |\n| **RAG 파이프라인 점검** | Retriever와 Vector Store 설정 재검토, 성능 로깅 | `B1`–`B3`에서 0.0 점수 발생 |\n| **환경 인프라** | Docker/LLM 실행 환경 재구성, GPU/CPU 설정과 메모리 한도 확인 | Run B에서 비정상 종료 가능성 |\n\n---\n\n## 다음 단계  \n\n1. **Run B를 동일한 구성과 프롬프트로 재실행**  \n   * 프롬프트 스냅샷을 확보하고, `ollama/gpt-oss-safeguard:20b`와 동일한 이미지 사용.  \n2. **데이터셋 확대**  \n   * `test_dataset`에 추가 질문·정답을 삽입해 `faithfulness`와 `answer_relevancy`의 분산을 확인.  \n3. **분석 리포트 자동화**  \n   * `comparison_details`와 `change_summary`를 파이프라인에 내장해 변동사항을 쉽게 추적.  \n4. **통계 검증**  \n   * `p_value`가 중요한 메트릭(`answer_relevancy`)에 대해 유의수준 0.05 이하 확인, `faithfulness`를 위해 T‑검정으로 효과 크기 재계산.  \n\n> **추가 데이터 필요**: 현재 `faithfulness` 변동이 통계적으로 유의미하지 않으므로, 더 많은 케이스와 재실행을 통해 신뢰도를 높여야 한다.  \n\n---",
+        "format": "markdown",
+        "llm_used": true,
+        "llm_model": "ollama/gpt-oss-safeguard:20b",
+        "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+        "summary": {
+          "report_type": "comparison",
+          "total_evidence": 6,
+          "has_run": true
+        },
+        "evidence": [
+          {
+            "test_case_id": "test_001",
+            "avg_score": 0.4183,
+            "failed_metrics": [
+              "faithfulness"
+            ],
+            "question": "What is Python?",
+            "answer": "Python is a high-level programming language.",
+            "contexts": [
+              "Python is a programming language",
+              "Python was created by Guido van Rossum"
+            ],
+            "ground_truth": "Python is a high-level interpreted programming language.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.8366828943604284
+            },
+            "evidence_id": "A1",
+            "run_label": "A",
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          },
+          {
+            "test_case_id": "test_003",
+            "avg_score": 0.4544,
+            "failed_metrics": [
+              "faithfulness"
+            ],
+            "question": "What is RAG?",
+            "answer": "RAG stands for Retrieval-Augmented Generation.",
+            "contexts": [
+              "RAG combines retrieval and generation",
+              "RAG improves LLM responses"
+            ],
+            "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.9087545725582776
+            },
+            "evidence_id": "A2",
+            "run_label": "A",
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          },
+          {
+            "test_case_id": "test_002",
+            "avg_score": 0.9362,
+            "failed_metrics": [],
+            "question": "What is machine learning?",
+            "answer": "Machine learning is a subset of AI.",
+            "contexts": [
+              "ML is part of AI",
+              "ML uses algorithms to learn from data"
+            ],
+            "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+            "metrics": {
+              "faithfulness": 1.0,
+              "answer_relevancy": 0.8724614057329397
+            },
+            "evidence_id": "A3",
+            "run_label": "A",
+            "run_id": "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+            "model_name": "ollama/gpt-oss-safeguard:20b"
+          },
+          {
+            "test_case_id": "test_001",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is Python?",
+            "answer": "Python is a high-level programming language.",
+            "contexts": [
+              "Python is a programming language",
+              "Python was created by Guido van Rossum"
+            ],
+            "ground_truth": "Python is a high-level interpreted programming language.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "B1",
+            "run_label": "B",
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "model_name": "gpt-oss-safeguard:20b"
+          },
+          {
+            "test_case_id": "test_002",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is machine learning?",
+            "answer": "Machine learning is a subset of AI.",
+            "contexts": [
+              "ML is part of AI",
+              "ML uses algorithms to learn from data"
+            ],
+            "ground_truth": "Machine learning is a method of data analysis that automates analytical model building.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "B2",
+            "run_label": "B",
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "model_name": "gpt-oss-safeguard:20b"
+          },
+          {
+            "test_case_id": "test_003",
+            "avg_score": 0.0,
+            "failed_metrics": [
+              "faithfulness",
+              "answer_relevancy"
+            ],
+            "question": "What is RAG?",
+            "answer": "RAG stands for Retrieval-Augmented Generation.",
+            "contexts": [
+              "RAG combines retrieval and generation",
+              "RAG improves LLM responses"
+            ],
+            "ground_truth": "RAG is a technique that enhances LLM outputs with retrieved information.",
+            "metrics": {
+              "faithfulness": 0.0,
+              "answer_relevancy": 0.0
+            },
+            "evidence_id": "B3",
+            "run_label": "B",
+            "run_id": "9fbf4776-9f5b-4c4b-ba08-c556032cee86",
+            "model_name": "gpt-oss-safeguard:20b"
+          }
+        ]
+      }
+    }
+  },
+  "run_ids": [
+    "0aa9fab0-6c2c-4c1c-b228-202a38a2f00c",
+    "9fbf4776-9f5b-4c4b-ba08-c556032cee86"
+  ]
+}

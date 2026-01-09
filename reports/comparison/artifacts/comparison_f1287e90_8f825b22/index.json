@@ -1,0 +1,38 @@
+{
+  "pipeline_id": "d2376ebb-6d5f-4756-8abf-f2254b5240ce",
+  "intent": "generate_comparison",
+  "duration_ms": 79329,
+  "started_at": "2026-01-09T12:26:23.685070",
+  "finished_at": "2026-01-09T12:27:43.014327",
+  "nodes": [
+    {
+      "node_id": "load_runs",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_f1287e90_8f825b22/load_runs.json"
+    },
+    {
+      "node_id": "run_metric_comparison",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_f1287e90_8f825b22/run_metric_comparison.json"
+    },
+    {
+      "node_id": "run_change_detection",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_f1287e90_8f825b22/run_change_detection.json"
+    },
+    {
+      "node_id": "report",
+      "status": "completed",
+      "duration_ms": 79324,
+      "error": null,
+      "path": "reports/comparison/artifacts/comparison_f1287e90_8f825b22/report.json"
+    }
+  ],
+  "final_output_path": "reports/comparison/artifacts/comparison_f1287e90_8f825b22/final_output.json"
+}

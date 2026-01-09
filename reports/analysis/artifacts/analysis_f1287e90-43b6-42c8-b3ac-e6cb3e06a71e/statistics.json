@@ -1,0 +1,169 @@
+{
+  "node_id": "statistics",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "analysis": {
+      "analysis_id": "9bf2bdc5-8190-477c-bd20-d39d054fad9b",
+      "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "analysis_type": "statistical",
+      "created_at": "2026-01-09T11:22:53.437195",
+      "metadata": {},
+      "metrics_summary": {
+        "faithfulness": {
+          "mean": 0.5,
+          "std": 0.5,
+          "min": 0.0,
+          "max": 1.0,
+          "median": 0.5,
+          "percentile_25": 0.0,
+          "percentile_75": 1.0,
+          "count": 4
+        },
+        "answer_relevancy": {
+          "mean": 0.8840076251449925,
+          "std": 0.03220948733981754,
+          "min": 0.8366828943604284,
+          "max": 0.9181316279283243,
+          "median": 0.8906079891456087,
+          "percentile_25": 0.8635167778898118,
+          "percentile_75": 0.9110988364007893,
+          "count": 4
+        }
+      },
+      "correlation_matrix": [
+        [
+          1.0,
+          0.3504834326153369
+        ],
+        [
+          0.3504834326153369,
+          1.0
+        ]
+      ],
+      "correlation_metrics": [
+        "faithfulness",
+        "answer_relevancy"
+      ],
+      "significant_correlations": [],
+      "low_performers": [
+        {
+          "test_case_id": "test_001",
+          "metric_name": "faithfulness",
+          "score": 0.0,
+          "threshold": 0.7,
+          "question_preview": "What is Python?",
+          "potential_causes": [
+            "Answer contains information not in context",
+            "Possible hallucination"
+          ]
+        },
+        {
+          "test_case_id": "test_003",
+          "metric_name": "faithfulness",
+          "score": 0.0,
+          "threshold": 0.7,
+          "question_preview": "What is RAG?",
+          "potential_causes": [
+            "Answer contains information not in context",
+            "Possible hallucination"
+          ]
+        }
+      ],
+      "insights": [
+        "Moderate pass rate needs improvement: 50.0%",
+        "Best performing metric: answer_relevancy (mean: 0.884)",
+        "Worst performing metric: faithfulness (mean: 0.500)",
+        "High variance metrics (std > 0.2): faithfulness",
+        "Found 2 low-performing test cases (score < threshold)",
+        "Most problematic metric: faithfulness (2 low performers)"
+      ],
+      "overall_pass_rate": 0.5,
+      "metric_pass_rates": {
+        "faithfulness": 0.5,
+        "answer_relevancy": 1.0
+      }
+    },
+    "summary": {
+      "total_metrics": 2,
+      "average_score": 0.692,
+      "overall_pass_rate": 0.5
+    },
+    "statistics": {
+      "faithfulness": {
+        "mean": 0.5,
+        "std": 0.5,
+        "min": 0.0,
+        "max": 1.0,
+        "median": 0.5,
+        "percentile_25": 0.0,
+        "percentile_75": 1.0,
+        "count": 4
+      },
+      "answer_relevancy": {
+        "mean": 0.8840076251449925,
+        "std": 0.03220948733981754,
+        "min": 0.8366828943604284,
+        "max": 0.9181316279283243,
+        "median": 0.8906079891456087,
+        "percentile_25": 0.8635167778898118,
+        "percentile_75": 0.9110988364007893,
+        "count": 4
+      }
+    },
+    "insights": [
+      "Moderate pass rate needs improvement: 50.0%",
+      "Best performing metric: answer_relevancy (mean: 0.884)",
+      "Worst performing metric: faithfulness (mean: 0.500)",
+      "High variance metrics (std > 0.2): faithfulness",
+      "Found 2 low-performing test cases (score < threshold)",
+      "Most problematic metric: faithfulness (2 low performers)"
+    ],
+    "analysis_id": "9bf2bdc5-8190-477c-bd20-d39d054fad9b",
+    "run_id": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+    "correlation_metrics": [
+      "faithfulness",
+      "answer_relevancy"
+    ],
+    "correlation_matrix": [
+      [
+        1.0,
+        0.3504834326153369
+      ],
+      [
+        0.3504834326153369,
+        1.0
+      ]
+    ],
+    "significant_correlations": [],
+    "low_performers": [
+      {
+        "test_case_id": "test_001",
+        "metric_name": "faithfulness",
+        "score": 0.0,
+        "threshold": 0.7,
+        "question_preview": "What is Python?",
+        "potential_causes": [
+          "Answer contains information not in context",
+          "Possible hallucination"
+        ]
+      },
+      {
+        "test_case_id": "test_003",
+        "metric_name": "faithfulness",
+        "score": 0.0,
+        "threshold": 0.7,
+        "question_preview": "What is RAG?",
+        "potential_causes": [
+          "Answer contains information not in context",
+          "Possible hallucination"
+        ]
+      }
+    ],
+    "metric_pass_rates": {
+      "faithfulness": 0.5,
+      "answer_relevancy": 1.0
+    }
+  }
+}

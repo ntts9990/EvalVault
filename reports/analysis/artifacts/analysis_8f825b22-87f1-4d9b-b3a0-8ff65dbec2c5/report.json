@@ -1,0 +1,136 @@
+{
+  "node_id": "report",
+  "status": "completed",
+  "duration_ms": 106214,
+  "error": null,
+  "output": {
+    "report": "# RAG 평가 분석 보고서  \n### run_id: **8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5**\n\n---\n\n## 1. 요약  \n모델 **ollama/gpt-oss-safeguard:20b** 가 **e2e-auto-insurance-qa-korean** 데이터셋에서 18개의 테스트를 수행했지만 전체 **pass rate** 는 0%로, 가장 낮은 지표인 **answer_relevancy**(평균 0.566) 가 기준 0.7을 크게 하회했습니다.  \n\n- **지표**: Faithfulness는 평균 0.833(통과) / Answer Relevancy는 평균 0.566(위험)  \n- **원인**: 답변과 문맥이 불일치하여 관련성 저하 → “컨텍스트‑답변 정합성”에 대한 품질 저하 (E1, E2, E3)  \n- **사용자 영향**: 실질적으로 요구되는 정보를 반영하지 못해 사용자에게 신뢰도 손실과 인지부하가 증가  \n\n---\n\n## 2. 지표 스코어카드  \n\n| Metric | 평균 | Threshold | Pass Rate | 상태 |\n|--------|-------|-----------|------------|------|\n| Faithfulness | 0.833 | 0.700 | 0.833 | ✅ Pass |\n| Answer Relevancy | 0.566 | 0.700 | 0.055 | ⚠️ Risk |\n\n> **주요 사항**  \n> - Faithfulness 0.833 > 0.7 → 대부분의 경우 참고 문맥이 충분히 반영됨.  \n> - Answer Relevancy 0.566 < 0.7 → 단 1개의 테스트(“auto‑015”) 를 제외하면 대부분 < 0.7 (특히 *E1*, *E2*, *E3*).\n\n---\n\n## 3. 데이터 품질 / 신뢰도  \n| 항목 | 결론 |\n|------|------|\n| 샘플 수 | **18**(표본 수가 적음). 분석 결과를 일반화하기 어려움. |\n| 커버리지 | 1.0(모든 문서에 대해 테스트)   |\n| 경고 | “추가 데이터 필요” 및 “실행 이력 부족”으로 인해 추세 분석 불가. |\n| 결함 | None (미리 정의된 품질 체크는 전혀 실패하지 않음). |\n\n> **결론**: 샘플이 제한적이며, 추세/장기 개선을 위한 과거 실행 기록이 없으므로, **추가 데이터와 반복 실행**이 필요합니다.\n\n---\n\n## 4. 증거 기반 인사이트  \n\n| Priority Highlight | Test Case | Metric(s) | 분석 힌트 | 증거 |\n|---------------------|-----------|-----------|-----------|------|\n| **high‑impact** | *auto‑007* | Faithfulness 0.0, Relevancy 0.495 | “컨텍스트‑답변 정합성 체크 필요” | [E1] |\n| **high‑impact** | *auto‑010* | Faithfulness 0.0, Relevancy 0.632 | “컨텍스트‑답변 정합성 체크 필요” | [E2] |\n| **high‑impact** | *auto‑003* | Faithfulness 0.0, Relevancy 0.715 | “보장 내용을 과장” | [E3] |\n| **가중치 위기** | *auto‑015* | Faithfulness 1.0, Relevancy 0.440 | “정답이 올바르지만 문맥이 부정확” | [E4] |\n| **가중치 위기** | *auto‑005* | Faithfulness 1.0, Relevancy 0.442 | “정답은 1억 원이지만 문맥이 과도한 상세 설명에 시맨틱 가려짐” | [E5] |\n| **가중치 위기** | *auto‑017* | Faithfulness 1.0, Relevancy 0.446 | “전화 번호가 정정리된 정답이지만 문맥이 불명확” | [E6] |\n\n> **내비게이션**: 가장 불량한 사례를 모두 “사실형” 질문으로 식별했으며, 각 응답이 주어진 문맥에서 핵심정보를 정확히 반영하거나 문맥과 일치하는지 확인이 필수적입니다.  \n\n---\n\n## 5. 원인 가설  \n\n1. **컨텍스트‑답변 정합성 부족**  \n   - *E1* 및 *E2*에서 모델이 문맥 일부를 잘못 해석해 정답을 제공하였지만 **Faithfulness 0.0** 으로 실제 문장을 인용할 수 없었다.  \n2. **Prompt‑Alignment 이슈**  \n   - “보험료 할증/할인”에 대한 질문(예: *auto‑015*)에서는 정답이 문맥에 존재하지만 **Answer Relevancy** 가 0.44 아래로 낮아, Prompt에 문맥 활용이 미흡한 것으로 추정.  \n3. **Embedding 모델 성능**  \n   - **qwen3‑embedding:8b** 를 사용했으나, 한 문장 정도의 문맥을 제대로 연계하지 못해 중요 정보를 끌어오지 못했을 가능성이 있음.  \n\n> **근거**: Root cause 데이터에서 “answer_relevancy” 가 기준 이하라는 명시가 있으며, 상세 사례 E1–E6 가 이를 뒷받침합니다.\n\n---\n\n## 6. 개선 제안  \n\n| 개선 방향 | 구체적 조치 | 기대 효과 |\n|-----------|------------|-----------|\n| **Context enrichment** | 문맥 제공 시, 가장 관련성 높은 문장 우선 선택 및 길이 제한 → *E1*, *E2* 오류 방지 | Relevancy 0.7 이상 달성 |\n| **Prompt re‑engineering** | “정답이 무엇인가요?” 등 사실형 질문에 대한 명확 지시어 삽입 | Faithfulness 1.0 유지, 불필요 정보 배제 |\n| **Dataset augmentation** | “자기신체사고 보상액”, “결제 옵션 할증” 같은 예시를 확대 | 다양성 증가, 높은 스코어일수 확장 |\n| **Evaluation‑feedback loop** | 각 테스트 케이스에 대한 상세 정규화 및 재평가 자동 트리거 | 지속적 개선 추적 |\n| **Model fine‑tuning** | qwen‑3‑embedding 모델 파인튜닝 → 문맥-정답 매핑 향상 | Relevancy 개선 가능 |\n\n> **유의**: 초기 개선 단계에서 10~20% 비용(≈$0.25) 내부에서 재실행해 피드백 루프를 검증합니다.\n\n---\n\n## 7. 다음 단계  \n\n1. **추가 테스트 케이스 도입** – 50+ 질문으로 샘플 확장.  \n2. **과거 실행 기록 수집** – 트렌드·성능 변화를 분석하기 위한 메타데이터 확보.  \n3. **문맥 추출 알고리즘 재설계** – 문서 수동으로 선별된 핵심 문장과 비슷한 임베딩 우선순위 적용.  \n4. **품질 체크 도입** – 각 테스트 케이스에 대해 “정확성”, “불일치 스코어”등 추가 검증.  \n5. **사용자 피드백 수집** – 실제 사용자 시나리오에서 인지부하 및 신뢰 지표를 평가.  \n\n---\n\n## 8. 부록 (산출물 목록)\n\n| 파일 | 용도 |\n|------|------|\n| `causal_analysis.json` | 원인 분석 결과 |\n| `load_data.json` | 데이터 로드 로그 |\n| `nlp_analysis.json` | 토큰/어휘 통계 |\n| `pattern_detection.json` | 패턴/루트 원인 목록 |\n| `priority_summary.json` | 높은 영향 케이스 요약 |\n| `ragas_eval.json` | 전반적 평가 |\n| `root_cause.json` | 근본 원인 리포트 |\n| `statistics.json` | 통계 수치 |\n| `trend_detection.json` | 추세 분석 |\n| `statistics.json` | 기타 통계 |\n| `trend_detection.json` | 트렌드 분석 |\n\n> **Note**: 현재 테스트 시나리오는 짧고 표본 수가 18개에 불과하므로, 추후 **추가 데이터** 확보와 장기 실행 경로 설계가 필수입니다.  \n\n---",
+    "format": "markdown",
+    "llm_used": true,
+    "llm_model": "ollama/gpt-oss-safeguard:20b",
+    "run_id": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+    "summary": {
+      "report_type": "analysis",
+      "total_evidence": 6,
+      "has_run": true
+    },
+    "evidence": [
+      {
+        "test_case_id": "auto-007",
+        "avg_score": 0.2473,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "question": "마일리지 특약에서 연간 1만km 이하 주행 시 할인율은 얼마인가요?",
+        "answer": "19% 할인입니다.",
+        "contexts": [
+          "7천km 이하: 29% 할인, 1만km 이하: 19% 할인.",
+          "마일리지 특약은 연간 주행거리에 따라 보험료를 할인합니다."
+        ],
+        "ground_truth": "19%",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.49459554832359515
+        },
+        "evidence_id": "E1"
+      },
+      {
+        "test_case_id": "auto-010",
+        "avg_score": 0.3161,
+        "failed_metrics": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "question": "블랙박스 2채널 이상 장착 시 할인율은 얼마인가요?",
+        "answer": "5% 할인입니다.",
+        "contexts": [
+          "블랙박스 장착 차량에 대해 보험료를 할인합니다.",
+          "2채널 이상: 5% 할인, 1채널: 3% 할인."
+        ],
+        "ground_truth": "5%",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.6322424139879534
+        },
+        "evidence_id": "E2"
+      },
+      {
+        "test_case_id": "auto-003",
+        "avg_score": 0.3573,
+        "failed_metrics": [
+          "faithfulness"
+        ],
+        "question": "대인배상 II는 어떤 보장을 제공하나요?",
+        "answer": "대인배상 I 한도를 초과하는 손해를 무한으로 보장합니다.",
+        "contexts": [
+          "대인배상 II는 대인배상 I의 한도를 초과하는 손해를 무한으로 보장합니다.",
+          "중상해 사고 시 필수적으로 가입을 권장합니다."
+        ],
+        "ground_truth": "무한 보장",
+        "metrics": {
+          "faithfulness": 0.0,
+          "answer_relevancy": 0.7145836968078935
+        },
+        "evidence_id": "E3"
+      },
+      {
+        "test_case_id": "auto-015",
+        "avg_score": 0.72,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "6회 분납 시 보험료는 어떻게 되나요?",
+        "answer": "2% 할증됩니다.",
+        "contexts": [
+          "납입 방법: 6회 분납은 2% 할증.",
+          "일시납은 1% 할인."
+        ],
+        "ground_truth": "2% 할증",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4399445014747145
+        },
+        "evidence_id": "E4"
+      },
+      {
+        "test_case_id": "auto-005",
+        "avg_score": 0.7212,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "자기신체사고에서 사망 시 최대 보상액은 얼마인가요?",
+        "answer": "최대 1억원까지 보장됩니다.",
+        "contexts": [
+          "자기신체사고는 운전자 본인의 상해를 보상합니다.",
+          "사망 시 최대 1억원, 부상 시 최대 3천만원 보장입니다."
+        ],
+        "ground_truth": "1억원",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4424365056726988
+        },
+        "evidence_id": "E5"
+      },
+      {
+        "test_case_id": "auto-017",
+        "avg_score": 0.7232,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "사고 접수 콜센터 번호는 무엇인가요?",
+        "answer": "1588-5114입니다.",
+        "contexts": [
+          "사고 접수: 24시간 콜센터 1588-5114.",
+          "모바일 앱: 삼성화재 다이렉트 앱."
+        ],
+        "ground_truth": "1588-5114",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.4464164242157778
+        },
+        "evidence_id": "E6"
+      }
+    ]
+  }
+}

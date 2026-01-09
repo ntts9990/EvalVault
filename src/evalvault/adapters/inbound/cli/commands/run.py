@@ -11,7 +11,9 @@ from typing import Any
 import click
 import typer
 from rich.console import Console
+from rich.table import Table
 
+from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis_pipeline_service
 from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
@@ -25,6 +27,7 @@ from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdap
 from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTracerAdapter
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings, apply_profile
+from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
@@ -40,6 +43,18 @@ from evalvault.domain.services.ragas_prompt_overrides import (
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 
+from ..utils.analysis_io import (
+    build_metric_scorecard,
+    build_priority_highlights,
+    build_quality_summary,
+    extract_markdown_report,
+    get_node_output,
+    resolve_artifact_dir,
+    resolve_output_paths,
+    serialize_pipeline_result,
+    write_json,
+    write_pipeline_artifacts,
+)
 from ..utils.console import print_cli_error, print_cli_warning, progress_spinner
 from ..utils.options import db_option, memory_db_option, profile_option
 from ..utils.presets import format_preset_help, get_preset, list_presets
@@ -185,6 +200,26 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        auto_analyze: bool = typer.Option(
+            False,
+            "--auto-analyze",
+            help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+        ),
+        analysis_output: Path | None = typer.Option(
+            None,
+            "--analysis-json",
+            help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+        ),
+        analysis_report: Path | None = typer.Option(
+            None,
+            "--analysis-report",
+            help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+        ),
+        analysis_dir: Path | None = typer.Option(
+            None,
+            "--analysis-dir",
+            help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -1239,6 +1274,20 @@ def register_run_commands(
             if prompt_bundle:
                 result.tracker_metadata["prompt_set"] = build_prompt_summary(prompt_bundle)
 
+        if retriever_instance:
+            result.tracker_metadata["retriever"] = {
+                "mode": retriever,
+                "docs_path": str(retriever_docs) if retriever_docs else None,
+                "top_k": retriever_top_k,
+            }
+        if memory_required:
+            result.tracker_metadata["domain_memory"] = {
+                "enabled": memory_required,
+                "domain": memory_domain_name,
+                "language": memory_language,
+                "augment_context": memory_augment_context,
+            }
+
         preprocess_summary = format_dataset_preprocess_summary(
             result.tracker_metadata.get("dataset_preprocess")
         )
@@ -1419,6 +1468,62 @@ def register_run_commands(
             _save_results(output, result, console)
             _log_duration(console, verbose, "결과 저장 완료", output_started_at)
 
+        if auto_analyze:
+            if not result.results:
+                print_cli_warning(
+                    console,
+                    "평가 결과가 없어 자동 분석을 건너뜁니다.",
+                    tips=["테스트 케이스가 포함된 데이터셋인지 확인하세요."],
+                )
+            else:
+                analysis_prefix = f"analysis_{result.run_id}"
+                analysis_output_path, analysis_report_path = resolve_output_paths(
+                    base_dir=analysis_dir,
+                    output_path=analysis_output,
+                    report_path=analysis_report,
+                    prefix=analysis_prefix,
+                )
+                console.print("\n[bold]자동 분석 실행[/bold]")
+                storage = SQLiteStorageAdapter(db_path=db_path) if db_path else None
+                pipeline_service = build_analysis_pipeline_service(
+                    storage=storage,
+                    llm_adapter=llm_adapter,
+                )
+                with console.status("[bold green]분석 파이프라인 실행 중..."):
+                    pipeline_result = pipeline_service.analyze_intent(
+                        AnalysisIntent.GENERATE_DETAILED,
+                        run_id=result.run_id,
+                        evaluation_run=result,
+                        report_type="analysis",
+                        use_llm_report=True,
+                    )
+                artifacts_dir = resolve_artifact_dir(
+                    base_dir=analysis_dir,
+                    output_path=analysis_output_path,
+                    report_path=analysis_report_path,
+                    prefix=analysis_prefix,
+                )
+                artifact_index = write_pipeline_artifacts(
+                    pipeline_result,
+                    artifacts_dir=artifacts_dir,
+                )
+                payload = serialize_pipeline_result(pipeline_result)
+                payload["run_id"] = result.run_id
+                payload["artifacts"] = artifact_index
+                write_json(analysis_output_path, payload)
+
+                report_text = extract_markdown_report(pipeline_result.final_output)
+                if not report_text:
+                    report_text = "# 자동 분석 보고서\n\n보고서 본문을 찾지 못했습니다.\n"
+                analysis_report_path.write_text(report_text, encoding="utf-8")
+                _display_pipeline_analysis_summary(console, pipeline_result, result)
+                console.print(f"[green]자동 분석 결과 저장:[/green] {analysis_output_path}")
+                console.print(f"[green]자동 분석 보고서 저장:[/green] {analysis_report_path}\n")
+                console.print(
+                    "[green]자동 분석 상세 결과 저장:[/green] "
+                    f"{artifact_index['dir']} (index: {artifact_index['index']})\n"
+                )
+
     @app.command(
         name="run-simple",
         help="Shortcut for 초보자용 간편 모드. `evalvault run --mode simple`과 동일합니다.",
@@ -1462,6 +1567,26 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        auto_analyze: bool = typer.Option(
+            False,
+            "--auto-analyze",
+            help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+        ),
+        analysis_output: Path | None = typer.Option(
+            None,
+            "--analysis-json",
+            help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+        ),
+        analysis_report: Path | None = typer.Option(
+            None,
+            "--analysis-report",
+            help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+        ),
+        analysis_dir: Path | None = typer.Option(
+            None,
+            "--analysis-dir",
+            help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -1641,6 +1766,10 @@ def register_run_commands(
                 profile=profile,
                 model=model,
                 output=output,
+                auto_analyze=auto_analyze,
+                analysis_output=analysis_output,
+                analysis_report=analysis_report,
+                analysis_dir=analysis_dir,
                 retriever=retriever,
                 retriever_docs=retriever_docs,
                 kg=kg,
@@ -1722,6 +1851,26 @@ def register_run_commands(
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        auto_analyze: bool = typer.Option(
+            False,
+            "--auto-analyze",
+            help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+        ),
+        analysis_output: Path | None = typer.Option(
+            None,
+            "--analysis-json",
+            help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+        ),
+        analysis_report: Path | None = typer.Option(
+            None,
+            "--analysis-report",
+            help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+        ),
+        analysis_dir: Path | None = typer.Option(
+            None,
+            "--analysis-dir",
+            help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -1901,6 +2050,10 @@ def register_run_commands(
                 profile=profile,
                 model=model,
                 output=output,
+                auto_analyze=auto_analyze,
+                analysis_output=analysis_output,
+                analysis_report=analysis_report,
+                analysis_dir=analysis_dir,
                 retriever=retriever,
                 retriever_docs=retriever_docs,
                 kg=kg,
@@ -1938,6 +2091,131 @@ def register_run_commands(
         finally:
             if ctx:
                 ctx.meta.pop("run_mode_alias", None)
+
+
+def _display_pipeline_analysis_summary(
+    console: Console,
+    pipeline_result,
+    run,
+) -> None:
+    """Display a concise auto-analysis summary."""
+
+    stats_output = get_node_output(pipeline_result, "statistics")
+    ragas_output = get_node_output(pipeline_result, "ragas_eval")
+    priority_output = get_node_output(pipeline_result, "priority_summary")
+    time_series_output = get_node_output(pipeline_result, "time_series")
+
+    scorecard = build_metric_scorecard(run, stats_output, ragas_output)
+    quality = build_quality_summary(run, ragas_output, time_series_output, {})
+    priority = build_priority_highlights(priority_output)
+
+    console.print("\n[bold]자동 분석 요약[/bold]")
+    console.print(f"- Run ID: {getattr(run, 'run_id', '-')}")
+    console.print(f"- 데이터셋: {getattr(run, 'dataset_name', '-')}")
+    console.print(f"- 모델: {getattr(run, 'model_name', '-')}")
+    console.print(f"- 테스트 케이스: {getattr(run, 'total_test_cases', 0)}")
+    console.print(f"- 통과율: {_format_percent(getattr(run, 'pass_rate', None))}")
+
+    if scorecard:
+        table = Table(title="지표 스코어카드", show_header=True, header_style="bold cyan")
+        table.add_column("Metric")
+        table.add_column("Mean", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Pass Rate", justify="right")
+        table.add_column("Status")
+
+        for row in scorecard:
+            table.add_row(
+                str(row.get("metric") or "-"),
+                _format_float(row.get("mean")),
+                _format_float(row.get("threshold")),
+                _format_percent(row.get("pass_rate")),
+                str(row.get("status") or "-"),
+            )
+
+        console.print(table)
+
+    console.print("\n[bold]데이터 품질/신뢰도[/bold]")
+    console.print(f"- 전체 케이스: {quality.get('total_cases', '-')}")
+    console.print(f"- 평가 샘플: {quality.get('sample_count', '-')}")
+    console.print(f"- 커버리지: {_format_percent(quality.get('coverage'))}")
+    for flag in quality.get("flags", []):
+        console.print(f"- 주의: {flag}")
+
+    cases = _merge_priority_cases(priority)
+    if cases:
+        table = Table(title="우선순위 케이스", show_header=True, header_style="bold cyan")
+        table.add_column("Type")
+        table.add_column("Case")
+        table.add_column("Avg", justify="right")
+        table.add_column("Impact", justify="right")
+        table.add_column("Failed")
+        table.add_column("Question")
+
+        for item in cases:
+            table.add_row(
+                item["type"],
+                str(item.get("test_case_id") or "-"),
+                _format_float(item.get("avg_score")),
+                _format_float(item.get("impact_score")),
+                ", ".join(item.get("failed_metrics") or []) or "-",
+                _truncate_preview(item.get("question_preview")),
+            )
+        console.print(table)
+
+
+def _merge_priority_cases(priority: dict[str, Any]) -> list[dict[str, Any]]:
+    """Merge bottom/impact cases into a single list."""
+    merged = []
+    seen = set()
+    for tag, cases in (
+        ("bottom", priority.get("bottom_cases", [])),
+        ("impact", priority.get("impact_cases", [])),
+    ):
+        for item in cases:
+            case_id = item.get("test_case_id")
+            key = (tag, case_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(
+                {
+                    "type": tag,
+                    "test_case_id": case_id,
+                    "avg_score": item.get("avg_score"),
+                    "impact_score": item.get("impact_score"),
+                    "failed_metrics": item.get("failed_metrics"),
+                    "question_preview": item.get("question_preview"),
+                }
+            )
+    return merged
+
+
+def _truncate_preview(text: str | None, max_len: int = 60) -> str:
+    if not text:
+        return "-"
+    text = text.strip()
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."
+
+
+def _format_float(value: float | None, precision: int = 3) -> str:
+    if value is None:
+        return "-"
+    try:
+        return f"{float(value):.{precision}f}"
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _format_percent(value: float | None, precision: int = 1) -> str:
+    if value is None:
+        return "-"
+    try:
+        return f"{float(value):.{precision}%}"
+    except (TypeError, ValueError):
+        return "-"
 
 
 __all__ = [

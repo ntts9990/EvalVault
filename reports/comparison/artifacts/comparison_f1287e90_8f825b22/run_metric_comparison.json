@@ -1,0 +1,76 @@
+{
+  "node_id": "run_metric_comparison",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "summary": {
+      "run_a": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "run_b": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+      "total_metrics": 2,
+      "significant_metrics": 1,
+      "wins": {
+        "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e": 1,
+        "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5": 0
+      },
+      "pass_rate_a": 0.5,
+      "pass_rate_b": 0.0,
+      "pass_rate_diff": -0.5,
+      "avg_score_a": 0.692,
+      "avg_score_b": 0.6997,
+      "avg_score_diff": 0.0077
+    },
+    "comparisons": [
+      {
+        "run_id_a": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "run_id_b": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "metric": "faithfulness",
+        "mean_a": 0.5,
+        "mean_b": 0.8333333333333334,
+        "diff": 0.33333333333333337,
+        "diff_percent": 66.66666666666667,
+        "p_value": 0.16491903619825024,
+        "is_significant": false,
+        "effect_size": 0.7559289460184545,
+        "effect_level": "medium",
+        "winner": null,
+        "direction": "up"
+      },
+      {
+        "run_id_a": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "run_id_b": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+        "metric": "answer_relevancy",
+        "mean_a": 0.8840076251449925,
+        "mean_b": 0.566023964076465,
+        "diff": -0.3179836610685275,
+        "diff_percent": -35.970692109852855,
+        "p_value": 7.103122615485664e-07,
+        "is_significant": true,
+        "effect_size": -4.991780024818316,
+        "effect_level": "large",
+        "winner": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+        "direction": "down"
+      }
+    ],
+    "notable_changes": [
+      {
+        "metric": "faithfulness",
+        "diff": 0.3333,
+        "diff_percent": 66.67,
+        "p_value": 0.1649,
+        "effect_size": 0.756,
+        "effect_level": "medium",
+        "winner": null
+      },
+      {
+        "metric": "answer_relevancy",
+        "diff": -0.318,
+        "diff_percent": -35.97,
+        "p_value": 0.0,
+        "effect_size": -4.992,
+        "effect_level": "large",
+        "winner": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e"
+      }
+    ]
+  }
+}

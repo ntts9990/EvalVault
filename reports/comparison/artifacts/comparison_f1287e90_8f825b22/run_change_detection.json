@@ -1,0 +1,42 @@
+{
+  "node_id": "run_change_detection",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "summary": {
+      "run_a": "f1287e90-43b6-42c8-b3ac-e6cb3e06a71e",
+      "run_b": "8f825b22-87f1-4d9b-b3a0-8ff65dbec2c5",
+      "dataset_changed": true,
+      "config_change_count": 0,
+      "prompt_change_count": 0,
+      "missing_run_ids": []
+    },
+    "dataset_changes": [
+      {
+        "field": "dataset_name",
+        "before": "test_dataset",
+        "after": "e2e-auto-insurance-qa-korean"
+      },
+      {
+        "field": "total_test_cases",
+        "before": 4,
+        "after": 18
+      }
+    ],
+    "config_changes": [],
+    "prompt_changes": {
+      "status": "missing",
+      "changes": [],
+      "summary": {},
+      "prompt_sets": {
+        "run_a": null,
+        "run_b": null
+      },
+      "notes": [
+        "Prompt snapshot을 찾을 수 없습니다.",
+        "평가 시 --db와 --system-prompt/--ragas-prompts 옵션을 사용하세요."
+      ]
+    }
+  }
+}

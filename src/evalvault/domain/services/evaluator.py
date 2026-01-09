@@ -270,6 +270,7 @@ class RagasEvaluator:
         # Evaluate with Ragas (if any Ragas metrics)
         eval_results_by_test_case = {}
         if ragas_metrics:
+            run.tracker_metadata["ragas_config"] = self._build_ragas_config(llm)
             eval_results_by_test_case, override_status = await self._evaluate_with_ragas(
                 dataset=dataset,
                 metrics=ragas_metrics,
@@ -341,6 +342,45 @@ class RagasEvaluator:
         # Finalize run
         run.finished_at = datetime.now()
         return run
+
+    def _build_ragas_config(self, llm: LLMPort) -> dict[str, Any]:
+        ragas_config: dict[str, Any] = {"embedding_model": None, "temperature": None}
+
+        ragas_llm = None
+        try:
+            ragas_llm = llm.as_ragas_llm()
+        except Exception:  # pragma: no cover - defensive for adapter mismatch
+            ragas_llm = None
+        if ragas_llm is not None:
+            get_temperature = getattr(ragas_llm, "get_temperature", None)
+            if callable(get_temperature):
+                try:
+                    ragas_config["temperature"] = get_temperature(1)
+                except Exception:  # pragma: no cover - best-effort metadata
+                    ragas_config["temperature"] = None
+
+        embedding_model = None
+        get_embedding_model_name = getattr(llm, "get_embedding_model_name", None)
+        if callable(get_embedding_model_name):
+            try:
+                embedding_model = get_embedding_model_name()
+            except Exception:  # pragma: no cover - best-effort metadata
+                embedding_model = None
+
+        if not embedding_model and hasattr(llm, "as_ragas_embeddings"):
+            ragas_embeddings = None
+            try:
+                ragas_embeddings = llm.as_ragas_embeddings()
+            except Exception:  # pragma: no cover - embeddings may be unavailable
+                ragas_embeddings = None
+            if ragas_embeddings is not None:
+                embedding_model = getattr(ragas_embeddings, "model", None) or getattr(
+                    ragas_embeddings, "model_name", None
+                )
+
+        if embedding_model:
+            ragas_config["embedding_model"] = embedding_model
+        return ragas_config
 
     async def _evaluate_with_ragas(
         self,

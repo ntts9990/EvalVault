@@ -1,0 +1,21 @@
+{
+  "node_id": "diagnostic",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "threshold": 0.6,
+    "diagnostics": [
+      {
+        "metric": "faithfulness",
+        "issue": "faithfulness 점수가 기준치 미달입니다 (0.50 < 0.70).",
+        "score": 0.5,
+        "threshold": 0.7,
+        "gap": 0.2
+      }
+    ],
+    "recommendations": [
+      "답변을 검색 컨텍스트에 더 강하게 고정하고 근거 인용을 강화하세요."
+    ]
+  }
+}

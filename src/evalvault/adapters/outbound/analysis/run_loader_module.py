@@ -35,9 +35,15 @@ class RunLoaderModule(BaseAnalysisModule):
 
         run_ids = additional_params.get("run_ids") or params.get("run_ids") or []
         limit = int(additional_params.get("limit") or params.get("limit") or 2)
+        allow_sample = params.get("allow_sample")
+        if allow_sample is None:
+            allow_sample = additional_params.get("allow_sample", True)
+        if isinstance(allow_sample, str):
+            allow_sample = allow_sample.strip().lower() in {"1", "true", "yes", "y", "on"}
 
         runs: list[EvaluationRun] = []
         seen_ids: set[str] = set()
+        missing_run_ids: list[str] = []
 
         if run_ids:
             for candidate in run_ids:
@@ -45,6 +51,8 @@ class RunLoaderModule(BaseAnalysisModule):
                 if run:
                     runs.append(run)
                     seen_ids.add(run.run_id)
+                else:
+                    missing_run_ids.append(candidate)
         elif run_id:
             run = self._load_run(run_id)
             if run:
@@ -54,7 +62,7 @@ class RunLoaderModule(BaseAnalysisModule):
         else:
             runs.extend(self._load_additional_runs(limit=limit, exclude_ids=seen_ids))
 
-        if not runs:
+        if not runs and allow_sample:
             runs = self._sample_runs()
 
         summaries = [run.to_summary_dict() for run in runs]
@@ -62,6 +70,7 @@ class RunLoaderModule(BaseAnalysisModule):
             "runs": runs,
             "summaries": summaries,
             "count": len(runs),
+            "missing_run_ids": missing_run_ids,
         }
 
     def _load_run(self, run_id: str) -> EvaluationRun | None:
