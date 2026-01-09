@@ -60,6 +60,14 @@ const API_STATUS_META: Record<string, { label: string; className: string }> = {
     error: { label: "API 연결 실패", className: "text-rose-700 bg-rose-50 border-rose-200" },
 };
 
+const STEP_STATUS_COLORS: Record<string, string> = {
+    completed: "bg-emerald-500",
+    failed: "bg-rose-500",
+    skipped: "bg-amber-500",
+    running: "bg-blue-500",
+    pending: "bg-slate-300",
+};
+
 const PRIORITY_META: Record<string, { label: string; color: string }> = {
     p0_critical: { label: "P0 Critical", color: "text-rose-600" },
     p1_high: { label: "P1 High", color: "text-amber-600" },
@@ -469,6 +477,11 @@ export function AnalysisLab() {
         const [left, right] = compareSelection;
         return `/analysis/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`;
     }, [compareSelection]);
+
+    const savedInCompare = useMemo(() => {
+        if (!savedResultId) return false;
+        return compareSelection.includes(savedResultId);
+    }, [compareSelection, savedResultId]);
 
     const historyIntentOptions = useMemo(() => {
         const unique = new Map<string, string>();
@@ -1435,6 +1448,23 @@ export function AnalysisLab() {
                                                 결과 보기
                                             </Link>
                                         )}
+                                        {savedResultId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleCompareSelection(savedResultId)}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                            >
+                                                {savedInCompare ? "비교에서 제거" : "비교에 추가"}
+                                            </button>
+                                        )}
+                                        {compareLink && (
+                                            <Link
+                                                to={compareLink}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg border border-border bg-background hover:border-primary/40"
+                                            >
+                                                비교 보기
+                                            </Link>
+                                        )}
                                         {saveError && (
                                             <span className="text-xs text-destructive">{saveError}</span>
                                         )}
@@ -1665,16 +1695,28 @@ export function AnalysisLab() {
                                     {selectedIntent?.nodes.length ? (
                                         <div>
                                             <h3 className="text-sm font-semibold mb-3">실행 단계</h3>
-                                            <div className="space-y-2">
-                                                {selectedIntent.nodes.map(node => {
-                                                    const status = getNodeStatus(result.node_results?.[node.id]);
+                                            <div className="space-y-3">
+                                                {selectedIntent.nodes.map((node, index) => {
+                                                    const status = getNodeStatus(safeNodeResults?.[node.id]);
+                                                    const indicatorClass = STEP_STATUS_COLORS[status] || STEP_STATUS_COLORS.pending;
+                                                    const isLast = index === selectedIntent.nodes.length - 1;
                                                     return (
-                                                        <div key={node.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2">
-                                                            <div>
-                                                                <p className="text-sm font-medium">{node.name}</p>
-                                                                <p className="text-xs text-muted-foreground">{node.module}</p>
+                                                        <div key={node.id} className="relative pl-7">
+                                                            <span
+                                                                className={`absolute left-0 top-2 flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-white ${indicatorClass}`}
+                                                            >
+                                                                {index + 1}
+                                                            </span>
+                                                            {!isLast && (
+                                                                <span className="absolute left-[7px] top-6 h-full w-px bg-border" />
+                                                            )}
+                                                            <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">{node.name}</p>
+                                                                    <p className="text-xs text-muted-foreground">{node.module}</p>
+                                                                </div>
+                                                                <StatusBadge status={status} />
                                                             </div>
-                                                            <StatusBadge status={status} />
                                                         </div>
                                                     );
                                                 })}
