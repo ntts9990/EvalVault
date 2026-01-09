@@ -169,6 +169,22 @@ const formatParamValue = (value: unknown) => {
     return String(value);
 };
 
+const collectNumericEntries = (record: Record<string, unknown>) =>
+    Object.entries(record)
+        .filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+        .map(([key, value]) => ({ key, value: value as number }));
+
+const extractMetricEntries = (record: Record<string, unknown>) => {
+    const metrics: { key: string; value: number }[] = [];
+    const sources = [record.summary, record.metrics, record.scores];
+    sources.forEach((source) => {
+        if (isPlainRecord(source)) {
+            metrics.push(...collectNumericEntries(source));
+        }
+    });
+    return metrics;
+};
+
 type ExecutionMeta = {
     query: string;
     intent: string;
@@ -202,6 +218,8 @@ export function AnalysisLab() {
     const [useLlmReport, setUseLlmReport] = useState(true);
     const [recomputeRagas, setRecomputeRagas] = useState(false);
     const [executionMeta, setExecutionMeta] = useState<ExecutionMeta | null>(null);
+    const [showFullReport, setShowFullReport] = useState(false);
+    const [showFullRaw, setShowFullRaw] = useState(false);
     const [benchmarkPath, setBenchmarkPath] = useState(
         "examples/benchmarks/korean_rag/retrieval_test.json"
     );
@@ -697,7 +715,19 @@ export function AnalysisLab() {
         return null;
     }, [result]);
 
+    const rawOutput = useMemo(() => {
+        if (!result?.final_output) return null;
+        try {
+            return JSON.stringify(result.final_output, null, 2);
+        } catch {
+            return null;
+        }
+    }, [result]);
+
     const reportIsLarge = (reportText?.length ?? 0) > 5000;
+    const rawIsLarge = (rawOutput?.length ?? 0) > 8000;
+    const reportPreview = reportText && reportIsLarge ? `${reportText.slice(0, 2000)}...` : reportText;
+    const rawPreview = rawOutput && rawIsLarge ? `${rawOutput.slice(0, 2000)}...` : rawOutput;
 
     useEffect(() => {
         if (!reportIsLarge) {
@@ -707,14 +737,16 @@ export function AnalysisLab() {
         }
     }, [reportIsLarge, reportText]);
 
-    const rawOutput = useMemo(() => {
-        if (!result?.final_output) return null;
-        try {
-            return JSON.stringify(result.final_output, null, 2);
-        } catch {
-            return null;
+    useEffect(() => {
+        setShowFullReport(false);
+        setShowFullRaw(false);
+    }, [reportText, rawOutput]);
+
+    useEffect(() => {
+        if (!showRaw) {
+            setShowFullRaw(false);
         }
-    }, [result]);
+    }, [showRaw]);
 
     const intentLabel = selectedIntent?.label
         || catalog.find(item => item.intent === result?.intent)?.label
@@ -767,6 +799,41 @@ export function AnalysisLab() {
             preview: errors.slice(0, 3),
         };
     }, [intentDefinition, safeNodeResults]);
+
+    const keyMetricEntries = useMemo(() => {
+        if (!result) return [];
+        const entries: { key: string; value: number }[] = [];
+        const seen = new Set<string>();
+
+        const addEntries = (items: { key: string; value: number }[]) => {
+            items.forEach((item) => {
+                if (seen.has(item.key)) return;
+                seen.add(item.key);
+                entries.push(item);
+            });
+        };
+
+        if (isPlainRecord(result.final_output)) {
+            addEntries(extractMetricEntries(result.final_output));
+            Object.values(result.final_output).forEach((value) => {
+                if (isPlainRecord(value)) {
+                    addEntries(extractMetricEntries(value));
+                }
+            });
+        }
+
+        if (safeNodeResults) {
+            Object.values(safeNodeResults).forEach((node) => {
+                if (!isPlainRecord(node)) return;
+                const output = node.output;
+                if (isPlainRecord(output)) {
+                    addEntries(extractMetricEntries(output));
+                }
+            });
+        }
+
+        return entries.slice(0, 3);
+    }, [result, safeNodeResults]);
 
     const executionParamEntries = useMemo(() => {
         if (!executionMeta) return [];
@@ -1378,6 +1445,55 @@ export function AnalysisLab() {
                                         </div>
                                     )}
 
+                                    {(keyMetricEntries.length > 0 || nodeErrorSummary) && (
+                                        <div className="border border-border rounded-lg p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold">핵심 요약</p>
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    주요 지표/실패 요인
+                                                </span>
+                                            </div>
+                                            {keyMetricEntries.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        주요 지표 상위 3개
+                                                    </p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                                        {keyMetricEntries.map((entry) => (
+                                                            <div
+                                                                key={`metric-${entry.key}`}
+                                                                className="border border-border rounded-md px-2 py-2"
+                                                            >
+                                                                <p className="text-muted-foreground">{entry.key}</p>
+                                                                <p className="text-sm font-semibold text-foreground">
+                                                                    {entry.value.toFixed(3)}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {nodeErrorSummary && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        실패 유형 상위 3개
+                                                    </p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                                        {nodeErrorSummary.preview.map((item) => (
+                                                            <div
+                                                                key={`failure-${item.id}`}
+                                                                className="border border-rose-200 bg-rose-50 text-rose-700 rounded-md px-2 py-2"
+                                                            >
+                                                                <p className="font-semibold">{item.name}</p>
+                                                                <p className="text-[11px]">{item.error}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="border border-border rounded-lg p-4 space-y-3">
                                         <div className="flex items-center justify-between">
                                             <p className="text-sm font-semibold">저장 메타데이터</p>
@@ -1736,24 +1852,50 @@ export function AnalysisLab() {
                                                     {showRaw ? "리포트 보기" : "RAW JSON"}
                                                 </button>
                                                 {!showRaw && reportIsLarge && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRenderMarkdown(prev => !prev)}
-                                                    className="text-xs text-muted-foreground hover:text-foreground"
-                                                >
-                                                    {renderMarkdown ? "경량 보기" : "마크다운 렌더링"}
-                                                </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFullReport(prev => !prev)}
+                                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        {showFullReport ? "요약 보기" : "전체 보기"}
+                                                    </button>
+                                                )}
+                                                {showRaw && rawIsLarge && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFullRaw(prev => !prev)}
+                                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        {showFullRaw ? "요약 보기" : "전체 보기"}
+                                                    </button>
+                                                )}
+                                                {!showRaw && (!reportIsLarge || showFullReport) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setRenderMarkdown(prev => !prev)}
+                                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        {renderMarkdown ? "경량 보기" : "마크다운 렌더링"}
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
                                         {showRaw ? (
                                             <VirtualizedText
-                                                text={rawOutput || "{}"}
-                                                height="20rem"
+                                                text={
+                                                    (!showFullRaw && rawIsLarge ? rawPreview : rawOutput) || "{}"
+                                                }
+                                                height={showFullRaw || !rawIsLarge ? "20rem" : "12rem"}
                                                 className="bg-background border border-border rounded-lg p-3 text-xs"
                                             />
                                         ) : reportText ? (
-                                            renderMarkdown ? (
+                                            reportIsLarge && !showFullReport ? (
+                                                <VirtualizedText
+                                                    text={reportPreview || ""}
+                                                    height="12rem"
+                                                    className="bg-background border border-border rounded-lg p-3 text-xs"
+                                                />
+                                            ) : renderMarkdown ? (
                                                 <div className="bg-background border border-border rounded-lg p-4 text-sm max-h-80 overflow-auto">
                                                     <MarkdownContent text={reportText} />
                                                 </div>
@@ -1766,8 +1908,10 @@ export function AnalysisLab() {
                                             )
                                         ) : (
                                             <VirtualizedText
-                                                text={rawOutput || "{}"}
-                                                height="20rem"
+                                                text={
+                                                    (!showFullRaw && rawIsLarge ? rawPreview : rawOutput) || "{}"
+                                                }
+                                                height={showFullRaw || !rawIsLarge ? "20rem" : "12rem"}
                                                 className="bg-background border border-border rounded-lg p-3 text-xs"
                                             />
                                         )}

@@ -227,10 +227,10 @@ test.describe("Analysis Lab", () => {
             page.getByText("일부 단계에서 오류가 발생했습니다. 실행 로그를 확인하세요.")
         ).toBeVisible();
 
-        const nodeSummary = page.locator("summary").filter({ hasText: "Summary Report" }).first();
-        await nodeSummary.click();
+        const nodeDetails = page.locator("details").filter({ hasText: "Summary Report" }).first();
+        await nodeDetails.locator("summary").first().click();
         await expect(
-            page.getByText("Timeout while generating summary", { exact: true })
+            nodeDetails.getByText("Timeout while generating summary", { exact: true })
         ).toBeVisible();
     });
 
@@ -242,6 +242,9 @@ test.describe("Analysis Lab", () => {
         await page.goto("/analysis");
         await page.getByRole("button", { name: /성능 요약/ }).click();
 
+        await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
+        await page.getByRole("button", { name: "전체 보기" }).click();
+        await expect(page.getByRole("button", { name: "요약 보기" })).toBeVisible();
         await expect(page.getByRole("button", { name: "마크다운 렌더링" })).toBeVisible();
         await page.getByRole("button", { name: "마크다운 렌더링" }).click();
         await expect(page.getByRole("button", { name: "경량 보기" })).toBeVisible();
