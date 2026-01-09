@@ -192,6 +192,15 @@ type ExecutionMeta = {
     params: Record<string, unknown>;
 };
 
+type NextActionItem = {
+    id: string;
+    title: string;
+    description: string;
+    ctaLabel?: string;
+    onClick?: () => void;
+    disabled?: boolean;
+};
+
 export function AnalysisLab() {
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
     const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -852,6 +861,71 @@ export function AnalysisLab() {
         return entries;
     }, [executionMeta, intentLabel]);
 
+    const nextActions = useMemo<NextActionItem[]>(() => {
+        if (!result) return [];
+        const actions: NextActionItem[] = [];
+
+        if (!savedResultId) {
+            actions.push({
+                id: "save-result",
+                title: "결과 저장",
+                description: "이번 결과를 저장해 비교와 추적에 활용하세요.",
+                ctaLabel: saving ? "저장 중..." : "저장하기",
+                onClick: () => {
+                    void handleSave();
+                },
+                disabled: saving,
+            });
+        }
+
+        if (!analysisRunId) {
+            actions.push({
+                id: "choose-run",
+                title: "실제 Run 선택",
+                description: "Run을 선택하면 실제 평가 데이터를 기반으로 분석합니다.",
+            });
+        }
+
+        if (reportErrorText) {
+            actions.push({
+                id: "llm-check",
+                title: "LLM 설정 확인",
+                description: "LLM 오류가 발생했습니다. 모델/키 설정을 확인하세요.",
+            });
+        }
+
+        if (hasNodeError) {
+            actions.push({
+                id: "node-errors",
+                title: "오류 노드 점검",
+                description: "실행 단계 또는 노드 상세 출력에서 오류 원인을 확인하세요.",
+            });
+        }
+
+        if (savedResultId && compareSelection.length < 2) {
+            actions.push({
+                id: "compare-ready",
+                title: "비교 준비",
+                description: "다른 결과 1개를 추가하면 비교가 가능합니다.",
+                ctaLabel: savedInCompare ? "비교에서 제거" : "비교에 추가",
+                onClick: () => toggleCompareSelection(savedResultId),
+            });
+        }
+
+        return actions.slice(0, 3);
+    }, [
+        analysisRunId,
+        compareSelection.length,
+        hasNodeError,
+        handleSave,
+        reportErrorText,
+        result,
+        savedInCompare,
+        savedResultId,
+        saving,
+        toggleCompareSelection,
+    ]);
+
     return (
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
@@ -1491,6 +1565,44 @@ export function AnalysisLab() {
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {nextActions.length > 0 && (
+                                        <div className="border border-border rounded-lg p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold">다음 액션</p>
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    추천 흐름
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                                {nextActions.map((action) => (
+                                                    <div
+                                                        key={action.id}
+                                                        className="border border-border rounded-md px-2 py-2 space-y-2"
+                                                    >
+                                                        <div>
+                                                            <p className="font-semibold text-foreground">
+                                                                {action.title}
+                                                            </p>
+                                                            <p className="text-muted-foreground">
+                                                                {action.description}
+                                                            </p>
+                                                        </div>
+                                                        {action.onClick && action.ctaLabel && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={action.onClick}
+                                                                disabled={action.disabled}
+                                                                className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:border-primary/40 disabled:opacity-60"
+                                                            >
+                                                                {action.ctaLabel}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 
