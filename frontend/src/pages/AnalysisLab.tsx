@@ -1469,7 +1469,8 @@ export function AnalysisLab() {
                     </div>
 
                     <div className="lg:col-span-2">
-                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm h-full">
+                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm h-full relative overflow-hidden">
+                            <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h2 className="text-xl font-semibold">{intentLabel} 결과</h2>
@@ -1562,7 +1563,7 @@ export function AnalysisLab() {
                             )}
 
                             {result && (
-                                <div className="space-y-6">
+                                <div className="space-y-6 animate-in fade-in duration-300">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                                         <div className="border border-border rounded-lg p-3">
                                             <p className="text-xs text-muted-foreground">분석 유형</p>
