@@ -6,14 +6,16 @@ import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import { Activity, AlertCircle, ArrowLeft, GitCompare } from "lucide-react";
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
-    completed: { label: "완료", color: "text-emerald-600" },
-    failed: { label: "실패", color: "text-rose-600" },
-    skipped: { label: "스킵", color: "text-amber-600" },
-    running: { label: "실행 중", color: "text-blue-600" },
-    pending: { label: "대기", color: "text-muted-foreground" },
-    missing: { label: "없음", color: "text-muted-foreground" },
+const STATUS_META: Record<string, { label: string; className: string }> = {
+    completed: { label: "완료", className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    failed: { label: "실패", className: "text-rose-700 bg-rose-50 border-rose-200" },
+    skipped: { label: "스킵", className: "text-amber-700 bg-amber-50 border-amber-200" },
+    running: { label: "실행 중", className: "text-blue-700 bg-blue-50 border-blue-200" },
+    pending: { label: "대기", className: "text-slate-600 bg-slate-50 border-slate-200" },
+    missing: { label: "없음", className: "text-slate-500 bg-slate-50 border-slate-200" },
 };
+
+const METRIC_EPSILON = 0.0001;
 
 const METRIC_EXCLUDE_KEYS = new Set([
     "per_query",
@@ -94,6 +96,28 @@ function formatMetricValue(value: number | undefined) {
     return value.toFixed(4);
 }
 
+function formatSignedDelta(value: number | null, digits: number = 4) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+        return "-";
+    }
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(digits)}`;
+}
+
+function formatSignedCount(value: number) {
+    if (!Number.isFinite(value)) return "-";
+    if (value === 0) return "0";
+    return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function formatSignedDuration(value: number | null | undefined) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+        return "-";
+    }
+    const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+    return `${sign}${formatDurationMs(Math.abs(value))}`;
+}
+
 function isPrioritySummary(value: any): value is PrioritySummary {
     if (!value || typeof value !== "object") return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
@@ -142,16 +166,116 @@ function aggregateFailedMetrics(cases: PriorityCase[]) {
     return counts;
 }
 
+function StatusBadge({ prefix, status }: { prefix?: string; status: string }) {
+    const meta = STATUS_META[status] || STATUS_META.pending;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.className}`}
+        >
+            {prefix ? `${prefix} · ` : ""}
+            {meta.label}
+        </span>
+    );
+}
+
+function ResultCard({
+    result,
+    variant,
+    failureCount,
+}: {
+    result: SavedAnalysisResult;
+    variant: "A" | "B";
+    failureCount: number;
+}) {
+    const queryText = result.query
+        ? result.query.length > 120
+            ? `${result.query.slice(0, 120)}...`
+            : result.query
+        : "N/A";
+    const completionLabel = result.is_complete ? "완료" : "미완료";
+    const completionClass = result.is_complete
+        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+        : "text-amber-700 bg-amber-50 border-amber-200";
+
+    return (
+        <div className="border border-border rounded-xl p-4 bg-card space-y-4">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-xs text-muted-foreground">{variant}</p>
+                    <h2 className="text-lg font-semibold">{result.label}</h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        {formatDateTime(result.created_at)}
+                    </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                    <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${completionClass}`}
+                    >
+                        {completionLabel}
+                    </span>
+                    <Link
+                        to={`/analysis/results/${result.result_id}`}
+                        className="text-xs text-primary hover:underline"
+                    >
+                        결과 보기
+                    </Link>
+                </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                    <p className="text-xs text-muted-foreground">Intent</p>
+                    <p className="font-medium">{result.intent}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="font-medium">{formatDurationMs(result.duration_ms)}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-muted-foreground">Run ID</p>
+                    <p className="font-medium">{result.run_id || "샘플 데이터"}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-muted-foreground">실패 노드</p>
+                    <p className="font-medium">{failureCount}개</p>
+                </div>
+                {result.profile && (
+                    <div>
+                        <p className="text-xs text-muted-foreground">Profile</p>
+                        <p className="font-medium">{result.profile}</p>
+                    </div>
+                )}
+            </div>
+            {result.tags && result.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                    {result.tags.map((tag) => (
+                        <span
+                            key={`${result.result_id}-${tag}`}
+                            className="px-2 py-0.5 rounded-full bg-secondary border border-border"
+                        >
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+            )}
+            <div className="text-xs text-muted-foreground">
+                <p className="text-[10px] uppercase tracking-wide">Query</p>
+                <p className="text-sm text-foreground mt-1 break-words">{queryText}</p>
+            </div>
+        </div>
+    );
+}
+
 export function AnalysisCompareView() {
     const [searchParams] = useSearchParams();
-    const idA = searchParams.get("a");
-    const idB = searchParams.get("b");
+    const idA = searchParams.get("left") ?? searchParams.get("a");
+    const idB = searchParams.get("right") ?? searchParams.get("b");
     const [resultA, setResultA] = useState<SavedAnalysisResult | null>(null);
     const [resultB, setResultB] = useState<SavedAnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showOnlyDiff, setShowOnlyDiff] = useState(true);
     const [showAllMetrics, setShowAllMetrics] = useState(false);
+    const [showOnlyMetricChanges, setShowOnlyMetricChanges] = useState(true);
 
     useEffect(() => {
         async function loadResults() {
@@ -160,6 +284,7 @@ export function AnalysisCompareView() {
                 return;
             }
             setLoading(true);
+            setError(null);
             try {
                 const [dataA, dataB] = await Promise.all([
                     fetchAnalysisResult(idA),
@@ -175,6 +300,9 @@ export function AnalysisCompareView() {
         }
         loadResults();
     }, [idA, idB]);
+
+    const prioritySummaryA = useMemo(() => extractPrioritySummary(resultA), [resultA]);
+    const prioritySummaryB = useMemo(() => extractPrioritySummary(resultB), [resultB]);
 
     const metricRows = useMemo(() => {
         if (!resultA || !resultB) return [];
@@ -204,8 +332,8 @@ export function AnalysisCompareView() {
     }, [resultA, resultB]);
 
     const priorityDiff = useMemo(() => {
-        const priorityA = extractPrioritySummary(resultA);
-        const priorityB = extractPrioritySummary(resultB);
+        const priorityA = prioritySummaryA;
+        const priorityB = prioritySummaryB;
         if (!priorityA || !priorityB) return null;
 
         const bottomA = buildCaseSet(priorityA.bottom_cases || []);
@@ -252,7 +380,7 @@ export function AnalysisCompareView() {
             impact: impactDelta,
             metricDeltas,
         };
-    }, [resultA, resultB]);
+    }, [prioritySummaryA, prioritySummaryB]);
 
     const nodeRows = useMemo(() => {
         if (!resultA || !resultB) return [];
@@ -260,7 +388,7 @@ export function AnalysisCompareView() {
         const mapB = buildNodeMap(resultB);
         const nodeIds = Array.from(new Set([...Object.keys(mapA), ...Object.keys(mapB)]));
 
-        return nodeIds.map((nodeId) => {
+        const rows = nodeIds.map((nodeId) => {
             const aNode = mapA[nodeId];
             const bNode = mapB[nodeId];
             const aStatus = aNode?.status || "missing";
@@ -275,6 +403,11 @@ export function AnalysisCompareView() {
                 diff,
             };
         });
+        rows.sort((left, right) => {
+            if (left.diff !== right.diff) return left.diff ? -1 : 1;
+            return left.nodeId.localeCompare(right.nodeId);
+        });
+        return rows;
     }, [resultA, resultB]);
 
     const filteredNodes = useMemo(() => {
@@ -289,18 +422,90 @@ export function AnalysisCompareView() {
         (row) => row.bStatus === "failed" || row.bError
     ).length;
 
-    const metricPreview = showAllMetrics ? metricRows : metricRows.slice(0, 20);
+    const nodeDiffCount = nodeRows.filter((row) => row.diff).length;
+    const failureDelta = failureCountB - failureCountA;
+    const failureDeltaClass =
+        failureDelta > 0
+            ? "text-rose-600"
+            : failureDelta < 0
+                ? "text-emerald-600"
+                : "text-muted-foreground";
+
+    const metricStats = useMemo(() => {
+        const stats = {
+            total: metricRows.length,
+            changed: 0,
+            increased: 0,
+            decreased: 0,
+            unchanged: 0,
+            missing: 0,
+        };
+        metricRows.forEach((row) => {
+            if (row.delta === null || row.delta === undefined || Number.isNaN(row.delta)) {
+                stats.missing += 1;
+                return;
+            }
+            if (Math.abs(row.delta) < METRIC_EPSILON) {
+                stats.unchanged += 1;
+                return;
+            }
+            stats.changed += 1;
+            if (row.delta > 0) stats.increased += 1;
+            if (row.delta < 0) stats.decreased += 1;
+        });
+        return stats;
+    }, [metricRows]);
+
+    const metricRowsView = useMemo(() => {
+        let rows = metricRows;
+        if (showOnlyMetricChanges) {
+            rows = rows.filter(
+                (row) =>
+                    row.delta !== null &&
+                    row.delta !== undefined &&
+                    Math.abs(row.delta) >= METRIC_EPSILON
+            );
+        }
+        return showAllMetrics ? rows : rows.slice(0, 20);
+    }, [metricRows, showOnlyMetricChanges, showAllMetrics]);
+
+    const durationDelta = useMemo(() => {
+        if (!resultA || !resultB) return null;
+        if (typeof resultA.duration_ms !== "number" || typeof resultB.duration_ms !== "number") {
+            return null;
+        }
+        return resultB.duration_ms - resultA.duration_ms;
+    }, [resultA, resultB]);
+
+    const durationDeltaClass =
+        durationDelta === null
+            ? "text-muted-foreground"
+            : durationDelta > 0
+                ? "text-rose-600"
+                : durationDelta < 0
+                    ? "text-emerald-600"
+                    : "text-muted-foreground";
 
     return (
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
-                <div className="mb-8 flex items-center gap-3">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                     <Link
                         to="/analysis"
                         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
                     >
                         <ArrowLeft className="w-4 h-4" /> 분석 실험실로 돌아가기
                     </Link>
+                    {resultA && resultB && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className="px-2 py-0.5 rounded-full bg-secondary border border-border">
+                                A · {resultA.result_id.slice(0, 8)}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-secondary border border-border">
+                                B · {resultB.result_id.slice(0, 8)}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {loading && (
@@ -324,84 +529,99 @@ export function AnalysisCompareView() {
 
                 {!loading && resultA && resultB && (
                     <div className="space-y-8">
-                        <div className="flex items-center gap-3">
-                            <GitCompare className="w-5 h-5 text-primary" />
-                            <div>
-                                <h1 className="text-2xl font-semibold">분석 결과 비교</h1>
-                                <p className="text-sm text-muted-foreground">
-                                    저장된 분석 결과 2건의 요약/메트릭/실패 노드를 비교합니다.
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <GitCompare className="w-5 h-5 text-primary" />
+                                <div>
+                                    <h1 className="text-2xl font-semibold">분석 결과 비교</h1>
+                                    <p className="text-sm text-muted-foreground">
+                                        저장된 분석 결과 2건의 요약/메트릭/실패 노드를 비교합니다.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                A → B 변화 기준
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">노드 변화</p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-semibold">
+                                        {nodeDiffCount}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        / {nodeRows.length}개
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    실패 노드 A {failureCountA} → B {failureCountB}
+                                </p>
+                                <p className={`text-xs mt-1 ${failureDeltaClass}`}>
+                                    Δ {formatSignedCount(failureDelta)}개
+                                </p>
+                            </div>
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">메트릭 변화</p>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-semibold">
+                                        {metricStats.changed}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        / {metricStats.total}개
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    상승 {metricStats.increased} · 하락 {metricStats.decreased} · 동일 {metricStats.unchanged}
+                                </p>
+                                {metricStats.missing > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        비교 불가 {metricStats.missing}개
+                                    </p>
+                                )}
+                            </div>
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">우선순위 변화</p>
+                                {!priorityDiff ? (
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        우선순위 요약 없음
+                                    </p>
+                                ) : (
+                                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                                        <p>
+                                            하위 추가 {priorityDiff.bottom.added.length} · 해소 {priorityDiff.bottom.removed.length}
+                                        </p>
+                                        <p>
+                                            영향 추가 {priorityDiff.impact.added.length} · 해소 {priorityDiff.impact.removed.length}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="border border-border rounded-xl p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">실행 시간</p>
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                    A {formatDurationMs(resultA.duration_ms)} → B {formatDurationMs(resultB.duration_ms)}
+                                </div>
+                                <p className={`text-xs mt-2 ${durationDeltaClass}`}>
+                                    Δ {formatSignedDuration(durationDelta)}
                                 </p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {[resultA, resultB].map((result, index) => (
-                                <div
-                                    key={result.result_id}
-                                    className="border border-border rounded-xl p-4 bg-card"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">
-                                                {index === 0 ? "A" : "B"}
-                                            </p>
-                                            <h2 className="text-lg font-semibold">{result.label}</h2>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {formatDateTime(result.created_at)}
-                                            </p>
-                                        </div>
-                                        <Link
-                                            to={`/analysis/results/${result.result_id}`}
-                                            className="text-xs text-primary hover:underline"
-                                        >
-                                            결과 보기
-                                        </Link>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Intent</p>
-                                            <p className="font-medium">{result.intent}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Duration</p>
-                                            <p className="font-medium">
-                                                {formatDurationMs(result.duration_ms)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Run ID</p>
-                                            <p className="font-medium">
-                                                {result.run_id || "샘플 데이터"}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">실패 노드</p>
-                                            <p className="font-medium">
-                                                {index === 0 ? failureCountA : failureCountB}개
-                                            </p>
-                                        </div>
-                                        {result.profile && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Profile</p>
-                                                <p className="font-medium">{result.profile}</p>
-                                            </div>
-                                        )}
-                                        {result.tags && result.tags.length > 0 && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Tags</p>
-                                                <p className="font-medium">
-                                                    {result.tags.join(", ")}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                            <ResultCard result={resultA} variant="A" failureCount={failureCountA} />
+                            <ResultCard result={resultB} variant="B" failureCount={failureCountB} />
                         </div>
 
                         <div className="border border-border rounded-xl p-4 bg-card">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-semibold">노드 상태 비교</h3>
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold">노드 상태 비교</h3>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        총 {nodeRows.length}개 중 {nodeDiffCount}개 변화
+                                    </p>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => setShowOnlyDiff((prev) => !prev)}
@@ -417,24 +637,23 @@ export function AnalysisCompareView() {
                                     </p>
                                 ) : (
                                     filteredNodes.map((row) => {
-                                        const metaA = STATUS_META[row.aStatus] || STATUS_META.pending;
-                                        const metaB = STATUS_META[row.bStatus] || STATUS_META.pending;
                                         return (
                                             <div
                                                 key={row.nodeId}
-                                                className="flex items-center justify-between border border-border rounded-lg px-3 py-2"
+                                                className={`flex flex-col md:flex-row md:items-center md:justify-between gap-2 border rounded-lg px-3 py-2 ${row.diff ? "border-primary/40 bg-primary/5" : "border-border"}`}
                                             >
                                                 <div>
                                                     <p className="text-sm font-medium">{row.nodeId}</p>
                                                     {(row.aError || row.bError) && (
-                                                        <p className="text-xs text-rose-600">
-                                                            {row.aError || row.bError}
-                                                        </p>
+                                                        <div className="text-xs text-rose-600 space-y-1">
+                                                            {row.aError && <p>A: {row.aError}</p>}
+                                                            {row.bError && <p>B: {row.bError}</p>}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-4 text-xs">
-                                                    <span className={metaA.color}>A · {metaA.label}</span>
-                                                    <span className={metaB.color}>B · {metaB.label}</span>
+                                                    <StatusBadge prefix="A" status={row.aStatus} />
+                                                    <StatusBadge prefix="B" status={row.bStatus} />
                                                 </div>
                                             </div>
                                         );
@@ -516,21 +735,30 @@ export function AnalysisCompareView() {
                                         숫자형 요약 지표를 추출해 차이를 계산합니다.
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAllMetrics((prev) => !prev)}
-                                    className="text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    {showAllMetrics ? "간단히" : "전체 보기"}
-                                </button>
+                                <div className="flex items-center gap-3 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOnlyMetricChanges((prev) => !prev)}
+                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showOnlyMetricChanges ? "전체 지표" : "변경 지표만"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllMetrics((prev) => !prev)}
+                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showAllMetrics ? "간단히" : "전체 보기"}
+                                    </button>
+                                </div>
                             </div>
-                            {metricPreview.length === 0 ? (
+                            {metricRowsView.length === 0 ? (
                                 <p className="text-xs text-muted-foreground">
                                     비교할 수 있는 숫자 지표가 없습니다.
                                 </p>
                             ) : (
                                 <div className="space-y-2 text-xs">
-                                    {metricPreview.map((row) => (
+                                    {metricRowsView.map((row) => (
                                         <div
                                             key={row.key}
                                             className="grid grid-cols-1 md:grid-cols-4 gap-2 border border-border rounded-lg px-3 py-2"
@@ -538,12 +766,27 @@ export function AnalysisCompareView() {
                                             <p className="text-muted-foreground break-all">{row.key}</p>
                                             <p>A: {formatMetricValue(row.aValue)}</p>
                                             <p>B: {formatMetricValue(row.bValue)}</p>
-                                            <p className="text-muted-foreground">
-                                                Δ {row.delta !== null ? row.delta.toFixed(4) : "-"}
+                                            <p
+                                                className={
+                                                    row.delta === null
+                                                        ? "text-muted-foreground"
+                                                        : row.delta > 0
+                                                            ? "text-emerald-600"
+                                                            : row.delta < 0
+                                                                ? "text-rose-600"
+                                                                : "text-muted-foreground"
+                                                }
+                                            >
+                                                Δ {formatSignedDelta(row.delta, 4)}
                                             </p>
                                         </div>
                                     ))}
                                 </div>
+                            )}
+                            {metricRows.length > 0 && (
+                                <p className="text-[11px] text-muted-foreground mt-3">
+                                    표시 중 {metricRowsView.length} / 전체 {metricRows.length}개
+                                </p>
                             )}
                         </div>
                     </div>

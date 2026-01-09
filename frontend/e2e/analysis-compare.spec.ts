@@ -87,7 +87,7 @@ test.describe("Analysis Compare", () => {
     });
 
     test("should compare saved analysis results", async ({ page }) => {
-        await page.goto("/analysis/compare?a=analysis-a&b=analysis-b");
+        await page.goto("/analysis/compare?left=analysis-a&right=analysis-b");
 
         await expect(page.getByRole("heading", { name: "분석 결과 비교" })).toBeVisible();
         await expect(page.getByRole("heading", { name: "Summary A" })).toBeVisible();

@@ -300,8 +300,8 @@ export function AnalysisLab() {
 
     const compareLink = useMemo(() => {
         if (compareSelection.length !== 2) return null;
-        const [a, b] = compareSelection;
-        return `/analysis/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
+        const [left, right] = compareSelection;
+        return `/analysis/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`;
     }, [compareSelection]);
 
     const historyIntentOptions = useMemo(() => {
