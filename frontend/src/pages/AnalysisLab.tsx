@@ -105,6 +105,9 @@ const RUN_REQUIRED_MODULES = new Set([
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
 const getNodeStatus = (node: unknown) => {
     if (!isRecord(node)) return "pending";
     const status = node.status;
@@ -126,9 +129,44 @@ const getNodeOutput = (nodeResults: Record<string, unknown> | null | undefined, 
 };
 
 function isPrioritySummary(value: unknown): value is PrioritySummary {
-    if (!isRecord(value)) return false;
+    if (!isPlainRecord(value)) return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
 }
+
+const PARAM_LABELS: Record<string, string> = {
+    use_llm_report: "LLM 보고서",
+    recompute_ragas: "RAGAS 재평가",
+    benchmark_path: "벤치마크 경로",
+    top_k: "top_k",
+    ndcg_k: "ndcg_k",
+    use_hybrid_search: "하이브리드 검색",
+    embedding_profile: "임베딩 프로필",
+};
+
+const formatParamValue = (value: unknown) => {
+    if (typeof value === "boolean") return value ? "예" : "아니오";
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "string") {
+        return value.length > 80 ? `${value.slice(0, 80)}...` : value;
+    }
+    if (value === null || value === undefined) return "-";
+    if (Array.isArray(value)) return value.map(item => String(item)).join(", ");
+    if (isPlainRecord(value)) {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return "object";
+        }
+    }
+    return String(value);
+};
+
+type ExecutionMeta = {
+    query: string;
+    intent: string;
+    runId: string | null;
+    params: Record<string, unknown>;
+};
 
 export function AnalysisLab() {
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
@@ -155,6 +193,7 @@ export function AnalysisLab() {
     const [metadataError, setMetadataError] = useState<string | null>(null);
     const [useLlmReport, setUseLlmReport] = useState(true);
     const [recomputeRagas, setRecomputeRagas] = useState(false);
+    const [executionMeta, setExecutionMeta] = useState<ExecutionMeta | null>(null);
     const [benchmarkPath, setBenchmarkPath] = useState(
         "examples/benchmarks/korean_rag/retrieval_test.json"
     );
@@ -342,7 +381,7 @@ export function AnalysisLab() {
     }, [recentHistory]);
 
     const reportMeta = useMemo(() => {
-        if (!result?.final_output || !isRecord(result.final_output)) return null;
+        if (!result?.final_output || !isPlainRecord(result.final_output)) return null;
         let hasReport = false;
         let llmUsed: boolean | null = null;
         let llmModel: string | null = null;
@@ -410,6 +449,20 @@ export function AnalysisLab() {
         if (reportMeta.llmError.length <= 120) return reportMeta.llmError;
         return `${reportMeta.llmError.slice(0, 120)}...`;
     }, [reportMeta]);
+
+    const schemaIssues = useMemo(() => {
+        if (!result) return [];
+        const issues: string[] = [];
+        if (result.final_output === null) {
+            issues.push("final_output가 비어 있습니다.");
+        } else if (!isPlainRecord(result.final_output)) {
+            issues.push("final_output 형식이 예상과 다릅니다.");
+        }
+        if (!isPlainRecord(result.node_results)) {
+            issues.push("node_results 형식이 예상과 다릅니다.");
+        }
+        return issues;
+    }, [result]);
 
     const compareLink = useMemo(() => {
         if (compareSelection.length !== 2) return null;
@@ -482,6 +535,12 @@ export function AnalysisLab() {
                     params.embedding_profile = benchmarkEmbeddingProfile.trim();
                 }
             }
+            setExecutionMeta({
+                query: intent.sample_query,
+                intent: intent.intent,
+                runId: runIdForAnalysis,
+                params,
+            });
             const analysis = await runAnalysis(
                 intent.sample_query,
                 runIdForAnalysis || undefined,
@@ -581,9 +640,14 @@ export function AnalysisLab() {
         setSortOrder("newest");
     };
 
+    const safeNodeResults = useMemo(() => {
+        if (!result?.node_results || !isPlainRecord(result.node_results)) return null;
+        return result.node_results;
+    }, [result]);
+
     const resultSummary = useMemo(() => {
-        if (!result) return null;
-        const nodeResults = result.node_results || {};
+        if (!result || !safeNodeResults) return null;
+        const nodeResults = safeNodeResults;
         const counts = {
             completed: 0,
             failed: 0,
@@ -598,7 +662,7 @@ export function AnalysisLab() {
             }
         });
         return counts;
-    }, [result]);
+    }, [result, safeNodeResults]);
 
     const resultSummaryTotal = useMemo(() => {
         if (!resultSummary) return 0;
@@ -606,7 +670,7 @@ export function AnalysisLab() {
     }, [resultSummary]);
 
     const reportText = useMemo(() => {
-        if (!result?.final_output) return null;
+        if (!result?.final_output || !isPlainRecord(result.final_output)) return null;
         const reportEntry = (result.final_output as Record<string, any>).report;
         if (reportEntry && typeof reportEntry === "object" && typeof reportEntry.report === "string") {
             return reportEntry.report as string;
@@ -654,19 +718,59 @@ export function AnalysisLab() {
 
     const prioritySummary = useMemo(() => {
         if (!result) return null;
-        const finalOutput = result.final_output || {};
+        const finalOutput = isPlainRecord(result.final_output) ? result.final_output : null;
+        if (!finalOutput) return null;
         for (const entry of Object.values(finalOutput)) {
             if (isPrioritySummary(entry)) return entry;
         }
-        const nodeOutput = getNodeOutput(result.node_results, "priority_summary");
+        const nodeOutput = getNodeOutput(safeNodeResults, "priority_summary");
         if (isPrioritySummary(nodeOutput)) return nodeOutput;
         return null;
-    }, [result]);
+    }, [result, safeNodeResults]);
 
     const hasNodeError = useMemo(() => {
-        if (!result?.node_results) return false;
-        return Object.values(result.node_results).some((node) => Boolean(getNodeError(node)));
-    }, [result]);
+        if (!safeNodeResults) return false;
+        return Object.values(safeNodeResults).some((node) => Boolean(getNodeError(node)));
+    }, [safeNodeResults]);
+
+    const nodeErrorSummary = useMemo(() => {
+        if (!safeNodeResults) return null;
+        const nodes = intentDefinition?.nodes || [];
+        const nameMap = new Map(nodes.map((node) => [node.id, node.name]));
+        const errors = Object.entries(safeNodeResults)
+            .map(([nodeId, nodeValue]) => {
+                const error = getNodeError(nodeValue);
+                if (!error) return null;
+                return {
+                    id: nodeId,
+                    name: nameMap.get(nodeId) || nodeId,
+                    error,
+                };
+            })
+            .filter((item): item is { id: string; name: string; error: string } => Boolean(item));
+        if (!errors.length) return null;
+        return {
+            total: errors.length,
+            preview: errors.slice(0, 3),
+        };
+    }, [intentDefinition, safeNodeResults]);
+
+    const executionParamEntries = useMemo(() => {
+        if (!executionMeta) return [];
+        const entries: { label: string; value: string }[] = [
+            { label: "쿼리", value: executionMeta.query },
+            { label: "Intent", value: intentLabel },
+            {
+                label: "Run",
+                value: executionMeta.runId ? `Run ${executionMeta.runId.slice(0, 8)}` : "샘플 데이터",
+            },
+        ];
+        Object.entries(executionMeta.params).forEach(([key, value]) => {
+            const label = PARAM_LABELS[key] || key;
+            entries.push({ label, value: formatParamValue(value) });
+        });
+        return entries;
+    }, [executionMeta, intentLabel]);
 
     return (
         <Layout>
@@ -1226,6 +1330,41 @@ export function AnalysisLab() {
                                         </div>
                                     )}
 
+                                    {schemaIssues.length > 0 && (
+                                        <div className="border border-amber-200 bg-amber-50 text-amber-700 rounded-lg p-3 text-xs space-y-1">
+                                            <p className="font-medium">결과 구조 확인 필요</p>
+                                            <ul className="list-disc list-inside">
+                                                {schemaIssues.map((issue) => (
+                                                    <li key={issue}>{issue}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {executionParamEntries.length > 0 && (
+                                        <div className="border border-border rounded-lg p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold">실행 파라미터</p>
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    재현용 요약
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                {executionParamEntries.map((entry) => (
+                                                    <div
+                                                        key={`${entry.label}-${entry.value}`}
+                                                        className="border border-border rounded-md px-2 py-1"
+                                                    >
+                                                        <span className="text-muted-foreground">{entry.label}</span>
+                                                        <span className="ml-2 font-semibold text-foreground">
+                                                            {entry.value || "-"}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="border border-border rounded-lg p-4 space-y-3">
                                         <div className="flex items-center justify-between">
                                             <p className="text-sm font-semibold">저장 메타데이터</p>
@@ -1323,6 +1462,19 @@ export function AnalysisLab() {
                                                     );
                                                 })}
                                             </div>
+                                            {nodeErrorSummary && (
+                                                <div className="mt-3 border border-rose-200 bg-rose-50 text-rose-700 rounded-lg p-3 text-xs space-y-1">
+                                                    <p className="font-semibold">오류 {nodeErrorSummary.total}건</p>
+                                                    {nodeErrorSummary.preview.map((item) => (
+                                                        <p key={item.id}>
+                                                            {item.name}: {item.error}
+                                                        </p>
+                                                    ))}
+                                                    {nodeErrorSummary.total > nodeErrorSummary.preview.length && (
+                                                        <p>그 외 {nodeErrorSummary.total - nodeErrorSummary.preview.length}건</p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -1580,7 +1732,7 @@ export function AnalysisLab() {
                                     </div>
 
                                     <AnalysisNodeOutputs
-                                        nodeResults={result.node_results}
+                                        nodeResults={safeNodeResults}
                                         nodeDefinitions={intentDefinition?.nodes}
                                         title="노드 상세 출력"
                                     />
