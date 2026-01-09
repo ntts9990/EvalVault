@@ -919,7 +919,7 @@ wheels = [
 
 [[package]]
 name = "evalvault"
-version = "1.43.0"
+version = "1.44.0"
 source = { editable = "." }
 dependencies = [
     { name = "chardet" },
@@ -1079,7 +1079,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.40.0" },
     { name = "xlrd" },
 ]
-provides-extras = ["dev", "docs", "analysis", "anthropic", "postgres", "mlflow", "phoenix", "korean", "perf"]
+provides-extras = ["dev", "docs", "web", "analysis", "anthropic", "postgres", "mlflow", "phoenix", "korean", "perf"]
 
 [[package]]
 name = "execnet"
