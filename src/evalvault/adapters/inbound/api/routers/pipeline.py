@@ -201,7 +201,6 @@ def _intent_label(intent_value: str) -> str:
 
 
 def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAdapter]:
-    service = AnalysisPipelineService()
     settings = Settings()
     storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
     llm_adapter = None
@@ -209,82 +208,11 @@ def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAda
         llm_adapter = get_llm_adapter(settings)
     except Exception as exc:
         logger.warning("LLM adapter initialization failed for pipeline: %s", exc)
-
-    from evalvault.adapters.outbound.analysis import (
-        AnalysisReportModule,
-        BM25SearcherModule,
-        CausalAnalyzerModule,
-        ComparisonReportModule,
-        DataLoaderModule,
-        DetailedReportModule,
-        DiagnosticPlaybookModule,
-        EmbeddingAnalyzerModule,
-        EmbeddingDistributionModule,
-        EmbeddingSearcherModule,
-        HybridRRFModule,
-        HybridWeightedModule,
-        LLMReportModule,
-        LowPerformerExtractorModule,
-        ModelAnalyzerModule,
-        MorphemeAnalyzerModule,
-        MorphemeQualityCheckerModule,
-        NLPAnalyzerModule,
-        PatternDetectorModule,
-        PrioritySummaryModule,
-        RagasEvaluatorModule,
-        RetrievalAnalyzerModule,
-        RetrievalBenchmarkModule,
-        RetrievalQualityCheckerModule,
-        RootCauseAnalyzerModule,
-        RunAnalyzerModule,
-        RunComparatorModule,
-        RunLoaderModule,
-        SearchComparatorModule,
-        StatisticalAnalyzerModule,
-        StatisticalComparatorModule,
-        SummaryReportModule,
-        TimeSeriesAnalyzerModule,
-        TrendDetectorModule,
-        VerificationReportModule,
+    from evalvault.adapters.outbound.analysis.pipeline_factory import (
+        build_analysis_pipeline_service,
     )
 
-    service.register_module(DataLoaderModule(storage=storage))
-    service.register_module(RunLoaderModule(storage=storage))
-    service.register_module(StatisticalAnalyzerModule())
-    service.register_module(NLPAnalyzerModule())
-    service.register_module(CausalAnalyzerModule())
-    service.register_module(SummaryReportModule())
-    service.register_module(DetailedReportModule())
-    service.register_module(AnalysisReportModule())
-    service.register_module(VerificationReportModule())
-    service.register_module(ComparisonReportModule())
-    service.register_module(LLMReportModule(llm_adapter=llm_adapter))
-    service.register_module(PrioritySummaryModule())
-
-    service.register_module(MorphemeAnalyzerModule())
-    service.register_module(MorphemeQualityCheckerModule())
-    service.register_module(EmbeddingAnalyzerModule())
-    service.register_module(EmbeddingDistributionModule())
-    service.register_module(RetrievalAnalyzerModule())
-    service.register_module(RetrievalBenchmarkModule())
-    service.register_module(RetrievalQualityCheckerModule())
-    service.register_module(BM25SearcherModule())
-    service.register_module(EmbeddingSearcherModule())
-    service.register_module(HybridRRFModule())
-    service.register_module(HybridWeightedModule())
-    service.register_module(SearchComparatorModule())
-    service.register_module(ModelAnalyzerModule())
-    service.register_module(RunAnalyzerModule())
-    service.register_module(StatisticalComparatorModule())
-    service.register_module(RunComparatorModule())
-    service.register_module(RagasEvaluatorModule(llm_adapter=llm_adapter))
-    service.register_module(LowPerformerExtractorModule())
-    service.register_module(DiagnosticPlaybookModule())
-    service.register_module(RootCauseAnalyzerModule())
-    service.register_module(PatternDetectorModule())
-    service.register_module(TimeSeriesAnalyzerModule())
-    service.register_module(TrendDetectorModule())
-
+    service = build_analysis_pipeline_service(storage=storage, llm_adapter=llm_adapter)
     return service, storage
 
 

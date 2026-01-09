@@ -48,11 +48,17 @@ class DataLoaderModule(BaseAnalysisModule):
         query = context.get("query", "")
         run_id = context.get("run_id")
         additional_params = context.get("additional_params", {}) or {}
+        params = params or {}
+        allow_sample = params.get("allow_sample")
+        if allow_sample is None:
+            allow_sample = additional_params.get("allow_sample", True)
+        if isinstance(allow_sample, str):
+            allow_sample = allow_sample.strip().lower() in {"1", "true", "yes", "y", "on"}
 
         run = self._load_run(run_id, additional_params)
 
         result: dict[str, Any] = {
-            "loaded": True,
+            "loaded": bool(run) or bool(allow_sample),
             "query": query,
         }
 
@@ -66,8 +72,11 @@ class DataLoaderModule(BaseAnalysisModule):
             result["run"] = run
             result["metrics"] = self._extract_metrics(run)
             result["summary"] = run.to_summary_dict()
-        else:
+        elif allow_sample:
             result["metrics"] = self._sample_metrics()
+            result["sample"] = True
+        else:
+            result["metrics"] = {}
 
         return result
 

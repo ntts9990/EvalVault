@@ -499,6 +499,7 @@ class PipelineTemplateRegistry:
                 id="load_data",
                 name="데이터 로드",
                 module="data_loader",
+                params={"allow_sample": False},
             ),
             AnalysisNode(
                 id="statistics",
@@ -507,10 +508,34 @@ class PipelineTemplateRegistry:
                 depends_on=["load_data"],
             ),
             AnalysisNode(
+                id="ragas_eval",
+                name="RAGAS 요약",
+                module="ragas_evaluator",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="low_samples",
+                name="낮은 성능 케이스 추출",
+                module="low_performer_extractor",
+                depends_on=["ragas_eval"],
+            ),
+            AnalysisNode(
+                id="diagnostic",
+                name="진단 분석",
+                module="diagnostic_playbook",
+                depends_on=["load_data", "ragas_eval"],
+            ),
+            AnalysisNode(
                 id="nlp_analysis",
                 name="NLP 분석",
                 module="nlp_analyzer",
                 depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="pattern_detection",
+                name="패턴 분석",
+                module="pattern_detector",
+                depends_on=["nlp_analysis"],
             ),
             AnalysisNode(
                 id="causal_analysis",
@@ -519,17 +544,51 @@ class PipelineTemplateRegistry:
                 depends_on=["load_data", "statistics"],
             ),
             AnalysisNode(
+                id="root_cause",
+                name="근본 원인 분석",
+                module="root_cause_analyzer",
+                depends_on=["low_samples", "diagnostic", "causal_analysis"],
+            ),
+            AnalysisNode(
                 id="priority_summary",
                 name="우선순위 요약",
                 module="priority_summary",
-                depends_on=["load_data"],
+                depends_on=["load_data", "ragas_eval"],
+            ),
+            AnalysisNode(
+                id="load_runs",
+                name="실행 이력 로드",
+                module="run_loader",
+                params={"limit": 5, "allow_sample": False},
+            ),
+            AnalysisNode(
+                id="time_series",
+                name="시계열 요약",
+                module="time_series_analyzer",
+                depends_on=["load_runs"],
+            ),
+            AnalysisNode(
+                id="trend_detection",
+                name="추세 감지",
+                module="trend_detector",
+                depends_on=["time_series"],
             ),
             AnalysisNode(
                 id="report",
                 name="LLM 상세 보고서",
                 module="llm_report",
-                params={"report_type": "detailed"},
-                depends_on=["load_data", "statistics", "nlp_analysis", "causal_analysis"],
+                params={"report_type": "analysis"},
+                depends_on=[
+                    "load_data",
+                    "statistics",
+                    "ragas_eval",
+                    "nlp_analysis",
+                    "pattern_detection",
+                    "causal_analysis",
+                    "root_cause",
+                    "priority_summary",
+                    "trend_detection",
+                ],
             ),
         ]
         return AnalysisPipeline(
@@ -544,11 +603,18 @@ class PipelineTemplateRegistry:
                 id="load_runs",
                 name="실행 결과 로드",
                 module="run_loader",
+                params={"limit": 2, "allow_sample": False},
             ),
             AnalysisNode(
-                id="run_comparison",
-                name="실행 비교",
-                module="run_comparator",
+                id="run_metric_comparison",
+                name="메트릭 통계 비교",
+                module="run_metric_comparator",
+                depends_on=["load_runs"],
+            ),
+            AnalysisNode(
+                id="run_change_detection",
+                name="변경 사항 탐지",
+                module="run_change_detector",
                 depends_on=["load_runs"],
             ),
             AnalysisNode(
@@ -556,7 +622,7 @@ class PipelineTemplateRegistry:
                 name="LLM 비교 보고서",
                 module="llm_report",
                 params={"report_type": "comparison"},
-                depends_on=["load_runs", "run_comparison"],
+                depends_on=["load_runs", "run_metric_comparison", "run_change_detection"],
             ),
         ]
         return AnalysisPipeline(

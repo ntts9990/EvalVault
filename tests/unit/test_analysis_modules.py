@@ -867,3 +867,125 @@ class TestModuleRegistryIntegration:
         assert result is not None
         assert result.is_complete
         assert result.intent == AnalysisIntent.GENERATE_SUMMARY
+
+
+# =============================================================================
+# RunChangeDetectorModule Tests
+# =============================================================================
+
+
+class TestRunChangeDetectorModule:
+    """RunChangeDetectorModule 테스트."""
+
+    def test_compare_summary_only_prompt_changes(self):
+        """Prompt set 요약만 있을 때 변경 요약을 반환."""
+        from evalvault.adapters.outbound.analysis.run_change_detector_module import (
+            RunChangeDetectorModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.result import MetricScore, TestCaseResult
+
+        run_a = EvaluationRun(
+            run_id="run-a",
+            dataset_name="dataset-1",
+            model_name="model-a",
+            metrics_evaluated=["faithfulness"],
+        )
+        run_a.results.append(
+            TestCaseResult(
+                test_case_id="tc-1",
+                metrics=[MetricScore(name="faithfulness", score=0.6)],
+            )
+        )
+        run_a.tracker_metadata["prompt_set"] = {
+            "system_prompt_checksum": "chk-a",
+            "ragas_prompt_checksums": {"faithfulness": "ragas-a"},
+        }
+
+        run_b = EvaluationRun(
+            run_id="run-b",
+            dataset_name="dataset-1",
+            model_name="model-b",
+            metrics_evaluated=["faithfulness"],
+        )
+        run_b.results.append(
+            TestCaseResult(
+                test_case_id="tc-1",
+                metrics=[MetricScore(name="faithfulness", score=0.8)],
+            )
+        )
+        run_b.tracker_metadata["prompt_set"] = {
+            "system_prompt_checksum": "chk-b",
+            "ragas_prompt_checksums": {"faithfulness": "ragas-b"},
+        }
+
+        module = RunChangeDetectorModule(storage=None)
+        inputs = {"run_loader": {"runs": [run_a, run_b], "missing_run_ids": []}}
+        result = module.execute(inputs)
+
+        assert result["summary"]["dataset_changed"] is False
+        assert result["prompt_changes"]["status"] == "summary_only"
+        assert result["prompt_changes"]["summary"]["changed"] >= 1
+
+
+# =============================================================================
+# RunMetricComparatorModule Tests
+# =============================================================================
+
+
+class TestRunMetricComparatorModule:
+    """RunMetricComparatorModule 테스트."""
+
+    def test_compare_runs(self):
+        """두 실행의 메트릭 비교 결과를 반환."""
+        from evalvault.adapters.outbound.analysis.run_metric_comparator_module import (
+            RunMetricComparatorModule,
+        )
+        from evalvault.domain.entities import EvaluationRun
+        from evalvault.domain.entities.result import MetricScore, TestCaseResult
+
+        run_a = EvaluationRun(
+            run_id="run-a",
+            dataset_name="dataset-1",
+            model_name="model-a",
+            metrics_evaluated=["faithfulness"],
+        )
+        run_a.results.extend(
+            [
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.6)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-2",
+                    metrics=[MetricScore(name="faithfulness", score=0.7)],
+                ),
+            ]
+        )
+
+        run_b = EvaluationRun(
+            run_id="run-b",
+            dataset_name="dataset-1",
+            model_name="model-b",
+            metrics_evaluated=["faithfulness"],
+        )
+        run_b.results.extend(
+            [
+                TestCaseResult(
+                    test_case_id="tc-1",
+                    metrics=[MetricScore(name="faithfulness", score=0.8)],
+                ),
+                TestCaseResult(
+                    test_case_id="tc-2",
+                    metrics=[MetricScore(name="faithfulness", score=0.9)],
+                ),
+            ]
+        )
+
+        module = RunMetricComparatorModule()
+        inputs = {"run_loader": {"runs": [run_a, run_b]}}
+        result = module.execute(inputs)
+
+        assert result["summary"]["total_metrics"] == 1
+        assert len(result["comparisons"]) == 1
+        assert result["comparisons"][0]["direction"] == "up"
