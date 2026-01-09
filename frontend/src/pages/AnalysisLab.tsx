@@ -26,7 +26,9 @@ import {
     AlertCircle,
     CheckCircle2,
     Circle,
+    Copy,
     ExternalLink,
+    Link2,
     Play,
     Save,
 } from "lucide-react";
@@ -185,6 +187,16 @@ const extractMetricEntries = (record: Record<string, unknown>) => {
     return metrics;
 };
 
+const extractEvidenceRecords = (record: Record<string, unknown>) => {
+    const candidates = [record.evidence, record.evidence_samples, record.samples];
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            return candidate.filter(isPlainRecord);
+        }
+    }
+    return [];
+};
+
 type ExecutionMeta = {
     query: string;
     intent: string;
@@ -229,6 +241,9 @@ export function AnalysisLab() {
     const [executionMeta, setExecutionMeta] = useState<ExecutionMeta | null>(null);
     const [showFullReport, setShowFullReport] = useState(false);
     const [showFullRaw, setShowFullRaw] = useState(false);
+    const [shareCopyStatus, setShareCopyStatus] = useState<"idle" | "success" | "error">("idle");
+    const [shareLinkStatus, setShareLinkStatus] = useState<"idle" | "success" | "error">("idle");
+    const [showAllMetrics, setShowAllMetrics] = useState(false);
     const [benchmarkPath, setBenchmarkPath] = useState(
         "examples/benchmarks/korean_rag/retrieval_test.json"
     );
@@ -757,6 +772,30 @@ export function AnalysisLab() {
         }
     }, [showRaw]);
 
+    const copyToClipboard = useCallback(async (text: string, mode: "summary" | "link") => {
+        if (typeof window === "undefined") return;
+        const setStatus = mode === "summary" ? setShareCopyStatus : setShareLinkStatus;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const textarea = document.createElement("textarea");
+                textarea.value = text;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            }
+            setStatus("success");
+        } catch {
+            setStatus("error");
+        }
+        setTimeout(() => setStatus("idle"), 1500);
+    }, []);
+
     const intentLabel = selectedIntent?.label
         || catalog.find(item => item.intent === result?.intent)?.label
         || result?.intent
@@ -809,6 +848,63 @@ export function AnalysisLab() {
         };
     }, [intentDefinition, safeNodeResults]);
 
+    const metricDistributions = useMemo(() => {
+        if (!result) return [];
+        const map = new Map<string, number[]>();
+        const addMetric = (key: string, value: number) => {
+            if (!map.has(key)) {
+                map.set(key, []);
+            }
+            map.get(key)?.push(value);
+        };
+
+        const scanRecord = (record: Record<string, unknown>) => {
+            extractEvidenceRecords(record).forEach((item) => {
+                const metrics =
+                    (isPlainRecord(item.metrics) && item.metrics)
+                    || (isPlainRecord(item.scores) && item.scores);
+                if (!metrics) return;
+                collectNumericEntries(metrics).forEach(({ key, value }) => {
+                    addMetric(key, value);
+                });
+            });
+        };
+
+        if (isPlainRecord(result.final_output)) {
+            scanRecord(result.final_output);
+            Object.values(result.final_output).forEach((value) => {
+                if (isPlainRecord(value)) {
+                    scanRecord(value);
+                }
+            });
+        }
+
+        if (safeNodeResults) {
+            Object.values(safeNodeResults).forEach((node) => {
+                if (!isPlainRecord(node)) return;
+                const output = node.output;
+                if (isPlainRecord(output)) {
+                    scanRecord(output);
+                }
+            });
+        }
+
+        return Array.from(map.entries())
+            .map(([key, values]) => {
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+                return {
+                    key,
+                    min,
+                    max,
+                    avg,
+                    count: values.length,
+                };
+            })
+            .sort((left, right) => right.count - left.count);
+    }, [result, safeNodeResults]);
+
     const keyMetricEntries = useMemo(() => {
         if (!result) return [];
         const entries: { key: string; value: number }[] = [];
@@ -843,6 +939,11 @@ export function AnalysisLab() {
 
         return entries.slice(0, 3);
     }, [result, safeNodeResults]);
+
+    const metricPreview = useMemo(() => {
+        if (metricDistributions.length <= 6) return metricDistributions;
+        return showAllMetrics ? metricDistributions : metricDistributions.slice(0, 6);
+    }, [metricDistributions, showAllMetrics]);
 
     const executionParamEntries = useMemo(() => {
         if (!executionMeta) return [];
@@ -925,6 +1026,28 @@ export function AnalysisLab() {
         saving,
         toggleCompareSelection,
     ]);
+
+    const shareSummaryText = useMemo(() => {
+        if (!result) return "";
+        const lines = [
+            `[EvalVault] ${intentLabel} 분석 결과`,
+            `상태: ${result.is_complete ? "완료" : "미완료"}`,
+            `처리 시간: ${formatDurationMs(result.duration_ms)}`,
+            `Run: ${analysisRunId ? `Run ${analysisRunId.slice(0, 8)}` : "샘플 데이터"}`,
+            `보고서: ${reportBadge.label}`,
+        ];
+        if (keyMetricEntries.length > 0) {
+            lines.push(
+                `주요 지표: ${keyMetricEntries
+                    .map((entry) => `${entry.key} ${entry.value.toFixed(3)}`)
+                    .join(", ")}`
+            );
+        }
+        if (nodeErrorSummary) {
+            lines.push(`오류: ${nodeErrorSummary.total}건`);
+        }
+        return lines.join("\n");
+    }, [analysisRunId, intentLabel, keyMetricEntries, nodeErrorSummary, reportBadge, result]);
 
     return (
         <Layout>
@@ -1605,6 +1728,116 @@ export function AnalysisLab() {
                                             </div>
                                         </div>
                                     )}
+
+                                    <div className="border border-border rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-semibold">지표 드릴다운</p>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                증거 기반 분포
+                                            </span>
+                                        </div>
+                                        {metricDistributions.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">
+                                                현재 결과에는 증거 기반 지표가 없습니다.
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                    {metricPreview.map((metric) => {
+                                                        const range = metric.max - metric.min;
+                                                        const ratio = range > 0 ? (metric.avg - metric.min) / range : 1;
+                                                        return (
+                                                            <div
+                                                                key={`dist-${metric.key}`}
+                                                                className="border border-border rounded-md px-2 py-2 space-y-2"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="font-semibold text-foreground">{metric.key}</p>
+                                                                    <span className="text-[11px] text-muted-foreground">
+                                                                        {metric.count}개
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-2 rounded-full bg-slate-100">
+                                                                    <div
+                                                                        className="h-2 rounded-full bg-primary/70"
+                                                                        style={{ width: `${Math.round(ratio * 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                                                    <span>min {metric.min.toFixed(3)}</span>
+                                                                    <span>avg {metric.avg.toFixed(3)}</span>
+                                                                    <span>max {metric.max.toFixed(3)}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {metricDistributions.length > 6 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowAllMetrics(prev => !prev)}
+                                                        className="text-xs text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        {showAllMetrics ? "접기" : "전체 지표 보기"}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="border border-border rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-semibold">공유 템플릿</p>
+                                            <span className="text-[11px] text-muted-foreground">
+                                                팀 공유용 요약
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            readOnly
+                                            value={shareSummaryText}
+                                            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs h-28"
+                                        />
+                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                            <button
+                                                type="button"
+                                                onClick={() => copyToClipboard(shareSummaryText, "summary")}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-background hover:border-primary/40"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                                요약 복사
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!savedResultId || typeof window === "undefined") return;
+                                                    const url = `${window.location.origin}/analysis/results/${savedResultId}`;
+                                                    void copyToClipboard(url, "link");
+                                                }}
+                                                disabled={!savedResultId}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-background hover:border-primary/40 disabled:opacity-60"
+                                            >
+                                                <Link2 className="w-3 h-3" />
+                                                결과 링크 복사
+                                            </button>
+                                            {shareCopyStatus === "success" && (
+                                                <span className="text-emerald-600">복사 완료</span>
+                                            )}
+                                            {shareCopyStatus === "error" && (
+                                                <span className="text-rose-600">복사 실패</span>
+                                            )}
+                                            {shareLinkStatus === "success" && (
+                                                <span className="text-emerald-600">링크 복사 완료</span>
+                                            )}
+                                            {shareLinkStatus === "error" && (
+                                                <span className="text-rose-600">링크 복사 실패</span>
+                                            )}
+                                            {!savedResultId && (
+                                                <span className="text-muted-foreground">
+                                                    결과 저장 후 링크 공유 가능
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     <div className="border border-border rounded-lg p-4 space-y-3">
                                         <div className="flex items-center justify-between">

@@ -196,8 +196,8 @@ test.describe("Analysis Lab", () => {
             .locator("..");
         await expect(resultOutput).toBeVisible();
         await expect(resultOutput.getByRole("heading", { name: "Summary Report" })).toBeVisible();
-        const statusCard = page.getByText("상태").locator("..");
-        await expect(statusCard.getByText("완료")).toBeVisible();
+        const statusCard = page.getByText("상태", { exact: true }).locator("..");
+        await expect(statusCard.getByText("완료", { exact: true })).toBeVisible();
     });
 
     test("should show LLM error banner and badge", async ({ page }) => {
@@ -208,7 +208,10 @@ test.describe("Analysis Lab", () => {
         await page.goto("/analysis");
         await page.getByRole("button", { name: /성능 요약/ }).click();
 
-        await expect(page.getByText("LLM 오류(대체 보고서)")).toBeVisible();
+        const reportCard = page.getByText("보고서 상태", { exact: true }).locator("..");
+        await expect(
+            reportCard.getByText("LLM 오류(대체 보고서)", { exact: true })
+        ).toBeVisible();
         await expect(
             page.getByText(/LLM 오류로 대체 보고서를 사용했습니다/)
         ).toBeVisible();
@@ -258,6 +261,9 @@ test.describe("Analysis Lab", () => {
         await page.goto("/analysis");
         await page.getByRole("button", { name: /성능 요약/ }).click();
 
-        await expect(page.getByText("보고서 없음")).toBeVisible();
+        const reportCard = page.getByText("보고서 상태", { exact: true }).locator("..");
+        await expect(
+            reportCard.getByText("보고서 없음", { exact: true })
+        ).toBeVisible();
     });
 });
