@@ -13,11 +13,29 @@ import {
     uploadDataset,
     uploadRetrieverDocs
 } from "../services/api";
-import { Play, Database, Brain, Target, CheckCircle2, AlertCircle, Settings, Upload, FileText, X } from "lucide-react";
+import {
+    Play,
+    Database,
+    Brain,
+    Target,
+    CheckCircle2,
+    AlertCircle,
+    Settings,
+    Upload,
+    FileText,
+    X,
+    ExternalLink
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
+import { getPhoenixUiUrl } from "../utils/phoenix";
 
 const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
+const RETRIEVER_MODES = [
+    { value: "none", label: "Off" },
+    { value: "bm25", label: "BM25" },
+    { value: "hybrid", label: "Hybrid" },
+] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
@@ -63,6 +81,7 @@ export function EvaluationStudio() {
     const [promptSetName, setPromptSetName] = useState<string>("");
     const [promptSetDescription, setPromptSetDescription] = useState<string>("");
     const [ragasPromptsYaml, setRagasPromptsYaml] = useState<string>("");
+    const [phoenixUiUrl, setPhoenixUiUrl] = useState<string | null>(null);
 
     // Upload Modal State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -160,6 +179,7 @@ export function EvaluationStudio() {
                     )
                 ).sort((a, b) => a.localeCompare(b));
                 setProjectOptions(projects);
+                setPhoenixUiUrl(getPhoenixUiUrl(cfg?.phoenix_endpoint));
 
                 if (d.length > 0) setSelectedDataset(d[0].path);
 
@@ -587,6 +607,9 @@ export function EvaluationStudio() {
                                 {showAdvanced ? "Hide" : "Show"}
                             </span>
                         </button>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            고급 옵션은 필요할 때만 사용하세요. 기본값만으로도 평가가 가능합니다.
+                        </p>
 
                         {showAdvanced && (
                             <div className="mt-6 space-y-6 pt-4 border-t border-border/50">
@@ -594,35 +617,49 @@ export function EvaluationStudio() {
                                 <div>
                                     <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                                         Retriever Setup
-                                        <span className="text-xs font-normal text-muted-foreground">(Augment context with external docs)</span>
+                                        <span className="text-xs font-normal text-muted-foreground">(빈 컨텍스트 자동 보강)</span>
                                     </h3>
+                                    <div className="text-xs text-muted-foreground space-y-1 mb-4">
+                                        <p>contexts가 비어 있는 케이스에만 문서 검색 결과를 채웁니다. 기존 contexts는 유지됩니다.</p>
+                                        <p>
+                                            Retriever는{" "}
+                                            <code className="px-1 py-0.5 rounded bg-muted font-mono text-[11px]">
+                                                uv sync --extra korean
+                                            </code>{" "}
+                                            설치가 필요합니다.
+                                        </p>
+                                        <p>Web UI는 top_k=5로 고정됩니다. 더 조정하려면 CLI/API를 사용하세요.</p>
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-4">
-                                    <div className="tab-shell">
-                                        {(["none", "bm25", "hybrid"] as const).map(mode => (
-                                            <button
-                                                key={mode}
-                                                onClick={() => setRetrieverMode(mode)}
-                                                className={`tab-pill capitalize ${retrieverMode === mode
-                                                    ? "tab-pill-active"
-                                                    : "tab-pill-inactive"}`}
-                                            >
-                                                {mode}Mode
-                                            </button>
-                                        ))}
-                                    </div>
+                                            <div className="tab-shell">
+                                                {RETRIEVER_MODES.map((mode) => (
+                                                    <button
+                                                        key={mode.value}
+                                                        onClick={() => setRetrieverMode(mode.value)}
+                                                        className={`tab-pill ${retrieverMode === mode.value
+                                                            ? "tab-pill-active"
+                                                            : "tab-pill-inactive"}`}
+                                                    >
+                                                        {mode.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                BM25는 키워드 기반, Hybrid는 BM25 + Dense를 결합합니다.
+                                            </p>
                                             {retrieverMode !== "none" && (
                                                 <div className="space-y-3">
                                                     <input
                                                         type="text"
-                                                        placeholder="Absolute path to documents (json/jsonl/txt)"
+                                                        placeholder="Upload docs or paste server path (json/jsonl/txt)"
                                                         className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
                                                         value={docsPath}
                                                         onChange={(e) => setDocsPath(e.target.value)}
                                                     />
                                                     <p className="text-xs text-muted-foreground">
-                                                        Example: /abs/path/to/retriever_docs.json (server path).
-                                                        Supports .json, .jsonl, .txt.
+                                                        문서 경로는 API 서버 기준입니다. 업로드 버튼을 사용하면 자동 경로가 입력됩니다.
+                                                        지원 포맷: .json, .jsonl, .txt.
                                                     </p>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="flex flex-wrap items-center gap-2">
@@ -665,6 +702,9 @@ export function EvaluationStudio() {
                                 {/* Performance Config */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Performance & Batching</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        배치 크기를 높이면 속도가 빨라지지만 LLM 호출량/메모리 사용량과 rate limit 부담이 증가합니다.
+                                    </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs text-muted-foreground mb-1 block">Batch Size (parallelism)</label>
@@ -683,6 +723,9 @@ export function EvaluationStudio() {
                                 {/* Threshold Profile */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Threshold Profile</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        데이터셋 threshold가 비어 있을 때 추천값을 적용합니다. 선택한 프로필에 해당하는 메트릭만 덮어씁니다.
+                                    </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs text-muted-foreground mb-1 block">
@@ -707,6 +750,9 @@ export function EvaluationStudio() {
                                 {/* Prompt Snapshot */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Prompt Snapshot</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        실행 시점의 프롬프트/설정을 저장해 추후 비교와 리포트, Phoenix/Langfuse 기록에 활용합니다.
+                                    </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs text-muted-foreground mb-1 block">Prompt Set Name</label>
@@ -767,6 +813,9 @@ export function EvaluationStudio() {
                                 {/* Domain Memory */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Domain Memory</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        평가 결과를 도메인 메모리에 학습하고, 실행 전에 컨텍스트를 보강합니다.
+                                    </p>
                                     <div
                                         onClick={() => setEnableMemory(!enableMemory)}
                                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${enableMemory
@@ -786,6 +835,9 @@ export function EvaluationStudio() {
                                 {/* Tracker */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Observability Tracker</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        Phoenix는 로컬 UI에서 trace/metrics를 확인합니다. Langfuse는 API 키가 필요합니다.
+                                    </p>
                                     <div className="tab-shell">
                                         {(["none", "phoenix", "langfuse"] as const).map(t => (
                                             <button
@@ -800,17 +852,26 @@ export function EvaluationStudio() {
                                         ))}
                                     </div>
                                     {tracker === "phoenix" && (
-                                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1">
-                                            <input
-                                                type="text"
-                                                placeholder="Phoenix Project Name (Optional)"
-                                                className="px-3 py-2 rounded-md border border-border bg-background text-sm"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Experiment Description (Optional)"
-                                                className="px-3 py-2 rounded-md border border-border bg-background text-sm"
-                                            />
+                                        <div className="mt-3 space-y-2 text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1">
+                                            {phoenixUiUrl && (
+                                                <a
+                                                    href={phoenixUiUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                >
+                                                    Open Phoenix UI
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            )}
+                                            <p>
+                                                Phoenix 서버가 없다면{" "}
+                                                <code className="px-1 py-0.5 rounded bg-muted font-mono text-[11px]">
+                                                    docker run -p 6006:6006 arizephoenix/phoenix:latest
+                                                </code>{" "}
+                                                로 실행하세요.
+                                            </p>
+                                            <p>Dataset/Experiment 업로드 및 Prompt manifest는 CLI에서만 지원됩니다.</p>
                                         </div>
                                     )}
                                 </div>

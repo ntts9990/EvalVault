@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # LLM Provider Selection
     llm_provider: str = Field(
-        default="openai",
+        default="ollama",
         description="LLM provider: 'openai', 'ollama', or 'vllm'",
     )
     faithfulness_fallback_provider: str | None = Field(
@@ -52,7 +52,10 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(
         default=None, description="Custom OpenAI API base URL (optional)"
     )
-    openai_model: str = Field(default="gpt-4o", description="OpenAI model to use for evaluation")
+    openai_model: str = Field(
+        default="gpt-5-mini",
+        description="OpenAI model to use for evaluation",
+    )
     openai_embedding_model: str = Field(
         default="text-embedding-3-small", description="OpenAI embedding model"
     )
@@ -245,6 +248,28 @@ def get_settings() -> Settings:
             _settings = apply_profile(_settings, _settings.evalvault_profile)
 
     return _settings
+
+
+def apply_runtime_overrides(overrides: dict[str, object]) -> Settings:
+    """런타임 설정을 갱신하고 동일한 인스턴스를 유지합니다.
+
+    API에서 전달된 변경 사항을 적용한 뒤, 전역 설정 인스턴스를
+    갱신해 동일 참조를 유지합니다.
+    """
+    settings = get_settings()
+    payload = settings.model_dump()
+    payload.update(overrides)
+
+    if any(
+        key in overrides for key in {"llm_provider", "openai_model", "ollama_model", "vllm_model"}
+    ):
+        payload["evalvault_profile"] = None
+
+    updated = Settings.model_validate(payload)
+    for key, value in updated.model_dump().items():
+        setattr(settings, key, value)
+
+    return settings
 
 
 def reset_settings() -> None:

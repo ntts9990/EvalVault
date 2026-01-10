@@ -22,6 +22,10 @@ cd frontend
 npm install
 npm run dev
 ```
+또는 Phoenix까지 함께 띄우려면 다음 스크립트를 사용하세요.
+```bash
+bash scripts/dev/start_web_ui_with_phoenix.sh
+```
 브라우저에서 `http://localhost:5173`에 접속한 뒤 Evaluation Studio에서 평가를 실행하고
 Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `tests/fixtures/e2e/insurance_qa_korean.json` 업로드)
 

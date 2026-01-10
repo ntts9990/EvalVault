@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
-import { fetchConfig, type SystemConfig } from "../services/api";
-import { Settings as SettingsIcon, Cpu, Globe, Activity, Shield } from "lucide-react";
+import {
+    fetchConfig,
+    fetchModels,
+    updateConfig,
+    type ModelItem,
+    type SystemConfig,
+} from "../services/api";
+import { Settings as SettingsIcon, Cpu, Globe, Activity, Shield, ExternalLink } from "lucide-react";
+import { getPhoenixUiUrl } from "../utils/phoenix";
 
 type ConfigValue = string | number | boolean | null | undefined;
 
@@ -15,12 +22,54 @@ export function Settings() {
     const [config, setConfig] = useState<SystemConfig | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [providerDraft, setProviderDraft] = useState<"ollama" | "openai" | "vllm">("ollama");
+    const [modelDraft, setModelDraft] = useState("");
+    const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+    const [modelsLoading, setModelsLoading] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [openaiConsent, setOpenaiConsent] = useState(false);
+
+    const activeModelValue = useMemo(() => {
+        if (!config) return "";
+        if (providerDraft === "openai") return String(config.openai_model || "");
+        if (providerDraft === "vllm") return String(config.vllm_model || "");
+        return String(config.ollama_model || "");
+    }, [config, providerDraft]);
+
+    const normalizeModelName = (provider: string, modelId: string) => {
+        if (!modelId) return "";
+        const prefix = `${provider}/`;
+        return modelId.startsWith(prefix) ? modelId.slice(prefix.length) : modelId;
+    };
+
+    const loadModels = async (provider: "ollama" | "openai" | "vllm") => {
+        setModelsLoading(true);
+        try {
+            const options = await fetchModels(provider);
+            setModelOptions(options);
+        } catch {
+            setModelOptions([]);
+        } finally {
+            setModelsLoading(false);
+        }
+    };
 
     useEffect(() => {
         async function loadConfig() {
             try {
                 const data = await fetchConfig();
                 setConfig(data);
+                const provider = (data.llm_provider as "ollama" | "openai" | "vllm") || "ollama";
+                setProviderDraft(provider);
+                setModelDraft(
+                    provider === "openai"
+                        ? String(data.openai_model || "")
+                        : provider === "vllm"
+                            ? String(data.vllm_model || "")
+                            : String(data.ollama_model || "")
+                );
+                await loadModels(provider);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load config");
             } finally {
@@ -29,6 +78,56 @@ export function Settings() {
         }
         loadConfig();
     }, []);
+
+    useEffect(() => {
+        if (saveStatus !== "success") return;
+        const timeout = window.setTimeout(() => setSaveStatus("idle"), 2000);
+        return () => window.clearTimeout(timeout);
+    }, [saveStatus]);
+
+    const modelSelectOptions = modelOptions.map((model) => {
+        const name = normalizeModelName(providerDraft, model.id);
+        return { id: model.id, name: model.name, value: name };
+    });
+
+    const handleProviderChange = async (provider: "ollama" | "openai" | "vllm") => {
+        setProviderDraft(provider);
+        setOpenaiConsent(false);
+        setSaveStatus("idle");
+        setSaveError(null);
+        await loadModels(provider);
+        const fallback =
+            provider === "openai"
+                ? config?.openai_model
+                : provider === "vllm"
+                    ? config?.vllm_model
+                    : config?.ollama_model;
+        setModelDraft(String(fallback || ""));
+    };
+
+    const handleSave = async () => {
+        if (!config) return;
+        setSaveStatus("saving");
+        setSaveError(null);
+        try {
+            const payload: Record<string, string> = {
+                llm_provider: providerDraft,
+            };
+            if (providerDraft === "openai") {
+                payload.openai_model = modelDraft;
+            } else if (providerDraft === "vllm") {
+                payload.vllm_model = modelDraft;
+            } else {
+                payload.ollama_model = modelDraft;
+            }
+            const updated = await updateConfig(payload);
+            setConfig(updated);
+            setSaveStatus("success");
+        } catch (err) {
+            setSaveStatus("error");
+            setSaveError(err instanceof Error ? err.message : "Failed to update settings");
+        }
+    };
 
     if (loading) {
         return (
@@ -51,6 +150,7 @@ export function Settings() {
         );
     }
 
+    const phoenixUiUrl = getPhoenixUiUrl(config.phoenix_endpoint);
     const sections = [
         {
             title: "LLM Provider",
@@ -114,6 +214,105 @@ export function Settings() {
                     <p className="text-muted-foreground">Runtime configuration loaded from the backend.</p>
                 </div>
 
+                <section className="surface-panel p-6 mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Cpu className="w-5 h-5 text-primary" />
+                        <h2 className="text-lg font-semibold">LLM 기본 제공자</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="tab-shell">
+                            {(["ollama", "openai", "vllm"] as const).map((provider) => (
+                                <button
+                                    key={provider}
+                                    type="button"
+                                    onClick={() => handleProviderChange(provider)}
+                                    className={`tab-pill capitalize ${providerDraft === provider
+                                        ? "tab-pill-active"
+                                        : "tab-pill-inactive"
+                                        }`}
+                                >
+                                    {provider}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            분석 실험실/리포트 기본 모델에 적용됩니다.
+                        </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase">
+                                기본 모델
+                            </label>
+                            {modelsLoading ? (
+                                <div className="text-sm text-muted-foreground">모델 목록을 불러오는 중...</div>
+                            ) : modelSelectOptions.length > 0 ? (
+                                <select
+                                    value={modelDraft || activeModelValue}
+                                    onChange={(event) => setModelDraft(event.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                                >
+                                    {modelSelectOptions.map((option) => (
+                                        <option key={option.id} value={option.value}>
+                                            {option.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    value={modelDraft}
+                                    onChange={(event) => setModelDraft(event.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                                    placeholder="예: gemma3:1b"
+                                />
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase">
+                                적용 상태
+                            </label>
+                            <div className="text-sm text-muted-foreground">
+                                기본값: {activeModelValue || "미설정"}
+                            </div>
+                            {providerDraft === "openai" && (
+                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        checked={openaiConsent}
+                                        onChange={(event) => setOpenaiConsent(event.target.checked)}
+                                    />
+                                    OpenAI 사용 시 비용이 발생하는 것에 동의합니다.
+                                </label>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={
+                                saveStatus === "saving"
+                                || (providerDraft === "openai" && !openaiConsent)
+                                || !modelDraft
+                            }
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                        >
+                            {saveStatus === "saving" ? "저장 중..." : "설정 적용"}
+                        </button>
+                        {saveStatus === "success" && (
+                            <span className="text-xs text-emerald-600">적용 완료</span>
+                        )}
+                        {saveStatus === "error" && (
+                            <span className="text-xs text-rose-600">{saveError}</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                            서버 재시작 시 기본 설정으로 돌아갈 수 있습니다.
+                        </span>
+                    </div>
+                </section>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {sections.map((section) => (
                         <section key={section.title} className="surface-panel p-6">
@@ -131,6 +330,19 @@ export function Settings() {
                                     </div>
                                 ))}
                             </div>
+                            {section.title === "Tracking" && phoenixUiUrl && (
+                                <div className="mt-4">
+                                    <a
+                                        href={phoenixUiUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                    >
+                                        Open Phoenix UI
+                                        <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            )}
                         </section>
                     ))}
                 </div>

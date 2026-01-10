@@ -130,6 +130,23 @@ class WebUIAdapter:
         self._phoenix_resolver = resolver
         return resolver
 
+    def apply_settings_patch(self, overrides: dict[str, Any]) -> Settings:
+        """런타임 설정을 업데이트하고 LLM 어댑터를 재초기화."""
+        from evalvault.adapters.outbound.llm import get_llm_adapter
+        from evalvault.config.settings import apply_runtime_overrides
+
+        settings = apply_runtime_overrides(overrides)
+        self._settings = settings
+        self._phoenix_resolver_checked = False
+        self._phoenix_resolver = None
+
+        try:
+            self._llm_adapter = get_llm_adapter(settings)
+        except Exception as exc:
+            logger.warning("LLM adapter re-initialization failed: %s", exc)
+            self._llm_adapter = None
+        return settings
+
     def _get_llm_for_model(self, model_id: str | None) -> LLMPort | None:
         """Get LLM adapter for specified model, or default if None.
 
@@ -1400,11 +1417,11 @@ def create_adapter() -> WebUIAdapter:
     """
     from evalvault.adapters.outbound.llm import get_llm_adapter
     from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-    from evalvault.config.settings import Settings
+    from evalvault.config.settings import get_settings
     from evalvault.domain.services.evaluator import RagasEvaluator
 
     # 설정 로드
-    settings = Settings()
+    settings = get_settings()
 
     # Storage 생성 (기본 SQLite)
     db_path = Path(settings.evalvault_db_path)

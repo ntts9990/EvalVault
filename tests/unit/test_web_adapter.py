@@ -27,7 +27,7 @@ class TestEvalRequest:
 
         assert request.dataset_path == "/path/to/dataset.json"
         assert request.metrics == ["faithfulness", "answer_relevancy"]
-        assert request.model_name == "openai/gpt-5-nano"
+        assert request.model_name == "ollama/gemma3:1b"
         assert request.langfuse_enabled is False
         assert request.thresholds == {}
 

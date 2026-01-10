@@ -22,7 +22,7 @@
 
 환경 변수 필요:
     - OPENAI_API_KEY: OpenAI API 키
-    - OPENAI_MODEL: 사용할 모델 (기본: gpt-5-nano)
+    - OPENAI_MODEL: 사용할 모델 (기본: gpt-5-mini)
     - LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST: Langfuse 설정
 """
 

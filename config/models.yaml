@@ -44,10 +44,10 @@ profiles:
   # OpenAI 사용 시 (외부망)
   # ──────────────────────────────────────────────────────────────
   openai:
-    description: "OpenAI API 사용 (외부망)"
+    description: "OpenAI API 사용 (외부망, 기본: gpt-5-mini)"
     llm:
       provider: openai
-      model: gpt-5-nano
+      model: gpt-5-mini
     embedding:
       provider: openai
       model: text-embedding-3-small

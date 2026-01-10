@@ -60,8 +60,8 @@ src/evalvault/
 ## External Services Configuration
 
 ### OpenAI
-- **Model**: `gpt-5-nano` (default, configurable via OPENAI_MODEL)
-- **Note**: `gpt-5-nano`는 실제 사용 가능한 모델입니다. 변경하지 마세요.
+- **Model**: `gpt-5-mini` (default, configurable via OPENAI_MODEL)
+- **Note**: OpenAI 모델은 비용이 발생하므로 필요할 때만 선택합니다.
 - **Usage**: Ragas metric evaluation via LangChain
 
 ### Langfuse (Self-hosted or Cloud)

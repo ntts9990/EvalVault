@@ -20,6 +20,7 @@ export interface RunSummary {
     phoenix_precision: number | null;
     phoenix_drift: number | null;
     phoenix_experiment_url: string | null;
+    phoenix_trace_url?: string | null;
 }
 
 export interface TestCase {
@@ -156,6 +157,13 @@ export interface Behavior {
 export interface SystemConfig {
     [key: string]: unknown;
 }
+
+export type ConfigUpdateRequest = {
+    llm_provider?: "ollama" | "openai" | "vllm";
+    openai_model?: string;
+    ollama_model?: string;
+    vllm_model?: string;
+};
 
 export interface ImprovementAction {
     action_id: string;
@@ -542,6 +550,16 @@ export async function fetchAnalysisResult(resultId: string): Promise<SavedAnalys
 export async function fetchConfig(): Promise<SystemConfig> {
     const response = await fetch(`${API_BASE_URL}/config/`);
     if (!response.ok) throw new Error("Failed to fetch config");
+    return response.json();
+}
+
+export async function updateConfig(payload: ConfigUpdateRequest): Promise<SystemConfig> {
+    const response = await fetch(`${API_BASE_URL}/config/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Failed to update config");
     return response.json();
 }
 

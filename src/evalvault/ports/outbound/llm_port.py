@@ -46,7 +46,7 @@ class LLMPort(ABC):
         """Get the model name being used.
 
         Returns:
-            Model identifier (e.g., 'gpt-5-nano')
+            Model identifier (e.g., 'gpt-5-mini')
         """
         pass
 

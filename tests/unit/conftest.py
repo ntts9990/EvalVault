@@ -12,4 +12,4 @@ load_dotenv(env_path)
 
 def get_test_model():
     """Get the model name from environment, with fallback for CI."""
-    return os.environ.get("OPENAI_MODEL", "gpt-5-nano")
+    return os.environ.get("OPENAI_MODEL", "gpt-5-mini")

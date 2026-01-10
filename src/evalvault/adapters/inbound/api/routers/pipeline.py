@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-from evalvault.config.settings import Settings
+from evalvault.config.settings import get_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
@@ -201,7 +201,7 @@ def _intent_label(intent_value: str) -> str:
 
 
 def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAdapter]:
-    settings = Settings()
+    settings = get_settings()
     storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
     llm_adapter = None
     try:

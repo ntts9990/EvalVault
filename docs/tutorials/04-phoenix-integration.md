@@ -263,7 +263,7 @@ rag_trace = RAGTraceData(
         ],
     ),
     generation=GenerationData(
-        model="gpt-5-nano",
+        model="gpt-5-mini",
         prompt="다음 컨텍스트를 바탕으로 질문에 답하세요...",
         response="보장금액은 1억원입니다.",
         input_tokens=150,

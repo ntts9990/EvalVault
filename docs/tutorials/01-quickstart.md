@@ -147,6 +147,10 @@ cd frontend
 npm install
 npm run dev
 ```
+또는 Phoenix까지 함께 실행하려면 다음을 사용하세요.
+```bash
+bash scripts/dev/start_web_ui_with_phoenix.sh
+```
 브라우저에서 `http://localhost:5173`를 열어 확인합니다.
 
 ---

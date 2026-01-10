@@ -150,6 +150,14 @@ export function RunDetails() {
     const thresholdProfileLabel = summary.threshold_profile
         ? summary.threshold_profile.toUpperCase()
         : "Dataset/default";
+    const phoenixLinks = [
+        summary.phoenix_trace_url
+            ? { label: "Phoenix Trace", url: summary.phoenix_trace_url }
+            : null,
+        summary.phoenix_experiment_url
+            ? { label: "Phoenix Experiment", url: summary.phoenix_experiment_url }
+            : null,
+    ].filter((link): link is { label: string; url: string } => Boolean(link));
     const summarySafetyRows = summaryMetrics.map((metric) => {
         const scores = results.flatMap(
             (result) =>
@@ -222,16 +230,21 @@ export function RunDetails() {
                             </p>
                         </div>
 
-                        {summary.phoenix_experiment_url && (
-                            <a
-                                href={summary.phoenix_experiment_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
-                            >
-                                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                                <span className="font-medium text-sm">Phoenix</span>
-                            </a>
+                        {phoenixLinks.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                {phoenixLinks.map((link) => (
+                                    <a
+                                        key={link.label}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
+                                    >
+                                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                                        <span className="font-medium text-sm">{link.label}</span>
+                                    </a>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
