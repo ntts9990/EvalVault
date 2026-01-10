@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from evalvault.adapters.inbound.api.main import AdapterDep
 from evalvault.config.settings import get_settings
@@ -33,10 +33,46 @@ def get_config():
 
 
 class ConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evalvault_profile: str | None = None
+    cors_origins: str | None = None
+    evalvault_db_path: str | None = None
+    evalvault_memory_db_path: str | None = None
     llm_provider: Literal["ollama", "openai", "vllm"] | None = None
+    faithfulness_fallback_provider: Literal["ollama", "openai", "vllm"] | None = None
+    faithfulness_fallback_model: str | None = None
     openai_model: str | None = None
+    openai_embedding_model: str | None = None
+    openai_base_url: str | None = None
     ollama_model: str | None = None
+    ollama_embedding_model: str | None = None
+    ollama_base_url: str | None = None
+    ollama_timeout: int | None = None
+    ollama_think_level: str | None = None
+    ollama_tool_models: str | None = None
     vllm_model: str | None = None
+    vllm_embedding_model: str | None = None
+    vllm_base_url: str | None = None
+    vllm_embedding_base_url: str | None = None
+    vllm_timeout: int | None = None
+    azure_endpoint: str | None = None
+    azure_deployment: str | None = None
+    azure_embedding_deployment: str | None = None
+    azure_api_version: str | None = None
+    anthropic_model: str | None = None
+    anthropic_thinking_budget: int | None = None
+    langfuse_host: str | None = None
+    mlflow_tracking_uri: str | None = None
+    mlflow_experiment_name: str | None = None
+    phoenix_endpoint: str | None = None
+    phoenix_enabled: bool | None = None
+    phoenix_sample_rate: float | None = None
+    tracker_provider: Literal["langfuse", "mlflow", "phoenix", "none"] | None = None
+    postgres_host: str | None = None
+    postgres_port: int | None = None
+    postgres_database: str | None = None
+    postgres_user: str | None = None
 
 
 @router.patch("/")
@@ -45,7 +81,7 @@ def update_config(
     adapter: AdapterDep,
 ):
     """Update runtime configuration (non-secret fields only)."""
-    updates = payload.model_dump(exclude_none=True)
+    updates = payload.model_dump(exclude_unset=True)
     if not updates:
         return get_config()
 
@@ -62,3 +98,28 @@ def update_config(
             "postgres_connection_string",
         }
     )
+
+
+@router.get("/profiles")
+def list_profiles():
+    """List available model profiles for selection."""
+    from evalvault.config.model_config import get_model_config
+
+    try:
+        model_config = get_model_config()
+    except FileNotFoundError:
+        return []
+
+    profiles = []
+    for name, profile in model_config.profiles.items():
+        profiles.append(
+            {
+                "name": name,
+                "description": profile.description,
+                "llm_provider": profile.llm.provider,
+                "llm_model": profile.llm.model,
+                "embedding_provider": profile.embedding.provider,
+                "embedding_model": profile.embedding.model,
+            }
+        )
+    return profiles

@@ -159,11 +159,54 @@ export interface SystemConfig {
 }
 
 export type ConfigUpdateRequest = {
+    evalvault_profile?: string | null;
+    cors_origins?: string | null;
+    evalvault_db_path?: string | null;
+    evalvault_memory_db_path?: string | null;
     llm_provider?: "ollama" | "openai" | "vllm";
-    openai_model?: string;
-    ollama_model?: string;
-    vllm_model?: string;
+    faithfulness_fallback_provider?: "ollama" | "openai" | "vllm" | null;
+    faithfulness_fallback_model?: string | null;
+    openai_model?: string | null;
+    openai_embedding_model?: string | null;
+    openai_base_url?: string | null;
+    ollama_model?: string | null;
+    ollama_embedding_model?: string | null;
+    ollama_base_url?: string | null;
+    ollama_timeout?: number | null;
+    ollama_think_level?: string | null;
+    ollama_tool_models?: string | null;
+    vllm_model?: string | null;
+    vllm_embedding_model?: string | null;
+    vllm_base_url?: string | null;
+    vllm_embedding_base_url?: string | null;
+    vllm_timeout?: number | null;
+    azure_endpoint?: string | null;
+    azure_deployment?: string | null;
+    azure_embedding_deployment?: string | null;
+    azure_api_version?: string | null;
+    anthropic_model?: string | null;
+    anthropic_thinking_budget?: number | null;
+    langfuse_host?: string | null;
+    mlflow_tracking_uri?: string | null;
+    mlflow_experiment_name?: string | null;
+    phoenix_endpoint?: string | null;
+    phoenix_enabled?: boolean | null;
+    phoenix_sample_rate?: number | null;
+    tracker_provider?: "langfuse" | "mlflow" | "phoenix" | "none" | null;
+    postgres_host?: string | null;
+    postgres_port?: number | null;
+    postgres_database?: string | null;
+    postgres_user?: string | null;
 };
+
+export interface ConfigProfile {
+    name: string;
+    description?: string;
+    llm_provider: string;
+    llm_model: string;
+    embedding_provider: string;
+    embedding_model: string;
+}
 
 export interface ImprovementAction {
     action_id: string;
@@ -550,6 +593,12 @@ export async function fetchAnalysisResult(resultId: string): Promise<SavedAnalys
 export async function fetchConfig(): Promise<SystemConfig> {
     const response = await fetch(`${API_BASE_URL}/config/`);
     if (!response.ok) throw new Error("Failed to fetch config");
+    return response.json();
+}
+
+export async function fetchConfigProfiles(): Promise<ConfigProfile[]> {
+    const response = await fetch(`${API_BASE_URL}/config/profiles`);
+    if (!response.ok) throw new Error("Failed to fetch config profiles");
     return response.json();
 }
 

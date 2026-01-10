@@ -260,12 +260,25 @@ def apply_runtime_overrides(overrides: dict[str, object]) -> Settings:
     payload = settings.model_dump()
     payload.update(overrides)
 
-    if any(
-        key in overrides for key in {"llm_provider", "openai_model", "ollama_model", "vllm_model"}
-    ):
+    profile_value = payload.get("evalvault_profile")
+    if isinstance(profile_value, str) and not profile_value.strip():
+        payload["evalvault_profile"] = None
+
+    model_override_keys = {
+        "llm_provider",
+        "openai_model",
+        "openai_embedding_model",
+        "ollama_model",
+        "ollama_embedding_model",
+        "vllm_model",
+        "vllm_embedding_model",
+    }
+    if any(key in overrides for key in model_override_keys):
         payload["evalvault_profile"] = None
 
     updated = Settings.model_validate(payload)
+    if updated.evalvault_profile:
+        updated = apply_profile(updated, updated.evalvault_profile)
     for key, value in updated.model_dump().items():
         setattr(settings, key, value)
 

@@ -3,6 +3,7 @@ import { Layout } from "../components/Layout";
 import {
     type DatasetItem,
     type ModelItem,
+    type SystemConfig,
     fetchDatasets,
     fetchDatasetTemplate,
     fetchModels,
@@ -72,7 +73,7 @@ export function EvaluationStudio() {
     const [retrieverFile, setRetrieverFile] = useState<File | null>(null);
     const [retrieverUploading, setRetrieverUploading] = useState(false);
     const [enableMemory, setEnableMemory] = useState<boolean>(false);
-    const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse">("phoenix");
+    const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse" | "mlflow">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [batchSize, setBatchSize] = useState<number>(1);
     const [thresholdProfile, setThresholdProfile] = useState<"none" | "summary" | "qa">("none");
@@ -82,6 +83,7 @@ export function EvaluationStudio() {
     const [promptSetDescription, setPromptSetDescription] = useState<string>("");
     const [ragasPromptsYaml, setRagasPromptsYaml] = useState<string>("");
     const [phoenixUiUrl, setPhoenixUiUrl] = useState<string | null>(null);
+    const [configDefaults, setConfigDefaults] = useState<SystemConfig | null>(null);
 
     // Upload Modal State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -179,6 +181,7 @@ export function EvaluationStudio() {
                     )
                 ).sort((a, b) => a.localeCompare(b));
                 setProjectOptions(projects);
+                setConfigDefaults(cfg);
                 setPhoenixUiUrl(getPhoenixUiUrl(cfg?.phoenix_endpoint));
 
                 if (d.length > 0) setSelectedDataset(d[0].path);
@@ -199,7 +202,21 @@ export function EvaluationStudio() {
                 }
 
                 setModels(modelList);
-                if (modelList.length > 0) setSelectedModel(modelList[0].id);
+                if (modelList.length > 0) {
+                    const defaultName = provider === "openai"
+                        ? String(cfg?.openai_model || "")
+                        : provider === "vllm"
+                            ? String(cfg?.vllm_model || "")
+                            : String(cfg?.ollama_model || "");
+                    const defaultId = defaultName ? `${provider}/${defaultName}` : "";
+                    const matched = defaultId ? modelList.find(model => model.id === defaultId) : undefined;
+                    setSelectedModel(matched?.id || modelList[0].id);
+                }
+
+                const trackerCandidate = cfg?.tracker_provider;
+                if (trackerCandidate === "phoenix" || trackerCandidate === "langfuse" || trackerCandidate === "mlflow" || trackerCandidate === "none") {
+                    setTracker(trackerCandidate);
+                }
             } catch (err) {
                 setError("Failed to load configuration options");
                 console.error(err);
@@ -223,7 +240,14 @@ export function EvaluationStudio() {
             const modelList = await fetchModels(provider);
             setModels(modelList);
             if (modelList.length > 0) {
-                setSelectedModel(modelList[0].id);
+                const defaultName = provider === "openai"
+                    ? String(configDefaults?.openai_model || "")
+                    : provider === "vllm"
+                        ? String(configDefaults?.vllm_model || "")
+                        : String(configDefaults?.ollama_model || "");
+                const defaultId = defaultName ? `${provider}/${defaultName}` : "";
+                const matched = defaultId ? modelList.find(model => model.id === defaultId) : undefined;
+                setSelectedModel(matched?.id || modelList[0].id);
             } else {
                 const hint = provider === "ollama"
                     ? "Run 'ollama list' to verify local models."
@@ -836,10 +860,10 @@ export function EvaluationStudio() {
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Observability Tracker</h3>
                                     <p className="text-xs text-muted-foreground mb-3">
-                                        Phoenix는 로컬 UI에서 trace/metrics를 확인합니다. Langfuse는 API 키가 필요합니다.
+                                        Phoenix는 로컬 UI에서 trace/metrics를 확인합니다. Langfuse/MLflow는 별도 설정이 필요합니다.
                                     </p>
                                     <div className="tab-shell">
-                                        {(["none", "phoenix", "langfuse"] as const).map(t => (
+                                        {(["none", "phoenix", "langfuse", "mlflow"] as const).map(t => (
                                             <button
                                                 key={t}
                                                 onClick={() => setTracker(t)}
