@@ -1060,6 +1060,8 @@ class TestMetricMaps:
         expected = {
             "context_precision",
             "context_recall",
+            "exact_match",
+            "f1_score",
             "factual_correctness",
             "semantic_similarity",
         }
