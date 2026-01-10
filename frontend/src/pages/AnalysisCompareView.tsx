@@ -164,7 +164,7 @@ function ResultCard({
         : "text-amber-700 bg-amber-50 border-amber-200";
 
     return (
-        <div className="border border-border rounded-xl p-4 bg-card space-y-4">
+        <div className="surface-panel p-4 space-y-4">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="text-xs text-muted-foreground">{variant}</p>
@@ -529,7 +529,7 @@ export function AnalysisCompareView() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">노드 상태 변경</p>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-semibold">
@@ -546,7 +546,7 @@ export function AnalysisCompareView() {
                                     {failureDeltaDisplay}
                                 </p>
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">메트릭 변화</p>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-semibold">
@@ -565,7 +565,7 @@ export function AnalysisCompareView() {
                                     </p>
                                 )}
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">우선순위 변화</p>
                                 {!priorityDiff ? (
                                     <p className="text-xs text-muted-foreground mt-2">
@@ -582,7 +582,7 @@ export function AnalysisCompareView() {
                                     </div>
                                 )}
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">처리 시간</p>
                                 <div className="mt-2 text-sm text-muted-foreground">
                                     A {formatDurationMs(resultA.duration_ms)} → B {formatDurationMs(resultB.duration_ms)}
@@ -598,7 +598,7 @@ export function AnalysisCompareView() {
                             <ResultCard result={resultB} variant="B" failureCount={failureCountB} />
                         </div>
 
-                        <div className="border border-border rounded-xl p-4 bg-card">
+                        <div className="surface-panel p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <div>
                                     <h3 className="text-sm font-semibold">노드 상태 비교</h3>
@@ -646,7 +646,7 @@ export function AnalysisCompareView() {
                             </div>
                         </div>
 
-                        <div className="border border-border rounded-xl p-4 bg-card">
+                        <div className="surface-panel p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
                                     <h3 className="text-sm font-semibold">우선순위 케이스 변화</h3>
@@ -711,7 +711,7 @@ export function AnalysisCompareView() {
                             )}
                         </div>
 
-                        <div className="border border-border rounded-xl p-4 bg-card">
+                        <div className="surface-panel p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
                                     <h3 className="text-sm font-semibold">메트릭 차이</h3>

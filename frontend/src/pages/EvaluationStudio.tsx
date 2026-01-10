@@ -345,7 +345,7 @@ export function EvaluationStudio() {
 
                 <div className="grid grid-cols-1 gap-8">
                     {/* Dataset Selection */}
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-semibold flex items-center gap-2">
                                 <Database className="w-5 h-5 text-primary" />
@@ -399,7 +399,7 @@ export function EvaluationStudio() {
                     </section>
 
                     {/* Model Selection */}
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Brain className="w-5 h-5 text-primary" />
                             Select Model
@@ -474,7 +474,7 @@ export function EvaluationStudio() {
                         </div>
                     </section>
 
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Target className="w-5 h-5 text-primary" />
                             Project Label
@@ -507,7 +507,7 @@ export function EvaluationStudio() {
                         </div>
                     </section>
 
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <FileText className="w-5 h-5 text-primary" />
                             Summary Evaluation
@@ -547,7 +547,7 @@ export function EvaluationStudio() {
                     </section>
 
                     {/* Metrics Selection */}
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Target className="w-5 h-5 text-primary" />
                             Select Metrics
@@ -576,7 +576,7 @@ export function EvaluationStudio() {
                         </div>
                     </section>
                     {/* Advanced Configuration */}
-                    <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <section className="surface-panel p-6">
                         <button
                             onClick={() => setShowAdvanced(!showAdvanced)}
                             className="flex items-center gap-2 w-full text-left"

@@ -290,7 +290,7 @@ export function AnalysisResultView() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">결과 상태</p>
                                 <div className="mt-2">
                                     <StatusBadge status={result.is_complete ? "completed" : "incomplete"} />
@@ -299,7 +299,7 @@ export function AnalysisResultView() {
                                     저장 {formatDateTime(result.created_at)}
                                 </p>
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">분석 유형</p>
                                 <p className="text-lg font-semibold mt-2">{result.intent}</p>
                                 {result.pipeline_id && (
@@ -308,7 +308,7 @@ export function AnalysisResultView() {
                                     </p>
                                 )}
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">처리 시간</p>
                                 <p className="text-2xl font-semibold mt-2">
                                     {formatDurationMs(result.duration_ms)}
@@ -320,7 +320,7 @@ export function AnalysisResultView() {
                                     종료 {formatDateTime(result.finished_at)}
                                 </p>
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">노드 상태</p>
                                 {nodeSummary ? (
                                     <>
@@ -349,13 +349,13 @@ export function AnalysisResultView() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">Query</p>
                                 <p className="text-sm font-medium mt-2">
                                     {result.query || "-"}
                                 </p>
                             </div>
-                            <div className="border border-border rounded-xl p-4 bg-card">
+                            <div className="surface-panel p-4">
                                 <p className="text-xs text-muted-foreground">Run ID</p>
                                 <p className="text-sm font-medium mt-2">
                                     {result.run_id || "샘플 데이터"}
@@ -365,13 +365,13 @@ export function AnalysisResultView() {
                         {(result.profile || (result.tags && result.tags.length > 0)) && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {result.profile && (
-                                    <div className="border border-border rounded-xl p-4 bg-card">
+                                    <div className="surface-panel p-4">
                                         <p className="text-xs text-muted-foreground">Profile</p>
                                         <p className="text-sm font-medium mt-2">{result.profile}</p>
                                     </div>
                                 )}
                                 {result.tags && result.tags.length > 0 && (
-                                    <div className="border border-border rounded-xl p-4 bg-card">
+                                    <div className="surface-panel p-4">
                                         <p className="text-xs text-muted-foreground">Tags</p>
                                         <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                                             {result.tags.map((tag) => (

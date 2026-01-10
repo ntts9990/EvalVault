@@ -317,7 +317,7 @@ export function Dashboard() {
                 </p>
             </div>
 
-            <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm mb-8">
+            <div className="surface-card p-6 mb-8">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-4">
                     <span className="inline-flex h-2 w-2 rounded-full bg-primary"></span>
                     Filters
@@ -408,7 +408,7 @@ export function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                <div className="surface-card p-5">
                     <div className="flex items-start justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground font-medium">Runs</p>
@@ -433,7 +433,7 @@ export function Dashboard() {
                     )}
                 </div>
 
-                <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                <div className="surface-card p-5">
                     <div className="flex items-start justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground font-medium">Test Cases</p>
@@ -460,7 +460,7 @@ export function Dashboard() {
                     )}
                 </div>
 
-                <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                <div className="surface-card p-5">
                     <div className="flex items-start justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground font-medium">Average Pass Rate</p>
@@ -487,7 +487,7 @@ export function Dashboard() {
                     )}
                 </div>
 
-                <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                <div className="surface-card p-5">
                     <div className="flex items-start justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground font-medium">Total Cost</p>
@@ -517,10 +517,10 @@ export function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="chart-panel p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h2 className="text-lg font-semibold">Pass Rate Trend</h2>
+                            <h2 className="section-title">Pass Rate Trend</h2>
                             <p className="text-sm text-muted-foreground">
                                 Weighted by test cases per day
                             </p>
@@ -576,10 +576,10 @@ export function Dashboard() {
                     </div>
                 </div>
 
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="chart-panel p-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h2 className="text-lg font-semibold">Metric Trend</h2>
+                            <h2 className="section-title">Metric Trend</h2>
                             <p className="text-sm text-muted-foreground">
                                 Track average metric scores over time
                             </p>

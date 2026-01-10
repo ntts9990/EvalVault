@@ -128,7 +128,7 @@ export function KnowledgeBase() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Stats Panel */}
                     <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="surface-panel p-6">
                             <div className="flex items-center gap-3 mb-2">
                                 <div className="p-2 bg-blue-500/10 rounded-lg">
                                     <Network className="w-6 h-6 text-blue-500" />
@@ -137,7 +137,7 @@ export function KnowledgeBase() {
                             </div>
                             <p className="text-3xl font-bold">{stats?.num_entities || 0}</p>
                         </div>
-                        <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="surface-panel p-6">
                             <div className="flex items-center gap-3 mb-2">
                                 <div className="p-2 bg-purple-500/10 rounded-lg">
                                     <Network className="w-6 h-6 text-purple-500" />
@@ -146,7 +146,7 @@ export function KnowledgeBase() {
                             </div>
                             <p className="text-3xl font-bold">{stats?.num_relations || 0}</p>
                         </div>
-                        <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="surface-panel p-6">
                             <div className="flex items-center gap-3 mb-2">
                                 <div className="p-2 bg-green-500/10 rounded-lg">
                                     <Database className="w-6 h-6 text-green-500" />
@@ -162,7 +162,7 @@ export function KnowledgeBase() {
 
                     {/* Upload Section */}
                     <div className="lg:col-span-2 space-y-6">
-                        <section className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <section className="surface-panel p-6">
                             <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
                                 <Upload className="w-5 h-5 text-primary" />
                                 Upload Documents
@@ -210,7 +210,7 @@ export function KnowledgeBase() {
 
                     {/* Build Action */}
                     <div className="lg:col-span-1">
-                        <section className="bg-card border border-border rounded-xl p-6 shadow-sm h-full">
+                        <section className="surface-panel p-6 h-full">
                             <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
                                 <Database className="w-5 h-5 text-primary" />
                                 Build Knowledge Graph

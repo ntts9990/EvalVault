@@ -237,7 +237,7 @@ export function RunDetails() {
                 </div>
 
                 {summarySafetyRows.length > 0 && (
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-8">
+                    <div className="surface-panel p-6 mb-8">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <h3 className="font-semibold mb-1 flex items-center gap-2">
@@ -289,7 +289,7 @@ export function RunDetails() {
                         {/* Charts & Summary Grid (Overview) */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                         {/* Metric Performance Chart */}
-                        <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <div className="lg:col-span-2 surface-panel p-6">
                             <h3 className="font-semibold mb-6 flex items-center gap-2">
                                 <Target className="w-4 h-4 text-primary" />
                                 Metric Performance
@@ -339,7 +339,7 @@ export function RunDetails() {
                         </div>
                         </div>
                         {promptSet && (
-                            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-8">
+                            <div className="surface-panel p-6 mb-8">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div>
                                         <h3 className="font-semibold flex items-center gap-2">
@@ -384,7 +384,7 @@ export function RunDetails() {
                     /* Performance Tab Content */
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-in fade-in duration-300">
                         {/* Latency Analysis */}
-                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <div className="surface-panel p-6">
                             <h3 className="font-semibold mb-2">Evaluation Speed</h3>
                             <p className="text-sm text-muted-foreground mb-6">Average time per test case</p>
                             <div className="h-64 w-full flex items-center justify-center">
@@ -413,7 +413,7 @@ export function RunDetails() {
                         </div>
 
                         {/* Token Usage / Cost Distribution */}
-                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                        <div className="surface-panel p-6">
                             <h3 className="font-semibold mb-2">Estimated Cost</h3>
                             <p className="text-sm text-muted-foreground mb-6">Based on model pricing (Input/Output)</p>
                             <div className="flex items-center justify-center h-64 text-muted-foreground italic">

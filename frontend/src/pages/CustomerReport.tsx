@@ -244,7 +244,7 @@ export function CustomerReport() {
                     </div>
                 </div>
 
-                <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm mb-8">
+                <div className="surface-card p-6 mb-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                             <label className="text-xs font-semibold text-muted-foreground uppercase">
@@ -311,7 +311,7 @@ export function CustomerReport() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                    <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                    <div className="surface-card p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground font-medium">Runs</p>
@@ -322,7 +322,7 @@ export function CustomerReport() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                    <div className="surface-card p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground font-medium">Test Cases</p>
@@ -335,7 +335,7 @@ export function CustomerReport() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                    <div className="surface-card p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground font-medium">Average Pass Rate</p>
@@ -348,7 +348,7 @@ export function CustomerReport() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-5 rounded-2xl bg-card border border-border/50 shadow-sm">
+                    <div className="surface-card p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground font-medium">Total Cost</p>
@@ -362,8 +362,8 @@ export function CustomerReport() {
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
-                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-lg font-semibold mb-2">Pass Rate Trend</h2>
+                    <div className="chart-panel p-6">
+                        <h2 className="section-title mb-2">Pass Rate Trend</h2>
                         <p className="text-sm text-muted-foreground mb-4">
                             Weighted by test cases per day
                         </p>
@@ -417,8 +417,8 @@ export function CustomerReport() {
                         </div>
                     </div>
 
-                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-lg font-semibold mb-2">Metric Trend</h2>
+                    <div className="chart-panel p-6">
+                        <h2 className="section-title mb-2">Metric Trend</h2>
                         <p className="text-sm text-muted-foreground mb-4">
                             Track average metric scores over time
                         </p>
@@ -492,7 +492,7 @@ export function CustomerReport() {
                     </div>
                 </div>
 
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="surface-card p-6">
                     <h2 className="text-lg font-semibold mb-4">Recent Runs</h2>
                     {filteredRuns.length === 0 ? (
                         <div className="text-sm text-muted-foreground">

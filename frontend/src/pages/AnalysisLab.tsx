@@ -1469,7 +1469,7 @@ export function AnalysisLab() {
                     </div>
 
                     <div className="lg:col-span-2">
-                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm h-full relative overflow-hidden">
+                        <div className="surface-panel p-6 h-full relative overflow-hidden">
                             <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
                             <div className="flex items-center justify-between mb-4">
                                 <div>
@@ -1933,7 +1933,7 @@ export function AnalysisLab() {
                                     </div>
 
                                     {resultSummary && (
-                                        <div className="border border-border rounded-xl p-4 bg-card">
+                                        <div className="surface-panel p-4">
                                             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                                 <div>
                                                     <h3 className="text-sm font-semibold">실행 요약</h3>

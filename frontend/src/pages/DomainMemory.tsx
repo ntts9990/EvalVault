@@ -110,7 +110,7 @@ export function DomainMemory() {
                                     <p className="text-muted-foreground p-8 text-center bg-card rounded-xl border border-border">No facts found yet.</p>
                                 ) : (
                                     facts.map((fact) => (
-                                        <div key={fact.fact_id} className="bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-all">
+                                        <div key={fact.fact_id} className="surface-panel p-4 hover:shadow-md transition-all">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex gap-2 items-center">
                                                     <span className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">{fact.domain || "General"}</span>
@@ -154,7 +154,7 @@ export function DomainMemory() {
                                     <p className="text-muted-foreground col-span-2 p-8 text-center bg-card rounded-xl border border-border">No behaviors learned yet.</p>
                                 ) : (
                                     behaviors.map((behavior) => (
-                                        <div key={behavior.behavior_id} className="bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-all">
+                                        <div key={behavior.behavior_id} className="surface-panel p-4 hover:shadow-md transition-all">
                                             <h3 className="font-semibold mb-2">{behavior.description}</h3>
                                             <div className="flex justify-between items-center text-sm text-muted-foreground mb-4">
                                                 <span>Uses: {behavior.use_count}</span>
@@ -169,7 +169,7 @@ export function DomainMemory() {
                         {activeTab === "insights" && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 {/* Fact Verification Trend (Line/Area Chart) */}
-                                <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                                <div className="surface-panel p-6">
                                     <h3 className="font-semibold mb-2 flex items-center gap-2">
                                         <Activity className="w-4 h-4 text-primary" />
                                         Fact Verification Trend
@@ -206,7 +206,7 @@ export function DomainMemory() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-card p-6 rounded-xl border border-border">
+                                    <div className="surface-panel p-6">
                                         <h3 className="font-semibold mb-4">Memory Health</h3>
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">

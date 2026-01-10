@@ -81,3 +81,42 @@
     background-repeat: no-repeat;
   }
 }
+
+@layer components {
+  .surface-card {
+    @apply bg-card/90 border border-border/60 rounded-2xl shadow-sm;
+    backdrop-filter: blur(6px);
+  }
+
+  .surface-panel {
+    @apply bg-card/90 border border-border/60 rounded-xl shadow-sm;
+  }
+
+  .surface-subtle {
+    @apply bg-card/80 border border-border/50 rounded-lg;
+  }
+
+  .chart-panel {
+    @apply bg-card/90 border border-border/60 rounded-2xl shadow-sm relative overflow-hidden;
+  }
+
+  .chart-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08), transparent 55%);
+    pointer-events: none;
+  }
+
+  .chart-panel > * {
+    position: relative;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold font-display tracking-tight;
+  }
+
+  .section-kicker {
+    @apply text-[11px] uppercase tracking-[0.2em] text-muted-foreground;
+  }
+}

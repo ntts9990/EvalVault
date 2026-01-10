@@ -200,7 +200,7 @@ export function CompareRuns() {
                 {/* Top Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     {/* Pass Rate Delta */}
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm flex items-center justify-between">
+                    <div className="surface-panel p-6 flex items-center justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Pass Rate Change</p>
                             <div className="flex items-baseline gap-2">
@@ -219,7 +219,7 @@ export function CompareRuns() {
                     </div>
 
                     {/* Regressions Count */}
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <div className="surface-panel p-6">
                         <p className="text-sm text-muted-foreground mb-1">Regressions</p>
                         <p className="text-3xl font-bold text-rose-500">
                             {resolvedCounts.regressions}
@@ -228,7 +228,7 @@ export function CompareRuns() {
                     </div>
 
                     {/* Improvements Count */}
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <div className="surface-panel p-6">
                         <p className="text-sm text-muted-foreground mb-1">Improvements</p>
                         <p className="text-3xl font-bold text-emerald-500">
                             {resolvedCounts.improvements}
@@ -253,7 +253,7 @@ export function CompareRuns() {
                 </div>
 
                 {/* Metric Delta Chart */}
-                <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-8">
+                <div className="surface-panel p-6 mb-8">
                     <h3 className="font-semibold mb-6">Metric Performance Delta</h3>
                     <div className="h-64 w-full">
                         <ResponsiveContainer width="100%" height="100%">
