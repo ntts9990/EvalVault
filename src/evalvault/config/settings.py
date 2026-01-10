@@ -1,7 +1,32 @@
 """Application settings using pydantic-settings."""
 
+from pathlib import Path
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _detect_repo_root(start: Path, max_depth: int = 6) -> Path | None:
+    current = start
+    for _ in range(max_depth):
+        if (current / "pyproject.toml").exists():
+            return current
+        if current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
+def _resolve_storage_path(path_value: str) -> str:
+    if not path_value or path_value == ":memory:":
+        return path_value
+    candidate = Path(path_value).expanduser()
+    if candidate.is_absolute():
+        return str(candidate)
+    repo_root = _detect_repo_root(Path.cwd())
+    base = repo_root if repo_root is not None else Path.cwd()
+    return str((base / candidate).resolve())
 
 
 class Settings(BaseSettings):
@@ -32,6 +57,10 @@ class Settings(BaseSettings):
         default="data/db/evalvault_memory.db",
         description="SQLite database path for Domain Memory storage.",
     )
+
+    def model_post_init(self, __context: Any) -> None:
+        self.evalvault_db_path = _resolve_storage_path(self.evalvault_db_path)
+        self.evalvault_memory_db_path = _resolve_storage_path(self.evalvault_memory_db_path)
 
     # LLM Provider Selection
     llm_provider: str = Field(

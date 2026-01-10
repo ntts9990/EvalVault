@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -66,6 +67,22 @@ class MockLLMAdapter(LLMPort):
         self._prompt_tokens = prompt
         self._completion_tokens = completion
         self._total_tokens = prompt + completion
+
+
+def build_dummy_prompt():
+    def input_model(**kwargs):
+        return SimpleNamespace(**kwargs)
+
+    def output_model(**kwargs):
+        return SimpleNamespace(**kwargs)
+
+    return SimpleNamespace(
+        instruction="",
+        input_model=input_model,
+        output_model=output_model,
+        examples=[],
+        language=None,
+    )
 
 
 @pytest.fixture
@@ -403,12 +420,12 @@ class TestScoreSingleSample:
         evaluator = RagasEvaluator()
 
         mock_metric = MagicMock(spec=["name"])
-        mock_metric.name = "faithfulness"
+        mock_metric.name = "answer_relevancy"
 
         scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         # 예외 발생 시 0.0 반환
-        assert scores["faithfulness"] == 0.0
+        assert scores["answer_relevancy"] == 0.0
 
 
 class TestProgressCallback:
@@ -799,6 +816,162 @@ class TestFaithfulnessFallback:
         result = evaluator._fallback_korean_faithfulness(sample)
 
         assert result is None
+
+
+class TestAnswerRelevancyPromptTuning:
+    """Answer relevancy 프롬프트 튜닝 테스트."""
+
+    def test_override_metric_prompt_updates_question_generation(self):
+        """answer_relevancy prompt override가 적용되는지 확인."""
+        prompt = build_dummy_prompt()
+        prompt.instruction = "기존 지시문"
+        metric = SimpleNamespace(question_generation=prompt)
+        original = metric.question_generation.instruction
+
+        applied = RagasEvaluator._override_metric_prompt(metric, "새 프롬프트 지시문")
+
+        assert applied is True
+        assert metric.question_generation.instruction == "새 프롬프트 지시문"
+        assert metric.question_generation.instruction != original
+
+    def test_korean_default_prompt_applied(self):
+        """한국어 데이터셋에 기본 프롬프트가 적용되는지 확인."""
+        evaluator = RagasEvaluator()
+        dataset = Dataset(
+            name="korean-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="kr-001",
+                    question="사망 시 보상 한도는 얼마인가요?",
+                    answer="사망 시 1억 5천만원까지 보장됩니다.",
+                    contexts=["사망 시 1억 5천만원까지 보장됩니다."],
+                )
+            ],
+        )
+        prompt = build_dummy_prompt()
+        metric = SimpleNamespace(name="answer_relevancy", question_generation=prompt)
+
+        evaluator._apply_answer_relevancy_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=[metric],
+            prompt_overrides=None,
+        )
+
+        assert (
+            metric.question_generation.instruction == evaluator.ANSWER_RELEVANCY_KOREAN_INSTRUCTION
+        )
+        assert metric.question_generation.examples
+        example_input, example_output = metric.question_generation.examples[0]
+        assert example_input.response == evaluator.ANSWER_RELEVANCY_KOREAN_EXAMPLES[0]["response"]
+        assert example_output.question == evaluator.ANSWER_RELEVANCY_KOREAN_EXAMPLES[0]["question"]
+
+    def test_english_dataset_skips_korean_defaults(self):
+        """영어 데이터셋은 한국어 기본 프롬프트를 적용하지 않는다."""
+        evaluator = RagasEvaluator()
+        dataset = Dataset(
+            name="english-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="en-001",
+                    question="What is the coverage limit for death benefits?",
+                    answer="The coverage limit for death benefits is 150 million KRW.",
+                    contexts=["The death benefit coverage limit is 150 million KRW."],
+                )
+            ],
+        )
+        prompt = build_dummy_prompt()
+        prompt.instruction = "기존 지시문"
+        metric = SimpleNamespace(name="answer_relevancy", question_generation=prompt)
+        original = metric.question_generation.instruction
+
+        evaluator._apply_answer_relevancy_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=[metric],
+            prompt_overrides=None,
+        )
+
+        assert metric.question_generation.instruction == original
+
+
+class TestFactualCorrectnessPromptTuning:
+    """Factual correctness 프롬프트 튜닝 테스트."""
+
+    def test_korean_default_prompts_applied(self):
+        """한국어 데이터셋에 기본 프롬프트가 적용되는지 확인."""
+        evaluator = RagasEvaluator()
+        dataset = Dataset(
+            name="korean-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="kr-001",
+                    question="사망 시 보상 한도는 얼마인가요?",
+                    answer="사망 시 1억 5천만원까지 보장됩니다.",
+                    contexts=["사망 시 1억 5천만원까지 보장됩니다."],
+                    ground_truth="1억 5천만원",
+                )
+            ],
+        )
+        claim_prompt = build_dummy_prompt()
+        nli_prompt = build_dummy_prompt()
+        metric = SimpleNamespace(
+            name="factual_correctness",
+            claim_decomposition_prompt=claim_prompt,
+            nli_prompt=nli_prompt,
+        )
+
+        evaluator._apply_factual_correctness_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=[metric],
+            prompt_overrides=None,
+        )
+
+        assert (
+            metric.claim_decomposition_prompt.instruction
+            == evaluator.FACTUAL_CORRECTNESS_CLAIM_INSTRUCTION
+        )
+        assert metric.nli_prompt.instruction == evaluator.FACTUAL_CORRECTNESS_NLI_INSTRUCTION
+        assert metric.claim_decomposition_prompt.examples
+        assert metric.nli_prompt.examples
+
+    def test_english_dataset_skips_korean_defaults(self):
+        """영어 데이터셋은 한국어 기본 프롬프트를 적용하지 않는다."""
+        evaluator = RagasEvaluator()
+        dataset = Dataset(
+            name="english-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="en-001",
+                    question="What is the coverage limit for death benefits?",
+                    answer="The coverage limit for death benefits is 150 million KRW.",
+                    contexts=["The death benefit coverage limit is 150 million KRW."],
+                    ground_truth="150 million KRW",
+                )
+            ],
+        )
+        claim_prompt = build_dummy_prompt()
+        nli_prompt = build_dummy_prompt()
+        claim_prompt.instruction = "기존 지시문"
+        nli_prompt.instruction = "기존 지시문"
+        metric = SimpleNamespace(
+            name="factual_correctness",
+            claim_decomposition_prompt=claim_prompt,
+            nli_prompt=nli_prompt,
+        )
+        claim_original = metric.claim_decomposition_prompt.instruction
+        nli_original = metric.nli_prompt.instruction
+
+        evaluator._apply_factual_correctness_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=[metric],
+            prompt_overrides=None,
+        )
+
+        assert metric.claim_decomposition_prompt.instruction == claim_original
+        assert metric.nli_prompt.instruction == nli_original
 
 
 class TestDataclasses:

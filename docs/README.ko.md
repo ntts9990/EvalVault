@@ -38,7 +38,8 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 uv run evalvault history --db data/db/evalvault.db
 uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db
 ```
-Tip: Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 맞추세요.
+Tip: repo 내부에서 실행하면 기본 DB 경로는 프로젝트 루트 기준 `data/db/evalvault.db`로 해석됩니다.
+Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 맞추세요.
 
 ---
 
@@ -68,6 +69,9 @@ Domain Memory를 켜면 자동 조정될 수 있습니다.
 - 테스트케이스 필수 필드: `id`, `question`, `answer`, `contexts`
 - `ground_truth`는 `context_precision`, `context_recall`,
   `factual_correctness`, `semantic_similarity`에 필요
+- 한국어 데이터셋이면 `answer_relevancy`, `factual_correctness`는
+  한국어 프롬프트가 기본 적용됩니다. 영어만 사용할 때는
+  `metadata.language: "en"` 또는 `--ragas-prompts`로 덮어쓰세요.
 - CSV/Excel: `threshold_*` 컬럼으로 임계값 지정 (첫 번째로 채워진 행 기준).
   `contexts`는 JSON 배열 문자열 또는 `|`로 구분합니다.
 - 템플릿: `uv run evalvault init`로 `dataset_templates/` 생성,

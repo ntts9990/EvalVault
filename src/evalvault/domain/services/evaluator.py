@@ -7,6 +7,7 @@ import json
 import logging
 import math
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -148,6 +149,60 @@ class RagasEvaluator:
         "summary_score": 0.85,
         "entity_preservation": 0.9,
     }
+    LANGUAGE_SAMPLE_LIMIT = 5
+    ANSWER_RELEVANCY_KOREAN_INSTRUCTION = (
+        "다음 답변에 대해 질문을 생성하고, 답변이 회피적, "
+        "모호, 불확실하면 noncommittal=1, 명확하면 0으로 표시하세요. "
+        "질문은 답변과 동일한 언어(한국어)로 작성하세요."
+    )
+    ANSWER_RELEVANCY_KOREAN_EXAMPLES = [
+        {
+            "response": "사망 시 1억 5천만원까지 보장됩니다.",
+            "question": "사망 시 보상 한도는 얼마인가요?",
+            "noncommittal": 0,
+        },
+        {
+            "response": "정확한 수치는 확인이 필요합니다.",
+            "question": "보장 한도는 얼마인가요?",
+            "noncommittal": 1,
+        },
+    ]
+    FACTUAL_CORRECTNESS_CLAIM_INSTRUCTION = (
+        "다음 문장을 독립적인 사실 주장으로 분해하세요. "
+        "각 주장은 다른 주장과 독립적으로 "
+        "참/거짓 판단이 가능해야 합니다. "
+        "예시의 원자성 수준을 따르세요."
+    )
+    FACTUAL_CORRECTNESS_NLI_INSTRUCTION = (
+        "다음 CONTEXT를 바탕으로 각 STATEMENT가 직접적으로 "
+        "추론 가능한지 판단하세요. "
+        "가능하면 verdict=1, 불가능하면 verdict=0으로 표시하고, "
+        "간단한 이유를 한국어로 적으세요."
+    )
+    FACTUAL_CORRECTNESS_CLAIM_EXAMPLES = [
+        {
+            "response": "대인배상 I은 사망 시 1억 5천만원까지 보장합니다.",
+            "claims": ["대인배상 I은 사망 시 1억 5천만원까지 보장한다."],
+        },
+        {
+            "response": "마일리지 특약은 3천km 이하 주행 시 47% 할인됩니다.",
+            "claims": ["마일리지 특약은 3천km 이하 주행 시 47% 할인된다."],
+        },
+    ]
+    FACTUAL_CORRECTNESS_NLI_EXAMPLES = [
+        {
+            "context": "대인배상 I은 사망 시 1억 5천만원까지 보장한다.",
+            "statements": [
+                "대인배상 I은 사망 시 1억 5천만원까지 보장한다.",
+                "대인배상 I은 부상 시 3천만원까지 보장한다.",
+            ],
+            "verdicts": [1, 0],
+            "reasons": [
+                "컨텍스트에 동일한 내용이 포함되어 있습니다.",
+                "컨텍스트에 부상 보장 내용이 없습니다.",
+            ],
+        }
+    ]
 
     # Estimated pricing (USD per 1M tokens) as of Jan 2025
     # Format: (input_price, output_price)
@@ -445,6 +500,17 @@ class RagasEvaluator:
                 else:
                     ragas_metrics.append(metric_class(llm=ragas_llm))
 
+        self._apply_answer_relevancy_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=ragas_metrics,
+            prompt_overrides=prompt_overrides,
+        )
+        self._apply_factual_correctness_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=ragas_metrics,
+            prompt_overrides=prompt_overrides,
+        )
+
         override_status = {}
         if prompt_overrides:
             override_status = self._apply_prompt_overrides(ragas_metrics, prompt_overrides)
@@ -473,6 +539,184 @@ class RagasEvaluator:
             override_status,
         )
 
+    def _apply_answer_relevancy_prompt_defaults(
+        self,
+        *,
+        dataset: Dataset,
+        ragas_metrics: list[Any],
+        prompt_overrides: dict[str, str] | None,
+    ) -> None:
+        if not ragas_metrics:
+            return
+        if prompt_overrides and "answer_relevancy" in prompt_overrides:
+            return
+        resolved_language = self._resolve_dataset_language(dataset)
+        if resolved_language == "en":
+            return
+
+        for metric in ragas_metrics:
+            if getattr(metric, "name", None) != "answer_relevancy":
+                continue
+            self._apply_korean_answer_relevancy_prompt(metric)
+
+    def _apply_factual_correctness_prompt_defaults(
+        self,
+        *,
+        dataset: Dataset,
+        ragas_metrics: list[Any],
+        prompt_overrides: dict[str, str] | None,
+    ) -> None:
+        if not ragas_metrics:
+            return
+        if prompt_overrides and "factual_correctness" in prompt_overrides:
+            return
+        resolved_language = self._resolve_dataset_language(dataset)
+        if resolved_language == "en":
+            return
+
+        for metric in ragas_metrics:
+            if getattr(metric, "name", None) != "factual_correctness":
+                continue
+            self._apply_korean_factual_correctness_prompts(metric)
+
+    def _resolve_dataset_language(self, dataset: Dataset) -> str | None:
+        metadata = dataset.metadata if isinstance(dataset.metadata, dict) else {}
+        for key in ("language", "lang", "locale"):
+            normalized = self._normalize_language_hint(metadata.get(key))
+            if normalized:
+                return normalized
+
+        languages = metadata.get("languages")
+        if isinstance(languages, (list, tuple, set)):
+            for entry in languages:
+                normalized = self._normalize_language_hint(entry)
+                if normalized:
+                    return normalized
+
+        english_found = False
+        for test_case in dataset.test_cases[: self.LANGUAGE_SAMPLE_LIMIT]:
+            if self._contains_korean(test_case.question) or self._contains_korean(test_case.answer):
+                return "ko"
+            if self._contains_latin(test_case.question) or self._contains_latin(test_case.answer):
+                english_found = True
+            for ctx in test_case.contexts:
+                if self._contains_korean(ctx):
+                    return "ko"
+                if self._contains_latin(ctx):
+                    english_found = True
+        if english_found:
+            return "en"
+        return None
+
+    @classmethod
+    def _normalize_language_hint(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip().lower().replace("_", "-")
+        if not text:
+            return None
+        if text in {"ko", "kor", "korean", "ko-kr", "kor-hang", "kr"}:
+            return "ko"
+        if text.startswith(("ko-", "kor-")):
+            return "ko"
+        if text in {"en", "eng", "english", "en-us", "en-gb"}:
+            return "en"
+        if text.startswith("en-"):
+            return "en"
+        return None
+
+    def _apply_korean_answer_relevancy_prompt(self, metric: Any) -> bool:
+        prompt = getattr(metric, "question_generation", None)
+        if prompt is None:
+            return False
+
+        if isinstance(prompt, str):
+            metric.question_generation = self.ANSWER_RELEVANCY_KOREAN_INSTRUCTION
+            return True
+        if not hasattr(prompt, "instruction"):
+            return False
+        prompt.instruction = self.ANSWER_RELEVANCY_KOREAN_INSTRUCTION
+
+        input_model = getattr(prompt, "input_model", None)
+        output_model = getattr(prompt, "output_model", None)
+        if input_model and output_model:
+            with suppress(Exception):  # pragma: no cover - best effort prompt tuning
+                prompt.examples = [
+                    (
+                        input_model(response=example["response"]),
+                        output_model(
+                            question=example["question"],
+                            noncommittal=example["noncommittal"],
+                        ),
+                    )
+                    for example in self.ANSWER_RELEVANCY_KOREAN_EXAMPLES
+                ]
+
+        if hasattr(prompt, "language"):
+            with suppress(Exception):  # pragma: no cover - best effort metadata
+                prompt.language = "ko"
+        return True
+
+    def _apply_korean_factual_correctness_prompts(self, metric: Any) -> bool:
+        claim_prompt = getattr(metric, "claim_decomposition_prompt", None)
+        nli_prompt = getattr(metric, "nli_prompt", None)
+        applied = False
+
+        if claim_prompt and hasattr(claim_prompt, "instruction"):
+            claim_prompt.instruction = self.FACTUAL_CORRECTNESS_CLAIM_INSTRUCTION
+            input_model = getattr(claim_prompt, "input_model", None)
+            output_model = getattr(claim_prompt, "output_model", None)
+            if input_model and output_model:
+                with suppress(Exception):  # pragma: no cover - best effort prompt tuning
+                    claim_prompt.examples = [
+                        (
+                            input_model(response=example["response"]),
+                            output_model(claims=example["claims"]),
+                        )
+                        for example in self.FACTUAL_CORRECTNESS_CLAIM_EXAMPLES
+                    ]
+            if hasattr(claim_prompt, "language"):
+                with suppress(Exception):  # pragma: no cover - best effort metadata
+                    claim_prompt.language = "ko"
+            applied = True
+
+        if nli_prompt and hasattr(nli_prompt, "instruction"):
+            nli_prompt.instruction = self.FACTUAL_CORRECTNESS_NLI_INSTRUCTION
+            input_model = getattr(nli_prompt, "input_model", None)
+            output_model = getattr(nli_prompt, "output_model", None)
+            if input_model and output_model:
+                with suppress(Exception):  # pragma: no cover - best effort prompt tuning
+                    nli_prompt.examples = [
+                        (
+                            input_model(
+                                context=example["context"],
+                                statements=example["statements"],
+                            ),
+                            output_model(
+                                statements=[
+                                    {
+                                        "statement": statement,
+                                        "reason": reason,
+                                        "verdict": verdict,
+                                    }
+                                    for statement, reason, verdict in zip(
+                                        example["statements"],
+                                        example["reasons"],
+                                        example["verdicts"],
+                                        strict=True,
+                                    )
+                                ]
+                            ),
+                        )
+                        for example in self.FACTUAL_CORRECTNESS_NLI_EXAMPLES
+                    ]
+            if hasattr(nli_prompt, "language"):
+                with suppress(Exception):  # pragma: no cover - best effort metadata
+                    nli_prompt.language = "ko"
+            applied = True
+
+        return applied
+
     def _apply_prompt_overrides(
         self,
         ragas_metrics: list[Any],
@@ -500,6 +744,18 @@ class RagasEvaluator:
             target = metric.prompt
             if isinstance(target, str):
                 metric.prompt = prompt_text
+                return True
+            if hasattr(target, "template"):
+                target.template = prompt_text
+                return True
+            if hasattr(target, "instruction"):
+                target.instruction = prompt_text
+                return True
+
+        if hasattr(metric, "question_generation"):
+            target = getattr(metric, "question_generation", None)
+            if isinstance(target, str):
+                metric.question_generation = prompt_text
                 return True
             if hasattr(target, "template"):
                 target.template = prompt_text
@@ -1059,6 +1315,10 @@ class RagasEvaluator:
     @staticmethod
     def _contains_korean(text: str) -> bool:
         return any("\uac00" <= ch <= "\ud7a3" for ch in text)
+
+    @staticmethod
+    def _contains_latin(text: str) -> bool:
+        return any("A" <= ch <= "Z" or "a" <= ch <= "z" for ch in text)
 
     @staticmethod
     def _summarize_ragas_error(exc: Exception) -> str:
