@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
+from instructor.processing.function_calls import extract_json_from_codeblock
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from evalvault.adapters.outbound.llm.base import TokenUsage
@@ -46,6 +48,58 @@ def _record_usage_attributes(span: Any, prompt: int, completion: int) -> None:
             "llm.usage.total_tokens": prompt + completion,
         },
     )
+
+
+def _first_tool_name(tools: Any) -> str | None:
+    if not isinstance(tools, list) or not tools:
+        return None
+    tool = tools[0]
+    if not isinstance(tool, dict):
+        return None
+    function = tool.get("function")
+    if not isinstance(function, dict):
+        return None
+    name = function.get("name")
+    return name if isinstance(name, str) and name else None
+
+
+def _extract_tool_arguments(message: Any) -> str | None:
+    content = getattr(message, "content", None)
+    if not isinstance(content, str) or not content.strip():
+        return None
+    try:
+        extracted = extract_json_from_codeblock(content)
+    except Exception:
+        return None
+    return extracted if extracted and extracted.strip() else None
+
+
+def _normalize_tool_calls(response: Any, tools: Any | None = None) -> None:
+    """Normalize tool call output for Instructor compatibility."""
+    try:
+        choices = getattr(response, "choices", None)
+        if not choices:
+            return
+        message = getattr(choices[0], "message", None)
+        if message is None:
+            return
+        tool_calls = getattr(message, "tool_calls", None)
+        if not tool_calls:
+            tool_name = _first_tool_name(tools)
+            arguments = _extract_tool_arguments(message)
+            if tool_name and arguments:
+                message.tool_calls = [
+                    SimpleNamespace(
+                        id="tool_call_0",
+                        type="function",
+                        function=SimpleNamespace(name=tool_name, arguments=arguments),
+                    )
+                ]
+                tool_calls = message.tool_calls
+        if isinstance(tool_calls, list) and len(tool_calls) > 1:
+            message.tool_calls = [tool_calls[0]]
+    except Exception:
+        return
 
 
 class TokenTrackingAsyncOpenAI(AsyncOpenAI):
@@ -93,6 +147,8 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)
+                    if provider_name == "ollama":
+                        _normalize_tool_calls(response, kwargs.get("tools"))
                     # Extract usage from response
                     if hasattr(response, "usage") and response.usage:
                         prompt_tokens = response.usage.prompt_tokens or 0
@@ -163,6 +219,8 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)
+                    if provider_name == "ollama":
+                        _normalize_tool_calls(response, kwargs.get("tools"))
 
                     if hasattr(response, "usage") and response.usage:
                         prompt_tokens = response.usage.prompt_tokens or 0

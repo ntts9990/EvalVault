@@ -1,0 +1,51 @@
+{
+  "name": "visualization_2q_korean",
+  "version": "1.0.0",
+  "description": "2문항 멀티도메인 고객지원 데이터셋 (빠른 시각화 테스트용)",
+  "metadata": {
+    "domain": "multi_support",
+    "language": "ko",
+    "clusters": {
+      "1": "insurance_finance",
+      "2": "commerce_delivery"
+    }
+  },
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7,
+    "context_precision": 0.6,
+    "context_recall": 0.6,
+    "factual_correctness": 0.7,
+    "semantic_similarity": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "vis-001",
+      "question": "연금보험의 연금 개시 연령은 언제인가요?",
+      "answer": "이 상품은 만 65세부터 연금이 지급됩니다.",
+      "contexts": [
+        "연금 개시 연령은 만 65세이며, 매월 연금이 지급됩니다.",
+        "연금 개시 이전에는 해지환급금 규정이 적용됩니다."
+      ],
+      "ground_truth": "만 65세",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-006",
+      "question": "무료배송 기준 금액은 얼마인가요?",
+      "answer": "3만원 이상 구매하면 무료배송이 적용됩니다.",
+      "contexts": [
+        "주문 금액이 30,000원 이상이면 무료배송입니다.",
+        "도서산간 지역은 추가 배송비가 발생할 수 있습니다."
+      ],
+      "ground_truth": "30,000원 이상",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    }
+  ]
+}
