@@ -2,5 +2,6 @@
 
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
+from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 
-__all__ = ["EntityPreservation", "InsuranceTermAccuracy"]
+__all__ = ["EntityPreservation", "ExactMatch", "F1Score", "InsuranceTermAccuracy"]

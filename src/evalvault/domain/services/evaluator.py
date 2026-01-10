@@ -51,6 +51,7 @@ from evalvault.domain.entities import (
 )
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
+from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
@@ -121,6 +122,8 @@ class RagasEvaluator:
     CUSTOM_METRIC_MAP = {
         "insurance_term_accuracy": InsuranceTermAccuracy,
         "entity_preservation": EntityPreservation,
+        "exact_match": ExactMatch,
+        "f1_score": F1Score,
     }
 
     # Metrics that require embeddings
@@ -133,6 +136,8 @@ class RagasEvaluator:
     REFERENCE_REQUIRED_METRICS = {
         "context_precision",
         "context_recall",
+        "exact_match",
+        "f1_score",
         "factual_correctness",
         "semantic_similarity",
     }
@@ -1518,10 +1523,27 @@ class RagasEvaluator:
 
             # Run each custom metric
             for metric_name, metric_instance in metric_instances.items():
-                score = metric_instance.score(
-                    answer=test_case.answer,
-                    contexts=test_case.contexts,
-                )
+                # Check if metric requires ground_truth
+                if metric_name in self.REFERENCE_REQUIRED_METRICS:
+                    if not test_case.ground_truth:
+                        logger.warning(
+                            "Metric %s requires ground_truth but test case %s has none. "
+                            "Skipping metric.",
+                            metric_name,
+                            test_case.id,
+                        )
+                        scores[metric_name] = 0.0
+                        continue
+                    score = metric_instance.score(
+                        answer=test_case.answer,
+                        ground_truth=test_case.ground_truth,
+                        contexts=test_case.contexts,
+                    )
+                else:
+                    score = metric_instance.score(
+                        answer=test_case.answer,
+                        contexts=test_case.contexts,
+                    )
                 scores[metric_name] = score
 
             # Track end time and calculate latency
