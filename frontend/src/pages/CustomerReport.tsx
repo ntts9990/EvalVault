@@ -293,9 +293,9 @@ export function CustomerReport() {
                                             key={project}
                                             type="button"
                                             onClick={() => toggleProjectSelection(project)}
-                                            className={`px-3 py-1.5 rounded-full text-xs border transition-all ${isSelected
-                                                ? "bg-primary text-primary-foreground border-primary"
-                                                : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80"
+                                            className={`filter-chip ${isSelected
+                                                ? "filter-chip-active"
+                                                : "filter-chip-inactive"
                                                 }`}
                                         >
                                             {projectLabel(project)}
@@ -433,9 +433,9 @@ export function CustomerReport() {
                                         key={metric}
                                         type="button"
                                         onClick={() => toggleMetricSelection(metric)}
-                                        className={`px-3 py-1.5 rounded-full text-xs border transition-all ${isSelected
-                                            ? "bg-primary text-primary-foreground border-primary"
-                                            : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80"
+                                        className={`filter-chip ${isSelected
+                                            ? "filter-chip-active"
+                                            : "filter-chip-inactive"
                                             }`}
                                     >
                                         {metric}

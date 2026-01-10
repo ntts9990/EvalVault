@@ -189,16 +189,16 @@ export function RunDetails() {
                     </div>
                     <div className="ml-auto flex items-center gap-6">
                         {/* Tab Navigation */}
-                        <div className="flex bg-secondary p-1 rounded-lg">
+                        <div className="tab-shell">
                             <button
                                 onClick={() => setActiveTab("overview")}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "overview" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                className={`tab-pill ${activeTab === "overview" ? "tab-pill-active" : "tab-pill-inactive"}`}
                             >
                                 Overview
                             </button>
                             <button
                                 onClick={() => setActiveTab("performance")}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "performance" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                className={`tab-pill ${activeTab === "performance" ? "tab-pill-active" : "tab-pill-inactive"}`}
                             >
                                 Performance
                             </button>

@@ -64,37 +64,39 @@ export function DomainMemory() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-4 border-b border-border/50 mb-6">
-                    <button
-                        onClick={() => setActiveTab("facts")}
-                        className={`pb-3 px-1 font-medium text-sm flex items-center gap-2 transition-all ${activeTab === "facts"
-                            ? "text-primary border-b-2 border-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                            }`}
-                    >
-                        <ScrollText className="w-4 h-4" />
-                        Verified Facts
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("behaviors")}
-                        className={`pb-3 px-1 font-medium text-sm flex items-center gap-2 transition-all ${activeTab === "behaviors"
-                            ? "text-primary border-b-2 border-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                            }`}
-                    >
-                        <Brain className="w-4 h-4" />
-                        Behaviors
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("insights")}
-                        className={`pb-3 px-1 font-medium text-sm flex items-center gap-2 transition-all ${activeTab === "insights"
-                            ? "text-primary border-b-2 border-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                            }`}
-                    >
-                        <TrendingUp className="w-4 h-4" />
-                        Insights
-                    </button>
+                <div className="mb-6">
+                    <div className="tab-shell">
+                        <button
+                            onClick={() => setActiveTab("facts")}
+                            className={`tab-pill flex items-center gap-2 ${activeTab === "facts"
+                                ? "tab-pill-active"
+                                : "tab-pill-inactive"
+                                }`}
+                        >
+                            <ScrollText className="w-4 h-4" />
+                            Verified Facts
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("behaviors")}
+                            className={`tab-pill flex items-center gap-2 ${activeTab === "behaviors"
+                                ? "tab-pill-active"
+                                : "tab-pill-inactive"
+                                }`}
+                        >
+                            <Brain className="w-4 h-4" />
+                            Behaviors
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("insights")}
+                            className={`tab-pill flex items-center gap-2 ${activeTab === "insights"
+                                ? "tab-pill-active"
+                                : "tab-pill-inactive"
+                                }`}
+                        >
+                            <TrendingUp className="w-4 h-4" />
+                            Insights
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}

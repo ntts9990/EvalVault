@@ -119,4 +119,32 @@
   .section-kicker {
     @apply text-[11px] uppercase tracking-[0.2em] text-muted-foreground;
   }
+
+  .tab-shell {
+    @apply inline-flex items-center gap-1 rounded-full border border-border/60 bg-secondary/50 p-1;
+  }
+
+  .tab-pill {
+    @apply px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200;
+  }
+
+  .tab-pill-active {
+    @apply bg-background text-foreground shadow-sm border border-border/60;
+  }
+
+  .tab-pill-inactive {
+    @apply text-muted-foreground hover:text-foreground hover:bg-background/60;
+  }
+
+  .filter-chip {
+    @apply px-3 py-1.5 rounded-full text-xs border border-border/50 bg-background/70 text-muted-foreground transition-all duration-200;
+  }
+
+  .filter-chip-active {
+    @apply border-primary/60 bg-primary/10 text-primary shadow-sm;
+  }
+
+  .filter-chip-inactive {
+    @apply hover:border-border hover:text-foreground hover:bg-background;
+  }
 }

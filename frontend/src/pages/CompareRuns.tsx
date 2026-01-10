@@ -305,9 +305,9 @@ export function CompareRuns() {
                                     key={mode}
                                     type="button"
                                     onClick={() => setFilterMode(mode)}
-                                    className={`px-2.5 py-1 rounded-full border transition-colors ${filterMode === mode
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                                    className={`filter-chip ${filterMode === mode
+                                        ? "filter-chip-active"
+                                        : "filter-chip-inactive"
                                         }`}
                                 >
                                     {mode === "all" ? "All" : mode === "changes" ? "Changes" : "Regressions"}
