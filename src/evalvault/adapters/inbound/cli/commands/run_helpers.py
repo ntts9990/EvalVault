@@ -141,6 +141,24 @@ def _display_results(result, console: Console, verbose: bool = False) -> None:
                 console.print(
                     f"    {m_status} {metric.name}: {score} (threshold: {metric.threshold})"
                 )
+                # Display claim-level details if available
+                if metric.claim_details:
+                    cd = metric.claim_details
+                    console.print(
+                        f"      [dim]Claims: {cd.total_claims} total, "
+                        f"{cd.supported_claims} supported, "
+                        f"{cd.not_supported_claims} not supported[/dim]"
+                    )
+                    # Show failed claims
+                    for claim in cd.claims:
+                        if claim.verdict != "supported":
+                            verdict_color = "red" if claim.verdict == "not_supported" else "yellow"
+                            console.print(
+                                f"        [{verdict_color}]✗[/{verdict_color}] "
+                                f"{claim.claim_text[:80]}{'...' if len(claim.claim_text) > 80 else ''}"
+                            )
+                            if claim.reason:
+                                console.print(f"          [dim]{claim.reason}[/dim]")
 
 
 def _display_summary_guidance(result, console: Console) -> None:

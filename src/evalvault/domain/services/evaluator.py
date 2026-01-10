@@ -40,7 +40,15 @@ except ImportError:  # pragma: no cover - fallback for older Ragas versions
     except ImportError:  # pragma: no cover - no summary support available
         RagasSummaryScore = None
 
-from evalvault.domain.entities import Dataset, EvaluationRun, MetricScore, TestCase, TestCaseResult
+from evalvault.domain.entities import (
+    ClaimLevelResult,
+    ClaimVerdict,
+    Dataset,
+    EvaluationRun,
+    MetricScore,
+    TestCase,
+    TestCaseResult,
+)
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.services.batch_executor import run_in_batches
@@ -76,6 +84,7 @@ class TestCaseEvalResult:
     started_at: datetime | None = None
     finished_at: datetime | None = None
     latency_ms: int = 0
+    claim_details: dict[str, ClaimLevelResult] | None = None  # metric_name -> ClaimLevelResult
 
 
 @dataclass
@@ -87,6 +96,7 @@ class ParallelSampleOutcome:
     finished_at: datetime
     latency_ms: int
     error: Exception | None = None
+    claim_details: dict[str, ClaimLevelResult] | None = None
 
 
 class RagasEvaluator:
@@ -242,6 +252,7 @@ class RagasEvaluator:
         retriever_doc_ids: Sequence[str] | None = None,
         on_progress: Callable[[int, int, str], None] | None = None,
         prompt_overrides: dict[str, str] | None = None,
+        claim_level: bool = False,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -256,6 +267,7 @@ class RagasEvaluator:
             retriever: 컨텍스트가 비어 있을 때 사용할 retriever
             retriever_top_k: retriever 결과 상위 k개 사용
             retriever_doc_ids: retriever 결과 doc_id 인덱스 해석용 문서 ID 목록
+            claim_level: Claim-level faithfulness 분석 활성화 여부 (기본값: False)
 
         Returns:
             평가 결과가 담긴 EvaluationRun
@@ -263,6 +275,7 @@ class RagasEvaluator:
         Note:
             임계값 우선순위: CLI 옵션 > 데이터셋 내장 > 기본값(0.7)
         """
+        self._claim_level = claim_level
         self._active_llm_provider = getattr(llm, "provider_name", None)
         self._active_llm_model = llm.get_model_name()
         self._active_llm = llm
@@ -364,11 +377,17 @@ class RagasEvaluator:
                 score_value = eval_result.scores.get(metric_name, 0.0)
                 threshold = thresholds.get(metric_name, 0.7)
 
+                # Get claim details for this metric if available
+                metric_claim_details = None
+                if eval_result.claim_details and metric_name in eval_result.claim_details:
+                    metric_claim_details = eval_result.claim_details[metric_name]
+
                 metric_scores.append(
                     MetricScore(
                         name=metric_name,
                         score=score_value,
                         threshold=threshold,
+                        claim_details=metric_claim_details,
                     )
                 )
 
@@ -811,7 +830,9 @@ class RagasEvaluator:
 
             # 단일 테스트 케이스 평가
             test_case_started_at = datetime.now()
-            scores = await self._score_single_sample(sample, ragas_metrics)
+            scores, claim_details = await self._score_single_sample(
+                sample, ragas_metrics, test_case_id=test_case_id
+            )
             test_case_finished_at = datetime.now()
 
             latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
@@ -841,6 +862,7 @@ class RagasEvaluator:
                 started_at=test_case_started_at,
                 finished_at=test_case_finished_at,
                 latency_ms=latency_ms,
+                claim_details=claim_details if claim_details else None,
             )
 
             if on_progress:
@@ -878,8 +900,11 @@ class RagasEvaluator:
             test_case, sample = pair
             started_at = datetime.now()
             error: Exception | None = None
+            claim_details: dict[str, ClaimLevelResult] | None = None
             try:
-                scores = await self._score_single_sample(sample, ragas_metrics)
+                scores, claim_details = await self._score_single_sample(
+                    sample, ragas_metrics, test_case_id=test_case.id
+                )
             except Exception as exc:  # pragma: no cover - safe fallback
                 logger.warning(
                     "Failed to evaluate test case '%s' in parallel mode: %s",
@@ -904,6 +929,7 @@ class RagasEvaluator:
                     finished_at=finished_at,
                     latency_ms=latency_ms,
                     error=error,
+                    claim_details=claim_details if claim_details else None,
                 ),
             )
 
@@ -934,6 +960,7 @@ class RagasEvaluator:
                 started_at=sample_outcome.started_at,
                 finished_at=sample_outcome.finished_at,
                 latency_ms=sample_outcome.latency_ms,
+                claim_details=sample_outcome.claim_details,
             )
 
         # 전체 토큰 사용량 가져와서 테스트 케이스별로 평균 분배
@@ -957,18 +984,24 @@ class RagasEvaluator:
         return results
 
     async def _score_single_sample(
-        self, sample: SingleTurnSample, ragas_metrics: list
-    ) -> dict[str, float]:
+        self,
+        sample: SingleTurnSample,
+        ragas_metrics: list,
+        *,
+        test_case_id: str = "",
+    ) -> tuple[dict[str, float], dict[str, ClaimLevelResult]]:
         """단일 샘플에 대해 모든 메트릭 점수 계산.
 
         Args:
             sample: 평가할 Ragas 샘플
             ragas_metrics: 메트릭 인스턴스 목록
+            test_case_id: 테스트 케이스 ID (claim ID 생성용)
 
         Returns:
-            메트릭명: 점수 딕셔너리
+            (메트릭명: 점수 딕셔너리, 메트릭명: ClaimLevelResult 딕셔너리)
         """
         scores: dict[str, float] = {}
+        claim_details: dict[str, ClaimLevelResult] = {}
 
         for metric in ragas_metrics:
             if metric.name in self.FAITHFULNESS_METRICS and self._faithfulness_ragas_failed:
@@ -1048,8 +1081,24 @@ class RagasEvaluator:
                     score_value = 0.0
 
                 scores[metric.name] = score_value
+
+                # Collect claim details when claim_level is enabled for faithfulness metrics
+                if (
+                    getattr(self, "_claim_level", False)
+                    and metric.name in self.FAITHFULNESS_METRICS
+                ):
+                    claim_result = self._fallback_korean_faithfulness(sample, return_details=True)
+                    if isinstance(claim_result, ClaimLevelResult):
+                        # Update claim IDs with test_case_id prefix
+                        for claim in claim_result.claims:
+                            if not claim.claim_id.startswith(test_case_id):
+                                idx = claim.claim_id.split("-")[-1]
+                                claim.claim_id = f"{test_case_id}-claim-{idx}"
+                        claim_details[metric.name] = claim_result
+
             except Exception as e:
                 fallback_score = None
+                fallback_claim_result = None
                 if metric.name == "summary_faithfulness":
                     fallback_score = await self._score_summary_faithfulness_judge(sample)
                 if fallback_score is None and metric.name in self.FAITHFULNESS_METRICS:
@@ -1061,7 +1110,21 @@ class RagasEvaluator:
                             self._summarize_ragas_error(e),
                         )
                         self._faithfulness_ragas_failed = True
-                    fallback_score = await self._score_faithfulness_with_fallback(sample)
+                    # When claim_level is enabled, get detailed results
+                    if getattr(self, "_claim_level", False):
+                        fallback_claim_result = self._fallback_korean_faithfulness(
+                            sample, return_details=True
+                        )
+                        if isinstance(fallback_claim_result, ClaimLevelResult):
+                            fallback_score = fallback_claim_result.support_rate
+                            # Update claim IDs with test_case_id prefix
+                            for claim in fallback_claim_result.claims:
+                                if not claim.claim_id.startswith(test_case_id):
+                                    idx = claim.claim_id.split("-")[-1]
+                                    claim.claim_id = f"{test_case_id}-claim-{idx}"
+                            claim_details[metric.name] = fallback_claim_result
+                    else:
+                        fallback_score = await self._score_faithfulness_with_fallback(sample)
                 if fallback_score is not None:
                     scores[metric.name] = fallback_score
                 else:
@@ -1069,7 +1132,7 @@ class RagasEvaluator:
                     logger.error(f"Failed to score metric {metric.name}: {e}", exc_info=True)
                     scores[metric.name] = 0.0
 
-        return scores
+        return scores, claim_details
 
     @classmethod
     def _resolve_summary_score_coeff(cls, domain: str | None) -> float:
@@ -1090,8 +1153,19 @@ class RagasEvaluator:
     def default_threshold_for(cls, metric_name: str) -> float:
         return cls.DEFAULT_METRIC_THRESHOLDS.get(metric_name, cls.DEFAULT_THRESHOLD_FALLBACK)
 
-    def _fallback_korean_faithfulness(self, sample: SingleTurnSample) -> float | None:
-        """Fallback faithfulness scoring for Korean text when Ragas fails."""
+    def _fallback_korean_faithfulness(
+        self, sample: SingleTurnSample, *, return_details: bool = False
+    ) -> float | ClaimLevelResult | None:
+        """Fallback faithfulness scoring for Korean text when Ragas fails.
+
+        Args:
+            sample: Ragas SingleTurnSample to evaluate
+            return_details: If True, return ClaimLevelResult instead of float score
+
+        Returns:
+            If return_details=False: float score or None
+            If return_details=True: ClaimLevelResult or None
+        """
         if not sample.response or not sample.retrieved_contexts:
             return None
 
@@ -1114,11 +1188,82 @@ class RagasEvaluator:
         except Exception:  # pragma: no cover - best effort fallback
             return None
 
+        if return_details:
+            return self._convert_to_claim_level_result(result, test_case_id="")
+
         score = getattr(result, "score", None)
         try:
             return float(score)
         except (TypeError, ValueError):
             return None
+
+    def _convert_to_claim_level_result(
+        self, faithfulness_result: Any, test_case_id: str
+    ) -> ClaimLevelResult:
+        """Convert KoreanFaithfulnessChecker result to ClaimLevelResult.
+
+        Args:
+            faithfulness_result: FaithfulnessResult from KoreanNLPToolkit
+            test_case_id: Test case ID for claim ID generation
+
+        Returns:
+            ClaimLevelResult with converted claim verdicts
+        """
+        claim_results = getattr(faithfulness_result, "claim_results", [])
+        total_claims = getattr(faithfulness_result, "total_claims", len(claim_results))
+
+        claims: list[ClaimVerdict] = []
+        for idx, cr in enumerate(claim_results):
+            claim_id = f"{test_case_id}-claim-{idx}" if test_case_id else f"claim-{idx}"
+            claim_text = getattr(cr, "claim", "")
+            is_faithful = getattr(cr, "is_faithful", False)
+            coverage = getattr(cr, "coverage", 0.0)
+            number_mismatch = getattr(cr, "number_mismatch", False)
+            matched_keywords = getattr(cr, "matched_keywords", [])
+
+            # Determine verdict string
+            if is_faithful:
+                verdict = "supported"
+            elif number_mismatch:
+                verdict = "not_supported"
+            elif coverage >= 0.3:  # Partial support threshold
+                verdict = "partially_supported"
+            else:
+                verdict = "not_supported"
+
+            # Build reason
+            reason_parts = []
+            if number_mismatch:
+                reason_parts.append("숫자 불일치 발견")
+            elif not is_faithful:
+                reason_parts.append(f"키워드 매칭률 {coverage:.0%}")
+            if matched_keywords:
+                reason_parts.append(f"매칭된 키워드: {', '.join(matched_keywords[:5])}")
+
+            claims.append(
+                ClaimVerdict(
+                    claim_id=claim_id,
+                    claim_text=claim_text,
+                    verdict=verdict,
+                    confidence=coverage,
+                    reason=" | ".join(reason_parts) if reason_parts else None,
+                    source_context_indices=None,  # Korean NLP doesn't track source indices
+                )
+            )
+
+        # Count verdicts
+        not_supported = sum(1 for c in claims if c.verdict == "not_supported")
+        partially_supported = sum(1 for c in claims if c.verdict == "partially_supported")
+        supported = total_claims - not_supported - partially_supported
+
+        return ClaimLevelResult(
+            total_claims=total_claims,
+            supported_claims=supported,
+            not_supported_claims=not_supported,
+            partially_supported_claims=partially_supported,
+            claims=claims,
+            extraction_method="korean_nlp",
+        )
 
     async def _score_summary_faithfulness_judge(self, sample: SingleTurnSample) -> float | None:
         llm = self._active_llm
