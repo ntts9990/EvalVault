@@ -404,14 +404,14 @@ export function EvaluationStudio() {
                             <Brain className="w-5 h-5 text-primary" />
                             Select Model
                         </h2>
-                        <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="tab-shell mb-4">
                             {(["ollama", "openai", "vllm"] as const).map((provider) => (
                                 <button
                                     key={provider}
                                     onClick={() => handleProviderChange(provider)}
-                                    className={`px-3 py-1.5 rounded-md text-sm border capitalize ${selectedProvider === provider
-                                        ? "bg-primary/10 border-primary text-primary"
-                                        : "bg-secondary border-transparent"}`}
+                                    className={`tab-pill capitalize ${selectedProvider === provider
+                                        ? "tab-pill-active"
+                                        : "tab-pill-inactive"}`}
                                 >
                                     {provider}
                                 </button>
@@ -562,9 +562,9 @@ export function EvaluationStudio() {
                                         key={metric}
                                         onClick={() => toggleMetric(metric)}
                                         disabled={isDisabled}
-                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all border disabled:opacity-60 disabled:cursor-not-allowed ${isSelected
-                                            ? "bg-primary text-primary-foreground border-primary"
-                                            : "bg-secondary text-secondary-foreground border-transparent hover:bg-secondary/80"
+                                        className={`filter-chip text-sm px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed ${isSelected
+                                            ? "filter-chip-active"
+                                            : "filter-chip-inactive"
                                             } ${summaryMode && isSummaryMetric ? "ring-1 ring-primary/40" : ""}`}
                                     >
                                         <span className="inline-flex items-center gap-2">
@@ -598,19 +598,19 @@ export function EvaluationStudio() {
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-4">
-                                            <div className="flex gap-2">
-                                                {(["none", "bm25", "hybrid"] as const).map(mode => (
-                                                    <button
-                                                        key={mode}
-                                                        onClick={() => setRetrieverMode(mode)}
-                                                        className={`px-3 py-1.5 rounded-md text-sm border capitalize ${retrieverMode === mode
-                                                            ? "bg-primary/10 border-primary text-primary"
-                                                            : "bg-secondary border-transparent"}`}
-                                                    >
-                                                        {mode}Mode
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    <div className="tab-shell">
+                                        {(["none", "bm25", "hybrid"] as const).map(mode => (
+                                            <button
+                                                key={mode}
+                                                onClick={() => setRetrieverMode(mode)}
+                                                className={`tab-pill capitalize ${retrieverMode === mode
+                                                    ? "tab-pill-active"
+                                                    : "tab-pill-inactive"}`}
+                                            >
+                                                {mode}Mode
+                                            </button>
+                                        ))}
+                                    </div>
                                             {retrieverMode !== "none" && (
                                                 <div className="space-y-3">
                                                     <input
@@ -786,14 +786,14 @@ export function EvaluationStudio() {
                                 {/* Tracker */}
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Observability Tracker</h3>
-                                    <div className="flex gap-2">
+                                    <div className="tab-shell">
                                         {(["none", "phoenix", "langfuse"] as const).map(t => (
                                             <button
                                                 key={t}
                                                 onClick={() => setTracker(t)}
-                                                className={`px-3 py-1.5 rounded-md text-sm border capitalize ${tracker === t
-                                                    ? "bg-primary/10 border-primary text-primary"
-                                                    : "bg-secondary border-transparent"}`}
+                                                className={`tab-pill capitalize ${tracker === t
+                                                    ? "tab-pill-active"
+                                                    : "tab-pill-inactive"}`}
                                             >
                                                 {t}
                                             </button>

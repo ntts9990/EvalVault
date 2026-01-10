@@ -606,13 +606,22 @@ export function AnalysisCompareView() {
                                         총 {nodeRows.length}개 중 {nodeDiffCount}개 변화
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowOnlyDiff((prev) => !prev)}
-                                    className="text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    {showOnlyDiff ? "전체 보기" : "차이만 보기"}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOnlyDiff(true)}
+                                        className={`filter-chip ${showOnlyDiff ? "filter-chip-active" : "filter-chip-inactive"}`}
+                                    >
+                                        차이만 보기
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOnlyDiff(false)}
+                                        className={`filter-chip ${showOnlyDiff ? "filter-chip-inactive" : "filter-chip-active"}`}
+                                    >
+                                        전체 보기
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 {filteredNodes.length === 0 ? (
@@ -719,21 +728,39 @@ export function AnalysisCompareView() {
                                         숫자형 요약 지표를 추출해 차이를 계산합니다.
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-3 text-xs">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowOnlyMetricChanges((prev) => !prev)}
-                                        className="text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                        {showOnlyMetricChanges ? "전체 지표" : "변경 지표만"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAllMetrics((prev) => !prev)}
-                                        className="text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                        {showAllMetrics ? "간단히" : "전체 보기"}
-                                    </button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowOnlyMetricChanges(true)}
+                                            className={`filter-chip ${showOnlyMetricChanges ? "filter-chip-active" : "filter-chip-inactive"}`}
+                                        >
+                                            변경 지표만
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowOnlyMetricChanges(false)}
+                                            className={`filter-chip ${showOnlyMetricChanges ? "filter-chip-inactive" : "filter-chip-active"}`}
+                                        >
+                                            전체 지표
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllMetrics(false)}
+                                            className={`filter-chip ${showAllMetrics ? "filter-chip-inactive" : "filter-chip-active"}`}
+                                        >
+                                            간단히
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllMetrics(true)}
+                                            className={`filter-chip ${showAllMetrics ? "filter-chip-active" : "filter-chip-inactive"}`}
+                                        >
+                                            전체 보기
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             {metricRowsView.length === 0 ? (
