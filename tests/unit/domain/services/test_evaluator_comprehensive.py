@@ -1063,6 +1063,7 @@ class TestMetricMaps:
             "exact_match",
             "f1_score",
             "factual_correctness",
+            "no_answer_accuracy",
             "semantic_similarity",
         }
 
