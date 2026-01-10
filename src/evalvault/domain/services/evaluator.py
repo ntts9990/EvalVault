@@ -52,6 +52,7 @@ from evalvault.domain.entities import (
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.metrics.no_answer import NoAnswerAccuracy
+from evalvault.domain.metrics.retrieval_rank import MRR, NDCG, HitRate
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
@@ -126,6 +127,9 @@ class RagasEvaluator:
         "exact_match": ExactMatch,
         "f1_score": F1Score,
         "no_answer_accuracy": NoAnswerAccuracy,
+        "mrr": MRR,
+        "ndcg": NDCG,
+        "hit_rate": HitRate,
     }
 
     # Metrics that require embeddings
@@ -141,6 +145,9 @@ class RagasEvaluator:
         "exact_match",
         "f1_score",
         "factual_correctness",
+        "hit_rate",
+        "mrr",
+        "ndcg",
         "no_answer_accuracy",
         "semantic_similarity",
     }
