@@ -414,6 +414,12 @@ def register_run_commands(
             "--stream-chunk-size",
             help="Chunk size when streaming evaluation is enabled (default: 200).",
         ),
+        claim_level: bool = typer.Option(
+            False,
+            "--claim-level",
+            help="Enable claim-level faithfulness analysis for detailed results.",
+            rich_help_panel="Full mode options",
+        ),
     ) -> None:
         """Run RAG evaluation on a dataset.
 
@@ -1223,6 +1229,7 @@ def register_run_commands(
                             retriever_doc_ids=retriever_doc_ids,
                             prompt_overrides=ragas_prompt_overrides or None,
                             on_progress=lambda c, _t, msg: update_progress(c, msg),
+                            claim_level=claim_level,
                         )
                     )
                 else:
@@ -1239,6 +1246,7 @@ def register_run_commands(
                             retriever_doc_ids=retriever_doc_ids,
                             prompt_overrides=ragas_prompt_overrides or None,
                             on_progress=lambda c, _t, msg: update_progress(c, msg),
+                            claim_level=claim_level,
                         )
                     )
                 _log_duration(console, verbose, "평가 완료", evaluation_started_at)

@@ -39,6 +39,8 @@ from evalvault.domain.entities.rag_trace import (
     RetrievedDocument,
 )
 from evalvault.domain.entities.result import (
+    ClaimLevelResult,
+    ClaimVerdict,
     EvaluationRun,
     MetricScore,
     MetricType,
@@ -108,6 +110,8 @@ __all__ = [
     "StagePayloadRef",
     "StageSummary",
     # Result
+    "ClaimLevelResult",
+    "ClaimVerdict",
     "EvaluationRun",
     "MetricScore",
     "MetricType",

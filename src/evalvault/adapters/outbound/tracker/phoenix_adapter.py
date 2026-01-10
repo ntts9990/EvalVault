@@ -384,6 +384,30 @@ class PhoenixAdapter(TrackerPort):
                 span.set_attribute(f"metric.{metric.name}.threshold", metric.threshold)
                 span.set_attribute(f"metric.{metric.name}.passed", metric.passed)
 
+                # Claim-level details for faithfulness metrics
+                if metric.claim_details:
+                    cd = metric.claim_details
+                    span.set_attribute(
+                        f"metric.{metric.name}.claim_details",
+                        json.dumps(cd.to_dict()),
+                    )
+                    span.set_attribute(
+                        f"metric.{metric.name}.total_claims",
+                        cd.total_claims,
+                    )
+                    span.set_attribute(
+                        f"metric.{metric.name}.supported_claims",
+                        cd.supported_claims,
+                    )
+                    span.set_attribute(
+                        f"metric.{metric.name}.not_supported_claims",
+                        cd.not_supported_claims,
+                    )
+                    span.set_attribute(
+                        f"metric.{metric.name}.support_rate",
+                        cd.support_rate,
+                    )
+
             # Timing
             if result.started_at:
                 span.set_attribute(

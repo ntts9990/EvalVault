@@ -48,6 +48,7 @@ class DummyEvaluator(RagasEvaluator):
         retriever_doc_ids: Sequence[str] | None = None,
         on_progress: object = None,
         prompt_overrides: dict[str, str] | None = None,
+        claim_level: bool = False,
     ) -> EvaluationRun:
         self.captured_thresholds = dict(thresholds or {})
         run = EvaluationRun(dataset_name=dataset.name, dataset_version=dataset.version)

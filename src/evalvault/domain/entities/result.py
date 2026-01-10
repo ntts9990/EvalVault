@@ -19,6 +19,78 @@ class MetricType(str, Enum):
 
 
 @dataclass
+class ClaimVerdict:
+    """개별 claim 검증 결과.
+
+    Attributes:
+        claim_id: 고유 식별자 (예: "tc-001-claim-0")
+        claim_text: 추출된 claim 텍스트
+        verdict: 검증 결과 ("supported", "not_supported", "partially_supported")
+        confidence: 신뢰도 (0.0 ~ 1.0)
+        reason: 판정 이유
+        source_context_indices: claim을 지지하는 컨텍스트 인덱스
+    """
+
+    claim_id: str
+    claim_text: str
+    verdict: str  # "supported" | "not_supported" | "partially_supported"
+    confidence: float = 0.0
+    reason: str | None = None
+    source_context_indices: list[int] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """딕셔너리로 변환."""
+        return {
+            "claim_id": self.claim_id,
+            "claim_text": self.claim_text,
+            "verdict": self.verdict,
+            "confidence": self.confidence,
+            "reason": self.reason,
+            "source_context_indices": self.source_context_indices,
+        }
+
+
+@dataclass
+class ClaimLevelResult:
+    """Claim-level faithfulness 결과.
+
+    Attributes:
+        total_claims: 총 claim 수
+        supported_claims: 지지된 claim 수
+        not_supported_claims: 지지되지 않은 claim 수
+        partially_supported_claims: 부분 지지 claim 수
+        claims: 개별 claim 결과 리스트
+        extraction_method: claim 추출 방법 ("korean_nlp", "ragas", "sentence")
+    """
+
+    total_claims: int = 0
+    supported_claims: int = 0
+    not_supported_claims: int = 0
+    partially_supported_claims: int = 0
+    claims: list[ClaimVerdict] = field(default_factory=list)
+    extraction_method: str = "korean_nlp"
+
+    @property
+    def support_rate(self) -> float:
+        """지지율 계산."""
+        if self.total_claims == 0:
+            return 1.0
+        return self.supported_claims / self.total_claims
+
+    def to_dict(self) -> dict[str, Any]:
+        """딕셔너리로 변환."""
+        return {
+            "total_claims": self.total_claims,
+            "supported_claims": self.supported_claims,
+            "not_supported_claims": self.not_supported_claims,
+            "partially_supported_claims": self.partially_supported_claims,
+            "support_rate": self.support_rate,
+            "extraction_method": self.extraction_method,
+            "claims": [c.to_dict() for c in self.claims],
+        }
+
+
+@dataclass
 class MetricScore:
     """개별 메트릭 점수."""
 
@@ -26,11 +98,25 @@ class MetricScore:
     score: float  # 0.0 ~ 1.0
     threshold: float = 0.7  # SLA 임계값
     reason: str | None = None  # LLM 평가 이유 (있는 경우)
+    claim_details: ClaimLevelResult | None = None  # Claim-level 세부 결과
 
     @property
     def passed(self) -> bool:
         """threshold 통과 여부."""
         return self.score >= self.threshold
+
+    def to_dict(self) -> dict[str, Any]:
+        """딕셔너리로 변환."""
+        result = {
+            "name": self.name,
+            "score": self.score,
+            "threshold": self.threshold,
+            "passed": self.passed,
+            "reason": self.reason,
+        }
+        if self.claim_details:
+            result["claim_details"] = self.claim_details.to_dict()
+        return result
 
 
 @dataclass
