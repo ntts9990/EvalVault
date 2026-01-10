@@ -1,0 +1,399 @@
+# EvalVault 컴포넌트 백서 매핑
+#
+# 각 컴포넌트가 백서 어디에 속하는지 정의합니다.
+# 이 파일은 백서 업데이트 필요 여부를 자동으로 감지하는 데 사용됩니다.
+
+mapping:
+  domain_entities:
+    - component: Dataset
+      file: src/evalvault/domain/entities/dataset.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: Dataset 엔티티
+        - section_id: 3.1
+          title: 평가 실행 흐름
+          subsection: 데이터셋 로드 단계
+
+    - component: TestCase
+      file: src/evalvault/domain/entities/dataset.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: TestCase 엔티티
+        - section_id: 3.1
+          title: 평가 실행 흐름
+          subsection: 평가 데이터 준비
+
+    - component: EvaluationRun
+      file: src/evalvault/domain/entities/result.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: EvaluationRun 엔티티
+        - section_id: 3.1
+          title: 평가 실행 흐름
+          subsection: 결과 집계 단계
+
+    - component: TestCaseResult
+      file: src/evalvault/domain/entities/result.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: TestCaseResult 엔티티
+
+    - component: MetricScore
+      file: src/evalvault/domain/entities/result.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: MetricScore 엔티티
+
+    - component: AnalysisBundle
+      file: src/evalvault/domain/entities/analysis.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: AnalysisBundle 엔티티
+        - section_id: 3.4
+          title: 분석 파이프라인 흐름
+          subsection: 결과 집계
+
+    - component: AnalysisPipeline
+      file: src/evalvault/domain/entities/analysis_pipeline.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: AnalysisPipeline 엔티티
+        - section_id: 3.4
+          title: 분석 파이프라인 흐름
+          subsection: 파이프라인 빌드
+
+    - component: Experiment
+      file: src/evalvault/domain/entities/experiment.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: Experiment 엔티티
+        - section_id: 3.2
+          title: 실험 관리 흐름
+          subsection: 실험 생성
+
+    - component: ExperimentGroup
+      file: src/evalvault/domain/entities/experiment.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: ExperimentGroup 엔티티
+
+    - component: BenchmarkRun
+      file: src/evalvault/domain/entities/benchmark.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: BenchmarkRun 엔티티
+
+    - component: ImprovementReport
+      file: src/evalvault/domain/entities/improvement.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: ImprovementReport 엔티티
+
+    - component: KnowledgeGraph
+      file: src/evalvault/domain/entities/kg.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: KnowledgeGraph 엔티티
+
+    - component: Entity
+      file: src/evalvault/domain/entities/kg.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: Entity 엔티티
+
+    - component: Relation
+      file: src/evalvault/domain/entities/kg.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: Relation 엔티티
+
+    - component: RAGTraceData
+      file: src/evalvault/domain/entities/rag_trace.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: RAGTraceData 엔티티
+        - section_id: 3.6
+          title: 관측성·추적 흐름
+          subsection: RAG Trace 데이터 변환
+
+    - component: RetrievalData
+      file: src/evalvault/domain/entities/rag_trace.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: RetrievalData 엔티티
+
+    - component: GenerationData
+      file: src/evalvault/domain/entities/rag_trace.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: GenerationData 엔티티
+
+    - component: FactualFact
+      file: src/evalvault/domain/entities/memory.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: FactualFact 엔티티
+        - section_id: 3.5
+          title: 도메인 메모리 형성 흐름
+          subsection: Factual Layer 형성
+
+    - component: LearningMemory
+      file: src/evalvault/domain/entities/memory.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: LearningMemory 엔티티
+        - section_id: 3.5
+          title: 도메인 메모리 형성 흐름
+          subsection: Experiential Layer 형성
+
+    - component: BehaviorEntry
+      file: src/evalvault/domain/entities/memory.py
+      whitepaper_sections:
+        - section_id: 4.1
+          title: 도메인 엔티티
+          subsection: BehaviorEntry 엔티티
+        - section_id: 3.5
+          title: 도메인 메모리 형성 흐름
+          subsection: Behavior Layer 형성
+
+  domain_services:
+    - component: RagasEvaluator
+      file: src/evalvault/domain/services/evaluator.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: RagasEvaluator 서비스
+        - section_id: 3.1
+          title: 평가 실행 흐름
+          subsection: 평가 실행 단계
+
+    - component: EntityExtractor
+      file: src/evalvault/domain/services/entity_extractor.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: EntityExtractor 서비스
+
+    - component: KnowledgeGraphGenerator
+      file: src/evalvault/domain/services/kg_generator.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: KnowledgeGraphGenerator 서비스
+        - section_id: 3.3
+          title: 테스트셋 생성 흐름
+          subsection: Knowledge Graph Method
+
+    - component: BasicTestsetGenerator
+      file: src/evalvault/domain/services/testset_generator.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: BasicTestsetGenerator 서비스
+        - section_id: 3.3
+          title: 테스트셋 생성 흐름
+          subsection: Basic Method
+
+    - component: DocumentChunker
+      file: src/evalvault/domain/services/document_chunker.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: DocumentChunker 서비스
+
+    - component: ExperimentManager
+      file: src/evalvault/domain/services/experiment_manager.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: ExperimentManager 서비스
+        - section_id: 3.2
+          title: 실험 관리 흐름
+          subsection: 실험 관리
+
+    - component: DomainLearningHook
+      file: src/evalvault/domain/services/domain_learning_hook.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: DomainLearningHook 서비스
+        - section_id: 3.5
+          title: 도메인 메모리 형성 흐름
+          subsection: 도메인 학습 훅
+
+    - component: AnalysisService
+      file: src/evalvault/domain/services/analysis_service.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: AnalysisService 서비스
+        - section_id: 3.4
+          title: 분석 파이프라인 흐름
+          subsection: 분석 서비스 오케스트레이션
+
+    - component: PipelineOrchestrator
+      file: src/evalvault/domain/services/pipeline_orchestrator.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: PipelineOrchestrator 서비스
+        - section_id: 3.4
+          title: 분석 파이프라인 흐름
+          subsection: 파이프라인 오케스트레이션
+
+    - component: ImprovementGuideService
+      file: src/evalvault/domain/services/improvement_guide_service.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: ImprovementGuideService 서비스
+
+    - component: BenchmarkRunner
+      file: src/evalvault/domain/services/benchmark_runner.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: BenchmarkRunner 서비스
+
+    - component: MemoryAwareEvaluator
+      file: src/evalvault/domain/services/memory_aware_evaluator.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: MemoryAwareEvaluator 서비스
+        - section_id: 3.1
+          title: 평가 실행 흐름
+          subsection: Domain Memory 초기화
+
+    - component: MemoryBasedAnalysis
+      file: src/evalvault/domain/services/memory_based_analysis.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: MemoryBasedAnalysis 서비스
+
+    - component: PipelineTemplateRegistry
+      file: src/evalvault/domain/services/pipeline_template_registry.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: PipelineTemplateRegistry 서비스
+
+    - component: KeywordIntentClassifier
+      file: src/evalvault/domain/services/intent_classifier.py
+      whitepaper_sections:
+        - section_id: 4.2
+          title: 도메인 서비스
+          subsection: KeywordIntentClassifier 서비스
+
+  domain_metrics:
+    - component: InsuranceTermAccuracy
+      file: src/evalvault/domain/metrics/insurance.py
+      whitepaper_sections:
+        - section_id: 4.3
+          title: 메트릭 시스템
+          subsection: 도메인 특화 메트릭
+
+    - component: EntityPreservation
+      file: src/evalvault/domain/metrics/entity_preservation.py
+      whitepaper_sections:
+        - section_id: 4.3
+          title: 메트릭 시스템
+          subsection: 커스텀 메트릭
+
+  inbound_ports:
+    - component: EvaluatorPort
+      file: src/evalvault/ports/inbound/evaluator_port.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 포트 계층
+          subsection: Inbound Ports
+
+  outbound_ports:
+    - component: DatasetPort
+      file: src/evalvault/ports/outbound/dataset_port.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 포트 계층
+          subsection: Outbound Ports
+
+  outbound_llm_adapters:
+    - component: OpenAIAdapter
+      file: src/evalvault/adapters/outbound/llm/openai_adapter.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 어댑터 계층
+          subsection: LLM Adapters
+
+  outbound_storage_adapters:
+    - component: SQLiteStorageAdapter
+      file: src/evalvault/adapters/outbound/storage/sqlite_adapter.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 어댑터 계층
+          subsection: Storage Adapters
+
+  outbound_tracker_adapters:
+    - component: LangfuseAdapter
+      file: src/evalvault/adapters/outbound/tracker/langfuse_adapter.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 어댑터 계층
+          subsection: Tracker Adapters
+
+    - component: PhoenixAdapter
+      file: src/evalvault/adapters/outbound/tracker/phoenix_adapter.py
+      whitepaper_sections:
+        - section_id: 2.3
+          title: 어댑터 계층
+          subsection: Tracker Adapters
+
+  inbound_cli:
+    - component: CLI commands
+      file: src/evalvault/adapters/inbound/cli.py
+      whitepaper_sections:
+        - section_id: 4.5
+          title: 사용 가이드
+          subsection: CLI 사용법
+
+  inbound_web_api:
+    - component: FastAPI routes
+      file: src/evalvault/adapters/inbound/api/
+      whitepaper_sections:
+        - section_id: 4.5
+          title: 사용 가이드
+          subsection: Web UI 사용법
+
+  config:
+    - component: Settings
+      file: src/evalvault/config/settings.py
+      whitepaper_sections:
+        - section_id: 4.6
+          title: 구현 상세
+          subsection: 설정 관리
+
+    - component: ModelConfig
+      file: src/evalvault/config/model_config.py
+      whitepaper_sections:
+        - section_id: 4.6
+          title: 구현 상세
+          subsection: 모델 프로필

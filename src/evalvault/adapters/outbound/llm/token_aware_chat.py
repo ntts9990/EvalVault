@@ -48,6 +48,22 @@ def _record_usage_attributes(span: Any, prompt: int, completion: int) -> None:
     )
 
 
+def _truncate_tool_calls(response: Any) -> None:
+    """Reduce tool calls to the first entry for Instructor compatibility."""
+    try:
+        choices = getattr(response, "choices", None)
+        if not choices:
+            return
+        message = getattr(choices[0], "message", None)
+        if message is None:
+            return
+        tool_calls = getattr(message, "tool_calls", None)
+        if isinstance(tool_calls, list) and len(tool_calls) > 1:
+            message.tool_calls = [tool_calls[0]]
+    except Exception:
+        return
+
+
 class TokenTrackingAsyncOpenAI(AsyncOpenAI):
     """AsyncOpenAI wrapper that tracks token usage from responses."""
 
@@ -93,6 +109,8 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)
+                    if provider_name == "ollama":
+                        _truncate_tool_calls(response)
                     # Extract usage from response
                     if hasattr(response, "usage") and response.usage:
                         prompt_tokens = response.usage.prompt_tokens or 0
@@ -142,6 +160,8 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 if provider_name == "ollama":
                     if "max_tokens" not in kwargs or kwargs["max_tokens"] < 4096:
                         kwargs["max_tokens"] = 16384
+                    # Instructor는 다중 tool call을 처리하지 못하므로 단일 호출로 제한합니다.
+                    kwargs.setdefault("parallel_tool_calls", False)
                 else:
                     model_name = str(kwargs.get("model") or "")
                     min_tokens = _min_completion_tokens_for_model(model_name)
@@ -163,6 +183,8 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)
+                    if provider_name == "ollama":
+                        _truncate_tool_calls(response)
 
                     if hasattr(response, "usage") and response.usage:
                         prompt_tokens = response.usage.prompt_tokens or 0

@@ -1,0 +1,305 @@
+{
+  "name": "visualization_20q_korean",
+  "version": "1.0.0",
+  "description": "20문항 멀티도메인 고객지원 데이터셋 (시각화/클러스터링 테스트용)",
+  "metadata": {
+    "domain": "multi_support",
+    "language": "ko",
+    "clusters": {
+      "1": "insurance_finance",
+      "2": "commerce_delivery",
+      "3": "travel_hospitality",
+      "4": "account_security"
+    }
+  },
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7,
+    "context_precision": 0.6,
+    "context_recall": 0.6,
+    "factual_correctness": 0.7,
+    "semantic_similarity": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "vis-001",
+      "question": "연금보험의 연금 개시 연령은 언제인가요?",
+      "answer": "이 상품은 만 65세부터 연금이 지급됩니다.",
+      "contexts": [
+        "연금 개시 연령은 만 65세이며, 매월 연금이 지급됩니다.",
+        "연금 개시 이전에는 해지환급금 규정이 적용됩니다."
+      ],
+      "ground_truth": "만 65세",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-002",
+      "question": "보험료 자동이체 할인율은 얼마나 되나요?",
+      "answer": "자동이체를 신청하면 월 보험료의 2%가 할인됩니다.",
+      "contexts": [
+        "자동이체 신청 시 월납 보험료의 2%를 할인합니다.",
+        "카드 납부 할인은 적용되지 않습니다."
+      ],
+      "ground_truth": "월 보험료 2% 할인",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-003",
+      "question": "3년차 해지 환급률은 얼마인가요?",
+      "answer": "3년차 해지 시 납입보험료의 약 50%가 환급됩니다.",
+      "contexts": [
+        "해지환급금은 경과기간에 따라 1년 30%, 3년 50%, 5년 70% 수준입니다.",
+        "조기 해지 시 원금 손실이 발생할 수 있습니다."
+      ],
+      "ground_truth": "3년차 50%",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-004",
+      "question": "암 진단비의 면책기간은 얼마나 되나요?",
+      "answer": "암 진단비는 계약일로부터 90일 이후에 보장됩니다.",
+      "contexts": [
+        "암 진단비는 계약일 기준 90일 면책기간 이후 보장됩니다.",
+        "면책기간 이전 진단은 보험금 지급 대상이 아닙니다."
+      ],
+      "ground_truth": "계약일로부터 90일",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-005",
+      "question": "실손보험의 자기부담금 비율은 어떻게 되나요?",
+      "answer": "급여 항목은 20%, 비급여 항목은 30%의 자기부담금이 있습니다.",
+      "contexts": [
+        "실손보험 자기부담금은 급여 20%, 비급여 30%입니다.",
+        "도수치료 등 일부 항목은 별도 한도가 적용됩니다."
+      ],
+      "ground_truth": "급여 20%, 비급여 30%",
+      "metadata": {
+        "topic": "insurance_finance",
+        "cluster": 1
+      }
+    },
+    {
+      "id": "vis-006",
+      "question": "무료배송 기준 금액은 얼마인가요?",
+      "answer": "3만원 이상 구매하면 무료배송이 적용됩니다.",
+      "contexts": [
+        "주문 금액이 30,000원 이상이면 무료배송입니다.",
+        "도서산간 지역은 추가 배송비가 발생할 수 있습니다."
+      ],
+      "ground_truth": "30,000원 이상",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    },
+    {
+      "id": "vis-007",
+      "question": "교환 신청은 언제까지 가능한가요?",
+      "answer": "상품 수령 후 7일 이내에 교환 신청이 가능합니다.",
+      "contexts": [
+        "교환 신청은 상품 수령일로부터 7일 이내 가능합니다.",
+        "사용 흔적이 있는 상품은 교환이 제한될 수 있습니다."
+      ],
+      "ground_truth": "수령 후 7일 이내",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    },
+    {
+      "id": "vis-008",
+      "question": "단순 변심 반품 시 배송비는 누가 부담하나요?",
+      "answer": "단순 변심 반품은 고객이 왕복 배송비를 부담합니다.",
+      "contexts": [
+        "단순 변심 반품의 경우 왕복 배송비는 고객 부담입니다.",
+        "제품 하자는 판매자가 배송비를 부담합니다."
+      ],
+      "ground_truth": "고객이 왕복 배송비 부담",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    },
+    {
+      "id": "vis-009",
+      "question": "쿠폰 중복 사용은 어떻게 되나요?",
+      "answer": "카테고리 쿠폰 1장과 장바구니 쿠폰 1장을 중복 사용할 수 있습니다.",
+      "contexts": [
+        "카테고리 쿠폰 1장과 장바구니 쿠폰 1장은 중복 사용 가능합니다.",
+        "동일 유형 쿠폰은 중복 사용이 불가합니다."
+      ],
+      "ground_truth": "카테고리 1장 + 장바구니 1장 중복 가능",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    },
+    {
+      "id": "vis-010",
+      "question": "정기배송 해지 시 다음 결제는 어떻게 되나요?",
+      "answer": "다음 결제 24시간 전까지 해지하면 다음 회차 결제가 취소됩니다.",
+      "contexts": [
+        "정기배송은 다음 결제 24시간 전까지 해지하면 다음 회차 결제가 발생하지 않습니다.",
+        "해지 이후에도 이미 출고된 상품은 배송됩니다."
+      ],
+      "ground_truth": "다음 결제 24시간 전까지 해지 시 다음 회차 미청구",
+      "metadata": {
+        "topic": "commerce_delivery",
+        "cluster": 2
+      }
+    },
+    {
+      "id": "vis-011",
+      "question": "국제선 무료 수하물 허용량은 얼마인가요?",
+      "answer": "일반석 기준으로 23kg 1개가 무료입니다.",
+      "contexts": [
+        "국제선 일반석 무료 수하물은 23kg 1개입니다.",
+        "초과 수하물은 노선별 추가 요금이 부과됩니다."
+      ],
+      "ground_truth": "23kg 1개",
+      "metadata": {
+        "topic": "travel_hospitality",
+        "cluster": 3
+      }
+    },
+    {
+      "id": "vis-012",
+      "question": "출발 7일 전 항공권 취소 수수료는 얼마나 되나요?",
+      "answer": "출발 7일 전 취소는 결제 금액의 10%가 수수료로 부과됩니다.",
+      "contexts": [
+        "출발 7일 전 취소 수수료는 결제 금액의 10%입니다.",
+        "출발 24시간 이내 취소는 20% 수수료가 부과됩니다."
+      ],
+      "ground_truth": "결제 금액의 10%",
+      "metadata": {
+        "topic": "travel_hospitality",
+        "cluster": 3
+      }
+    },
+    {
+      "id": "vis-013",
+      "question": "호텔 체크인과 체크아웃 시간은 언제인가요?",
+      "answer": "체크인은 오후 3시, 체크아웃은 오전 11시입니다.",
+      "contexts": [
+        "호텔 체크인 시간은 15시, 체크아웃 시간은 11시입니다.",
+        "얼리 체크인은 객실 상황에 따라 추가 요금이 발생할 수 있습니다."
+      ],
+      "ground_truth": "체크인 15시, 체크아웃 11시",
+      "metadata": {
+        "topic": "travel_hospitality",
+        "cluster": 3
+      }
+    },
+    {
+      "id": "vis-014",
+      "question": "입국 시 여권 유효기간 규정은 어떻게 되나요?",
+      "answer": "입국일 기준 여권 유효기간이 최소 6개월 이상 남아 있어야 합니다.",
+      "contexts": [
+        "입국 시 여권 유효기간은 최소 6개월 이상이어야 합니다.",
+        "미달 시 탑승이 거절될 수 있습니다."
+      ],
+      "ground_truth": "유효기간 6개월 이상",
+      "metadata": {
+        "topic": "travel_hospitality",
+        "cluster": 3
+      }
+    },
+    {
+      "id": "vis-015",
+      "question": "항공 지연이 2시간 이상일 때 제공되는 보상은 무엇인가요?",
+      "answer": "2시간 이상 지연 시 식사 쿠폰이 제공됩니다.",
+      "contexts": [
+        "항공 지연이 2시간 이상이면 식사 쿠폰이 제공됩니다.",
+        "장시간 지연 시 숙박 바우처가 제공될 수 있습니다."
+      ],
+      "ground_truth": "식사 쿠폰 제공",
+      "metadata": {
+        "topic": "travel_hospitality",
+        "cluster": 3
+      }
+    },
+    {
+      "id": "vis-016",
+      "question": "2단계 인증은 어디에서 설정하나요?",
+      "answer": "보안 설정에서 OTP 앱을 등록해 2단계 인증을 활성화합니다.",
+      "contexts": [
+        "계정 설정 > 보안에서 OTP 앱을 등록하면 2단계 인증이 활성화됩니다.",
+        "2단계 인증 설정 후 백업 코드를 저장해 주세요."
+      ],
+      "ground_truth": "보안 설정에서 OTP 앱 등록",
+      "metadata": {
+        "topic": "account_security",
+        "cluster": 4
+      }
+    },
+    {
+      "id": "vis-017",
+      "question": "비밀번호 재설정 링크는 얼마나 유효한가요?",
+      "answer": "재설정 링크는 발급 후 30분 동안 유효합니다.",
+      "contexts": [
+        "비밀번호 재설정 링크의 유효 시간은 30분입니다.",
+        "유효 시간이 지나면 다시 요청해야 합니다."
+      ],
+      "ground_truth": "30분",
+      "metadata": {
+        "topic": "account_security",
+        "cluster": 4
+      }
+    },
+    {
+      "id": "vis-018",
+      "question": "API 호출 제한은 어떻게 되나요?",
+      "answer": "API는 분당 120회까지 호출할 수 있습니다.",
+      "contexts": [
+        "API 호출 제한은 분당 120회입니다.",
+        "제한 초과 시 429 응답이 반환됩니다."
+      ],
+      "ground_truth": "분당 120회",
+      "metadata": {
+        "topic": "account_security",
+        "cluster": 4
+      }
+    },
+    {
+      "id": "vis-019",
+      "question": "접속 로그 보관 기간은 얼마나 되나요?",
+      "answer": "접속 로그는 1년 동안 보관됩니다.",
+      "contexts": [
+        "접속 로그는 1년간 보관 후 자동 삭제됩니다.",
+        "보관 기간은 관련 법령에 따라 변경될 수 있습니다."
+      ],
+      "ground_truth": "1년 보관",
+      "metadata": {
+        "topic": "account_security",
+        "cluster": 4
+      }
+    },
+    {
+      "id": "vis-020",
+      "question": "계정 삭제 후 복구 가능한 기간은 얼마나 되나요?",
+      "answer": "계정 삭제 요청 후 14일 이내에 복구할 수 있습니다.",
+      "contexts": [
+        "계정 삭제 후 14일 동안은 복구 요청이 가능합니다.",
+        "14일이 지나면 데이터가 영구 삭제됩니다."
+      ],
+      "ground_truth": "삭제 후 14일 이내",
+      "metadata": {
+        "topic": "account_security",
+        "cluster": 4
+      }
+    }
+  ]
+}
