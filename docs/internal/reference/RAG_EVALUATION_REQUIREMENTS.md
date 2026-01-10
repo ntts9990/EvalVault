@@ -1,6 +1,6 @@
 # RAG 평가 시스템 요구사항 및 메트릭 권장사항
 
-> **Last Updated**: 2026-01-11 (P0 완료, P1 Synthetic Q&A/MRR/NDCG/Confidence Score 완료)
+> **Last Updated**: 2026-01-11 (P0 완료, P1 완료)
 > **Based on**: 폐쇄망 RAG 시스템 평가 보고서 + 전문가 합의 문서 + 최신 연구 동향
 
 ## 개요
@@ -16,11 +16,11 @@
 │  ├─ ✅ Exact Match / F1 Score   ← 구현 완료 (2026-01-10)     │
 │  └─ ✅ No-Answer Accuracy       ← 구현 완료 (2026-01-10)     │
 │                                                             │
-│  P1 (중요) - Synthetic Q&A, MRR/NDCG, Confidence Score 완료 │
+│  P1 (중요) ✅ 완료                                           │
 │  ├─ ✅ Synthetic Q&A 생성    ← 구현 완료 (2026-01-10)        │
 │  ├─ ✅ MRR, NDCG, HitRate    ← 구현 완료 (2026-01-10)        │
 │  ├─ ✅ Confidence Score      ← 구현 완료 (2026-01-11)        │
-│  └─ Contextual Relevancy      ← 중복 확인 후 결정            │
+│  └─ ✅ Contextual Relevancy  ← 구현 완료 (2026-01-11)        │
 │                                                             │
 │  P2 (개선)                                                  │
 │  ├─ BERTScore                 ← BLEU/ROUGE 대신 이것만       │
@@ -245,14 +245,22 @@ evalvault run data.json --metrics mrr,ndcg,hit_rate
   - `score_detailed()`: 컴포넌트별 상세 분석
   - `should_escalate(threshold=0.7)`: 휴먼 에스컬레이션 권장 여부
 
-#### Contextual Relevancy (문맥 관련성) - 확인 필요
+#### ✅ Contextual Relevancy (문맥 관련성) - 구현 완료
+
+> **구현 완료**: 2026-01-11 | PR #114
 
 - **정의**: 검색된 컨텍스트가 질문과 얼마나 관련이 있는지 평가
 - **중요성**: RAG 트라이어드의 세 번째 축 (TruLens, Microsoft Azure AI 강조)
-- **계산 방식**: LLM 또는 임베딩으로 질문-컨텍스트 관련성 평가
+- **계산 방식**: 토큰 기반 질문-컨텍스트 관련성 평가 (Reference-free)
 - **임계값**: >0.7
-- **구현 난이도**: ⭐⭐
-- **주의**: `Context Precision`과 중복 가능성 있음. RAGAS 확인 후 추가 여부 결정
+- **Context Precision과의 차이**:
+  - Context Precision: contexts vs. ground_truth (reference-required)
+  - Contextual Relevancy: contexts vs. question (reference-free)
+- **사용법**: `--metrics contextual_relevancy`
+- **API**:
+  - `score()`: 0~1 관련성 점수
+  - `score_detailed()`: 컨텍스트별 상세 점수
+  - `get_relevant_contexts()`: 관련 컨텍스트 필터링
 
 ---
 
@@ -376,7 +384,7 @@ evalvault run data.json --metrics mrr,ndcg,hit_rate
 | **Synthetic Q&A 생성** | P1 | ✅ 완료 | Ground Truth 부족 해결. `evalvault generate -m synthetic` |
 | **MRR, NDCG, HitRate** | P1 | ✅ 완료 | 검색 순위 품질. `--metrics mrr,ndcg,hit_rate` |
 | **Confidence Score** | P1 | ✅ 완료 | Human-in-the-Loop 연계. `--metrics confidence_score` |
-| Contextual Relevancy | P1 | ❌ | Context Precision과 중복 확인 후 결정 |
+| **Contextual Relevancy** | P1 | ✅ 완료 | RAG Triad 완성. `--metrics contextual_relevancy` |
 
 ### Phase 3: 중기 구현 (3-6개월) - 개선
 
@@ -485,7 +493,7 @@ EvalVault는 이미 폐쇄망 환경과 핵심 RAG 평가를 잘 지원합니다
 │  ✅ Synthetic Q&A 생성      ← 구현 완료 (-m synthetic)       │
 │  ✅ MRR, NDCG, HitRate      ← 구현 완료 (--metrics mrr,ndcg) │
 │  ✅ Confidence Score        ← 구현 완료 (--metrics confidence_score) │
-│  ❌ Contextual Relevancy    ← 중복 확인 후                   │
+│  ✅ Contextual Relevancy    ← 구현 완료 (--metrics contextual_relevancy) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
