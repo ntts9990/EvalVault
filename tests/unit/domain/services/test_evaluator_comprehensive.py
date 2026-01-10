@@ -1063,6 +1063,9 @@ class TestMetricMaps:
             "exact_match",
             "f1_score",
             "factual_correctness",
+            "hit_rate",
+            "mrr",
+            "ndcg",
             "no_answer_accuracy",
             "semantic_similarity",
         }
