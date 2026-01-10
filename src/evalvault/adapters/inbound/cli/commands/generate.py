@@ -9,6 +9,10 @@ import typer
 from rich.console import Console
 
 from evalvault.domain.services.kg_generator import KnowledgeGraphGenerator
+from evalvault.domain.services.synthetic_qa_generator import (
+    SyntheticQAConfig,
+    SyntheticQAGenerator,
+)
 from evalvault.domain.services.testset_generator import (
     BasicTestsetGenerator,
     GenerationConfig,
@@ -39,7 +43,7 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
             "basic",
             "--method",
             "-m",
-            help="Generation method: 'basic' (random chunks) or 'knowledge_graph' (KG-based).",
+            help="Generation method: 'basic', 'knowledge_graph', or 'synthetic'.",
         ),
         output: Path = typer.Option(
             "generated_testset.json",
@@ -59,6 +63,23 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
             "-N",
             help="Name for the generated dataset.",
         ),
+        profile: str = typer.Option(
+            None,
+            "--profile",
+            "-p",
+            help="Model profile for LLM-based generation (required for 'synthetic' method).",
+        ),
+        language: str = typer.Option(
+            "ko",
+            "--language",
+            "-l",
+            help="Language for Q&A generation: 'ko' or 'en'.",
+        ),
+        include_no_answer: bool = typer.Option(
+            True,
+            "--include-no-answer/--no-include-no-answer",
+            help="Include no-answer test cases for hallucination detection.",
+        ),
     ) -> None:
         """Generate a synthetic test dataset from documents.
 
@@ -67,8 +88,9 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
 
         \b
         Methods:
-          • basic          — Random chunk sampling with simple Q&A generation.
+          • basic          — Random chunk sampling with template-based Q&A.
           • knowledge_graph — Extract entities/relations for structured Q&A.
+          • synthetic      — LLM-based Q&A with ground truth (requires --profile).
 
         \b
         Examples:
@@ -81,6 +103,12 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
           # Use knowledge graph method for better quality
           evalvault generate docs/*.txt -m knowledge_graph -n 20
 
+          # Use LLM-based synthetic generation with ground truth
+          evalvault generate doc.txt -m synthetic -p local -n 20
+
+          # Synthetic with English language
+          evalvault generate doc.txt -m synthetic -p openai -l en -n 10
+
           # Custom chunk size for longer contexts
           evalvault generate doc.txt -c 1000 -n 10
 
@@ -92,7 +120,8 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
           {
             "name": "...",
             "test_cases": [
-              {"id": "tc-001", "question": "...", "answer": "...", "contexts": [...]}
+              {"id": "tc-001", "question": "...", "answer": "...", "contexts": [...],
+               "ground_truth": "..."}
             ]
           }
 
@@ -102,8 +131,14 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
           evalvault kg build  — Build knowledge graphs from documents
         """
 
-        allowed_methods = ("basic", "knowledge_graph")
+        allowed_methods = ("basic", "knowledge_graph", "synthetic")
         validate_choice(method, allowed_methods, console, value_label="method")
+
+        # Synthetic method requires profile
+        if method == "synthetic" and not profile:
+            console.print("[red]Error:[/red] --profile is required for 'synthetic' method.")
+            console.print("Example: evalvault generate doc.txt -m synthetic -p local")
+            raise typer.Exit(1)
 
         console.print("\n[bold]EvalVault[/bold] - Testset Generation")
         console.print(f"Documents: [cyan]{len(documents)}[/cyan]")
@@ -136,6 +171,35 @@ def register_generate_commands(app: typer.Typer, console: Console) -> None:
                     num_questions=num_questions,
                     name=name,
                     version="1.0.0",
+                )
+            elif method == "synthetic":
+                # Load LLM adapter based on profile
+                from evalvault.config import load_model_config
+
+                model_config = load_model_config(profile)
+                llm = model_config.create_llm_adapter()
+
+                console.print(f"[dim]LLM: {llm.get_model_name()}[/dim]")
+
+                syn_generator = SyntheticQAGenerator(llm)
+                syn_config = SyntheticQAConfig(
+                    num_questions=num_questions,
+                    chunk_size=chunk_size,
+                    dataset_name=name,
+                    language=language,
+                    include_no_answer=include_no_answer,
+                )
+
+                def progress_cb(current: int, total: int) -> None:
+                    update_stage(1, current)
+
+                dataset = syn_generator.generate(doc_texts, syn_config, progress_cb)
+
+                # Show generation stats
+                meta = dataset.metadata
+                console.print(
+                    f"[dim]Generated: {meta.get('questions_generated', 0)} → "
+                    f"Filtered: {meta.get('questions_final', 0)}[/dim]"
                 )
             else:
                 generator = BasicTestsetGenerator()
