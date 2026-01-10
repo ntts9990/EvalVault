@@ -1,6 +1,6 @@
 # RAG 평가 시스템 요구사항 및 메트릭 권장사항
 
-> **Last Updated**: 2026-01-10 (P0 Claim-level Faithfulness 구현 완료)
+> **Last Updated**: 2026-01-10 (P0 Claim-level Faithfulness, Exact Match / F1 Score 구현 완료)
 > **Based on**: 폐쇄망 RAG 시스템 평가 보고서 + 전문가 합의 문서 + 최신 연구 동향
 
 ## 개요
@@ -13,7 +13,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  P0 (핵심)                                                  │
 │  ├─ ✅ Claim-level Faithfulness ← 구현 완료 (2026-01-10)     │
-│  ├─ Exact Match / F1 Score    ← 보험 도메인 정확도           │
+│  ├─ ✅ Exact Match / F1 Score   ← 구현 완료 (2026-01-10)     │
 │  └─ "정답 없음" 평가          ← 환각 방지                    │
 │                                                             │
 │  P1 (중요)                                                  │
@@ -64,6 +64,8 @@
 |--------|------|------|
 | Entity Preservation | ✅ | 엔티티 보존율 |
 | Insurance Term Accuracy | ✅ | 도메인 용어 정확도 |
+| Exact Match | ✅ | 완전 일치율 (number_strict 지원) |
+| F1 Score | ✅ | 부분 일치 평가 (number_weight 지원) |
 
 ### 1.4 Stage-level 메트릭
 
@@ -116,12 +118,25 @@
           숫자 불일치 발견
   ```
 
-#### 생성 단계 정확도 메트릭
+#### ✅ 생성 단계 정확도 메트릭 - 구현 완료
 
-| 메트릭 | 정의 | 중요성 | 구현 난이도 |
-|--------|------|--------|------------|
-| **Exact Match (EM)** | 완전 일치율 | 보험 도메인에서 보장금액, 보험료 등 정확한 숫자 일치 필수 | ⭐ |
-| **F1 Score** | 부분 일치 평가 | 부분 정답 인정 | ⭐ |
+> **구현 완료**: 2026-01-10 | PR #109
+
+| 메트릭 | 정의 | 중요성 | 상태 |
+|--------|------|--------|------|
+| **Exact Match (EM)** | 완전 일치율 | 보험 도메인에서 보장금액, 보험료 등 정확한 숫자 일치 필수 | ✅ |
+| **F1 Score** | 부분 일치 평가 | 부분 정답 인정 | ✅ |
+
+**구현 특징**:
+- 한국어 particle 제거 (은/는, 이/가, 을/를, 입니다, etc.)
+- number_strict 모드: 숫자만 일치해도 1.0 점수
+- F1에서 숫자 토큰 가중치 조절 가능 (`number_weight`)
+- Reference-based (ground_truth 필요)
+
+**사용법**:
+```bash
+uv run evalvault run data.json --metrics exact_match,f1_score
+```
 
 **참고**: Ground truth가 있는 경우 정량적 평가에 필수. 보험 도메인 특성상 EM이 특히 중요
 
@@ -304,7 +319,7 @@
 | 항목 | 우선순위 | 상태 | 설명 |
 |------|---------|------|------|
 | **Claim-level Faithfulness** | P0 | ✅ 완료 | 환각 탐지 핵심. `--claim-level` 옵션으로 사용 |
-| Exact Match, F1 Score | P0 | 🔲 예정 | 보험 도메인 정확도 (보장금액, 보험료 등) |
+| **Exact Match, F1 Score** | P0 | ✅ 완료 | 보험 도메인 정확도 (보장금액, 보험료 등) |
 | "정답 없음" 평가 | P0 | 🔲 예정 | 환각 방지. 잘못된 정보 제공 차단 |
 
 ### Phase 2: 단기 구현 (1-2개월) - 중요
@@ -412,7 +427,7 @@ EvalVault는 이미 폐쇄망 환경과 핵심 RAG 평가를 잘 지원합니다
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  ✅ Claim-level Faithfulness ← 구현 완료 (--claim-level)     │
-│  🔲 Exact Match / F1 Score   ← 보험 도메인 정확도            │
+│  ✅ Exact Match / F1 Score   ← 구현 완료 (exact_match, f1)   │
 │  🔲 "정답 없음" 평가         ← 환각 방지                     │
 └─────────────────────────────────────────────────────────────┘
 ```
