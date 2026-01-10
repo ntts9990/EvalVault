@@ -16,6 +16,7 @@
 6. [분석 워크플로](#분석-워크플로)
 7. [Domain Memory 활용](#domain-memory-활용)
 8. [관측성 & Phoenix](#관측성--phoenix)
+   - [Open RAG Trace 표준 연동](#open-rag-trace-표준-연동)
 9. [프롬프트 관리](#프롬프트-관리)
 10. [성능 튜닝](#성능-튜닝)
 11. [메서드 플러그인](#메서드-플러그인)
@@ -751,6 +752,44 @@ uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
 - `--phoenix-experiment`: Phoenix Experiment 생성 및 메트릭/Pass Rate/Domain Memory 메타데이터 포함
 - 생성된 URL은 JSON 출력과 Web UI 히스토리에서 확인할 수 있습니다.
 
+### Open RAG Trace 표준 연동
+
+외부/내부 RAG 시스템을 EvalVault·Phoenix와 동일한 스키마로 연결하려면
+OpenTelemetry + OpenInference 기반의 **Open RAG Trace 표준**을 따르세요.
+
+**핵심 규칙**
+- `rag.module`로 모듈 단위를 식별 (retrieve/llm/eval 등)
+- 로그는 span event로 흡수
+- 표준 필드 외 데이터는 `custom.*`로 보존
+- 객체 배열은 `*_json`으로 직렬화 (`retrieval.documents_json` 등)
+
+**연동 순서**
+1. Collector 실행
+   ```bash
+   docker run --rm \
+     -p 4317:4317 -p 4318:4318 \
+     -e PHOENIX_OTLP_ENDPOINT=http://host.docker.internal:6006 \
+     -v "$(pwd)/scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml" \
+     otel/opentelemetry-collector:latest \
+     --config=/etc/otelcol/config.yaml
+   ```
+2. 계측 래퍼 적용
+   - `OpenRagTraceAdapter`, `trace_module`, `install_open_rag_log_handler`
+   - `build_retrieval_attributes`, `build_llm_attributes` 등 헬퍼 사용
+3. OTLP 전송
+   - Collector: `http://localhost:4318/v1/traces`
+   - Phoenix 직접: `http://localhost:6006/v1/traces`
+4. 검증 스크립트 실행
+   ```bash
+   python3 scripts/dev/validate_open_rag_trace.py --input traces.json
+   ```
+
+**관련 문서**
+- `docs/architecture/open-rag-trace-spec.md`
+- `docs/architecture/open-rag-trace-collector.md`
+- `docs/guides/open-rag-trace-internal-adapter.md`
+- `docs/guides/open-rag-trace-samples.md`
+
 ### 임베딩 분석 & 내보내기
 
 Phoenix 12.27.0의 Embeddings Analysis 뷰는 드리프트/클러스터/3D 시각화를 제공합니다. 업로드된 Dataset/Experiment 화면에서 "Embeddings" 탭을 열면 EvalVault 질문/답변 벡터 및 Domain Memory 태그를 확인할 수 있습니다.
@@ -1109,7 +1148,7 @@ Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며
 | `Command 'evalvault' not found` | `uv run evalvault ...` 또는 PATH에 `.venv/bin` 추가 |
 | OpenAI 401 에러 | `.env` 의 `OPENAI_API_KEY` 확인, 프로필이 OpenAI인지 확인 |
 | Ollama connection refused | `ollama serve` 실행 여부, `OLLAMA_BASE_URL` 확인 |
-| Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 |
+| Phoenix tracing 미동작 | `uv sync --extra phoenix`, `.env` 의 `PHOENIX_ENABLED` 등 확인, endpoint가 `/v1/traces` 로 끝나는지 검증 (`/v1/traces`는 POST 전용이므로 GET 405는 정상) |
 | Langfuse history 비어있음 | `--tracker langfuse` 사용 여부, Docker Compose 컨테이너 상태 확인 |
 | Web UI 접속 불가 | API 서버(`evalvault serve-api`)와 프론트(`npm run dev`)가 켜져 있는지 확인 |
 | React 프론트 CORS 에러 | `CORS_ORIGINS`에 `http://localhost:5173` 추가 또는 Vite 프록시 사용, `VITE_API_BASE_URL` 확인 |
@@ -1124,6 +1163,9 @@ Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며
 - [README.md](../README.md) - 프로젝트 개요
 - [INDEX.md](../INDEX.md) - 전체 문서 인덱스
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - 아키텍처 가이드
+- [open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md) - Open RAG Trace 표준
+- [open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md) - Collector 구성 가이드
+- [open-rag-trace-internal-adapter.md](open-rag-trace-internal-adapter.md) - 내부 시스템 계측
 - [ROADMAP.md](../status/ROADMAP.md) - 개발 로드맵
 - [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md) - 변경 이력
 

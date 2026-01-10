@@ -19,6 +19,7 @@ It is not just a scoring script, but a full **evaluation, observability, and ana
 - **Dataset‑centric evaluation**: datasets carry metrics, thresholds, and domain knowledge together
 - **Decoupled retrievers/LLMs/profiles**: switch OpenAI, Ollama, vLLM, Azure, Anthropic via `config/models.yaml` profiles
 - **Stage‑level tracing**: capture fine‑grained `StageEvent`/`StageMetric` across input → retrieval → rerank → generation
+- **Open RAG Trace standard**: trace external RAG systems with OpenTelemetry + OpenInference schema
 - **Domain Memory & analysis pipelines**: learn from past runs to auto‑tune thresholds, enrich context, and generate improvement guides
 - **Web UI + CLI**: FastAPI + React Evaluation Studio / Analysis Lab and Typer CLI all operate on the same DB and traces
 
@@ -108,6 +109,49 @@ adjust them when `--use-domain-memory` is enabled.
   JSON array string or `|`-separated.
 - Generate templates via `uv run evalvault init` (`dataset_templates/`) or start from
   `tests/fixtures/sample_dataset.json`.
+
+---
+
+## Open RAG Trace Standard (External/Internal Systems)
+
+EvalVault ships an **OpenTelemetry + OpenInference-based Open RAG Trace standard** so
+external RAG systems can emit traces in the same schema and be analyzed alongside EvalVault runs.
+The core contract is **module-level spans (`rag.module`) + log events + shared attributes**.
+
+**What you get**
+- Unified Phoenix traces across systems
+- Comparable analysis using shared fields
+- Non-standard metrics preserved under `custom.*`
+
+**Minimal integration steps**
+1. **Run the collector**
+   ```bash
+   docker run --rm \
+     -p 4317:4317 -p 4318:4318 \
+     -v "$(pwd)/scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml" \
+     otel/opentelemetry-collector:latest \
+     --config=/etc/otelcol/config.yaml
+   ```
+2. **Instrument your system**
+   - Python: `OpenRagTraceAdapter`, `trace_module`, `install_open_rag_log_handler`
+   - Attribute helpers: `build_retrieval_attributes`, `build_llm_attributes`, etc.
+3. **Send OTLP**
+   - Via collector: `http://localhost:4318/v1/traces`
+   - Direct to Phoenix: `http://localhost:6006/v1/traces`
+4. **Validate**
+   ```bash
+   python3 scripts/dev/validate_open_rag_trace.py --input traces.json
+   ```
+
+**OTel attribute limits**
+- Only scalars/arrays are supported. Serialize complex objects as JSON strings
+  (e.g., `retrieval.documents_json`) or store them as `artifact.uri`.
+
+**Docs**
+- `docs/architecture/open-rag-trace-spec.md`
+- `docs/architecture/open-rag-trace-collector.md`
+- `docs/guides/open-rag-trace-internal-adapter.md`
+- `docs/guides/open-rag-trace-samples.md`
 
 ---
 

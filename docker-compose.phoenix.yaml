@@ -1,0 +1,27 @@
+services:
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    volumes:
+      - phoenix_data:/data
+    environment:
+      - PHOENIX_WORKING_DIR=/data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    depends_on:
+      - phoenix
+    environment:
+      - PHOENIX_OTLP_ENDPOINT=http://phoenix:6006
+    volumes:
+      - ./scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    restart: unless-stopped
+
+volumes:
+  phoenix_data:

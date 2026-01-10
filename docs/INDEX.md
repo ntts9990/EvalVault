@@ -1,6 +1,6 @@
 # EvalVault 문서 인덱스
 
-> **Last Updated**: 2026-01-09
+> **Last Updated**: 2026-01-10
 
 이 디렉터리(`docs/`)는 **배포/공개용 문서**와 **개발·운영 내부용 문서**를 분리하여 관리합니다.
 목적, 기능, 시점에 따라 아래 구조를 참고하세요.
@@ -49,6 +49,8 @@ docs/
 | 문서 | 대상 | 설명 |
 |------|------|------|
 | [guides/USER_GUIDE.md](guides/USER_GUIDE.md) | 모든 사용자 | 통합 사용자 가이드 (CLI, Web UI, 분석 워크플로, Domain Memory, 관측성, 프롬프트 관리, 성능 튜닝, 메서드 플러그인, 문제 해결) |
+| [guides/open-rag-trace-samples.md](guides/open-rag-trace-samples.md) | 개발자 | Open RAG Trace 최소 계측 샘플 |
+| [guides/open-rag-trace-internal-adapter.md](guides/open-rag-trace-internal-adapter.md) | 개발자 | 내부 시스템 최소 계측 래퍼 가이드 |
 
 **USER_GUIDE.md에 통합된 내용**:
 - CLI 명령어 참조 (기존 CLI_GUIDE.md)
@@ -77,6 +79,8 @@ docs/
 | 문서 | 대상 | 설명 |
 |------|------|------|
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 개발자/아키텍트 | 통합 아키텍처 가이드 (Hexagonal Architecture, 프로젝트 개요, 소스 구조, 확장 지점, 구조 파악 방법론) |
+| [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md) | 개발자/아키텍트 | OpenTelemetry + OpenInference 기반 RAG 트레이싱 표준 초안 |
+| [architecture/open-rag-trace-collector.md](architecture/open-rag-trace-collector.md) | 개발자/아키텍트 | Open RAG Trace Collector 구성 예시 |
 | [status/ROADMAP.md](status/ROADMAP.md) | 모든 사용자 | 향후 계획, 마일스톤 |
 | [status/STATUS.md](status/STATUS.md) | 모든 사용자 | 현재 상태 요약 (버전, 테스트, 완료 항목) |
 

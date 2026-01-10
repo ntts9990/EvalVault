@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from evalvault.domain.entities import EvaluationRun, GenerationData, RAGTraceData, RetrievalData
+from evalvault.adapters.outbound.tracer.open_rag_trace_helpers import serialize_json
+from evalvault.domain.entities import (
+    EvaluationRun,
+    GenerationData,
+    RAGTraceData,
+    RetrievalData,
+    RetrievedDocument,
+)
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 if TYPE_CHECKING:
@@ -437,6 +445,18 @@ class PhoenixAdapter(TrackerPort):
             # Set query
             if data.query:
                 span.set_attribute("retrieval.query", data.query)
+                span.set_attribute("input.value", data.query)
+
+            span.set_attribute("spec.version", "0.1")
+            span.set_attribute("rag.module", "retrieve")
+
+            documents_payload = _build_retrieval_payload(data.candidates)
+            span.set_attribute("custom.retrieval.doc_count", len(documents_payload))
+            if documents_payload:
+                span.set_attribute("retrieval.documents_json", serialize_json(documents_payload))
+                doc_ids = _extract_doc_ids(documents_payload)
+                if doc_ids:
+                    span.set_attribute("output.value", doc_ids)
 
             # Log each retrieved document as an event
             for i, doc in enumerate(data.candidates):
@@ -501,14 +521,17 @@ class PhoenixAdapter(TrackerPort):
 
             # Set prompt/response (truncate if too long)
             max_len = 10000
-            if data.prompt:
-                prompt = data.prompt[:max_len] if len(data.prompt) > max_len else data.prompt
+            prompt = data.prompt[:max_len] if data.prompt else ""
+            response = data.response[:max_len] if data.response else ""
+            if prompt:
                 span.set_attribute("generation.prompt", prompt)
-            if data.response:
-                response = (
-                    data.response[:max_len] if len(data.response) > max_len else data.response
-                )
+                span.set_attribute("input.value", prompt)
+            if response:
                 span.set_attribute("generation.response", response)
+                span.set_attribute("output.value", response)
+
+            span.set_attribute("spec.version", "0.1")
+            span.set_attribute("rag.module", "llm")
 
             # Set prompt template if available
             if data.prompt_template:
@@ -544,6 +567,13 @@ class PhoenixAdapter(TrackerPort):
         if data.final_answer:
             preview = data.final_answer[:1000]
             span.set_attribute("rag.final_answer", preview)
+            span.set_attribute("output.value", preview)
+
+        if data.query:
+            span.set_attribute("input.value", data.query)
+
+        span.set_attribute("spec.version", "0.1")
+        span.set_attribute("rag.module", "custom.pipeline")
 
         if should_end:
             self.end_trace(trace_id)
@@ -555,3 +585,29 @@ class PhoenixAdapter(TrackerPort):
         if self._tracer_provider:
             self._tracer_provider.shutdown()
             self._initialized = False
+
+
+def _build_retrieval_payload(
+    documents: Sequence[RetrievedDocument],
+) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for index, doc in enumerate(documents, start=1):
+        doc_id = doc.chunk_id or doc.source or doc.metadata.get("doc_id") or f"doc_{index}"
+        item: dict[str, Any] = {"doc_id": doc_id, "score": doc.score}
+        if doc.source:
+            item["source"] = doc.source
+        if doc.rerank_score is not None:
+            item["rerank_score"] = doc.rerank_score
+        if doc.rerank_rank is not None:
+            item["rerank_rank"] = doc.rerank_rank
+        payload.append(item)
+    return payload
+
+
+def _extract_doc_ids(documents: Sequence[dict[str, Any]]) -> list[str]:
+    doc_ids: list[str] = []
+    for document in documents:
+        doc_id = document.get("doc_id")
+        if doc_id is not None:
+            doc_ids.append(str(doc_id))
+    return doc_ids

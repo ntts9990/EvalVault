@@ -1902,6 +1902,12 @@ class InsightGenerator(InsightGeneratorPort):
 
 ### 4.10 관측성 · 추적 흐름 (Observability & Tracing Flow)
 
+EvalVault는 내부 실행뿐 아니라 **외부 RAG 시스템**도 동일한 스키마로 추적할 수 있도록
+OpenTelemetry + OpenInference 기반의 **Open RAG Trace 표준**을 제공합니다.
+외부 시스템은 `rag.module`을 중심으로 스팬을 생성하고,
+`custom.*` 네임스페이스로 표준 외 메타데이터를 보존하며,
+로그는 span event로 흡수합니다.
+
 ```
 [1] CLI --phoenix-enabled / --tracker 옵션
     │

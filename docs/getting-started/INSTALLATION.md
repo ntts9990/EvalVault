@@ -1,7 +1,7 @@
 # EvalVault 설치 가이드
 
 > Audience: 처음 사용자
-> Last Updated: 2026-01-09
+> Last Updated: 2026-01-10
 
 ---
 
@@ -82,5 +82,7 @@ npm run dev
 
 - 5분 빠른 시작: [tutorials/01-quickstart.md](../tutorials/01-quickstart.md)
 - 설치/환경설정/CLI/Web UI: [guides/USER_GUIDE.md](../guides/USER_GUIDE.md)
+- 외부 시스템 트레이싱 표준: [architecture/open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md)
+- Collector 구성: [architecture/open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md)
 - 프로젝트 개요(한국어): [README.md](../../README.md)
 - 프로젝트 개요(영문): [README.en.md](../../README.en.md)

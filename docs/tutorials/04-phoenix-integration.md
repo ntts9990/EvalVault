@@ -56,7 +56,7 @@ docker ps | grep phoenix
 ### 방법 2: Docker Compose
 
 ```yaml
-# docker-compose.phoenix.yaml
+# docker-compose.phoenix.yaml (Phoenix + OTel Collector)
 services:
   phoenix:
     image: arizephoenix/phoenix:latest
@@ -66,6 +66,20 @@ services:
       - phoenix_data:/data
     environment:
       - PHOENIX_WORKING_DIR=/data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    depends_on:
+      - phoenix
+    environment:
+      - PHOENIX_OTLP_ENDPOINT=http://phoenix:6006
+    volumes:
+      - ./scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config=/etc/otelcol/config.yaml"]
     restart: unless-stopped
 
 volumes:
@@ -89,11 +103,12 @@ uv run python -m phoenix.server.main serve
 ### 설치 확인
 
 ```bash
-# 헬스체크
-curl http://localhost:6006/v1/traces
+# UI 응답 확인
+curl http://localhost:6006
+# /v1/traces는 POST 전용이라 GET 405가 정상입니다.
 ```
 
-정상 응답: `{"status":"ok"}` 또는 빈 응답
+정상 응답: HTTP 200 OK
 
 ---
 
@@ -162,6 +177,38 @@ uv run evalvault run "$DATASET" \
 1. Phoenix 대시보드 접속: http://localhost:6006
 2. Traces 탭에서 `evalvault` 서비스 확인
 3. 평가 트레이스 클릭하여 상세 정보 확인
+
+---
+
+## Open RAG Trace 표준으로 외부 시스템 연결
+
+EvalVault 밖의 RAG 시스템도 OpenTelemetry + OpenInference 스키마로 트레이스를 보내면
+Phoenix에서 동일한 방식으로 확인할 수 있습니다.
+
+### Step 1: Collector 실행
+```bash
+docker run --rm \
+  -p 4317:4317 -p 4318:4318 \
+  -e PHOENIX_OTLP_ENDPOINT=http://host.docker.internal:6006 \
+  -v "$(pwd)/scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml" \
+  otel/opentelemetry-collector:latest \
+  --config=/etc/otelcol/config.yaml
+```
+
+### Step 2: 외부 시스템 계측
+- `rag.module` 필수
+- 로그는 span event로 수집
+- 객체 배열은 `*_json`으로 직렬화
+
+### Step 3: 데모 전송
+```bash
+python3 scripts/dev/open_rag_trace_demo.py --endpoint http://localhost:4318/v1/traces
+```
+
+### 참고 문서
+- `docs/architecture/open-rag-trace-spec.md`
+- `docs/architecture/open-rag-trace-collector.md`
+- `docs/guides/open-rag-trace-internal-adapter.md`
 
 ---
 
@@ -383,7 +430,8 @@ Error: Failed to initialize Phoenix tracer
 1. Phoenix 서버 실행 확인:
    ```bash
    docker ps | grep phoenix
-   curl http://localhost:6006/v1/traces
+   curl http://localhost:6006
+   # /v1/traces는 POST 전용이라 GET 405가 정상입니다.
    ```
 
 2. 엔드포인트 확인:

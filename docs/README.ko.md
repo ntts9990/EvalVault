@@ -121,6 +121,7 @@ EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 FastAPI + React 
 - OpenAI/Ollama/vLLM/폐쇄망을 아우르는 프로필 기반 모델 구성
 - FastAPI + React Web UI에서 평가, 히스토리, 보고서 생성
 - Langfuse 및 Phoenix 트래커로 트레이스/데이터셋/실험/프롬프트 동기화
+- OpenTelemetry + OpenInference 기반 Open RAG Trace 표준으로 외부 시스템 트레이싱 통합
 - Domain Memory로 과거 결과를 학습하여 threshold 조정·컨텍스트 보강·트렌드 분석
 - 통계·NLP·인과 모듈을 가진 DAG 분석 파이프라인
 
@@ -285,6 +286,10 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 - [INDEX.md](INDEX.md): 전체 문서 인덱스
 - [guides/USER_GUIDE.md](guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): 설계 문서
+- [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md): Open RAG Trace 표준 초안
+- [architecture/open-rag-trace-collector.md](architecture/open-rag-trace-collector.md): Collector 구성 예시
+- [guides/open-rag-trace-samples.md](guides/open-rag-trace-samples.md): 최소 계측 샘플
+- [guides/open-rag-trace-internal-adapter.md](guides/open-rag-trace-internal-adapter.md): 내부 시스템 최소 계측 래퍼
 - [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md): 릴리스 히스토리
 
 ---

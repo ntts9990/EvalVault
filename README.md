@@ -14,10 +14,11 @@ English version? See [README.en.md](README.en.md).
 ## EvalVault 한눈에 보기
 
 EvalVault의 목표는 **"RAG 시스템의 품질을 데이터셋/메트릭/트레이싱 관점에서 일관되게 관리하는 운영 콘솔"**입니다.
-단순 점수 계산기가 아니라, 아래 네 가지 축을 모두 다룹니다.
+단순 점수 계산기가 아니라, 아래 다섯 가지 핵심 축을 모두 다룹니다.
 
 - **평가(Evaluation)**: 데이터셋 기반으로 다양한 LLM/리트리버/프롬프트 조합을 실험하고 점수/threshold 관리
 - **관측(Observability)**: Stage 단위 이벤트와 메트릭, Langfuse/Phoenix 트레이스를 한 Run ID로 연결
+- **표준 연동(Open RAG Trace)**: OpenTelemetry + OpenInference 스키마로 외부 RAG 시스템도 동일하게 추적
 - **학습(Domain Memory)**: 과거 실행으로부터 도메인 지식/패턴을 축적해 threshold, 컨텍스트, 리포트를 자동 보정
 - **분석(Analysis Pipelines)**: 통계·NLP·인과 모듈이 포함된 DAG 파이프라인으로 결과를 다각도로 해석
 
@@ -175,31 +176,92 @@ uv run evalvault run tests/fixtures/e2e/graphrag_smoke.json \
 
 ---
 
+## Open RAG Trace 표준 연동 (외부/내부 RAG 시스템)
+
+EvalVault는 **OpenTelemetry + OpenInference 기반의 Open RAG Trace 표준**을 제공해,
+외부 RAG 시스템도 같은 방식으로 트레이싱/분석할 수 있도록 설계했습니다.
+핵심은 **모듈 단위 스팬(`rag.module`) + 로그 이벤트 + 공통 스키마**입니다.
+
+**무엇을 얻나?**
+- 외부 시스템 로그/메트릭을 Phoenix에서 동일한 뷰로 확인
+- EvalVault 분석 파이프라인에서 공통 필드로 비교/리포트
+- 표준 필드 외 데이터도 `custom.*` 네임스페이스로 보존
+
+**최소 연결 순서**
+1. **Collector 실행**
+   ```bash
+   docker run --rm \
+     -p 4317:4317 -p 4318:4318 \
+     -v "$(pwd)/scripts/dev/otel-collector-config.yaml:/etc/otelcol/config.yaml" \
+     otel/opentelemetry-collector:latest \
+     --config=/etc/otelcol/config.yaml
+   ```
+2. **대상 시스템 계측**
+   - Python: `OpenRagTraceAdapter`, `trace_module`, `install_open_rag_log_handler` 사용
+   - 공통 속성 헬퍼: `build_retrieval_attributes`, `build_llm_attributes` 등
+3. **OTLP 전송**
+   - Collector 경유: `http://localhost:4318/v1/traces`
+   - Phoenix 직접: `http://localhost:6006/v1/traces`
+4. **검증**
+   ```bash
+   python3 scripts/dev/validate_open_rag_trace.py --input traces.json
+   ```
+
+**OTel 속성 제한**
+- OTel 속성은 스칼라/스칼라 배열만 허용하므로
+  `retrieval.documents_json`처럼 JSON 문자열로 직렬화하거나 `artifact.uri`로 분리합니다.
+
+**관련 문서**
+- `docs/architecture/open-rag-trace-spec.md`
+- `docs/architecture/open-rag-trace-collector.md`
+- `docs/guides/open-rag-trace-internal-adapter.md`
+- `docs/guides/open-rag-trace-samples.md`
+
+---
+
 ## 왜 EvalVault인가?
 
-**우리가 풀고 싶은 문제**
+### 우리가 풀고 싶은 문제
 
-- "모델/프롬프트/리트리버를 바꿨을 때 **정말 좋아진 건지** 수치로 설명하기 어렵다."
-- LLM 로그, 검색 로그, 트레이스가 여러 곳에 흩어져 있고 **한 눈에 병목·품질 이슈를 잡기 힘들다.**
-- 팀/프로젝트마다 ad-hoc 스크립트가 늘어나 **재현성과 회귀 테스트가 깨지기 쉽다.**
+RAG 시스템을 운영하다 보면 다음과 같은 문제에 직면합니다:
 
-EvalVault는 이 문제를 위해 다음과 같은 축으로 설계되었습니다.
+- **"모델/프롬프트/리트리버를 바꿨을 때 정말 좋아진 건지 수치로 설명하기 어렵다."**
+  - 점수만 봐서는 개선의 원인을 파악하기 어렵고, 실험 간 비교가 일관되지 않습니다.
+- **LLM 로그, 검색 로그, 트레이스가 여러 곳에 흩어져 있고 한 눈에 병목·품질 이슈를 잡기 힘들다.**
+  - 각 단계별 데이터가 분산되어 있어 전체 파이프라인을 통합적으로 분석하기 어렵습니다.
+- **팀/프로젝트마다 ad-hoc 스크립트가 늘어나 재현성과 회귀 테스트가 깨지기 쉽다.**
+  - 표준화된 평가 워크플로가 없어 실험 결과의 재현성과 비교가 어렵습니다.
 
-- **데이터셋 중심 평가**
-  - JSON/CSV/XLSX 데이터셋에 메트릭/threshold/도메인 정보를 함께 정의
-  - 동일 데이터셋으로 모델/리트리버/프롬프트 실험을 반복 가능하게 관리
-- **LLM/리트리버 프로필 시스템**
-  - OpenAI, Ollama, vLLM, Azure, Anthropic 등을 `config/models.yaml` 프로필로 선언
-  - 로컬/클라우드/폐쇄망 환경 간에도 동일한 CLI·Web 흐름 유지
-- **Stage 단위 트레이싱 & 디버깅**
-  - `StageEvent`/`StageMetric`/DebugReport로 입력 → 검색 → 리랭크 → 최종 답변까지 단계별로 기록
-  - Langfuse·Phoenix 트레이서와 연동해 외부 관측 시스템과 바로 연결
-- **Domain Memory & 분석 파이프라인**
-  - 과거 실행에서 fact/behavior를 추출해 threshold 튜닝, 컨텍스트 보강, 개선 가이드 자동화
-  - 통계·NLP·인과 분석 모듈이 포함된 DAG 파이프라인으로 성능 저하 원인 추적
-- **Web UI + CLI 일관성**
-  - Typer CLI와 **FastAPI + React Web UI**가 동일한 DB/트레이스 위에서 동작
-  - 로컬 실험 → 팀 공유 → CI/CD 게이트까지 하나의 도구 체인으로 연결
+### EvalVault의 설계 철학
+
+EvalVault는 위 문제를 해결하기 위해 **다섯 가지 핵심 축**으로 설계되었습니다:
+
+#### 1. 데이터셋 중심 평가
+- JSON/CSV/XLSX 데이터셋에 메트릭/threshold/도메인 정보를 함께 정의
+- 동일 데이터셋으로 모델/리트리버/프롬프트 실험을 반복 가능하게 관리
+- 데이터셋별 threshold를 자동으로 관리하여 도메인 특성에 맞는 평가 기준 적용
+
+#### 2. LLM/리트리버 프로필 시스템
+- OpenAI, Ollama, vLLM, Azure, Anthropic 등을 `config/models.yaml` 프로필로 선언
+- 로컬/클라우드/폐쇄망 환경 간에도 동일한 CLI·Web 흐름 유지
+- 프로필 기반으로 모델 전환 시 코드 변경 없이 실험 가능
+
+#### 3. Stage 단위 트레이싱 & 디버깅
+- `StageEvent`/`StageMetric`/DebugReport로 입력 → 검색 → 리랭크 → 최종 답변까지 단계별로 기록
+- Langfuse·Phoenix 트레이서와 연동해 외부 관측 시스템과 바로 연결
+- 각 단계의 성능과 품질을 세밀하게 추적하여 병목 지점을 빠르게 식별
+
+#### 4. Domain Memory & 분석 파이프라인
+- 과거 실행에서 fact/behavior를 추출해 threshold 튜닝, 컨텍스트 보강, 개선 가이드 자동화
+- 통계·NLP·인과 분석 모듈이 포함된 DAG 파이프라인으로 성능 저하 원인 추적
+- 평가 결과를 학습하여 다음 평가에 자동으로 반영하는 지속적 개선 루프
+
+#### 5. Web UI + CLI 일관성
+- Typer CLI와 **FastAPI + React Web UI**가 동일한 DB/트레이스 위에서 동작
+- 로컬 실험 → 팀 공유 → CI/CD 게이트까지 하나의 도구 체인으로 연결
+- CLI로 빠르게 실험하고, Web UI로 결과를 시각화하고 공유하는 통합 워크플로
+
+---
 
 상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](docs/guides/USER_GUIDE.md)를 참고하세요.
 
@@ -340,6 +402,86 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 ---
 
+## RAG 성능 평가 핵심 메트릭 (2026년 기준)
+
+RAG 시스템의 성능을 판단할 때 전문가들이 공통적으로 중요하게 여기는 메트릭들을 정리했습니다.
+EvalVault는 이러한 메트릭들을 체계적으로 측정하고 비교할 수 있도록 설계되었습니다.
+
+### 1. 답변 품질 메트릭 (Answer Quality Metrics)
+
+| 메트릭 | 중요도 | 설명 | EvalVault 지원 |
+|--------|--------|------|----------------|
+| **Faithfulness (충실도)** | ⭐⭐⭐⭐⭐ | 생성된 답변이 검색된 문서의 내용에 얼마나 충실한지. 환각(hallucination) 감지의 핵심 지표 | ✅ 지원 |
+| **Answer Relevancy (답변 관련성)** | ⭐⭐⭐⭐⭐ | 답변이 질문 의도와 얼마나 잘 맞는지. 사용자 질문에 대한 적절성 평가 | ✅ 지원 |
+| **Answer Correctness (답변 정확도)** | ⭐⭐⭐⭐ | Ground truth 대비 사실적 정확성. ROUGE, BERTScore 등으로 측정 | ✅ 지원 (factual_correctness) |
+| **Semantic Similarity (의미적 유사도)** | ⭐⭐⭐⭐ | 답변과 정답 간 의미적 유사도. 단순 문자열 매칭을 넘어선 의미 이해 평가 | ✅ 지원 |
+| **Fluency (유창성)** | ⭐⭐⭐ | 답변이 언어적으로 자연스럽고 문법적으로 정확한지 | 🔄 계획 중 |
+
+### 2. 검색 품질 메트릭 (Retrieval Quality Metrics)
+
+| 메트릭 | 중요도 | 설명 | EvalVault 지원 |
+|--------|--------|------|----------------|
+| **Context Precision (문맥 정밀도)** | ⭐⭐⭐⭐⭐ | 검색된 컨텍스트가 얼마나 불필요한 내용을 적게 포함하는지. 노이즈 최소화 평가 | ✅ 지원 |
+| **Context Recall (문맥 재현율)** | ⭐⭐⭐⭐⭐ | 필요한 정보가 컨텍스트에 충분히 포함되었는지. 핵심 정보 누락 방지 평가 | ✅ 지원 |
+| **Hit Rate@K** | ⭐⭐⭐⭐ | 상위 K개 검색 결과 중 정답 문서가 포함된 비율. 검색기의 적중률 평가 | 🔄 Stage Metric으로 측정 가능 |
+| **NDCG (Normalized Discounted Cumulative Gain)** | ⭐⭐⭐⭐ | 검색 결과의 순위 품질. 관련성 높은 문서가 상위에 배치되었는지 평가 | 🔄 Stage Metric으로 측정 가능 |
+| **MRR (Mean Reciprocal Rank)** | ⭐⭐⭐ | 정답이 몇 번째 순위에 위치하는지. 순위 정확도 평가 | 🔄 Stage Metric으로 측정 가능 |
+
+### 3. 파이프라인 단계 메트릭 (Stage-level Metrics)
+
+프로덕션 환경에서는 각 단계별 성능을 세밀하게 추적하는 것이 중요합니다:
+
+| 단계 | 주요 메트릭 | 중요도 | EvalVault 지원 |
+|------|------------|--------|----------------|
+| **Retrieval (검색)** | `precision_at_k`, `recall_at_k`, `result_count`, `latency_ms` | ⭐⭐⭐⭐⭐ | ✅ StageMetricService |
+| **Rerank (재순위화)** | `keep_rate`, `avg_score`, `latency_ms` | ⭐⭐⭐⭐ | ✅ StageMetricService |
+| **Generation (생성)** | `citation_count`, `token_ratio`, `latency_ms` | ⭐⭐⭐⭐⭐ | ✅ StageMetricService |
+| **Input (입력)** | `query_length`, `query_complexity` | ⭐⭐⭐ | ✅ StageMetricService |
+
+### 4. 운영 메트릭 (Operational Metrics)
+
+프로덕션 환경에서 필수적으로 모니터링해야 하는 메트릭:
+
+| 메트릭 | 중요도 | 설명 | EvalVault 지원 |
+|--------|--------|------|----------------|
+| **Latency (지연 시간)** | ⭐⭐⭐⭐⭐ | 질문에 대한 응답까지 걸린 시간. 사용자 경험에 직접적 영향 | ✅ Stage Metric으로 측정 |
+| **Throughput (처리량)** | ⭐⭐⭐⭐ | 단위 시간당 처리 가능한 요청 수 | 🔄 계획 중 |
+| **Cost (비용)** | ⭐⭐⭐⭐ | LLM API 호출 비용, 임베딩 비용 등 | 🔄 계획 중 |
+| **Error Rate (에러율)** | ⭐⭐⭐⭐⭐ | 시스템 실패율, 타임아웃 비율 등 | ✅ 에러 추적 지원 |
+
+### 5. 도메인 특화 메트릭 (Domain-specific Metrics)
+
+특정 도메인에 맞춘 커스텀 메트릭:
+
+| 메트릭 | 중요도 | 설명 | EvalVault 지원 |
+|--------|--------|------|----------------|
+| **Entity Preservation (엔티티 보존)** | ⭐⭐⭐⭐ | 입력과 출력 간 엔티티 보존도. 정보 손실 방지 평가 | ✅ 지원 |
+| **Domain Term Accuracy (도메인 용어 정확도)** | ⭐⭐⭐⭐ | 도메인 특화 용어의 정확한 사용 여부 | ✅ 지원 (예: insurance_term_accuracy) |
+| **Summary Quality (요약 품질)** | ⭐⭐⭐ | 요약 작업 시 원본 충실도와 품질 | ✅ 지원 (summary_score, summary_faithfulness) |
+
+### 평가 전략 권장사항
+
+전문가들의 공통된 의견에 따르면, RAG 시스템 평가는 다음과 같은 전략을 권장합니다:
+
+1. **다각도 평가**: 단일 메트릭이 아닌 여러 메트릭을 조합하여 평가
+   - 필수: `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`
+   - 권장: `factual_correctness`, `semantic_similarity`, Stage-level 메트릭
+
+2. **단계별 추적**: Retrieval → Rerank → Generation 각 단계의 성능을 개별적으로 측정
+   - 병목 지점을 빠르게 식별하고 개선 방향 도출
+
+3. **지속적 모니터링**: 프로덕션 환경에서 지속적으로 메트릭을 추적하여 성능 저하 감지
+   - Phoenix, Langfuse 등 관측성 도구와 연동
+
+4. **도메인 맞춤화**: 도메인 특성에 맞는 커스텀 메트릭 개발 및 적용
+   - 예: 의료 도메인의 전문 용어 정확도, 법률 도메인의 조항 인용 정확도
+
+5. **비용 효율성**: 메트릭 계산 비용과 정확도의 균형 고려
+   - LLM 기반 메트릭은 정확하지만 비용이 높음
+   - 임베딩 기반 메트릭은 빠르고 저렴하지만 정확도가 상대적으로 낮을 수 있음
+
+---
+
 ## 지원 메트릭
 
 EvalVault는 RAG 평가에 널리 쓰이는 Ragas 0.4.x 계열 메트릭을 기본으로 제공하면서,
@@ -370,6 +512,8 @@ EvalVault는 RAG 평가에 널리 쓰이는 Ragas 0.4.x 계열 메트릭을 기�
 - [docs/INDEX.md](docs/INDEX.md): 전체 문서 인덱스
 - [docs/guides/USER_GUIDE.md](docs/guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): 설계 문서
+- [docs/architecture/open-rag-trace-spec.md](docs/architecture/open-rag-trace-spec.md): Open RAG Trace 표준
+- [docs/guides/open-rag-trace-internal-adapter.md](docs/guides/open-rag-trace-internal-adapter.md): 내부 시스템 계측 가이드
 - [CHANGELOG.md](CHANGELOG.md): 릴리스 히스토리
 
 ---
