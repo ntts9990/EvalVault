@@ -152,7 +152,7 @@ class TestEvaluateSequential:
             evaluator,
             "_score_single_sample",
             new_callable=AsyncMock,
-            return_value={"faithfulness": 0.85},
+            return_value=({"faithfulness": 0.85}, {}),
         ):
             results = await evaluator._evaluate_sequential(
                 dataset=sample_dataset,
@@ -191,7 +191,7 @@ class TestEvaluateSequential:
             nonlocal call_count
             call_count += 1
             mock_llm.set_token_usage(100 * call_count, 50 * call_count)
-            return {"faithfulness": 0.85}
+            return ({"faithfulness": 0.85}, {})
 
         with patch.object(evaluator, "_score_single_sample", side_effect=mock_score):
             results = await evaluator._evaluate_sequential(
@@ -225,7 +225,7 @@ class TestEvaluateSequential:
 
         async def mock_score(*args, **kwargs):
             await asyncio.sleep(0.01)  # 10ms 지연
-            return {"faithfulness": 0.85}
+            return ({"faithfulness": 0.85}, {})
 
         with patch.object(evaluator, "_score_single_sample", side_effect=mock_score):
             results = await evaluator._evaluate_sequential(
@@ -269,7 +269,7 @@ class TestEvaluateParallel:
             call_count += 1
             if call_count == 1:
                 raise Exception("API Error")
-            return {"faithfulness": 0.85}
+            return ({"faithfulness": 0.85}, {})
 
         with patch.object(evaluator, "_score_single_sample", side_effect=mock_score):
             results = await evaluator._evaluate_parallel(
@@ -341,7 +341,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.ascore = AsyncMock(return_value=MagicMock(value=float("nan")))
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.0
 
@@ -354,7 +354,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.ascore = AsyncMock(return_value=MagicMock(value="invalid"))
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.0
 
@@ -367,7 +367,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.ascore = AsyncMock(return_value=MagicMock(value=0.95))
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.95
 
@@ -384,7 +384,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.ascore = AsyncMock(return_value=mock_result)
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.88
 
@@ -397,7 +397,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.ascore = AsyncMock(return_value=0.75)
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.75
 
@@ -410,7 +410,7 @@ class TestScoreSingleSample:
         mock_metric.name = "faithfulness"
         mock_metric.single_turn_ascore = AsyncMock(return_value=0.82)
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         assert scores["faithfulness"] == 0.82
 
@@ -422,7 +422,7 @@ class TestScoreSingleSample:
         mock_metric = MagicMock(spec=["name"])
         mock_metric.name = "answer_relevancy"
 
-        scores = await evaluator._score_single_sample(ragas_sample, [mock_metric])
+        scores, _ = await evaluator._score_single_sample(ragas_sample, [mock_metric])
 
         # 예외 발생 시 0.0 반환
         assert scores["answer_relevancy"] == 0.0
@@ -458,7 +458,7 @@ class TestProgressCallback:
             evaluator,
             "_score_single_sample",
             new_callable=AsyncMock,
-            return_value={"faithfulness": 0.85},
+            return_value=({"faithfulness": 0.85}, {}),
         ):
             await evaluator._evaluate_sequential(
                 dataset=sample_dataset,
