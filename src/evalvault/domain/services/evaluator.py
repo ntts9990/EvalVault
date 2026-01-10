@@ -49,6 +49,7 @@ from evalvault.domain.entities import (
     TestCase,
     TestCaseResult,
 )
+from evalvault.domain.metrics.confidence import ConfidenceScore
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.metrics.no_answer import NoAnswerAccuracy
@@ -130,6 +131,7 @@ class RagasEvaluator:
         "mrr": MRR,
         "ndcg": NDCG,
         "hit_rate": HitRate,
+        "confidence_score": ConfidenceScore,
     }
 
     # Metrics that require embeddings

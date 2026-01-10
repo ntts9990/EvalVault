@@ -1,6 +1,6 @@
 # RAG 평가 시스템 요구사항 및 메트릭 권장사항
 
-> **Last Updated**: 2026-01-10 (P0 완료, P1 Synthetic Q&A/MRR/NDCG 완료)
+> **Last Updated**: 2026-01-11 (P0 완료, P1 Synthetic Q&A/MRR/NDCG/Confidence Score 완료)
 > **Based on**: 폐쇄망 RAG 시스템 평가 보고서 + 전문가 합의 문서 + 최신 연구 동향
 
 ## 개요
@@ -16,10 +16,10 @@
 │  ├─ ✅ Exact Match / F1 Score   ← 구현 완료 (2026-01-10)     │
 │  └─ ✅ No-Answer Accuracy       ← 구현 완료 (2026-01-10)     │
 │                                                             │
-│  P1 (중요) - Synthetic Q&A, MRR/NDCG 완료                   │
+│  P1 (중요) - Synthetic Q&A, MRR/NDCG, Confidence Score 완료 │
 │  ├─ ✅ Synthetic Q&A 생성    ← 구현 완료 (2026-01-10)        │
 │  ├─ ✅ MRR, NDCG, HitRate    ← 구현 완료 (2026-01-10)        │
-│  ├─ Confidence Score          ← Human-in-the-Loop            │
+│  ├─ ✅ Confidence Score      ← 구현 완료 (2026-01-11)        │
 │  └─ Contextual Relevancy      ← 중복 확인 후 결정            │
 │                                                             │
 │  P2 (개선)                                                  │
@@ -226,20 +226,24 @@ evalvault run data.json --metrics mrr,ndcg,hit_rate
   | `--language` | 언어 (ko, en) |
   | `--include-no-answer` | No-answer 케이스 포함 여부 |
 
-#### Confidence Score (모델 신뢰도 점수)
+#### ✅ Confidence Score (모델 신뢰도 점수) - 구현 완료
+
+> **구현 완료**: 2026-01-11 | PR #113
 
 - **정의**: 모델이 각 답변에 대해 추정하는 자신감 수준 (0~1)
 - **중요성**:
   - 폐쇄망 Human-in-the-Loop의 핵심 지표
   - 낮은 신뢰도 답변을 사람 검토 대상으로 선별
   - Escalation Rate와 연계하여 운영 정책 수립
-- **계산 방식**:
-  - Retrieval 스코어 기반
-  - 모델 로짓 기반
-  - Faithfulness 점수 기반
-  - Calibration: 신뢰도와 실제 정답률 일치도 보정
-- **구현 난이도**: ⭐⭐⭐
-- **주의**: 개념은 좋지만 구현 복잡. 투자 대비 효과 검토 필요
+- **계산 방식** (복합 점수):
+  - Context Coverage (40%): 답변-컨텍스트 토큰 중첩
+  - Answer Specificity (30%): 구체적 정보(숫자 등), 헤징/단정 언어
+  - Consistency (30%): Ground truth와의 일치도
+- **사용법**: `--metrics confidence_score`
+- **API**:
+  - `score()`: 0~1 신뢰도 점수
+  - `score_detailed()`: 컴포넌트별 상세 분석
+  - `should_escalate(threshold=0.7)`: 휴먼 에스컬레이션 권장 여부
 
 #### Contextual Relevancy (문맥 관련성) - 확인 필요
 
@@ -371,7 +375,7 @@ evalvault run data.json --metrics mrr,ndcg,hit_rate
 |------|---------|------|------|
 | **Synthetic Q&A 생성** | P1 | ✅ 완료 | Ground Truth 부족 해결. `evalvault generate -m synthetic` |
 | **MRR, NDCG, HitRate** | P1 | ✅ 완료 | 검색 순위 품질. `--metrics mrr,ndcg,hit_rate` |
-| Confidence Score | P1 | ❌ | Human-in-the-Loop 연계 (구현 복잡도 고려) |
+| **Confidence Score** | P1 | ✅ 완료 | Human-in-the-Loop 연계. `--metrics confidence_score` |
 | Contextual Relevancy | P1 | ❌ | Context Precision과 중복 확인 후 결정 |
 
 ### Phase 3: 중기 구현 (3-6개월) - 개선
@@ -480,7 +484,7 @@ EvalVault는 이미 폐쇄망 환경과 핵심 RAG 평가를 잘 지원합니다
 ┌─────────────────────────────────────────────────────────────┐
 │  ✅ Synthetic Q&A 생성      ← 구현 완료 (-m synthetic)       │
 │  ✅ MRR, NDCG, HitRate      ← 구현 완료 (--metrics mrr,ndcg) │
-│  ❌ Confidence Score        ← Human-in-the-Loop              │
+│  ✅ Confidence Score        ← 구현 완료 (--metrics confidence_score) │
 │  ❌ Contextual Relevancy    ← 중복 확인 후                   │
 └─────────────────────────────────────────────────────────────┘
 ```
