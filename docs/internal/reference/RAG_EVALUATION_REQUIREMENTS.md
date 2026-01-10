@@ -1,6 +1,6 @@
 # RAG 평가 시스템 요구사항 및 메트릭 권장사항
 
-> **Last Updated**: 2026-01-10 (P0 완료: Claim-level Faithfulness, Exact Match / F1 Score, No-Answer Accuracy)
+> **Last Updated**: 2026-01-10 (P0 완료, P1 Synthetic Q&A 완료)
 > **Based on**: 폐쇄망 RAG 시스템 평가 보고서 + 전문가 합의 문서 + 최신 연구 동향
 
 ## 개요
@@ -16,8 +16,8 @@
 │  ├─ ✅ Exact Match / F1 Score   ← 구현 완료 (2026-01-10)     │
 │  └─ ✅ No-Answer Accuracy       ← 구현 완료 (2026-01-10)     │
 │                                                             │
-│  P1 (중요)                                                  │
-│  ├─ Synthetic Q&A 생성        ← Ground Truth 확보            │
+│  P1 (중요) - Synthetic Q&A 완료                             │
+│  ├─ ✅ Synthetic Q&A 생성    ← 구현 완료 (2026-01-10)        │
 │  ├─ MRR, NDCG                 ← 검색 순위 품질               │
 │  ├─ Confidence Score          ← Human-in-the-Loop            │
 │  └─ Contextual Relevancy      ← 중복 확인 후 결정            │
@@ -179,7 +179,9 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 **임계값**: Hit Rate@10 >0.8, MRR >0.6, NDCG@10 >0.7
 **참고**: 이미 `precision_at_k`, `recall_at_k` 있으므로 급하지 않음
 
-#### Synthetic Q&A 데이터셋 생성
+#### ✅ Synthetic Q&A 데이터셋 생성 - 구현 완료
+
+> **구현 완료**: 2026-01-10 | PR #111
 
 - **정의**: 내부 문서로부터 질문-답변 쌍을 자동 생성
 - **중요성**:
@@ -188,11 +190,27 @@ uv run evalvault run data.json --metrics exact_match,f1_score
   - 초기 성능 측정 가능
 - **구현 방식**:
   1. 문서에서 잠재 질문 생성 (LLM 활용)
-  2. 해당 문서 내용으로 답변 추출
-  3. 품질 검수 및 필터링
-- **구현 난이도**: ⭐⭐⭐
+  2. 해당 문서 내용으로 답변 추출 (Ground Truth)
+  3. 신뢰도 기반 품질 필터링 (high/medium/low)
+  4. No-answer 테스트 케이스 자동 생성 (환각 탐지용)
+- **사용법**:
+  ```bash
+  # 기본 사용
+  evalvault generate doc.txt -m synthetic -p local -n 20
 
-**참고**: 현재 `evalvault generate` 명령 존재, Synthetic Q&A 특화 기능 추가 필요
+  # 영어 문서
+  evalvault generate doc.txt -m synthetic -p openai -l en -n 10
+
+  # No-answer 케이스 제외
+  evalvault generate doc.txt -m synthetic -p local --no-include-no-answer
+  ```
+- **옵션**:
+  | 옵션 | 설명 |
+  |------|------|
+  | `--method synthetic` | LLM 기반 Q&A 생성 |
+  | `--profile` | 모델 프로필 (local, openai 등) |
+  | `--language` | 언어 (ko, en) |
+  | `--include-no-answer` | No-answer 케이스 포함 여부 |
 
 #### Confidence Score (모델 신뢰도 점수)
 
@@ -309,7 +327,7 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 |------|----------|----------|
 | Reference-free 평가 | ✅ Faithfulness, Answer Relevancy | - |
 | 과거 평가 활용 | ✅ Domain Memory | - |
-| Synthetic Q&A | ❌ | 자동 생성 기능 |
+| Synthetic Q&A | ✅ `evalvault generate -m synthetic` | - |
 | 골드셋 구축 가이드 | ❌ | 문서화 필요 |
 
 ### 3.3 모델/시스템 제약
@@ -335,12 +353,12 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 
 ### Phase 2: 단기 구현 (1-2개월) - 중요
 
-| 항목 | 우선순위 | 설명 |
-|------|---------|------|
-| Synthetic Q&A 생성 | P1 | Ground Truth 부족 해결 |
-| Hit Rate@K, MRR, NDCG | P1 | 검색 순위 품질 (이미 precision/recall 있어 급하지 않음) |
-| Confidence Score | P1 | Human-in-the-Loop 연계 (구현 복잡도 고려) |
-| Contextual Relevancy | P1 | Context Precision과 중복 확인 후 결정 |
+| 항목 | 우선순위 | 상태 | 설명 |
+|------|---------|------|------|
+| **Synthetic Q&A 생성** | P1 | ✅ 완료 | Ground Truth 부족 해결. `evalvault generate -m synthetic` |
+| Hit Rate@K, MRR, NDCG | P1 | ❌ | 검색 순위 품질 (이미 precision/recall 있어 급하지 않음) |
+| Confidence Score | P1 | ❌ | Human-in-the-Loop 연계 (구현 복잡도 고려) |
+| Contextual Relevancy | P1 | ❌ | Context Precision과 중복 확인 후 결정 |
 
 ### Phase 3: 중기 구현 (3-6개월) - 개선
 
@@ -443,11 +461,15 @@ EvalVault는 이미 폐쇄망 환경과 핵심 RAG 평가를 잘 지원합니다
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 단기 (P1) - 중요
-- Synthetic Q&A 생성 (Ground Truth 확보)
-- MRR, NDCG (검색 순위 품질)
-- Confidence Score (Human-in-the-Loop)
-- Contextual Relevancy (중복 확인 후)
+### 단기 (P1) - 부분 완료
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ✅ Synthetic Q&A 생성      ← 구현 완료 (-m synthetic)       │
+│  ❌ MRR, NDCG               ← 검색 순위 품질                 │
+│  ❌ Confidence Score        ← Human-in-the-Loop              │
+│  ❌ Contextual Relevancy    ← 중복 확인 후                   │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### 중기 (P2) - 개선
 - BERTScore (BLEU/ROUGE 대신 이것만)
