@@ -187,7 +187,7 @@ export function CompareRuns() {
                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Run Comparison</h1>
+                        <h1 className="text-2xl font-bold tracking-tight font-display">Run Comparison</h1>
                         <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
                             Comparing
                             <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs text-foreground">{baseRun.summary.run_id.slice(0, 8)}</span>

@@ -59,7 +59,7 @@ export function DomainMemory() {
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Domain Memory</h1>
+                    <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">Domain Memory</h1>
                     <p className="text-muted-foreground">Inspect learned facts and reusable behaviors.</p>
                 </div>
 

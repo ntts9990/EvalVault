@@ -332,7 +332,7 @@ export function EvaluationStudio() {
         <Layout>
             <div className="max-w-4xl mx-auto pb-20">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Evaluation Studio</h1>
+                    <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">Evaluation Studio</h1>
                     <p className="text-muted-foreground">Configure and execute new RAG evaluations.</p>
                 </div>
 

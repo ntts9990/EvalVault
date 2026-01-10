@@ -229,7 +229,7 @@ export function AnalysisResultView() {
                     <div className="space-y-6">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">{result.label}</h1>
+                                <h1 className="text-3xl font-bold tracking-tight font-display">{result.label}</h1>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     저장된 분석 결과를 확인합니다.
                                 </p>

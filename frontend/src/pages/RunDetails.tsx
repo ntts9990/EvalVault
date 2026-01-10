@@ -178,7 +178,7 @@ export function RunDetails() {
                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{summary.dataset_name} Analysis</h1>
+                        <h1 className="text-2xl font-bold tracking-tight font-display">{summary.dataset_name} Analysis</h1>
                         <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
                             <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs">{summary.run_id.slice(0, 8)}</span>
                             <span>•</span>

@@ -218,7 +218,7 @@ export function CustomerReport() {
             <div className="max-w-6xl mx-auto pb-20">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">Customer Report</h1>
+                        <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">Customer Report</h1>
                         <p className="text-muted-foreground">
                             Shareable performance summary for stakeholders.
                         </p>

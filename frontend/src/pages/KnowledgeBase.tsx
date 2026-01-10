@@ -106,7 +106,7 @@ export function KnowledgeBase() {
             <div className="max-w-6xl mx-auto pb-20">
                 <div className="mb-8 flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight mb-2">Knowledge Base</h1>
+                        <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">Knowledge Base</h1>
                         <p className="text-muted-foreground">Manage raw documents and build the Knowledge Graph.</p>
                     </div>
                     <button

@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
@@ -12,8 +13,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 221 82% 62%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -29,7 +30,7 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 221 82% 62%;
 
     --radius: 0.5rem;
   }
@@ -72,5 +73,11 @@
 
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(1200px circle at 10% -20%, hsl(var(--primary) / 0.16), transparent 45%),
+      radial-gradient(900px circle at 110% 0%, hsl(210 40% 96% / 0.9), transparent 40%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(210 40% 98%) 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 }

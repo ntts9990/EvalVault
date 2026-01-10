@@ -517,7 +517,7 @@ export function AnalysisCompareView() {
                             <div className="flex items-center gap-3">
                                 <GitCompare className="w-5 h-5 text-primary" />
                                 <div>
-                                    <h1 className="text-2xl font-semibold">분석 결과 비교</h1>
+                                    <h1 className="text-2xl font-semibold font-display">분석 결과 비교</h1>
                                     <p className="text-sm text-muted-foreground">
                                         저장된 분석 결과 2건의 요약/메트릭/실패 노드를 비교합니다.
                                     </p>

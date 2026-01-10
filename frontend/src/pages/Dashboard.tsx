@@ -308,7 +308,7 @@ export function Dashboard() {
     return (
         <Layout>
             <div className="mb-10">
-                <h1 className="text-3xl font-bold tracking-tight mb-2">Evaluation Overview</h1>
+                <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">Evaluation Overview</h1>
                 <p className="text-muted-foreground flex items-center gap-2">
                     Track performance by date range and project scope
                     <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">

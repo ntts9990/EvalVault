@@ -1055,7 +1055,7 @@ export function AnalysisLab() {
                 <div className="mb-8 space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight mb-2">분석 실험실</h1>
+                            <h1 className="text-3xl font-bold tracking-tight mb-2 font-display">분석 실험실</h1>
                             <p className="text-muted-foreground">
                                 분석 클래스를 선택해 바로 실행하고 결과를 확인하세요.
                             </p>
