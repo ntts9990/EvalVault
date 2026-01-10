@@ -20,6 +20,12 @@ import {
     type ImprovementReport,
     type RunSummary,
 } from "../services/api";
+import {
+    ANALYSIS_LARGE_RAW_THRESHOLD,
+    ANALYSIS_LARGE_REPORT_THRESHOLD,
+    ANALYSIS_RAW_PREVIEW_LENGTH,
+    ANALYSIS_REPORT_PREVIEW_LENGTH,
+} from "../config/ui";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import {
     Activity,
@@ -748,10 +754,14 @@ export function AnalysisLab() {
         }
     }, [result]);
 
-    const reportIsLarge = (reportText?.length ?? 0) > 5000;
-    const rawIsLarge = (rawOutput?.length ?? 0) > 8000;
-    const reportPreview = reportText && reportIsLarge ? `${reportText.slice(0, 2000)}...` : reportText;
-    const rawPreview = rawOutput && rawIsLarge ? `${rawOutput.slice(0, 2000)}...` : rawOutput;
+    const reportIsLarge = (reportText?.length ?? 0) > ANALYSIS_LARGE_REPORT_THRESHOLD;
+    const rawIsLarge = (rawOutput?.length ?? 0) > ANALYSIS_LARGE_RAW_THRESHOLD;
+    const reportPreview = reportText && reportIsLarge
+        ? `${reportText.slice(0, ANALYSIS_REPORT_PREVIEW_LENGTH)}...`
+        : reportText;
+    const rawPreview = rawOutput && rawIsLarge
+        ? `${rawOutput.slice(0, ANALYSIS_RAW_PREVIEW_LENGTH)}...`
+        : rawOutput;
 
     useEffect(() => {
         if (!reportIsLarge) {

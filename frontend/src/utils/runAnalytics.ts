@@ -1,4 +1,5 @@
 import type { RunSummary } from "../services/api";
+import { DATE_RANGE_DISPLAY_LABELS } from "../config/ui";
 
 export const PROJECT_ALL = "__all__";
 export const PROJECT_UNASSIGNED = "__unassigned__";
@@ -102,17 +103,17 @@ export function resolveDateRange(
     const today = startOfDay(new Date());
 
     if (preset === "all") {
-        return { from: null, to: null, label: "All" };
+        return { from: null, to: null, label: DATE_RANGE_DISPLAY_LABELS.all };
     }
 
     if (preset === "custom") {
         if (!customStart || !customEnd) {
-            return { from: null, to: null, label: "Custom" };
+            return { from: null, to: null, label: DATE_RANGE_DISPLAY_LABELS.custom };
         }
         const from = new Date(`${customStart}T00:00:00`);
         const to = new Date(`${customEnd}T23:59:59`);
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-            return { from: null, to: null, label: "Custom" };
+            return { from: null, to: null, label: DATE_RANGE_DISPLAY_LABELS.custom };
         }
         return {
             from: startOfDay(from),
@@ -122,19 +123,19 @@ export function resolveDateRange(
     }
 
     let startOffset = 0;
-    let label = "All";
+    let label = DATE_RANGE_DISPLAY_LABELS.all;
     if (preset === "7d") {
         startOffset = 6;
-        label = "Last 7 days";
+        label = DATE_RANGE_DISPLAY_LABELS["7d"];
     } else if (preset === "30d") {
         startOffset = 29;
-        label = "Last 30 days";
+        label = DATE_RANGE_DISPLAY_LABELS["30d"];
     } else if (preset === "90d") {
         startOffset = 89;
-        label = "Last 90 days";
+        label = DATE_RANGE_DISPLAY_LABELS["90d"];
     } else if (preset === "year") {
         const from = new Date(today.getFullYear(), 0, 1);
-        return { from, to: endOfDay(today), label: "This year" };
+        return { from, to: endOfDay(today), label: DATE_RANGE_DISPLAY_LABELS.year };
     }
 
     const from = new Date(today.getTime() - startOffset * ONE_DAY_MS);

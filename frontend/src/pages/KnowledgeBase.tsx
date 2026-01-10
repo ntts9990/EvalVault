@@ -16,6 +16,7 @@ import {
     fetchJobStatus,
     type KGStats
 } from "../services/api";
+import { KNOWLEDGE_BASE_BUILD_WORKERS } from "../config/ui";
 
 export function KnowledgeBase() {
     const [stats, setStats] = useState<KGStats | null>(null);
@@ -92,7 +93,10 @@ export function KnowledgeBase() {
         setBuilding(true);
         setError(null);
         try {
-            const { job_id } = await buildKnowledgeGraph({ workers: 4, rebuild: true });
+            const { job_id } = await buildKnowledgeGraph({
+                workers: KNOWLEDGE_BASE_BUILD_WORKERS,
+                rebuild: true,
+            });
             setBuildJobId(job_id);
             setBuildStatus("pending");
         } catch {

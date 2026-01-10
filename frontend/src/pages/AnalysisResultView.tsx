@@ -7,6 +7,7 @@ import { PrioritySummaryPanel, type PrioritySummary } from "../components/Priori
 import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
+import { ANALYSIS_LARGE_REPORT_THRESHOLD } from "../config/ui";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import {
     Activity,
@@ -98,7 +99,7 @@ export function AnalysisResultView() {
         return null;
     }, [result]);
 
-    const reportIsLarge = (reportText?.length ?? 0) > 5000;
+    const reportIsLarge = (reportText?.length ?? 0) > ANALYSIS_LARGE_REPORT_THRESHOLD;
 
     useEffect(() => {
         if (!reportIsLarge) {

@@ -28,6 +28,12 @@ import {
     type DateRangePreset,
 } from "../utils/runAnalytics";
 import {
+    CHART_METRIC_COLORS,
+    CUSTOM_RANGE_DEFAULT_DAYS,
+    DATE_RANGE_OPTIONS,
+    DEFAULT_DATE_RANGE_PRESET,
+} from "../config/ui";
+import {
     Activity,
     AlertCircle,
     FileText,
@@ -36,24 +42,6 @@ import {
 } from "lucide-react";
 
 type MetricTrendRow = Record<string, number | string | null>;
-
-const RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
-    { value: "7d", label: "Last 7 days" },
-    { value: "30d", label: "Last 30 days" },
-    { value: "90d", label: "Last 90 days" },
-    { value: "year", label: "This year" },
-    { value: "all", label: "All time" },
-    { value: "custom", label: "Custom range" },
-];
-
-const METRIC_COLORS = [
-    "#38BDF8",
-    "#A78BFA",
-    "#F97316",
-    "#22C55E",
-    "#F59E0B",
-    "#EF4444",
-];
 
 function projectLabel(value: string) {
     if (value === PROJECT_ALL) return "All Projects";
@@ -67,10 +55,11 @@ export function CustomerReport() {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const [rangePreset, setRangePreset] = useState<DateRangePreset>("30d");
-    const [customStart, setCustomStart] = useState(() =>
-        toDateInputValue(addDays(new Date(), -29))
-    );
+    const [rangePreset, setRangePreset] = useState<DateRangePreset>(DEFAULT_DATE_RANGE_PRESET);
+    const [customStart, setCustomStart] = useState(() => {
+        const offset = -(CUSTOM_RANGE_DEFAULT_DAYS - 1);
+        return toDateInputValue(addDays(new Date(), offset));
+    });
     const [customEnd, setCustomEnd] = useState(() => toDateInputValue(new Date()));
     const [selectedProjects, setSelectedProjects] = useState<string[]>([PROJECT_ALL]);
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
@@ -255,7 +244,7 @@ export function CustomerReport() {
                                 onChange={(event) => setRangePreset(event.target.value as DateRangePreset)}
                                 className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                             >
-                                {RANGE_OPTIONS.map((option) => (
+                                {DATE_RANGE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>
                                         {option.label}
                                     </option>
@@ -479,7 +468,7 @@ export function CustomerReport() {
                                                 key={metric}
                                                 type="monotone"
                                                 dataKey={metric}
-                                                stroke={METRIC_COLORS[index % METRIC_COLORS.length]}
+                                                stroke={CHART_METRIC_COLORS[index % CHART_METRIC_COLORS.length]}
                                                 strokeWidth={2}
                                                 dot={false}
                                                 connectNulls

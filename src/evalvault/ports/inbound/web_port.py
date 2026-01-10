@@ -17,7 +17,7 @@ class EvalRequest:
 
     dataset_path: str
     metrics: list[str]
-    model_name: str = "openai/gpt-5-nano"
+    model_name: str = "openai/gpt-5-mini"
     evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)

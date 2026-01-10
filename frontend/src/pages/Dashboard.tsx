@@ -41,26 +41,15 @@ import {
     toDateInputValue,
     type DateRangePreset,
 } from "../utils/runAnalytics";
+import {
+    CHART_METRIC_COLORS,
+    CUSTOM_RANGE_DEFAULT_DAYS,
+    DATE_RANGE_OPTIONS,
+    DEFAULT_DATE_RANGE_PRESET,
+    PASS_RATE_COLOR_BANDS,
+} from "../config/ui";
 
 type MetricTrendRow = Record<string, number | string | null>;
-
-const RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
-    { value: "7d", label: "Last 7 days" },
-    { value: "30d", label: "Last 30 days" },
-    { value: "90d", label: "Last 90 days" },
-    { value: "year", label: "This year" },
-    { value: "all", label: "All time" },
-    { value: "custom", label: "Custom range" },
-];
-
-const METRIC_COLORS = [
-    "#38BDF8",
-    "#A78BFA",
-    "#F97316",
-    "#22C55E",
-    "#F59E0B",
-    "#EF4444",
-];
 
 function formatDelta(value: number, unit: string) {
     const sign = value > 0 ? "+" : value < 0 ? "-" : "";
@@ -102,10 +91,11 @@ export function Dashboard() {
 
     const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState("");
-    const [rangePreset, setRangePreset] = useState<DateRangePreset>("30d");
-    const [customStart, setCustomStart] = useState(() =>
-        toDateInputValue(addDays(new Date(), -29))
-    );
+    const [rangePreset, setRangePreset] = useState<DateRangePreset>(DEFAULT_DATE_RANGE_PRESET);
+    const [customStart, setCustomStart] = useState(() => {
+        const offset = -(CUSTOM_RANGE_DEFAULT_DAYS - 1);
+        return toDateInputValue(addDays(new Date(), offset));
+    });
     const [customEnd, setCustomEnd] = useState(() => toDateInputValue(new Date()));
     const [selectedProjects, setSelectedProjects] = useState<string[]>([PROJECT_ALL]);
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
@@ -169,10 +159,8 @@ export function Dashboard() {
     };
 
     const getPassRateColor = (rate: number) => {
-        if (rate >= 0.9) return "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
-        if (rate >= 0.7) return "text-blue-500 bg-blue-500/10 border-blue-500/20";
-        if (rate >= 0.5) return "text-amber-500 bg-amber-500/10 border-amber-500/20";
-        return "text-rose-500 bg-rose-500/10 border-rose-500/20";
+        const match = PASS_RATE_COLOR_BANDS.find((band) => rate >= band.min);
+        return match ? match.className : PASS_RATE_COLOR_BANDS.at(-1)?.className ?? "";
     };
 
     const projectOptions = useMemo(() => collectProjectNames(runs), [runs]);
@@ -332,7 +320,7 @@ export function Dashboard() {
                             onChange={(event) => setRangePreset(event.target.value as DateRangePreset)}
                             className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                         >
-                            {RANGE_OPTIONS.map((option) => (
+                            {DATE_RANGE_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
                                 </option>
@@ -642,7 +630,7 @@ export function Dashboard() {
                                             key={metric}
                                             type="monotone"
                                             dataKey={metric}
-                                            stroke={METRIC_COLORS[index % METRIC_COLORS.length]}
+                                            stroke={CHART_METRIC_COLORS[index % CHART_METRIC_COLORS.length]}
                                             strokeWidth={2}
                                             dot={false}
                                             connectNulls

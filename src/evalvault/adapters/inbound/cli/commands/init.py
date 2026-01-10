@@ -108,7 +108,7 @@ def _create_env_file(console: Console, output_dir: Path) -> None:
 
 # OpenAI (recommended)
 OPENAI_API_KEY=your-api-key-here
-OPENAI_MODEL=gpt-5-nano
+OPENAI_MODEL=gpt-5-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 # Optional: Langfuse Tracking

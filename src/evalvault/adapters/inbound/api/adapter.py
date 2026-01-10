@@ -1305,6 +1305,9 @@ class WebUIAdapter:
 
     def _list_openai_models(self) -> list[dict[str, str | bool]]:
         return [
+            {"id": "openai/gpt-5-mini", "name": "OpenAI gpt-5-mini", "supports_tools": True},
+            {"id": "openai/gpt-5.1", "name": "OpenAI gpt-5.1", "supports_tools": True},
+            {"id": "openai/gpt-5.2", "name": "OpenAI gpt-5.2", "supports_tools": True},
             {"id": "openai/gpt-5-nano", "name": "OpenAI gpt-5-nano", "supports_tools": True},
         ]
 
