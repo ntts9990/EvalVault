@@ -1,6 +1,6 @@
 # RAG 평가 시스템 요구사항 및 메트릭 권장사항
 
-> **Last Updated**: 2026-01-10 (P0 Claim-level Faithfulness, Exact Match / F1 Score 구현 완료)
+> **Last Updated**: 2026-01-10 (P0 완료: Claim-level Faithfulness, Exact Match / F1 Score, No-Answer Accuracy)
 > **Based on**: 폐쇄망 RAG 시스템 평가 보고서 + 전문가 합의 문서 + 최신 연구 동향
 
 ## 개요
@@ -11,10 +11,10 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  P0 (핵심)                                                  │
+│  P0 (핵심) ✅ 완료                                           │
 │  ├─ ✅ Claim-level Faithfulness ← 구현 완료 (2026-01-10)     │
 │  ├─ ✅ Exact Match / F1 Score   ← 구현 완료 (2026-01-10)     │
-│  └─ "정답 없음" 평가          ← 환각 방지                    │
+│  └─ ✅ No-Answer Accuracy       ← 구현 완료 (2026-01-10)     │
 │                                                             │
 │  P1 (중요)                                                  │
 │  ├─ Synthetic Q&A 생성        ← Ground Truth 확보            │
@@ -66,6 +66,7 @@
 | Insurance Term Accuracy | ✅ | 도메인 용어 정확도 |
 | Exact Match | ✅ | 완전 일치율 (number_strict 지원) |
 | F1 Score | ✅ | 부분 일치 평가 (number_weight 지원) |
+| No Answer Accuracy | ✅ | 정답 없음 평가 (환각 방지) |
 
 ### 1.4 Stage-level 메트릭
 
@@ -140,16 +141,26 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 
 **참고**: Ground truth가 있는 경우 정량적 평가에 필수. 보험 도메인 특성상 EM이 특히 중요
 
-#### "정답 없음" 상황 평가
+#### ✅ "정답 없음" 상황 평가 (No-Answer Accuracy) - 구현 완료
+
+> **구현 완료**: 2026-01-10 | PR #110
 
 - **정의**: 답이 문서에 없을 때 "정보 없음"으로 올바르게 응답하는지 평가
 - **중요성**:
   - **환각 방지의 핵심** - 보험에서 잘못된 정보 제공은 실제 피해로 이어질 수 있음
   - 지식 공백 상황 대응 능력 평가
-- **평가 방식**:
-  - 의도적으로 정답 없는 질문을 평가 세트에 포함
-  - "답변 불가" 또는 "정보 없음" 응답 비율 측정
-- **구현 난이도**: ⭐⭐ (평가 데이터셋 구성 + 메트릭 추가)
+- **분류 방식**:
+  | 분류 | 설명 |
+  |------|------|
+  | `true_abstention` | 정답 없을 때 올바르게 "정보 없음" 응답 |
+  | `hallucination` | 정답 없는데 답변 생성 (환각) |
+  | `false_abstention` | 정답 있는데 "정보 없음" 응답 |
+  | `true_answer` | 정답 있을 때 올바르게 답변 |
+- **지원 패턴**: 한국어 (정보 없음, 답변 불가, 확인 불가 등) / 영어 (N/A, No information, Cannot answer 등)
+- **사용법**:
+  ```bash
+  uv run evalvault run data.json --metrics no_answer_accuracy
+  ```
 
 ---
 
@@ -314,13 +325,13 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 
 ## 4. 구현 로드맵
 
-### Phase 1: 즉시 구현 (1-2주) - 핵심
+### Phase 1: 즉시 구현 (1-2주) - 핵심 ✅ 완료
 
 | 항목 | 우선순위 | 상태 | 설명 |
 |------|---------|------|------|
 | **Claim-level Faithfulness** | P0 | ✅ 완료 | 환각 탐지 핵심. `--claim-level` 옵션으로 사용 |
 | **Exact Match, F1 Score** | P0 | ✅ 완료 | 보험 도메인 정확도 (보장금액, 보험료 등) |
-| "정답 없음" 평가 | P0 | 🔲 예정 | 환각 방지. 잘못된 정보 제공 차단 |
+| **No-Answer Accuracy** | P0 | ✅ 완료 | 환각 방지. 잘못된 정보 제공 차단 |
 
 ### Phase 2: 단기 구현 (1-2개월) - 중요
 
@@ -423,12 +434,12 @@ uv run evalvault run data.json --metrics exact_match,f1_score
 
 EvalVault는 이미 폐쇄망 환경과 핵심 RAG 평가를 잘 지원합니다. 보험 도메인 특성과 폐쇄망 환경을 고려한 추가 구현 우선순위:
 
-### 즉시 (P0) - 핵심
+### 즉시 (P0) - 핵심 ✅ 완료
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  ✅ Claim-level Faithfulness ← 구현 완료 (--claim-level)     │
 │  ✅ Exact Match / F1 Score   ← 구현 완료 (exact_match, f1)   │
-│  🔲 "정답 없음" 평가         ← 환각 방지                     │
+│  ✅ No-Answer Accuracy       ← 구현 완료 (no_answer_accuracy)│
 └─────────────────────────────────────────────────────────────┘
 ```
 
