@@ -14,12 +14,15 @@ from urllib.request import urlopen
 
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
+from evalvault.domain.entities.prompt import PromptSetBundle
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
     build_prompt_summary,
 )
 from evalvault.domain.services.prompt_status import extract_prompt_entries
+from evalvault.domain.services.stage_event_builder import StageEventBuilder
+from evalvault.domain.services.stage_metric_service import StageMetricService
 from evalvault.domain.services.threshold_profiles import apply_threshold_profile
 from evalvault.ports.inbound.web_port import (
     EvalProgress,
@@ -31,6 +34,7 @@ from evalvault.ports.inbound.web_port import (
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun
     from evalvault.domain.entities.improvement import ImprovementReport
+    from evalvault.domain.entities.stage import StageEvent, StageMetric
     from evalvault.ports.outbound.llm_port import LLMPort
     from evalvault.ports.outbound.storage_port import StoragePort
 
@@ -386,6 +390,7 @@ class WebUIAdapter:
 
         settings = self._settings or Settings()
         tracker_provider, tracker = self._get_tracker(settings, request.tracker_config)
+        stage_store = bool(request.stage_store)
 
         retriever_instance = None
         retriever_doc_ids: list[str] | None = None
@@ -624,6 +629,29 @@ class WebUIAdapter:
             except Exception as exc:
                 logger.warning("Tracker logging failed: %s", exc)
 
+        if stage_store and self._storage and hasattr(self._storage, "save_stage_events"):
+            try:
+                prompt_metadata_entries = self._build_prompt_metadata_entries(prompt_bundle)
+                stage_event_builder = StageEventBuilder()
+                stage_events = stage_event_builder.build_for_run(
+                    result,
+                    prompt_metadata=prompt_metadata_entries or None,
+                    retrieval_metadata=None,
+                )
+                stored_events = self._storage.save_stage_events(stage_events)
+                logger.info("Stored %d stage event(s) for run %s", stored_events, result.run_id)
+
+                if stage_events and hasattr(self._storage, "save_stage_metrics"):
+                    stage_metrics = StageMetricService().build_metrics(stage_events)
+                    stored_metrics = self._storage.save_stage_metrics(stage_metrics)
+                    logger.info(
+                        "Stored %d stage metric(s) for run %s",
+                        stored_metrics,
+                        result.run_id,
+                    )
+            except Exception as exc:
+                logger.warning("Stage event storage failed: %s", exc)
+
         # 4. 완료 진행률 콜백
         if on_progress:
             elapsed = time.monotonic() - start_time
@@ -783,6 +811,41 @@ class WebUIAdapter:
             run.tracker_metadata = metadata
 
         return run
+
+    def list_stage_events(self, run_id: str, *, stage_type: str | None = None) -> list[StageEvent]:
+        """Stage 이벤트 목록 조회."""
+        if self._storage is None or not hasattr(self._storage, "list_stage_events"):
+            return []
+        return self._storage.list_stage_events(run_id, stage_type=stage_type)
+
+    def list_stage_metrics(
+        self,
+        run_id: str,
+        *,
+        stage_id: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[StageMetric]:
+        """Stage 메트릭 목록 조회 (없으면 StageEvent로 재계산)."""
+        if self._storage is None or not hasattr(self._storage, "list_stage_metrics"):
+            return []
+
+        metrics = self._storage.list_stage_metrics(run_id)
+        if not metrics and hasattr(self._storage, "list_stage_events"):
+            events = self._storage.list_stage_events(run_id)
+            if events:
+                service = StageMetricService()
+                metrics = service.build_metrics(events)
+                if hasattr(self._storage, "save_stage_metrics"):
+                    self._storage.save_stage_metrics(metrics)
+
+        if stage_id or metric_name:
+            metrics = [
+                metric
+                for metric in metrics
+                if (stage_id is None or metric.stage_id == stage_id)
+                and (metric_name is None or metric.metric_name == metric_name)
+            ]
+        return metrics
 
     def delete_run(self, run_id: str) -> bool:
         """평가 삭제.
@@ -1408,6 +1471,34 @@ class WebUIAdapter:
         return [
             {"id": "anthropic/claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
         ]
+
+    @staticmethod
+    def _build_prompt_metadata_entries(
+        bundle: PromptSetBundle | None,
+        *,
+        preview_length: int = 400,
+    ) -> list[dict[str, Any]]:
+        if bundle is None:
+            return []
+        prompt_map = {prompt.prompt_id: prompt for prompt in bundle.prompts}
+        entries: list[dict[str, Any]] = []
+        for item in bundle.items:
+            prompt = prompt_map.get(item.prompt_id)
+            if not prompt:
+                continue
+            entry: dict[str, Any] = {
+                "prompt_id": prompt.prompt_id,
+                "name": prompt.name,
+                "kind": prompt.kind,
+                "role": item.role,
+                "checksum": prompt.checksum,
+            }
+            if prompt.source:
+                entry["source"] = prompt.source
+            if prompt.content:
+                entry["content_preview"] = prompt.content[:preview_length]
+            entries.append(entry)
+        return entries
 
 
 def create_adapter() -> WebUIAdapter:

@@ -73,6 +73,7 @@ export function EvaluationStudio() {
     const [retrieverFile, setRetrieverFile] = useState<File | null>(null);
     const [retrieverUploading, setRetrieverUploading] = useState(false);
     const [enableMemory, setEnableMemory] = useState<boolean>(false);
+    const [stageStore, setStageStore] = useState<boolean>(true);
     const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse" | "mlflow">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [batchSize, setBatchSize] = useState<number>(1);
@@ -326,6 +327,7 @@ export function EvaluationStudio() {
                     : undefined,
                 memory_config: enableMemory ? { enabled: true, augment_context: true } : undefined,
                 tracker_config: tracker !== "none" ? { provider: tracker } : undefined,
+                stage_store: stageStore,
                 system_prompt: systemPromptValue ? systemPrompt : undefined,
                 system_prompt_name: systemPromptName.trim() || undefined,
                 prompt_set_name: promptSetName.trim() || undefined,
@@ -852,6 +854,31 @@ export function EvaluationStudio() {
                                         <div>
                                             <p className="font-medium text-sm">Enable Domain Memory</p>
                                             <p className="text-xs text-muted-foreground">Use historical facts and behaviors to improve generation</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Stage Events */}
+                                <div>
+                                    <h3 className="text-sm font-medium mb-3">Stage Event Trace</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        입력/검색/출력 단계 이벤트를 저장해 Waterfall/Stage 메트릭 시각화의 기반을
+                                        만듭니다.
+                                    </p>
+                                    <div
+                                        onClick={() => setStageStore(!stageStore)}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${stageStore
+                                            ? "border-primary bg-primary/5"
+                                            : "border-border hover:border-primary/30"}`}
+                                    >
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${stageStore ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                                            {stageStore && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-sm">Store Stage Events</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Stage 이벤트/메트릭 API에 바로 사용할 수 있습니다.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

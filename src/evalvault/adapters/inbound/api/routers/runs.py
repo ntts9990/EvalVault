@@ -87,6 +87,7 @@ class StartEvaluationRequest(BaseModel):
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
+    stage_store: bool = False
     prompt_config: dict[str, Any] | None = None
     system_prompt: str | None = None
     system_prompt_name: str | None = None
@@ -345,6 +346,7 @@ async def start_evaluation_endpoint(
         retriever_config=request.retriever_config,
         memory_config=request.memory_config,
         tracker_config=request.tracker_config,
+        stage_store=request.stage_store,
         prompt_config=request.prompt_config,
         system_prompt=request.system_prompt,
         system_prompt_name=request.system_prompt_name,
@@ -487,6 +489,45 @@ def get_run_details(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
     try:
         run: EvaluationRun = adapter.get_run_details(run_id)
         return _serialize_run_details(run)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/stage-events", response_model=None)
+def list_stage_events(
+    run_id: str,
+    adapter: AdapterDep,
+    stage_type: str | None = Query(None, description="Filter by stage type"),
+) -> list[dict[str, Any]]:
+    """List stage events for a run."""
+    try:
+        adapter.get_run_details(run_id)
+        events = adapter.list_stage_events(run_id, stage_type=stage_type)
+        return [event.to_dict() for event in events]
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/stage-metrics", response_model=None)
+def list_stage_metrics(
+    run_id: str,
+    adapter: AdapterDep,
+    stage_id: str | None = Query(None, description="Filter by stage id"),
+    metric_name: str | None = Query(None, description="Filter by metric name"),
+) -> list[dict[str, Any]]:
+    """List stage metrics for a run."""
+    try:
+        adapter.get_run_details(run_id)
+        metrics = adapter.list_stage_metrics(
+            run_id,
+            stage_id=stage_id,
+            metric_name=metric_name,
+        )
+        return [metric.to_dict() for metric in metrics]
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as e:

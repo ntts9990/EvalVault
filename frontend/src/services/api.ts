@@ -120,6 +120,7 @@ export interface StartEvaluationRequest {
     retriever_config?: Record<string, unknown>;
     memory_config?: Record<string, unknown>;
     tracker_config?: Record<string, unknown>;
+    stage_store?: boolean;
     prompt_config?: Record<string, unknown>;
     system_prompt?: string;
     system_prompt_name?: string;
@@ -248,6 +249,33 @@ export interface ImprovementReport {
     metadata: Record<string, any>;
 }
 
+export interface StageEvent {
+    run_id: string;
+    stage_id: string;
+    parent_stage_id?: string | null;
+    stage_type: string;
+    stage_name?: string | null;
+    status: string;
+    attempt: number;
+    started_at?: string | null;
+    finished_at?: string | null;
+    duration_ms?: number | null;
+    input_ref?: Record<string, unknown> | null;
+    output_ref?: Record<string, unknown> | null;
+    attributes: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    trace?: { trace_id?: string | null; span_id?: string | null };
+}
+
+export interface StageMetric {
+    run_id: string;
+    stage_id: string;
+    metric_name: string;
+    score: number;
+    threshold?: number | null;
+    evidence?: Record<string, unknown> | null;
+}
+
 export interface LLMReport {
     run_id: string;
     content: string; // Markdown content
@@ -266,6 +294,40 @@ export async function fetchRunDetails(runId: string): Promise<RunDetailsResponse
     const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchStageEvents(
+    runId: string,
+    stageType?: string
+): Promise<StageEvent[]> {
+    const params = new URLSearchParams();
+    if (stageType) params.append("stage_type", stageType);
+    const query = params.toString();
+    const response = await fetch(
+        `${API_BASE_URL}/runs/${runId}/stage-events${query ? `?${query}` : ""}`
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to fetch stage events: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchStageMetrics(
+    runId: string,
+    stageId?: string,
+    metricName?: string
+): Promise<StageMetric[]> {
+    const params = new URLSearchParams();
+    if (stageId) params.append("stage_id", stageId);
+    if (metricName) params.append("metric_name", metricName);
+    const query = params.toString();
+    const response = await fetch(
+        `${API_BASE_URL}/runs/${runId}/stage-metrics${query ? `?${query}` : ""}`
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to fetch stage metrics: ${response.statusText}`);
     }
     return response.json();
 }

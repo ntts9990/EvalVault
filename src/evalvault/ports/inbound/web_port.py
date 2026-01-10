@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun
+    from evalvault.domain.entities.stage import StageEvent, StageMetric
 
 
 @dataclass
@@ -28,6 +29,7 @@ class EvalRequest:
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
+    stage_store: bool = False
     prompt_config: dict[str, Any] | None = None
     system_prompt: str | None = None
     system_prompt_name: str | None = None
@@ -184,4 +186,23 @@ class WebUIPort(Protocol):
         Returns:
             메트릭 이름 목록
         """
+        ...
+
+    def list_stage_events(
+        self,
+        run_id: str,
+        *,
+        stage_type: str | None = None,
+    ) -> list[StageEvent]:
+        """Stage 이벤트 목록 조회."""
+        ...
+
+    def list_stage_metrics(
+        self,
+        run_id: str,
+        *,
+        stage_id: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[StageMetric]:
+        """Stage 메트릭 목록 조회."""
         ...
