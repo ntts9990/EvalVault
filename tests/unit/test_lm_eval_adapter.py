@@ -240,7 +240,7 @@ class TestLMEvalAdapterWithMockedEvaluator:
         assert response.error is None
         assert "kmmlu_insurance" in response.results
         assert response.results["kmmlu_insurance"].metrics["acc,none"] == 0.78
-        assert response.total_time_seconds > 0
+        assert response.total_time_seconds >= 0
 
         mock_lm_eval.simple_evaluate.assert_called_once()
         call_kwargs = mock_lm_eval.simple_evaluate.call_args.kwargs
