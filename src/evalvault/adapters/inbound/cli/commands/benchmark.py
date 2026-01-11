@@ -601,6 +601,175 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         console.print(table)
         console.print(f"\n[dim]Showing {len(runs)} runs from {db}[/dim]")
 
+    @benchmark_app.command("report")
+    def benchmark_report(
+        run_id: str = typer.Argument(..., help="Benchmark run ID to generate report for."),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output file for report (markdown format).",
+        ),
+        db: Path = typer.Option(
+            Path("data/db/evalvault.db"),
+            "--db",
+            help="Database path.",
+        ),
+        profile: str | None = typer.Option(
+            None,
+            "--profile",
+            "-p",
+            help="LLM profile for report generation.",
+        ),
+    ) -> None:
+        """Generate LLM-powered analysis report for a benchmark run.
+
+        \b
+        Examples:
+          evalvault benchmark report abc123
+          evalvault benchmark report abc123 -o report.md -p dev
+        """
+        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+        from evalvault.config.settings import get_settings
+        from evalvault.domain.services.benchmark_report_service import (
+            BenchmarkReportService,
+        )
+
+        settings = get_settings()
+        if profile:
+            settings.profile = profile
+
+        storage = SQLiteStorageAdapter(db_path=db)
+        benchmark_run = storage.get_benchmark_run(run_id)
+
+        if not benchmark_run:
+            console.print(f"[red]Error:[/red] Benchmark run not found: {run_id}")
+            raise typer.Exit(1)
+
+        try:
+            from evalvault.adapters.outbound.llm import create_llm_adapter
+
+            llm_adapter = create_llm_adapter(settings)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to create LLM adapter: {e}")
+            console.print("[dim]Check your profile settings in config/models.yaml[/dim]")
+            raise typer.Exit(1)
+
+        service = BenchmarkReportService(llm_adapter)
+
+        console.print("\n[bold]Generating Benchmark Report[/bold]")
+        console.print(f"  Run ID: {run_id}")
+        console.print(f"  Model: {benchmark_run.model_name}")
+        console.print(
+            f"  Accuracy: {benchmark_run.overall_accuracy:.1%}"
+            if benchmark_run.overall_accuracy
+            else ""
+        )
+        console.print()
+
+        with console.status("[bold green]Generating LLM analysis..."):
+            report = service.generate_report_sync(benchmark_run)
+
+        markdown_content = report.to_markdown()
+
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(markdown_content, encoding="utf-8")
+            console.print(f"[green]Report saved to {output}[/green]")
+        else:
+            default_output = Path(f"reports/benchmark/benchmark_{run_id[:8]}.md")
+            default_output.parent.mkdir(parents=True, exist_ok=True)
+            default_output.write_text(markdown_content, encoding="utf-8")
+            console.print(f"[green]Report saved to {default_output}[/green]")
+
+        console.print("\n[bold]Report Preview:[/bold]")
+        preview_lines = markdown_content.split("\n")[:30]
+        console.print("\n".join(preview_lines))
+        if len(markdown_content.split("\n")) > 30:
+            console.print("\n[dim]... (truncated, see full report in file)[/dim]")
+
+    @benchmark_app.command("compare")
+    def benchmark_compare(
+        baseline_id: str = typer.Argument(..., help="Baseline benchmark run ID."),
+        target_id: str = typer.Argument(..., help="Target benchmark run ID to compare."),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output file for comparison report.",
+        ),
+        db: Path = typer.Option(
+            Path("data/db/evalvault.db"),
+            "--db",
+            help="Database path.",
+        ),
+        profile: str | None = typer.Option(
+            None,
+            "--profile",
+            "-p",
+            help="LLM profile for report generation.",
+        ),
+    ) -> None:
+        """Compare two benchmark runs and generate analysis.
+
+        \b
+        Examples:
+          evalvault benchmark compare abc123 def456
+          evalvault benchmark compare abc123 def456 -o comparison.md
+        """
+        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+        from evalvault.config.settings import get_settings
+        from evalvault.domain.services.benchmark_report_service import (
+            BenchmarkReportService,
+        )
+
+        settings = get_settings()
+        if profile:
+            settings.profile = profile
+
+        storage = SQLiteStorageAdapter(db_path=db)
+        baseline = storage.get_benchmark_run(baseline_id)
+        target = storage.get_benchmark_run(target_id)
+
+        if not baseline:
+            console.print(f"[red]Error:[/red] Baseline run not found: {baseline_id}")
+            raise typer.Exit(1)
+        if not target:
+            console.print(f"[red]Error:[/red] Target run not found: {target_id}")
+            raise typer.Exit(1)
+
+        try:
+            from evalvault.adapters.outbound.llm import create_llm_adapter
+
+            llm_adapter = create_llm_adapter(settings)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to create LLM adapter: {e}")
+            raise typer.Exit(1)
+
+        service = BenchmarkReportService(llm_adapter)
+
+        console.print("\n[bold]Generating Comparison Report[/bold]")
+        console.print(f"  Baseline: {baseline_id} ({baseline.model_name})")
+        console.print(f"  Target: {target_id} ({target.model_name})")
+        console.print()
+
+        with console.status("[bold green]Generating comparison analysis..."):
+            report = service.generate_comparison_report_sync(baseline, target)
+
+        markdown_content = report.to_markdown()
+
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(markdown_content, encoding="utf-8")
+            console.print(f"[green]Report saved to {output}[/green]")
+        else:
+            default_output = Path(
+                f"reports/benchmark/comparison_{baseline_id[:8]}_{target_id[:8]}.md"
+            )
+            default_output.parent.mkdir(parents=True, exist_ok=True)
+            default_output.write_text(markdown_content, encoding="utf-8")
+            console.print(f"[green]Report saved to {default_output}[/green]")
+
     return benchmark_app
 
 
