@@ -64,18 +64,13 @@ npm run dev
 
 ## 문서 작업 규칙 (Docs)
 
-- "내부 상태"는 [internal/status/STATUS.md](../internal/status/STATUS.md)가 단일 출처(SSoT)입니다.
-- 사용자 문서는 `README.ko.md`(루트)/`docs/guides/USER_GUIDE.md`/`docs/tutorials/`에, 내부 설계/운영은 `docs/internal/`에 둡니다.
-- 새 문서를 추가하면 [INDEX.md](../INDEX.md)와 `mkdocs.yml` 네비게이션을 함께 갱신합니다.
-- [INDEX.md](../INDEX.md)는 문서 허브로 유지합니다.
-- 튜토리얼 코드는 `scripts/validate_tutorials.py`로 검증합니다.
-  - 실행: `uv run python scripts/validate_tutorials.py`
-- 문서 스타일 가이드는 [internal/reference/STYLE_GUIDE.md](../internal/reference/STYLE_GUIDE.md)를 따릅니다.
+- `docs/`는 **현재 프로젝트에 필요한 문서만** 유지합니다. (중복/과거 정보는 삭제)
+- 새 문서를 추가/삭제하면 `docs/INDEX.md`와 `mkdocs.yml` 네비게이션을 함께 갱신합니다.
+- 문서 스타일/업데이트 규칙은 `docs/new_whitepaper/STYLE_GUIDE.md`를 기준으로 합니다.
 
 ---
 
 ## 더 자세한 정보
 
-- **상세 개발 가이드**: [internal/reference/DEVELOPMENT_GUIDE.md](../internal/reference/DEVELOPMENT_GUIDE.md) - 아키텍처 원칙, 코드 품질, AI 에이전트 시스템
-- **기능 스펙**: [internal/reference/FEATURE_SPECS.md](../internal/reference/FEATURE_SPECS.md) - 한국어 RAG, Phoenix, Domain Memory 등
-- **클래스 카탈로그**: [internal/reference/CLASS_CATALOG.md](../internal/reference/CLASS_CATALOG.md)
+- 설계/컴포넌트/운영 기준: `docs/new_whitepaper/INDEX.md`
+- Open RAG Trace 스펙/샘플: `docs/architecture/open-rag-trace-spec.md`, `docs/guides/open-rag-trace-samples.md`

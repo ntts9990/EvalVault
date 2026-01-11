@@ -126,7 +126,7 @@ npm run dev
 
 - `README.md` (5대 축, 빠른 시작, 산출물 경로)
 - `docs/guides/USER_GUIDE.md` (워크플로/설치/CLI/Web 상세)
-- `docs/architecture/ARCHITECTURE.md` (미션/구조/원칙)
+- `docs/new_whitepaper/02_architecture.md` (미션/구조/원칙)
 - `src/evalvault/adapters/inbound/cli/commands/run.py` (CLI 관점 워크플로)
 - `src/evalvault/adapters/inbound/cli/commands/run_helpers.py` (실행 모드 프리셋)
 

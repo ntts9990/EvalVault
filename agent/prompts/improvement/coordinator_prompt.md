@@ -45,7 +45,7 @@ cat agent/memory/shared/decisions.md | tail -50
 
 ## PARALLEL EXECUTION GROUPS
 
-From IMPROVEMENT_PLAN.md:
+From the current roadmap/standards (`docs/ROADMAP.md`, `docs/new_whitepaper/INDEX.md`):
 
 ### Group A: Fully Independent (Can Run Together)
 - `performance`: Caching, batch processing
@@ -126,7 +126,7 @@ When agents modify the same files:
 
 1. Run full test suite
 2. Generate coverage report
-3. Update IMPROVEMENT_PLAN.md progress
+3. Update `docs/ROADMAP.md` (if scope changed)
 4. Announce to all agents via shared docs
 
 ---
@@ -139,8 +139,9 @@ agent/memory/shared/
 └── dependencies.md   # Blocking issues
 
 docs/
-├── IMPROVEMENT_PLAN.md   # Overall progress
-└── ROADMAP.md            # Long-term vision
+├── ROADMAP.md            # Public direction
+├── STATUS.md             # One-page snapshot
+└── new_whitepaper/       # Engineering standards
 
 feature_list.json         # Task tracking
 claude-progress.txt       # Session progress
@@ -152,7 +153,7 @@ claude-progress.txt       # Session progress
 
 1. Check all agent statuses
 2. Identify and resolve any blockers
-3. Update overall progress in IMPROVEMENT_PLAN.md
+3. Keep shared docs + roadmap aligned
 4. Plan next parallel execution batch
 
 ---

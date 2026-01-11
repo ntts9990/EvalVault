@@ -27,7 +27,7 @@ evalvault (PyPI Package)              agent/ (Development Only)
 
 ### Development Mode (This Folder)
 
-Agents for improving EvalVault codebase based on IMPROVEMENT_PLAN.md:
+Agents for improving EvalVault codebase based on the current roadmap and engineering standards (see `docs/ROADMAP.md`, `docs/new_whitepaper/INDEX.md`):
 
 | Agent Type | Focus | P-Levels |
 |------------|-------|----------|
@@ -280,9 +280,9 @@ cat agent/memory/shared/decisions.md | tail -50
 uv run python main.py --project-dir .. --agent-type coordinator
 ```
 
-## Integration with IMPROVEMENT_PLAN.md
+## Integration with Project Docs
 
-The agent system follows the improvement plan in `docs/IMPROVEMENT_PLAN.md`:
+The agent system follows the project documentation and current engineering standards (see `docs/INDEX.md`):
 
 | Priority | Agent | Tasks |
 |----------|-------|-------|
@@ -298,10 +298,10 @@ The agent system follows the improvement plan in `docs/IMPROVEMENT_PLAN.md`:
 
 - [Claude Agent SDK Docs](https://platform.claude.com/docs/en/agent-sdk/overview)
 - [Effective Harnesses](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
-- [EvalVault Architecture](../docs/ARCHITECTURE.md)
+- [Docs Index](../docs/INDEX.md)
+- [Developer Whitepaper](../docs/new_whitepaper/INDEX.md)
+- [Open RAG Trace Spec](../docs/architecture/open-rag-trace-spec.md)
 - [Agent Types Configuration](../src/evalvault/config/agent_types.py)
-- [Agent Strategy](../docs/AGENT_STRATEGY.md)
-- [Improvement Plan](../docs/IMPROVEMENT_PLAN.md)
 - [nonstop-agent](https://github.com/seolcoding/nonstop-agent)
 
 ---

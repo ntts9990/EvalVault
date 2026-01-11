@@ -7,8 +7,8 @@
 
 | 문서 | 용도 |
 |------|------|
-| [IMPROVEMENT_PLAN.md](../../../docs/IMPROVEMENT_PLAN.md) | 개발 자동화 에이전트 상세 계획 |
-| [AGENT_STRATEGY.md](../../../docs/AGENT_STRATEGY.md) | 전체 에이전트 활용 전략 |
+| [docs/INDEX.md](../../../docs/INDEX.md) | 프로젝트 문서 허브(최신 링크) |
+| [Developer Whitepaper](../../../docs/new_whitepaper/INDEX.md) | 설계/운영/품질 기준 |
 | [agent/README.md](../../README.md) | 에이전트 시스템 사용법 |
 
 ---
@@ -137,8 +137,8 @@ architecture (Storage Adapter)┘
 | `src/evalvault/config/settings.py` | `architecture` | - | 모든 에이전트 영향 |
 | `src/evalvault/ports/outbound/tracker_port.py` | `observability` | `rag-data` | 스키마 변경 공유 |
 | `src/evalvault/domain/entities/result.py` | `architecture` | - | 테스트 영향 체크 |
-| `docs/IMPROVEMENT_PLAN.md` | `coordinator` | All | 병렬 작업 영향 체크 |
-| `docs/AGENT_STRATEGY.md` | `coordinator` | All | 운영 모드 영향 체크 |
+| `docs/INDEX.md` | `coordinator` | All | 문서 구조/링크 변경 시 동기화 |
+| `docs/new_whitepaper/INDEX.md` | `coordinator` | All | 설계/운영 기준 변경 시 동기화 |
 | `agent/memory/shared/decisions.md` | All | - | ADR 형식 준수 |
 
 ### Shared Namespaces

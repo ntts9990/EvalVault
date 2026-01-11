@@ -74,4 +74,4 @@ Interface for tracking and observability systems.
 
 ## Implementation Guide
 
-See the [Architecture Guide](../../architecture/ARCHITECTURE.md) for details on implementing custom adapters.
+See the [Developer Whitepaper](../../new_whitepaper/02_architecture.md) for details on boundaries/ports/adapters when implementing custom adapters.

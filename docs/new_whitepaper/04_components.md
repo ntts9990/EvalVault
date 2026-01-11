@@ -140,7 +140,7 @@
 - `src/evalvault/adapters/inbound/api/main.py` (FastAPI 라우터 연결)
 - `src/evalvault/adapters/inbound/api/routers/runs.py` (Runs API)
 - `src/evalvault/adapters/outbound/analysis/pipeline_factory.py` (분석 모듈 등록)
-- `docs/architecture/ARCHITECTURE.md` (상세 구조 가이드)
+- `docs/new_whitepaper/02_architecture.md` (설계 원칙/구조)
 
 ---
 

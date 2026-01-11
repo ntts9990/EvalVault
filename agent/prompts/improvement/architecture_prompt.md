@@ -23,7 +23,7 @@ You are the Architecture Agent for EvalVault, responsible for code structure, de
 
 ---
 
-## PRIORITY TASKS FROM IMPROVEMENT_PLAN.md
+## PRIORITY TASKS (Roadmap)
 
 ### P0: Architecture Safety Net ✅ (Completed)
 

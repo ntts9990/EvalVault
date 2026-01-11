@@ -157,7 +157,7 @@ flowchart LR
 
 ## Evidence
 
-- `docs/architecture/ARCHITECTURE.md` (전체 설계 원칙/구조)
+- `docs/new_whitepaper/INDEX.md` (백서 전체 맥락)
 - `src/evalvault/domain/` (도메인 서비스/엔티티)
 - `src/evalvault/ports/` (계약 정의)
 - `src/evalvault/adapters/` (CLI/FastAPI/외부 통합)

@@ -69,5 +69,6 @@ Graph Statistics:
 
 ## 관련 문서
 
-- [USER_GUIDE.md](../docs/USER_GUIDE.md) - 전체 사용자 가이드
-- [ARCHITECTURE.md](../docs/ARCHITECTURE.md) - 아키텍처 설명
+- [USER_GUIDE.md](../docs/guides/USER_GUIDE.md) - 전체 사용자 가이드
+- [INDEX.md](../docs/INDEX.md) - 문서 허브
+- [Developer Whitepaper](../docs/new_whitepaper/INDEX.md) - 설계/운영/품질 기준
