@@ -9,7 +9,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.entities import (
+    EvaluationRun,
+    MetricScore,
+    RunClusterMap,
+    RunClusterMapInfo,
+    TestCaseResult,
+)
 
 
 class SQLQueries:
@@ -61,6 +67,14 @@ class SQLQueries:
         ) VALUES ({values})
         """
 
+    def insert_cluster_map(self) -> str:
+        values = self._values(7)
+        return f"""
+        INSERT INTO run_cluster_maps (
+            run_id, map_id, test_case_id, cluster_id, source, metadata, created_at
+        ) VALUES ({values})
+        """
+
     def select_run(self) -> str:
         return f"""
         SELECT run_id, dataset_name, dataset_version, model_name,
@@ -89,8 +103,37 @@ class SQLQueries:
         ORDER BY id
         """
 
+    def select_cluster_map(self) -> str:
+        return f"""
+        SELECT test_case_id, cluster_id, source, map_id, created_at, metadata
+        FROM run_cluster_maps
+        WHERE run_id = {self.placeholder} AND map_id = {self.placeholder}
+        ORDER BY test_case_id
+        """
+
+    def select_cluster_map_latest(self) -> str:
+        return f"""
+        SELECT map_id, source, created_at
+        FROM run_cluster_maps
+        WHERE run_id = {self.placeholder}
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+
+    def select_cluster_map_sets(self) -> str:
+        return f"""
+        SELECT map_id, source, created_at, COUNT(*) AS item_count
+        FROM run_cluster_maps
+        WHERE run_id = {self.placeholder}
+        GROUP BY map_id, source, created_at
+        ORDER BY created_at DESC
+        """
+
     def delete_run(self) -> str:
         return f"DELETE FROM evaluation_runs WHERE run_id = {self.placeholder}"
+
+    def delete_cluster_map(self) -> str:
+        return f"DELETE FROM run_cluster_maps WHERE run_id = {self.placeholder} AND map_id = {self.placeholder}"
 
     def list_runs_base(self) -> str:
         return "SELECT run_id FROM evaluation_runs WHERE 1=1"
@@ -213,6 +256,112 @@ class BaseSQLStorageAdapter(ABC):
         with self._get_connection() as conn:
             cursor = self._execute(conn, self.queries.delete_run(), (run_id,))
             deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+
+    def save_run_cluster_map(
+        self,
+        run_id: str,
+        mapping: dict[str, str],
+        source: str | None = None,
+        map_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        if not mapping:
+            raise ValueError("Cluster map is empty")
+        if map_id is None:
+            from uuid import uuid4
+
+            map_id = str(uuid4())
+        created_at = self._serialize_datetime(datetime.now())
+        metadata_payload = self._serialize_json(metadata)
+        with self._get_connection() as conn:
+            self._execute(conn, self.queries.delete_cluster_map(), (run_id, map_id))
+            for test_case_id, cluster_id in mapping.items():
+                self._execute(
+                    conn,
+                    self.queries.insert_cluster_map(),
+                    (
+                        run_id,
+                        map_id,
+                        test_case_id,
+                        cluster_id,
+                        source,
+                        metadata_payload,
+                        created_at,
+                    ),
+                )
+            conn.commit()
+        return map_id
+
+    def get_run_cluster_map(self, run_id: str, map_id: str | None = None) -> RunClusterMap | None:
+        with self._get_connection() as conn:
+            source: str | None = None
+            created_at: datetime | None = None
+            metadata: dict[str, Any] | None = None
+            if map_id is None:
+                latest_row = self._execute(
+                    conn, self.queries.select_cluster_map_latest(), (run_id,)
+                ).fetchone()
+                if not latest_row:
+                    return None
+                map_id = self._row_value(latest_row, "map_id")
+                source = self._row_value(latest_row, "source")
+                created_at = self._deserialize_datetime(self._row_value(latest_row, "created_at"))
+                if map_id is None:
+                    return None
+
+            rows = self._execute(
+                conn, self.queries.select_cluster_map(), (run_id, map_id)
+            ).fetchall()
+            if not rows:
+                return None
+
+            mapping: dict[str, str] = {}
+            for row in rows:
+                test_case_id = self._row_value(row, "test_case_id")
+                cluster_id = self._row_value(row, "cluster_id")
+                row_source = self._row_value(row, "source")
+                row_created_at = self._row_value(row, "created_at")
+                row_metadata = self._row_value(row, "metadata")
+                if row_source and not source:
+                    source = row_source
+                if row_created_at and created_at is None:
+                    created_at = self._deserialize_datetime(row_created_at)
+                if metadata is None and row_metadata not in (None, ""):
+                    metadata = self._deserialize_json(row_metadata)
+                if test_case_id and cluster_id:
+                    mapping[str(test_case_id)] = str(cluster_id)
+
+            if not mapping:
+                return None
+            return RunClusterMap(
+                map_id=str(map_id),
+                mapping=mapping,
+                source=source,
+                created_at=created_at,
+                metadata=metadata,
+            )
+
+    def list_run_cluster_maps(self, run_id: str) -> list[RunClusterMapInfo]:
+        with self._get_connection() as conn:
+            rows = self._execute(conn, self.queries.select_cluster_map_sets(), (run_id,)).fetchall()
+            results: list[RunClusterMapInfo] = []
+            for row in rows:
+                results.append(
+                    RunClusterMapInfo(
+                        map_id=str(self._row_value(row, "map_id") or ""),
+                        source=self._row_value(row, "source"),
+                        created_at=self._deserialize_datetime(self._row_value(row, "created_at")),
+                        item_count=int(self._row_value(row, "item_count") or 0),
+                    )
+                )
+            return results
+
+    def delete_run_cluster_map(self, run_id: str, map_id: str) -> int:
+        with self._get_connection() as conn:
+            cursor = self._execute(conn, self.queries.delete_cluster_map(), (run_id, map_id))
+            deleted = cursor.rowcount if cursor.rowcount is not None else 0
             conn.commit()
             return deleted
 

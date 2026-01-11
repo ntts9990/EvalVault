@@ -1,5 +1,8 @@
 """Storage adapters for evaluation results."""
 
+from evalvault.adapters.outbound.storage.benchmark_storage_adapter import (
+    SQLiteBenchmarkStorageAdapter,
+)
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 
 try:
@@ -7,7 +10,11 @@ try:
         PostgreSQLStorageAdapter,
     )
 
-    __all__ = ["SQLiteStorageAdapter", "PostgreSQLStorageAdapter"]
+    __all__ = [
+        "SQLiteStorageAdapter",
+        "PostgreSQLStorageAdapter",
+        "SQLiteBenchmarkStorageAdapter",
+    ]
 except ImportError:
     # psycopg not installed
-    __all__ = ["SQLiteStorageAdapter"]
+    __all__ = ["SQLiteStorageAdapter", "SQLiteBenchmarkStorageAdapter"]

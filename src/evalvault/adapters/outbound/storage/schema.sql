@@ -45,6 +45,22 @@ CREATE TABLE IF NOT EXISTS test_case_results (
 
 CREATE INDEX IF NOT EXISTS idx_results_run_id ON test_case_results(run_id);
 
+-- Run cluster map table
+CREATE TABLE IF NOT EXISTS run_cluster_maps (
+    run_id TEXT NOT NULL,
+    map_id TEXT NOT NULL,
+    test_case_id TEXT NOT NULL,
+    cluster_id TEXT NOT NULL,
+    source TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, map_id, test_case_id),
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_cluster_maps_run_id ON run_cluster_maps(run_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_maps_map_id ON run_cluster_maps(map_id);
+
 -- Metric scores table
 CREATE TABLE IF NOT EXISTS metric_scores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,3 +258,27 @@ CREATE TABLE IF NOT EXISTS stage_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_stage_metrics_run_id ON stage_metrics(run_id);
 CREATE INDEX IF NOT EXISTS idx_stage_metrics_stage_id ON stage_metrics(stage_id);
+
+-- Benchmark runs table (KMMLU, MMLU, etc.)
+CREATE TABLE IF NOT EXISTS benchmark_runs (
+    run_id TEXT PRIMARY KEY,
+    benchmark_type TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    tasks TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    task_scores TEXT,
+    overall_accuracy REAL,
+    num_fewshot INTEGER DEFAULT 0,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    duration_seconds REAL DEFAULT 0.0,
+    error_message TEXT,
+    phoenix_trace_id TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_benchmark_runs_type ON benchmark_runs(benchmark_type);
+CREATE INDEX IF NOT EXISTS idx_benchmark_runs_model ON benchmark_runs(model_name);
+CREATE INDEX IF NOT EXISTS idx_benchmark_runs_created_at ON benchmark_runs(created_at DESC);

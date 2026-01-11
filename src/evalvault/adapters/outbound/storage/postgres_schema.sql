@@ -44,6 +44,21 @@ CREATE TABLE IF NOT EXISTS test_case_results (
 
 CREATE INDEX IF NOT EXISTS idx_results_run_id ON test_case_results(run_id);
 
+-- Run cluster map table
+CREATE TABLE IF NOT EXISTS run_cluster_maps (
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    map_id UUID NOT NULL,
+    test_case_id VARCHAR(255) NOT NULL,
+    cluster_id VARCHAR(255) NOT NULL,
+    source TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, map_id, test_case_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cluster_maps_run_id ON run_cluster_maps(run_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_maps_map_id ON run_cluster_maps(map_id);
+
 -- Metric scores table
 CREATE TABLE IF NOT EXISTS metric_scores (
     id SERIAL PRIMARY KEY,

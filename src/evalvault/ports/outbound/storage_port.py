@@ -2,7 +2,12 @@
 
 from typing import Any, Protocol
 
-from evalvault.domain.entities import EvaluationRun, PromptSetBundle
+from evalvault.domain.entities import (
+    EvaluationRun,
+    PromptSetBundle,
+    RunClusterMap,
+    RunClusterMapInfo,
+)
 from evalvault.domain.entities.experiment import Experiment
 
 
@@ -69,6 +74,29 @@ class StoragePort(Protocol):
         Returns:
             EvaluationRun 객체 리스트 (최신순)
         """
+        ...
+
+    def save_run_cluster_map(
+        self,
+        run_id: str,
+        mapping: dict[str, str],
+        source: str | None = None,
+        map_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """런별 클러스터 맵을 저장합니다."""
+        ...
+
+    def get_run_cluster_map(self, run_id: str, map_id: str | None = None) -> RunClusterMap | None:
+        """런별 클러스터 맵을 조회합니다."""
+        ...
+
+    def list_run_cluster_maps(self, run_id: str) -> list[RunClusterMapInfo]:
+        """런별 클러스터 맵 버전을 조회합니다."""
+        ...
+
+    def delete_run_cluster_map(self, run_id: str, map_id: str) -> int:
+        """런별 클러스터 맵을 삭제합니다."""
         ...
 
     # Experiment 관련 메서드

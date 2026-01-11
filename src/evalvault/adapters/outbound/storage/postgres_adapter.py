@@ -129,6 +129,75 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             if "metadata" not in pipeline_columns:
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata JSONB")
 
+        cluster_cursor = conn.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'run_cluster_maps'
+            """
+        )
+        cluster_columns = {row[0] for row in cluster_cursor.fetchall()}
+        if cluster_columns and "map_id" not in cluster_columns:
+            conn.execute("ALTER TABLE run_cluster_maps RENAME TO run_cluster_maps_legacy")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS run_cluster_maps (
+                    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+                    map_id UUID NOT NULL,
+                    test_case_id VARCHAR(255) NOT NULL,
+                    cluster_id VARCHAR(255) NOT NULL,
+                    source TEXT,
+                    metadata JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (run_id, map_id, test_case_id)
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cluster_maps_run_id ON run_cluster_maps(run_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cluster_maps_map_id ON run_cluster_maps(map_id)"
+            )
+
+            legacy_rows = conn.execute(
+                """
+                SELECT run_id, test_case_id, cluster_id, source, created_at
+                FROM run_cluster_maps_legacy
+                """
+            ).fetchall()
+            if legacy_rows:
+                import uuid
+                from datetime import UTC, datetime
+
+                grouped: dict[tuple[str, str | None], list[tuple]] = {}
+                for row in legacy_rows:
+                    run_id = str(row[0])
+                    source = row[3]
+                    grouped.setdefault((run_id, source), []).append(row)
+                for (run_id, source), rows in grouped.items():
+                    map_id = uuid.uuid4()
+                    created_at = rows[0][4] or datetime.now(UTC)
+                    for row in rows:
+                        conn.execute(
+                            """
+                            INSERT INTO run_cluster_maps (
+                                run_id, map_id, test_case_id, cluster_id, source, metadata, created_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                run_id,
+                                map_id,
+                                row[1],
+                                row[2],
+                                source,
+                                None,
+                                created_at,
+                            ),
+                        )
+        elif cluster_columns and "metadata" not in cluster_columns:
+            conn.execute("ALTER TABLE run_cluster_maps ADD COLUMN metadata JSONB")
+
     # Prompt set methods
 
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:

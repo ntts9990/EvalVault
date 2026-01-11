@@ -1,11 +1,13 @@
 """SQLite storage adapter for evaluation results."""
 
+from __future__ import annotations
+
 import json
 import sqlite3
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from evalvault.adapters.outbound.storage.base_sql import BaseSQLStorageAdapter, SQLQueries
 from evalvault.domain.entities.analysis import (
@@ -24,6 +26,9 @@ from evalvault.domain.entities.analysis import (
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
 from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
 from evalvault.domain.entities.stage import StageEvent, StageMetric, StagePayloadRef
+
+if TYPE_CHECKING:
+    from evalvault.domain.entities.benchmark_run import BenchmarkRun
 
 
 class SQLiteStorageAdapter(BaseSQLStorageAdapter):
@@ -71,6 +76,69 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata TEXT")
         if "retrieval_metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata TEXT")
+
+        cluster_cursor = conn.execute("PRAGMA table_info(run_cluster_maps)")
+        cluster_columns = {row[1] for row in cluster_cursor.fetchall()}
+        if cluster_columns and "map_id" not in cluster_columns:
+            conn.execute("ALTER TABLE run_cluster_maps RENAME TO run_cluster_maps_legacy")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS run_cluster_maps (
+                    run_id TEXT NOT NULL,
+                    map_id TEXT NOT NULL,
+                    test_case_id TEXT NOT NULL,
+                    cluster_id TEXT NOT NULL,
+                    source TEXT,
+                    metadata TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (run_id, map_id, test_case_id),
+                    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cluster_maps_run_id ON run_cluster_maps(run_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cluster_maps_map_id ON run_cluster_maps(map_id)"
+            )
+
+            legacy_rows = conn.execute(
+                """
+                SELECT run_id, test_case_id, cluster_id, source, created_at
+                FROM run_cluster_maps_legacy
+                """
+            ).fetchall()
+            if legacy_rows:
+                import uuid
+                from datetime import datetime
+
+                grouped: dict[tuple[str, str | None], list[sqlite3.Row]] = {}
+                for row in legacy_rows:
+                    key = (row["run_id"], row["source"])
+                    grouped.setdefault(key, []).append(row)
+                for (run_id, source), rows in grouped.items():
+                    map_id = str(uuid.uuid4())
+                    created_at = rows[0]["created_at"] or datetime.now().isoformat()
+                    for row in rows:
+                        conn.execute(
+                            """
+                            INSERT INTO run_cluster_maps (
+                                run_id, map_id, test_case_id, cluster_id, source, metadata, created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                run_id,
+                                map_id,
+                                row["test_case_id"],
+                                row["cluster_id"],
+                                source,
+                                None,
+                                created_at,
+                            ),
+                        )
+        elif cluster_columns and "metadata" not in cluster_columns:
+            conn.execute("ALTER TABLE run_cluster_maps ADD COLUMN metadata TEXT")
 
         pipeline_cursor = conn.execute("PRAGMA table_info(pipeline_results)")
         pipeline_columns = {row[1] for row in pipeline_cursor.fetchall()}
@@ -1059,3 +1127,153 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         if isinstance(payload, dict):
             return StagePayloadRef.from_dict(payload)
         return None
+
+    def save_benchmark_run(self, run: BenchmarkRun) -> str:
+        with self._get_connection() as conn:
+            task_scores_json = json.dumps(
+                [
+                    {
+                        "task_name": ts.task_name,
+                        "accuracy": ts.accuracy,
+                        "num_samples": ts.num_samples,
+                        "metrics": ts.metrics,
+                        "version": ts.version,
+                    }
+                    for ts in run.task_scores
+                ],
+                ensure_ascii=False,
+            )
+
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO benchmark_runs (
+                    run_id, benchmark_type, model_name, backend, tasks,
+                    status, task_scores, overall_accuracy, num_fewshot,
+                    started_at, finished_at, duration_seconds,
+                    error_message, phoenix_trace_id, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.run_id,
+                    run.benchmark_type.value,
+                    run.model_name,
+                    run.backend,
+                    json.dumps(run.tasks, ensure_ascii=False),
+                    run.status.value,
+                    task_scores_json,
+                    run.overall_accuracy,
+                    run.num_fewshot,
+                    run.started_at.isoformat() if run.started_at else None,
+                    run.finished_at.isoformat() if run.finished_at else None,
+                    run.duration_seconds,
+                    run.error_message,
+                    run.phoenix_trace_id,
+                    json.dumps(run.metadata, ensure_ascii=False) if run.metadata else None,
+                ),
+            )
+            conn.commit()
+        return run.run_id
+
+    def get_benchmark_run(self, run_id: str) -> BenchmarkRun:
+        from evalvault.domain.entities.benchmark_run import (
+            BenchmarkRun,
+            BenchmarkStatus,
+            BenchmarkTaskScore,
+            BenchmarkType,
+        )
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT run_id, benchmark_type, model_name, backend, tasks,
+                       status, task_scores, overall_accuracy, num_fewshot,
+                       started_at, finished_at, duration_seconds,
+                       error_message, phoenix_trace_id, metadata
+                FROM benchmark_runs
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            )
+            row = cursor.fetchone()
+
+        if not row:
+            raise KeyError(f"Benchmark run not found: {run_id}")
+
+        task_scores_raw = row["task_scores"]
+        task_scores: list[BenchmarkTaskScore] = []
+        if task_scores_raw:
+            for ts_data in json.loads(task_scores_raw):
+                task_scores.append(
+                    BenchmarkTaskScore(
+                        task_name=ts_data["task_name"],
+                        accuracy=ts_data["accuracy"],
+                        num_samples=ts_data["num_samples"],
+                        metrics=ts_data.get("metrics", {}),
+                        version=ts_data.get("version", "0"),
+                    )
+                )
+
+        tasks_raw = row["tasks"]
+        tasks = json.loads(tasks_raw) if tasks_raw else []
+
+        metadata_raw = row["metadata"]
+        metadata = json.loads(metadata_raw) if metadata_raw else {}
+
+        started_at = row["started_at"]
+        finished_at = row["finished_at"]
+
+        return BenchmarkRun(
+            run_id=row["run_id"],
+            benchmark_type=BenchmarkType(row["benchmark_type"]),
+            model_name=row["model_name"],
+            backend=row["backend"],
+            tasks=tasks,
+            status=BenchmarkStatus(row["status"]),
+            task_scores=task_scores,
+            overall_accuracy=row["overall_accuracy"],
+            num_fewshot=row["num_fewshot"] or 0,
+            started_at=datetime.fromisoformat(started_at) if started_at else datetime.now(),
+            finished_at=datetime.fromisoformat(finished_at) if finished_at else None,
+            duration_seconds=row["duration_seconds"] or 0.0,
+            error_message=row["error_message"],
+            phoenix_trace_id=row["phoenix_trace_id"],
+            metadata=metadata,
+        )
+
+    def list_benchmark_runs(
+        self,
+        benchmark_type: str | None = None,
+        model_name: str | None = None,
+        limit: int = 100,
+    ) -> list[BenchmarkRun]:
+        query = """
+            SELECT run_id FROM benchmark_runs WHERE 1=1
+        """
+        params: list[Any] = []
+
+        if benchmark_type:
+            query += " AND benchmark_type = ?"
+            params.append(benchmark_type)
+
+        if model_name:
+            query += " AND model_name = ?"
+            params.append(model_name)
+
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(query, params)
+            run_ids = [row["run_id"] for row in cursor.fetchall()]
+
+        return [self.get_benchmark_run(run_id) for run_id in run_ids]
+
+    def delete_benchmark_run(self, run_id: str) -> bool:
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM benchmark_runs WHERE run_id = ?",
+                (run_id,),
+            )
+            deleted = cursor.rowcount > 0
+            conn.commit()
+        return deleted
