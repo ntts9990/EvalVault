@@ -98,6 +98,32 @@ class TestStoragePort:
         method = StoragePort.list_runs
         assert callable(method)
 
+    def test_has_cluster_map_methods(self):
+        """클러스터 맵 관련 메서드가 정의되어 있는지 확인."""
+        assert hasattr(StoragePort, "save_run_cluster_map")
+        assert hasattr(StoragePort, "get_run_cluster_map")
+        assert hasattr(StoragePort, "list_run_cluster_maps")
+        assert hasattr(StoragePort, "delete_run_cluster_map")
+
+        assert callable(StoragePort.save_run_cluster_map)
+        assert callable(StoragePort.get_run_cluster_map)
+        assert callable(StoragePort.list_run_cluster_maps)
+        assert callable(StoragePort.delete_run_cluster_map)
+
+    def test_cluster_map_method_hints(self):
+        """클러스터 맵 메서드 반환 타입 힌트 확인."""
+        hints = get_type_hints(StoragePort.save_run_cluster_map)
+        assert hints.get("return") is str
+
+        hints = get_type_hints(StoragePort.get_run_cluster_map)
+        assert "return" in hints
+
+        hints = get_type_hints(StoragePort.list_run_cluster_maps)
+        assert "return" in hints
+
+        hints = get_type_hints(StoragePort.delete_run_cluster_map)
+        assert hints.get("return") is int
+
 
 class TestTrackerPort:
     """Tracker Port 인터페이스 테스트."""
