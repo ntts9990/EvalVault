@@ -3,6 +3,13 @@
 from evalvault.ports.outbound.analysis_cache_port import AnalysisCachePort
 from evalvault.ports.outbound.analysis_module_port import AnalysisModulePort
 from evalvault.ports.outbound.analysis_port import AnalysisPort
+from evalvault.ports.outbound.benchmark_port import (
+    BenchmarkBackend,
+    BenchmarkPort,
+    BenchmarkRequest,
+    BenchmarkResponse,
+    BenchmarkTaskResult,
+)
 from evalvault.ports.outbound.causal_analysis_port import CausalAnalysisPort
 from evalvault.ports.outbound.dataset_port import DatasetPort
 from evalvault.ports.outbound.domain_memory_port import (
@@ -90,4 +97,9 @@ __all__ = [
     "FaithfulnessResultProtocol",
     "RetrieverPort",
     "RetrieverResultProtocol",
+    "BenchmarkBackend",
+    "BenchmarkPort",
+    "BenchmarkRequest",
+    "BenchmarkResponse",
+    "BenchmarkTaskResult",
 ]
