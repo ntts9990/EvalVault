@@ -82,7 +82,52 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra web --extra korean
+        run: uv sync --extra dev --extra web --extra korean --extra docs
+
+      - name: Docs build
+        run: uv run mkdocs build -q
+
+      - name: Docs link check
+        run: |
+          uv run python - <<'PY'
+          import re
+          from pathlib import Path
+
+          def check_file(p: Path) -> list[str]:
+              text = p.read_text(encoding='utf-8', errors='ignore')
+              link_re = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+              missing: list[str] = []
+              for target in link_re.findall(text):
+                  target = target.strip()
+                  if not target or target.startswith('#'):
+                      continue
+                  if target.startswith(('http://', 'https://', 'mailto:')):
+                      continue
+                  if ' ' in target:
+                      target = target.split(' ')[0]
+                  target = target.split('#', 1)[0]
+                  if not target or target.startswith('/'):
+                      continue
+                  resolved = (p.parent / target).resolve()
+                  if not resolved.exists():
+                      missing.append(f"{p}: {target}")
+              return missing
+
+          missing: list[str] = []
+          docs_root = Path('docs')
+          for md in docs_root.rglob('*.md'):
+              missing.extend(check_file(md))
+          for md in [Path('README.md'), Path('README.en.md')]:
+              if md.exists():
+                  missing.extend(check_file(md))
+
+          if missing:
+              print('Missing local link targets:')
+              for item in missing[:100]:
+                  print('-', item)
+              raise SystemExit(1)
+          print('Docs links OK')
+          PY
 
       - name: Check formatting
         run: uv run ruff format --check src/ tests/
