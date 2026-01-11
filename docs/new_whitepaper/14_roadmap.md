@@ -10,23 +10,18 @@
 
 ## TL;DR
 
-- 공개 로드맵의 단일 진실: `docs/status/ROADMAP.md`
-- 공개 상태 요약(1페이지): `docs/status/STATUS.md`
-- 내부 상태 SSoT: `docs/internal/status/STATUS.md`
-- 이 백서는 “개발자 온보딩/확장/운영” 관점의 정리이며, 로드맵의 상세 항목을 대체하지 않는다.
+- 공개 로드맵: `docs/ROADMAP.md`
+- 상태 요약(1페이지): `docs/STATUS.md`
+- 이 백서는 “개발자 온보딩/확장/운영” 관점의 기준 문서이며, 로드맵의 상세 항목을 대체하지 않는다.
 
 ---
 
 ## 1) 문서들의 역할 분담(SSoT)
 
-- `docs/status/STATUS.md`
-  - “지금 어디까지 왔나”를 1페이지로 공유(외부 리뷰/내부 공유 모두용)
-- `docs/status/ROADMAP.md`
-  - 전체 개발 계획과 우선순위(Phase 1~14 완료 + 리팩토링 트랙 포함)
-- `docs/internal/status/STATUS.md`
-  - 내부 진행 상황의 단일 진실(증거/링크/산출물 집계)
-- `docs/internal/plans/PARALLEL_WORK_PLAN.md`
-  - 병렬 작업 기준(작업 분해/의존성/완료 조건)
+- `docs/STATUS.md`
+  - “지금 어디까지 왔나”를 1페이지로 공유
+- `docs/ROADMAP.md`
+  - 전체 개발 방향과 우선순위(외부 공유용)
 - `docs/new_whitepaper/*`
   - 신규 합류자가 “실제 코드/경계/운영 루틴”을 빠르게 이해하도록 돕는 개발 백서
 
@@ -36,7 +31,7 @@
 
 ### 2.1 큰 흐름
 
-- `docs/status/ROADMAP.md`는
+- `docs/ROADMAP.md`는
   - Phase 1~14(핵심 시스템) 완료 상태를 기반으로
   - 현재는 R1~R4 같은 “리팩토링/통합/품질 개선” 트랙을 중심으로 정리한다.
 
@@ -95,12 +90,8 @@
 
 ## Evidence
 
-- 공개 상태/로드맵:
-  - `docs/status/STATUS.md`
-  - `docs/status/ROADMAP.md`
-- 내부 상태/병렬 계획:
-  - `docs/internal/status/STATUS.md`
-  - `docs/internal/plans/PARALLEL_WORK_PLAN.md`
+- `docs/STATUS.md`
+- `docs/ROADMAP.md`
 
 ---
 

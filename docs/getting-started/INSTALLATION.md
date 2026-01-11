@@ -80,8 +80,9 @@ npm run dev
 
 ## 다음 단계
 
-- 5분 빠른 시작: [tutorials/01-quickstart.md](../tutorials/01-quickstart.md)
 - 설치/환경설정/CLI/Web UI: [guides/USER_GUIDE.md](../guides/USER_GUIDE.md)
+- 개발/기여: [guides/DEV_GUIDE.md](../guides/DEV_GUIDE.md)
+- 개발 백서(설계/운영/품질 기준): [new_whitepaper/INDEX.md](../new_whitepaper/INDEX.md)
 - 외부 시스템 트레이싱 표준: [architecture/open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md)
 - Collector 구성: [architecture/open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md)
 - 프로젝트 개요(한국어): [README.md](../../README.md)

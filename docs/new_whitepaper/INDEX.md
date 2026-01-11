@@ -34,7 +34,7 @@
 
 ## 근거 SSoT 링크 (참조용)
 
-- 아키텍처 상세: `docs/architecture/ARCHITECTURE.md`
-- 로드맵: `docs/status/ROADMAP.md`
+- 아키텍처/설계 기준: `docs/new_whitepaper/02_architecture.md`
+- 로드맵: `docs/ROADMAP.md`
+- 상태 요약: `docs/STATUS.md`
 - 사용자 워크플로(명령/설정): `docs/guides/USER_GUIDE.md`
-- 내부 백서 작성 계획(구 버전): `docs/internal/DEVELOPMENT_WHITEPAPER_PLAN.md`

@@ -66,7 +66,7 @@ EvalVault 개선 작업이 다양한 영역(아키텍처, 성능, 테스트 등)
 
 **Related Files**:
 - `agent/memory/README.md`
-- `docs/IMPROVEMENT_PLAN.md`
+- `docs/INDEX.md`
 
 ---
 

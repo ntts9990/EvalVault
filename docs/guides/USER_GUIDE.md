@@ -1192,20 +1192,16 @@ Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며
 ## 참고 자료
 
 ### EvalVault 문서
-- [README.md](../README.md) - 프로젝트 개요
-- [INDEX.md](../INDEX.md) - 전체 문서 인덱스
-- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - 아키텍처 가이드
+- [README.md](../../README.md) - 프로젝트 개요
+- [INDEX.md](../INDEX.md) - 문서 허브
+- [STATUS.md](../STATUS.md) - 1페이지 상태 요약
+- [ROADMAP.md](../ROADMAP.md) - 공개 로드맵
+- [DEV_GUIDE.md](DEV_GUIDE.md) - 개발/테스트 루틴
+- [new_whitepaper/INDEX.md](../new_whitepaper/INDEX.md) - 개발 백서(설계/운영/품질 기준)
 - [open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md) - Open RAG Trace 표준
 - [open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md) - Collector 구성 가이드
 - [open-rag-trace-internal-adapter.md](open-rag-trace-internal-adapter.md) - 내부 시스템 계측
-- [ROADMAP.md](../status/ROADMAP.md) - 개발 로드맵
 - [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md) - 변경 이력
-
-### 튜토리얼
-- [tutorials/01-quickstart.md](../tutorials/01-quickstart.md) - 5분 빠른 시작
-- [tutorials/02-basic-evaluation.md](../tutorials/02-basic-evaluation.md) - 기본 평가 실행
-- [tutorials/04-phoenix-integration.md](../tutorials/04-phoenix-integration.md) - Phoenix 통합
-- [tutorials/07-domain-memory.md](../tutorials/07-domain-memory.md) - Domain Memory
 
 ### 외부 리소스
 - [Phoenix 공식 문서](https://docs.arize.com/phoenix)

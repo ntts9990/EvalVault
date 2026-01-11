@@ -99,7 +99,7 @@ uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
 
 새 기능/리팩토링이 들어오면 다음 순서로 문서를 갱신한다.
 
-1. **SSoT 확인**: `docs/status/STATUS.md`, `docs/status/ROADMAP.md`, `docs/architecture/ARCHITECTURE.md`
+1. **SSoT 확인**: `docs/STATUS.md`, `docs/ROADMAP.md`, `docs/INDEX.md`
 2. **입출력 변화 확인**: CLI/API에서 사용자에게 보이는 변화(플래그/응답/산출물)부터 반영
 3. **근거 매핑 갱신**: 해당 기능의 “근거 파일”을 Evidence에 추가
 4. **장별 ‘향후 추가’ 섹션 업데이트**: 각 장의 마지막에 있는 “향후 변경 시” 가이드에 체크리스트를 누적
@@ -109,6 +109,6 @@ uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
 ## Evidence
 
 - `docs/guides/USER_GUIDE.md` (핵심 워크플로/설치/명령)
-- `docs/architecture/ARCHITECTURE.md` (설계 원칙/구조)
-- `docs/status/ROADMAP.md` (현재 상태/향후 계획)
-- `docs/status/STATUS.md` (1페이지 상태 요약)
+- `docs/new_whitepaper/02_architecture.md` (설계 원칙/구조)
+- `docs/ROADMAP.md` (현재 방향/우선순위)
+- `docs/STATUS.md` (1페이지 상태 요약)

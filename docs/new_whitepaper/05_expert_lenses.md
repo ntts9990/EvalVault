@@ -112,7 +112,7 @@
 ## Evidence
 
 - `docs/new_whitepaper/STYLE_GUIDE.md`
-- `docs/internal/DEVELOPMENT_WHITEPAPER_PLAN.md` (전문가 관점 반영 계획)
+- `docs/INDEX.md` (문서 운영 원칙)
 
 ---
 

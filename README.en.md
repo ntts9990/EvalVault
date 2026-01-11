@@ -361,8 +361,11 @@ On top of these, `StageMetricService` derives **pipeline-stage metrics** such as
 ---
 
 ## Documentation
+- [Docs Index](docs/INDEX.md): documentation hub.
 - [User Guide](docs/guides/USER_GUIDE.md): installation, configuration, CLI recipes, Web UI, Phoenix, automation.
-- [Architecture](docs/architecture/ARCHITECTURE.md) & [C4 Diagram](docs/internal/reference/ARCHITECTURE_C4.md): design details.
+- [Dev Guide](docs/guides/DEV_GUIDE.md): local dev/test/lint routines.
+- [Developer Whitepaper](docs/new_whitepaper/INDEX.md): architecture, operations, and engineering standards.
+- [Open RAG Trace Spec](docs/architecture/open-rag-trace-spec.md): tracing schema and integration guide.
 - [CHANGELOG](CHANGELOG.md) for release history.
 
 ---

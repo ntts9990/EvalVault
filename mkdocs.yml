@@ -11,7 +11,6 @@ theme:
   name: material
   language: ko
   palette:
-    # Light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: indigo
@@ -19,7 +18,6 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: indigo
@@ -65,7 +63,7 @@ plugins:
             separate_signature: true
             line_length: 80
             filters:
-              - "!^_"  # Exclude private members
+              - "!^_"
 
 markdown_extensions:
   - admonition
@@ -94,106 +92,51 @@ markdown_extensions:
       separator: "-"
 
 nav:
-  - Home: INDEX.md
-  - Docs Hub: DOCS_HUB.md
-  - Overview:
-    - README (Korean): README.ko.md
-    - Project Overview: PROJECT_OVERVIEW.md
-    - Source Guide: PROJECT_SOURCE_GUIDE.md
+  - Docs: INDEX.md
+  - Project:
+      - README (Korean): README.ko.md
+      - Status: STATUS.md
+      - Roadmap: ROADMAP.md
   - Getting Started:
-    - Installation: getting-started/INSTALLATION.md
-    - Quickstart: tutorials/01-quickstart.md
+      - Installation: getting-started/INSTALLATION.md
   - Guides:
-    - User Guide: guides/USER_GUIDE.md
-    - CLI Guide: guides/CLI_GUIDE.md
-    - Method Plugins: method_plugins.md
-    - Ragas Performance Tuning: guides/RAGAS_PERFORMANCE_TUNING.md
-    - Observability Playbook: guides/OBSERVABILITY_PLAYBOOK.md
-    - Release Checklist: guides/RELEASE_CHECKLIST.md
-    - Development Guide: guides/DEV_GUIDE.md
-    - Project Structure Methods:
-      - Overview: guides/PROJECT_STRUCTURE_METHODS.md
-      - Folder Topology: guides/structure-methods/01-folder-topology.md
-      - Hexagonal Layer Map: guides/structure-methods/02-hexagonal-layer-map.md
-      - Entrypoint Flow: guides/structure-methods/03-entrypoint-flow.md
-      - C4 Component View: guides/structure-methods/04-c4-component-view.md
-      - Dependency Graph: guides/structure-methods/05-dependency-graph.md
-      - Data Config Flow: guides/structure-methods/06-data-config-flow.md
-      - Test Driven Map: guides/structure-methods/07-test-driven-map.md
-  - Tutorials:
-    - Basic Evaluation: tutorials/02-basic-evaluation.md
-    - Custom Metrics: tutorials/03-custom-metrics.md
-    - Phoenix Integration: tutorials/04-phoenix-integration.md
-    - Korean RAG: tutorials/05-korean-rag.md
-    - Production Tips: tutorials/06-production-tips.md
-    - Domain Memory: tutorials/07-domain-memory.md
-  - Architecture:
-    - Overview: architecture/ARCHITECTURE.md
-    - C4 Model: internal/reference/ARCHITECTURE_C4.md
-    - Class Catalog: internal/reference/CLASS_CATALOG.md
-    - Feature Specs: internal/reference/FEATURE_SPECS.md
+      - User Guide: guides/USER_GUIDE.md
+      - Dev Guide: guides/DEV_GUIDE.md
+      - Release Checklist: guides/RELEASE_CHECKLIST.md
+      - Open RAG Trace Samples: guides/open-rag-trace-samples.md
+      - Open RAG Trace Internal Adapter: guides/open-rag-trace-internal-adapter.md
+  - Open RAG Trace:
+      - Spec: architecture/open-rag-trace-spec.md
+      - Collector: architecture/open-rag-trace-collector.md
+  - Whitepaper:
+      - Index: new_whitepaper/INDEX.md
+      - Overview: new_whitepaper/01_overview.md
+      - Architecture: new_whitepaper/02_architecture.md
+      - Data Flow: new_whitepaper/03_data_flow.md
+      - Components: new_whitepaper/04_components.md
+      - Expert Lenses: new_whitepaper/05_expert_lenses.md
+      - Implementation: new_whitepaper/06_implementation.md
+      - Advanced: new_whitepaper/07_advanced.md
+      - Customization: new_whitepaper/08_customization.md
+      - Quality: new_whitepaper/09_quality.md
+      - Performance: new_whitepaper/10_performance.md
+      - Security: new_whitepaper/11_security.md
+      - Operations: new_whitepaper/12_operations.md
+      - Standards: new_whitepaper/13_standards.md
+      - Roadmap (Whitepaper): new_whitepaper/14_roadmap.md
   - API Reference:
-    - Domain:
-      - Entities: api/domain/entities.md
-      - Services: api/domain/services.md
-      - Metrics: api/domain/metrics.md
-    - Ports:
-      - Inbound: api/ports/inbound.md
-      - Outbound: api/ports/outbound.md
-    - Adapters:
-      - Inbound: api/adapters/inbound.md
-      - Outbound: api/adapters/outbound.md
-    - Configuration: api/config.md
-  - Status:
-    - Roadmap: status/ROADMAP.md
-    - Status: status/STATUS.md
-  - Enterprise:
-    - Enterprise Readiness: enterprise/ENTERPRISE_READINESS.md
-    - Implementation Plan: enterprise/IMPLEMENTATION_PLAN.md
-  - Internal:
-    - Guides:
-      - D1 Debug Layer Agent Guide: internal/guides/D1_DEBUG_LAYER_AGENT_GUIDE.md
-    - Plans:
-      - Frontend Gap Analysis: internal/FRONTEND_GAP_ANALYSIS_AND_PLAN.md
-      - AB Test Comparison Plan: internal/plans/AB_TEST_COMPARISON_PLAN.md
-      - Agent Docs Sync Plan: internal/plans/AGENT_DOCS_SYNC_PLAN.md
-      - CLI Development Plan: internal/plans/CLI_DEVELOPMENT_PLAN.md
-      - Enterprise Method Testbed Plan: internal/plans/ENTERPRISE_METHOD_TESTBED_PLAN.md
-      - Debug Tool Plan: internal/plans/DEBUG_TOOL_PLAN.md
-      - Docs Refactor Plan: internal/plans/DOCS_REFACTOR_PLAN.md
-      - P2 Agent Tasks: internal/plans/P2_AGENT_TASKS.md
-      - Parallel Work Plan: internal/plans/PARALLEL_WORK_PLAN.md
-      - User Scenario Execution Plan: internal/plans/USER_SCENARIO_EXECUTION_PLAN.md
-    - Reference:
-      - Development Guide: internal/reference/DEVELOPMENT_GUIDE.md
-      - Query Analysis: internal/reference/QUERY_BASED_ANALYSIS_PIPELINE.md
-      - Style Guide: internal/reference/STYLE_GUIDE.md
-      - Agent Strategy: internal/reference/AGENT_STRATEGY.md
-      - LightRAG Operations Guide: internal/reference/LIGHTRAG_OPERATIONS_GUIDE.md
-      - User Scenario Requirements: internal/reference/USER_SCENARIO_REQUIREMENTS.md
-    - Reports:
-      - R1 Completion Report: internal/reports/R1_COMPLETION_REPORT.md
-      - R2 Completion Report: internal/reports/R2_COMPLETION_REPORT.md
-      - R3 Progress Report: internal/reports/R3_PROGRESS_REPORT.md
-      - R4 Progress Report: internal/reports/R4_PROGRESS_REPORT.md
-    - Status:
-      - Internal Status: internal/status/STATUS.md
-      - O1 D1 Debug Report Summary: internal/status/O1_D1_DEBUG_REPORT_SUMMARY.md
-      - O1 Parallel Status: internal/status/O1_PARALLEL_STATUS.md
-    - Logs:
-      - Agent Review Quest Log: internal/logs/AGENT_REVIEW_QUEST_LOG.md
-    - Archive:
-      - Architecture Audit: internal/archive/ARCHITECTURE_AUDIT.md
-      - Completed: internal/archive/COMPLETED.md
-      - D1 Debug Layer R2 R3 Update: internal/archive/D1_debug_layer_r2_r3_update.md
-      - Domain Memory Usage: internal/archive/DOMAIN_MEMORY_USAGE.md
-      - Improvement Plan: internal/archive/IMPROVEMENT_PLAN.md
-      - Korean RAG Optimization: internal/archive/KOREAN_RAG_OPTIMIZATION.md
-      - Parallel Status: internal/archive/PARALLEL_STATUS.md
-      - Parallel Work Plan: internal/archive/PARALLEL_WORK_PLAN.md
-      - Qwen3 Embedding Integration: internal/archive/QWEN3_EMBEDDING_INTEGRATION.md
-      - RAG Performance Data Strategy Final: internal/archive/RAG_PERFORMANCE_DATA_STRATEGY_FINAL.md
-      - Ticket Streamlit Prompt Preview: internal/archive/TICKET_STREAMLIT_PROMPT_PREVIEW.md
+      - Domain:
+          - Entities: api/domain/entities.md
+          - Services: api/domain/services.md
+          - Metrics: api/domain/metrics.md
+      - Ports:
+          - Inbound: api/ports/inbound.md
+          - Outbound: api/ports/outbound.md
+      - Adapters:
+          - Inbound: api/adapters/inbound.md
+          - Outbound: api/adapters/outbound.md
+      - Configuration: api/config.md
+
 extra:
   social:
     - icon: fontawesome/brands/github

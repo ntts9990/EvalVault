@@ -285,8 +285,9 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ## 문서
 - [INDEX.md](INDEX.md): 전체 문서 인덱스
 - [guides/USER_GUIDE.md](guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
-- [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md): 설계 문서
-- [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md): Open RAG Trace 표준 초안
+- [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md): 로컬 개발/테스트/린트 루틴
+- [new_whitepaper/INDEX.md](new_whitepaper/INDEX.md): 개발 백서 (설계/운영/품질 기준)
+- [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md): Open RAG Trace 표준 (Draft)
 - [architecture/open-rag-trace-collector.md](architecture/open-rag-trace-collector.md): Collector 구성 예시
 - [guides/open-rag-trace-samples.md](guides/open-rag-trace-samples.md): 최소 계측 샘플
 - [guides/open-rag-trace-internal-adapter.md](guides/open-rag-trace-internal-adapter.md): 내부 시스템 최소 계측 래퍼

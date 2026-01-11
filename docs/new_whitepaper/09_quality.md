@@ -168,7 +168,7 @@ uv run ruff check src/ tests/ && uv run ruff format src/ tests/
 
 - `AGENTS.md` (개발 명령/테스트/품질 규칙)
 - `CONTRIBUTING.md` (테스트/린트/커밋 가이드)
-- `docs/status/ROADMAP.md` (품질 개선 트랙)
+- `docs/ROADMAP.md` (품질/운영 개선 트랙)
 
 ---
 
