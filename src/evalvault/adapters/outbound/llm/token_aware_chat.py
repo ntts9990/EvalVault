@@ -144,6 +144,9 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
                 if "max_tokens" in kwargs:
                     del kwargs["max_tokens"]
 
+                if provider_name == "ollama":
+                    kwargs.setdefault("parallel_tool_calls", False)
+
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
                     response = await inner_self._completions.create(**kwargs)
@@ -198,6 +201,7 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
                 if provider_name == "ollama":
                     if "max_tokens" not in kwargs or kwargs["max_tokens"] < 4096:
                         kwargs["max_tokens"] = 16384
+                    kwargs.setdefault("parallel_tool_calls", False)
                 else:
                     model_name = str(kwargs.get("model") or "")
                     min_tokens = _min_completion_tokens_for_model(model_name)
