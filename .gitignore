@@ -62,6 +62,9 @@ reports/api-docs/
 # E2E test results database
 data/e2e_results/
 
+# HuggingFace tokenizer cache (lm-eval benchmarks)
+data/tokenizers/
+
 # Local state data (should not be versioned)
 data/evaluations.db
 *.db

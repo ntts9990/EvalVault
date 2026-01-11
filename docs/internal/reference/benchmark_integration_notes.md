@@ -1,7 +1,7 @@
 # 벤치마크 통합 중간 진행 기록
 
-> **Last Updated**: 2026-01-11
-> **Status**: 진행 중 (lm-eval 우선 통합)
+> **Last Updated**: 2026-01-11 (3차 업데이트)
+> **Status**: 진행 중 (lm-eval 어댑터, CLI, Thinking Model 지원, Phoenix 트레이싱 완료)
 
 ---
 
@@ -84,6 +84,7 @@ tar -xzf kmmlu_insurance.tar.gz -C /data/benchmarks
 |--------|------|------|----------|
 | `hf` | 완전 로컬/폐쇄망 적합 | GPU 메모리 요구 큼 | 로컬 체크포인트 |
 | `vllm` | 가장 빠름, 대규모 모델 효율적 | vLLM 서버 필요 | vLLM 기반 RAG 시스템 |
+| `ollama` | 로컬 실행 용이, thinking 모델 지원 | 상대적 느린 속도 | 개발/테스트, thinking 모델 |
 | `api` | 운영 서버/상용 API 연동 | task 제한 있을 수 있음 | OpenAI 호환 서버 |
 
 ### 4.2 EvalVault vLLM 현황
@@ -94,6 +95,40 @@ tar -xzf kmmlu_insurance.tar.gz -C /data/benchmarks
 ### 4.3 설치 권장
 ```bash
 pip install "lm_eval[hf,vllm,api]"
+```
+
+### 4.4 Ollama Thinking Model 지원
+
+**Thinking Model**이란 응답에 별도의 `thinking` 필드로 추론 과정을 출력하는 모델입니다.
+(예: `gpt-oss-safeguard:20b`, `deepseek-r1:*` 등)
+
+**문제점**
+1. OpenAI-compatible API에서 `max_tokens`에 thinking 토큰이 포함되어 조기 종료 발생
+2. Stop sequence (`.`, `\n\n`)가 thinking 단계에서 트리거되어 응답 절단
+3. 최종 답변이 verbose한 형태 (예: `정답: **B**`)로 나와 exact match 실패
+
+**해결 방안 (lm_eval_adapter.py)**
+```python
+# 1. Thinking 모델 자동 감지
+def _is_ollama_thinking_model(self, model: str) -> bool:
+    # 테스트 API 호출로 thinking 필드 존재 여부 확인
+
+# 2. max_gen_toks 증가 (256 → 8192)
+self.max_gen_toks = 8192 if is_thinking else 256
+
+# 3. Stop sequence 수정
+# 기본: [".", "\n\n"] → Thinking용: ["Q:", "\n\n\n"]
+
+# 4. MCQ 추출 정규식
+def _parse_results_with_mcq_extraction(self, results: dict) -> dict:
+    # 응답에서 첫 번째 A/B/C/D 추출
+    pattern = r'\b([A-D])\b'
+```
+
+**사용 예시**
+```bash
+# Thinking 모델로 KMMLU 실행
+evalvault benchmark kmmlu -s Accounting --backend ollama -m gpt-oss-safeguard:20b --limit 10
 ```
 
 ---
@@ -206,20 +241,26 @@ lm_eval --model openai-chat-completions \
 
 ## 8. 다음 단계 체크리스트
 
-### 즉시 진행
+### 즉시 진행 (완료)
 - [x] lm-eval 백엔드 전략 확정
 - [x] EvalVault ↔ lm-eval 모델 인자 매핑표 작성
-- [ ] KMMLU 로컬 로딩 테스트 (외부망에서 다운로드 후 검증)
-- [ ] lm-eval 어댑터 설계 착수
+- [x] lm-eval 어댑터 구현 (`src/evalvault/adapters/outbound/benchmark/lm_eval_adapter.py`)
+- [x] 벤치마크 포트 정의 (`src/evalvault/ports/outbound/benchmark_port.py`)
+- [x] `evalvault benchmark kmmlu` CLI 명령어 구현
+- [x] KMMLU 로컬 다운로드 스크립트 (`scripts/benchmark/download_kmmlu.py`)
+- [x] Ollama thinking model 자동 감지 및 지원
+- [x] Phoenix 트레이싱 연동 (`--phoenix` CLI 옵션)
+- [x] 벤치마크 결과 DB 저장 (BenchmarkStorageAdapter)
 
 ### 단기 (1-2주)
-- [ ] `evalvault benchmark kmmlu` CLI 명령어 구현
-- [ ] 시각화 breakdown 연동 구현
-- [ ] 보험 도메인 KMMLU 평가 파일럿
+- [ ] 실제 vLLM 서버로 KMMLU 평가 파일럿 테스트
+- [ ] 폐쇄망 환경에서 로컬 로딩 검증
+- [ ] 보험 도메인 KMMLU 평가 실행 및 결과 분석
 
 ### 중기 (1개월)
 - [ ] HRET 검증 체크리스트 실행
 - [ ] 검증 통과 시 HRET 선택 통합
+- [ ] 시각화 breakdown 연동 (VisualSpaceService 구현 후)
 
 ---
 
@@ -239,8 +280,161 @@ lm_eval --model openai-chat-completions \
 
 ---
 
+## 10. 구현된 파일 목록
+
+| 파일 | 설명 |
+|------|------|
+| `src/evalvault/ports/outbound/benchmark_port.py` | 벤치마크 포트 인터페이스 (BenchmarkRequest, BenchmarkResponse) |
+| `src/evalvault/adapters/outbound/benchmark/__init__.py` | 벤치마크 어댑터 모듈 |
+| `src/evalvault/adapters/outbound/benchmark/lm_eval_adapter.py` | lm-evaluation-harness 어댑터 (thinking model 지원 포함) |
+| `src/evalvault/adapters/outbound/storage/benchmark_storage_adapter.py` | 벤치마크 결과 DB 저장 어댑터 |
+| `src/evalvault/domain/entities/benchmark_run.py` | 벤치마크 실행 엔티티 (BenchmarkRun, BenchmarkResult) |
+| `src/evalvault/domain/services/benchmark_service.py` | 벤치마크 서비스 (오케스트레이션) |
+| `src/evalvault/adapters/inbound/cli/commands/benchmark.py` | `evalvault benchmark kmmlu` CLI 명령어 (Phoenix 트레이싱 지원) |
+| `src/evalvault/adapters/inbound/api/routers/benchmark.py` | 벤치마크 API 라우터 |
+| `scripts/benchmark/download_kmmlu.py` | KMMLU 다운로드/로드 스크립트 |
+| `tests/unit/test_lm_eval_adapter.py` | lm-eval 어댑터 유닛 테스트 |
+| `tests/integration/benchmark/` | 벤치마크 통합 테스트 |
+
+---
+
+## 11. 사용 예시
+
+### CLI로 KMMLU 벤치마크 실행
+
+```bash
+# Ollama 백엔드로 보험 도메인 KMMLU 실행
+evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b
+
+# Thinking 모델로 실행 (자동 감지됨)
+evalvault benchmark kmmlu -s Accounting --backend ollama -m gpt-oss-safeguard:20b --limit 10
+
+# Phoenix 트레이싱 활성화
+evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b --phoenix
+
+# vLLM 백엔드로 실행
+evalvault benchmark kmmlu -s Insurance --backend vllm
+
+# 여러 도메인 동시 실행
+evalvault benchmark kmmlu -s "Insurance,Finance" -m llama2
+
+# 테스트용 샘플 제한
+evalvault benchmark kmmlu -s Insurance --limit 10 -o results.json
+```
+
+### Python API로 직접 사용
+
+```python
+from evalvault.adapters.outbound.benchmark import LMEvalAdapter
+from evalvault.ports.outbound.benchmark_port import BenchmarkBackend, BenchmarkRequest
+from evalvault.config.settings import get_settings
+
+settings = get_settings()
+adapter = LMEvalAdapter(settings=settings)
+
+request = BenchmarkRequest(
+    tasks=["kmmlu_insurance", "kmmlu_finance"],
+    backend=BenchmarkBackend.VLLM,
+    num_fewshot=5,
+    limit=100,  # 테스트용
+)
+
+response = adapter.run_benchmark(request)
+print(response.to_breakdown_dict())
+```
+
+---
+
+## 12. Thinking Model 상세 구현
+
+### 12.1 문제 상황
+
+Ollama의 thinking 모델(예: `gpt-oss-safeguard:20b`, `deepseek-r1:*`)은 응답에 `thinking` 필드로
+추론 과정을 별도로 출력합니다. lm-evaluation-harness와 연동 시 다음 문제가 발생했습니다:
+
+1. **max_tokens 문제**: OpenAI-compatible API에서 `max_tokens`에 thinking 토큰이 포함되어
+   실제 답변이 잘리는 현상
+2. **Stop sequence 문제**: 기본 stop sequence (`.`, `\n\n`)가 thinking 단계에서 트리거되어
+   응답이 조기 종료됨
+3. **Verbose 응답**: 최종 답변이 `정답: **B**` 같은 형태로 나와 exact match 실패
+
+### 12.2 해결 방안
+
+```python
+# lm_eval_adapter.py
+
+class LMEvalAdapter:
+    def _is_ollama_thinking_model(self, model: str) -> bool:
+        """테스트 API 호출로 thinking 필드 존재 여부 확인"""
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Hi"}],
+            max_tokens=10
+        )
+        # response.choices[0].message에 thinking 속성이 있으면 True
+        return hasattr(response.choices[0].message, "thinking")
+
+    def _build_model_args_from_settings(self, ...):
+        # Thinking 모델 감지
+        is_thinking = self._is_ollama_thinking_model(model)
+        self._ollama_is_thinking = is_thinking
+
+        if is_thinking:
+            # 1. max_gen_toks 증가 (thinking 토큰 포함)
+            self.max_gen_toks = 8192
+
+            # 2. Stop sequence 수정
+            gen_kwargs["stop"] = ["Q:", "\n\n\n"]
+
+    def _parse_results_with_mcq_extraction(self, results: dict) -> dict:
+        """Thinking 모델의 verbose 응답에서 첫 번째 A/B/C/D 추출"""
+        pattern = r'\b([A-D])\b'
+        # log_samples에서 응답 파싱 후 정답 추출
+```
+
+### 12.3 테스트 결과
+
+| 모델 | 백엔드 | 정확도 | 비고 |
+|------|--------|--------|------|
+| `gemma3:1b` | ollama | ~10% | 소형 모델 |
+| `gpt-oss-safeguard:20b` | ollama | 80-100% | Thinking 모델, MCQ 추출 적용 |
+
+---
+
+## 13. Phoenix 트레이싱 연동
+
+### 13.1 활성화 방법
+
+```bash
+# CLI 옵션으로 활성화
+evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b --phoenix
+```
+
+### 13.2 구현 상세
+
+```python
+# benchmark.py CLI
+
+@app.command("kmmlu")
+def benchmark_kmmlu(
+    ...
+    phoenix: bool = typer.Option(False, "--phoenix", help="Enable Phoenix tracing"),
+):
+    if phoenix:
+        from evalvault.adapters.outbound.tracing.phoenix_adapter import (
+            ensure_phoenix_instrumentation,
+        )
+        ensure_phoenix_instrumentation()
+```
+
+Phoenix 트레이싱이 활성화되면 lm-eval의 모든 LLM 호출이 자동으로 추적됩니다.
+
+---
+
 ## 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2026-01-11 | 초안 작성 (lm-eval 우선 통합 계획) |
+| 2026-01-11 | lm-eval 어댑터 및 CLI 구현 완료, 사용 예시 추가 |
+| 2026-01-11 | Ollama thinking model 지원, Phoenix 트레이싱 연동, DB 저장 추가 |

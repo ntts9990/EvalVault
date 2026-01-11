@@ -76,11 +76,11 @@ dev = [
     "pytest-mock",
     "pytest-xdist",
     "pytest-rerunfailures",
-    "pytest-html",      # HTML test reports
+    "pytest-html",
     "ruff",
     "pydeps>=3.0.1",
     "python-multipart",
-    # Full feature extras (analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs)
+    # Full feature extras (analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs/benchmark)
     "scikit-learn>=1.8.0",
     "anthropic",
     "langchain-anthropic",
@@ -91,11 +91,13 @@ dev = [
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
-    "kiwipiepy>=0.18.0",              # 한국어 형태소 분석 (Pure Python)
-    "rank-bm25>=0.2.2",               # BM25 검색
+    "kiwipiepy>=0.18.0",
+    "rank-bm25>=0.2.2",
     "sentence-transformers>=5.2.0",
-    "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)
-    "ijson>=3.3.0",                   # JSON 스트리밍 파싱 (대용량 데이터셋)
+    "faiss-cpu>=1.8.0",
+    "ijson>=3.3.0",
+    "lm_eval[api]>=0.4.0",
+    "datasets>=2.0.0",
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.5.0",
     "mkdocstrings[python]>=0.24.0",
@@ -136,6 +138,10 @@ korean = [
 perf = [
     "faiss-cpu>=1.8.0",               # 벡터 검색 가속 (DenseRetriever FAISS 인덱스)
     "ijson>=3.3.0",                   # JSON 스트리밍 파싱 (대용량 데이터셋)
+]
+benchmark = [
+    "lm_eval[api]>=0.4.0",            # lm-evaluation-harness with OpenAI-compatible API (Ollama 등)
+    "datasets>=2.0.0",                # HuggingFace datasets (KMMLU 등)
 ]
 
 [project.scripts]

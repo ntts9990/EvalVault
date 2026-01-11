@@ -509,11 +509,43 @@ uv run evalvault domain memory stats --db data/db/evalvault_memory.db
 uv run evalvault domain memory ingest-embeddings phoenix.csv --domain insurance --language ko
 ```
 
-#### `benchmark` - 벤치마크 실행
+#### `benchmark` - KMMLU 벤치마크 실행
+
+lm-evaluation-harness를 사용하여 KMMLU(Korean MMLU) 벤치마크를 실행합니다.
 
 ```bash
-uv run evalvault benchmark run --dataset data.json --methods method1,method2
+# Ollama 백엔드로 실행
+uv run evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b
+
+# Thinking 모델로 실행 (gpt-oss-safeguard, deepseek-r1 등)
+uv run evalvault benchmark kmmlu -s Accounting --backend ollama -m gpt-oss-safeguard:20b --limit 10
+
+# Phoenix 트레이싱 활성화
+uv run evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b --phoenix
+
+# vLLM 백엔드로 실행
+uv run evalvault benchmark kmmlu -s Insurance --backend vllm
+
+# 여러 도메인 동시 실행
+uv run evalvault benchmark kmmlu -s "Insurance,Finance" -m llama2
+
+# 테스트용 샘플 제한
+uv run evalvault benchmark kmmlu -s Insurance --limit 10 -o results.json
 ```
+
+**주요 옵션**:
+- `-s, --subjects`: 평가할 KMMLU 도메인 (Insurance, Finance, Accounting 등)
+- `--backend`: 백엔드 선택 (`ollama`, `vllm`, `hf`, `openai`)
+- `-m, --model`: 모델 이름
+- `--limit`: 테스트 샘플 수 제한
+- `--phoenix`: Phoenix 트레이싱 활성화
+- `-o, --output`: 결과 JSON 파일 경로
+
+**Thinking Model 지원**:
+Ollama의 thinking 모델(예: `gpt-oss-safeguard:20b`, `deepseek-r1:*`)은 자동으로 감지됩니다.
+- `max_gen_toks`가 8192로 증가 (thinking 토큰 포함)
+- Stop sequence가 `["Q:", "\n\n\n"]`로 수정
+- MCQ 응답에서 첫 번째 A/B/C/D를 자동 추출
 
 #### `method` - 메서드 플러그인
 

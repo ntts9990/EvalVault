@@ -482,6 +482,54 @@ EvalVault는 이러한 메트릭들을 체계적으로 측정하고 비교할 �
 
 ---
 
+## KMMLU 벤치마크
+
+EvalVault는 lm-evaluation-harness를 통해 **KMMLU(Korean MMLU)** 벤치마크를 지원합니다.
+LLM의 한국어 지식 수준을 표준화된 방식으로 측정할 수 있습니다.
+
+### 빠른 시작
+
+```bash
+# Ollama 백엔드로 보험 도메인 KMMLU 실행
+evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b
+
+# Thinking 모델로 실행 (자동 감지됨)
+evalvault benchmark kmmlu -s Accounting --backend ollama -m gpt-oss-safeguard:20b --limit 10
+
+# Phoenix 트레이싱과 함께 실행
+evalvault benchmark kmmlu -s Insurance --backend ollama -m gemma3:1b --phoenix
+```
+
+### 지원 백엔드
+
+| 백엔드 | 설명 | 사용 예 |
+|--------|------|---------|
+| `ollama` | 로컬 Ollama 서버 (thinking 모델 자동 감지) | `--backend ollama -m gemma3:1b` |
+| `vllm` | vLLM OpenAI-compatible 서버 | `--backend vllm` |
+| `hf` | HuggingFace 로컬 체크포인트 | `--backend hf` |
+| `openai` | OpenAI API | `--backend openai` |
+
+### Thinking Model 지원
+
+Ollama의 thinking 모델(예: `gpt-oss-safeguard:20b`, `deepseek-r1:*`)은 자동으로 감지되어
+최적의 설정이 적용됩니다:
+- `max_gen_toks`가 8192로 증가 (thinking 토큰 포함)
+- Stop sequence가 thinking 단계에서 조기 종료되지 않도록 수정
+- Verbose 응답에서 첫 번째 A/B/C/D를 자동 추출
+
+### 결과 저장
+
+벤치마크 결과는 SQLite DB에 자동 저장되어 이력 관리 및 비교가 가능합니다.
+
+```bash
+# 벤치마크 이력 조회 (추후 지원 예정)
+evalvault benchmark history
+```
+
+상세 사용법은 [USER_GUIDE.md](docs/guides/USER_GUIDE.md)를 참고하세요.
+
+---
+
 ## 지원 메트릭
 
 EvalVault는 RAG 평가에 널리 쓰이는 Ragas 0.4.x 계열 메트릭을 기본으로 제공하면서,
