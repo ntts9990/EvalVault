@@ -7,7 +7,7 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response, StreamingResponse
@@ -27,6 +27,7 @@ from evalvault.domain.services.ragas_prompt_overrides import (
     PromptOverrideError,
     normalize_ragas_prompt_overrides,
 )
+from evalvault.domain.services.visual_space_service import VisualSpaceQuery
 from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
 
 router = APIRouter()
@@ -165,6 +166,16 @@ class ClusterMapDeleteResponse(BaseModel):
     run_id: str
     map_id: str
     deleted_count: int
+
+
+class VisualSpaceRequest(BaseModel):
+    granularity: Literal["run", "case", "cluster"] = "case"
+    base_run_id: str | None = None
+    auto_base: bool = True
+    include: list[str] | None = None
+    limit: int | None = None
+    offset: int | None = None
+    cluster_map: dict[str, str] | None = None
 
 
 def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
@@ -618,6 +629,34 @@ def delete_cluster_map_version(
         raise HTTPException(status_code=404, detail="Cluster map not found")
 
     return ClusterMapDeleteResponse(run_id=run_id, map_id=map_id, deleted_count=deleted)
+
+
+@router.post("/{run_id}/visual-space", response_model=None)
+def get_visual_space(
+    run_id: str, payload: VisualSpaceRequest, adapter: AdapterDep
+) -> dict[str, Any]:
+    """Build visual space coordinates for a run."""
+    try:
+        adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    include = set(payload.include) if payload.include else None
+    query = VisualSpaceQuery(
+        run_id=run_id,
+        granularity=payload.granularity,
+        base_run_id=payload.base_run_id,
+        auto_base=payload.auto_base,
+        include=include,
+        limit=payload.limit,
+        offset=payload.offset,
+        cluster_map=payload.cluster_map,
+    )
+
+    try:
+        return adapter.get_visual_space(query)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # --- Endpoints ---

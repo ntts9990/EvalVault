@@ -25,6 +25,7 @@ from evalvault.domain.services.prompt_status import extract_prompt_entries
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
 from evalvault.domain.services.stage_metric_service import StageMetricService
 from evalvault.domain.services.threshold_profiles import apply_threshold_profile
+from evalvault.domain.services.visual_space_service import VisualSpaceQuery, VisualSpaceService
 from evalvault.ports.inbound.web_port import (
     EvalProgress,
     EvalRequest,
@@ -53,6 +54,7 @@ AVAILABLE_METRICS = [
     "summary_faithfulness",
     "insurance_term_accuracy",
     "entity_preservation",
+    "contextual_relevancy",
 ]
 
 
@@ -855,6 +857,16 @@ class WebUIAdapter:
             run.tracker_metadata = metadata
 
         return run
+
+    def get_visual_space(self, query: VisualSpaceQuery) -> dict[str, Any]:
+        """시각화 좌표 데이터 생성."""
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        service = VisualSpaceService(
+            storage=self._storage,
+            phoenix_resolver=self._get_phoenix_resolver(),
+        )
+        return service.build(query)
 
     def get_run_cluster_map(self, run_id: str, map_id: str | None = None) -> RunClusterMap | None:
         """런별 클러스터 맵 조회."""
