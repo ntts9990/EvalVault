@@ -305,6 +305,188 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             )
             console.print(f"[green]Results saved to {output}[/green]")
 
+    @benchmark_app.command("kmmlu")
+    def benchmark_kmmlu(
+        subjects: str = typer.Option(
+            "Insurance",
+            "--subjects",
+            "-s",
+            help="Comma-separated KMMLU subjects (e.g., Insurance,Finance).",
+        ),
+        backend: str = typer.Option(
+            "ollama",
+            "--backend",
+            "-b",
+            help="Model backend: vllm, hf, openai, api, ollama.",
+        ),
+        model: str | None = typer.Option(
+            None,
+            "--model",
+            "-m",
+            help="Model name (uses profile default if not specified).",
+        ),
+        base_url: str | None = typer.Option(
+            None,
+            "--base-url",
+            help="API base URL for vllm/api/ollama backends.",
+        ),
+        num_fewshot: int = typer.Option(
+            5,
+            "--num-fewshot",
+            "-f",
+            help="Number of few-shot examples.",
+        ),
+        limit: int | None = typer.Option(
+            None,
+            "--limit",
+            "-l",
+            help="Limit samples per task (for testing).",
+        ),
+        db: Path = typer.Option(
+            Path("data/db/evalvault.db"),
+            "--db",
+            help="Database path for storing results.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output file for results (JSON format).",
+        ),
+        phoenix: bool = typer.Option(
+            False,
+            "--phoenix",
+            help="Enable Phoenix tracing.",
+        ),
+    ) -> None:
+        """Run KMMLU benchmark via lm-evaluation-harness.
+
+        Results are automatically saved to the database and can be viewed with
+        'evalvault benchmark history'.
+
+        \b
+        Examples:
+          # Run KMMLU Insurance with Ollama (default)
+          evalvault benchmark kmmlu -s Insurance -m gemma3:1b
+
+          # Run with vLLM backend
+          evalvault benchmark kmmlu -s Insurance --backend vllm
+
+          # Run multiple subjects
+          evalvault benchmark kmmlu -s "Insurance,Finance" -m gemma3:1b
+
+          # Quick test with limited samples
+          evalvault benchmark kmmlu -s Insurance -m gemma3:1b --limit 10
+
+        \b
+        See also:
+          evalvault benchmark list       — List available benchmarks
+          evalvault benchmark history    — View past benchmark runs
+        """
+        try:
+            from evalvault.adapters.outbound.benchmark import LMEvalAdapter
+            from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+            from evalvault.config.settings import get_settings
+            from evalvault.domain.services.benchmark_service import BenchmarkService
+            from evalvault.ports.outbound.benchmark_port import BenchmarkBackend
+        except ImportError as exc:
+            console.print(f"[red]Error:[/red] lm-eval not installed: {exc}")
+            console.print('[dim]Install with: uv add "lm_eval[api]"[/dim]')
+            raise typer.Exit(1)
+
+        backend_map = {
+            "vllm": BenchmarkBackend.VLLM,
+            "hf": BenchmarkBackend.HF,
+            "openai": BenchmarkBackend.OPENAI,
+            "api": BenchmarkBackend.API,
+            "ollama": BenchmarkBackend.OLLAMA,
+        }
+        if backend.lower() not in backend_map:
+            console.print(f"[red]Error:[/red] Unknown backend: {backend}")
+            console.print("[dim]Supported backends: vllm, hf, openai, api, ollama[/dim]")
+            raise typer.Exit(1)
+
+        subject_list = [s.strip() for s in subjects.split(",") if s.strip()]
+
+        settings = get_settings()
+        if model:
+            settings.ollama_model = model
+        if base_url:
+            settings.ollama_base_url = base_url
+
+        model_args: dict[str, Any] = {}
+        if model:
+            model_args["model"] = model
+        if base_url:
+            model_args["base_url"] = base_url
+
+        if phoenix:
+            from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
+
+            ensure_phoenix_instrumentation(settings, console=console, force=True)
+
+        benchmark_adapter = LMEvalAdapter(settings=settings)
+        storage_adapter = SQLiteStorageAdapter(db_path=db)
+        tracer_adapter = _create_tracer_adapter(phoenix)
+        service = BenchmarkService(
+            benchmark_adapter=benchmark_adapter,
+            storage_adapter=storage_adapter,
+            tracer_adapter=tracer_adapter,
+        )
+
+        resolved_model = model or getattr(settings, "ollama_model", "unknown")
+        console.print("\n[bold]Running KMMLU Benchmark[/bold]")
+        console.print(f"  Subjects: {', '.join(subject_list)}")
+        console.print(f"  Model: {resolved_model}")
+        console.print(f"  Backend: {backend}")
+        console.print(f"  Few-shot: {num_fewshot}")
+        if limit:
+            console.print(f"  Limit: {limit} samples/task")
+        console.print(f"  DB: {db}")
+        if phoenix:
+            console.print("  Phoenix: enabled")
+        console.print()
+
+        with console.status("[bold green]Running lm-eval benchmark..."):
+            run = service.run_kmmlu(
+                subjects=subject_list,
+                model_name=resolved_model,
+                backend=backend_map[backend.lower()],
+                num_fewshot=num_fewshot,
+                limit=limit,
+                model_args=model_args,
+            )
+
+        if run.error_message:
+            console.print(f"[red]Error:[/red] {run.error_message}")
+            raise typer.Exit(1)
+
+        table = Table(
+            title="KMMLU Benchmark Results",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Task")
+        table.add_column("Accuracy", justify="right")
+        table.add_column("Samples", justify="right")
+
+        for score in run.task_scores:
+            acc_str = f"{score.accuracy:.4f}"
+            table.add_row(score.task_name, acc_str, str(score.num_samples))
+
+        console.print(table)
+        acc_display = f"{run.overall_accuracy:.4f}" if run.overall_accuracy is not None else "N/A"
+        console.print(f"\n[bold]Overall Accuracy:[/bold] {acc_display}")
+        console.print(f"[dim]Run ID: {run.run_id}[/dim]")
+        console.print(f"[dim]Duration: {run.duration_seconds:.1f}s[/dim]")
+        console.print("[green]Results saved to database[/green]")
+
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with output.open("w", encoding="utf-8") as f:
+                json.dump(run.to_dict(), f, ensure_ascii=False, indent=2)
+            console.print(f"[green]Results also saved to {output}[/green]")
+
     @benchmark_app.command("list")
     def benchmark_list() -> None:
         """List available benchmarks.
@@ -317,6 +499,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         See also:
           evalvault benchmark run        — Run a benchmark suite
           evalvault benchmark retrieval  — Run retrieval benchmarks
+          evalvault benchmark kmmlu      — Run KMMLU benchmark
         """
 
         console.print("\n[bold]Available Benchmarks[/bold]\n")
@@ -333,13 +516,105 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             "~10",
             "kiwipiepy, rank-bm25, sentence-transformers (install with --extra korean)",
         )
+        table.add_row(
+            "kmmlu",
+            "Korean MMLU benchmark (via lm-eval)",
+            "~1,000+",
+            'lm_eval (install with: pip install "lm_eval[hf,vllm,api]")',
+        )
 
         console.print(table)
         console.print(
-            "\n[dim]Use 'evalvault benchmark run --name <name>' to run a benchmark.[/dim]\n"
+            "\n[dim]Use 'evalvault benchmark run --name <name>' to run a benchmark.[/dim]"
+        )
+        console.print("[dim]Use 'evalvault benchmark kmmlu' to run KMMLU benchmark.[/dim]\n")
+
+    @benchmark_app.command("history")
+    def benchmark_history(
+        benchmark_type: str | None = typer.Option(
+            None,
+            "--type",
+            "-t",
+            help="Filter by benchmark type (kmmlu, mmlu, custom).",
+        ),
+        model_name: str | None = typer.Option(
+            None,
+            "--model",
+            "-m",
+            help="Filter by model name.",
+        ),
+        limit: int = typer.Option(
+            20,
+            "--limit",
+            "-l",
+            help="Maximum number of results.",
+        ),
+        db: Path = typer.Option(
+            Path("data/db/evalvault.db"),
+            "--db",
+            help="Database path.",
+        ),
+    ) -> None:
+        """View past benchmark runs."""
+        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+
+        storage = SQLiteStorageAdapter(db_path=db)
+        runs = storage.list_benchmark_runs(
+            benchmark_type=benchmark_type,
+            model_name=model_name,
+            limit=limit,
         )
 
+        if not runs:
+            console.print("[dim]No benchmark runs found.[/dim]")
+            return
+
+        table = Table(
+            title="Benchmark History",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Run ID")
+        table.add_column("Type")
+        table.add_column("Model")
+        table.add_column("Status")
+        table.add_column("Accuracy", justify="right")
+        table.add_column("Duration", justify="right")
+        table.add_column("Date")
+
+        for run in runs:
+            status_style = "green" if run.status.value == "completed" else "red"
+            acc_str = f"{run.overall_accuracy:.4f}" if run.overall_accuracy else "-"
+            duration_str = f"{run.duration_seconds:.1f}s"
+            date_str = run.started_at.strftime("%Y-%m-%d %H:%M") if run.started_at else "-"
+
+            table.add_row(
+                run.run_id,
+                run.benchmark_type.value,
+                run.model_name,
+                f"[{status_style}]{run.status.value}[/{status_style}]",
+                acc_str,
+                duration_str,
+                date_str,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Showing {len(runs)} runs from {db}[/dim]")
+
     return benchmark_app
+
+
+def _create_tracer_adapter(enabled: bool) -> Any | None:
+    if not enabled:
+        return None
+    try:
+        from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import (
+            PhoenixTracerAdapter,
+        )
+
+        return PhoenixTracerAdapter()
+    except ImportError:
+        return None
 
 
 def _load_retrieval_testset(path: Path) -> dict[str, Any]:
