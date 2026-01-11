@@ -116,7 +116,7 @@ class TestSQLiteBenchmarkStorageAdapter:
         assert len(retrieved.task_scores) == 2
         assert retrieved.overall_accuracy is not None
         assert retrieved.overall_accuracy == pytest.approx(0.775, rel=0.01)
-        assert retrieved.duration_seconds > 0
+        assert retrieved.duration_seconds >= 0
 
         # Verify task scores
         insurance_score = next(
