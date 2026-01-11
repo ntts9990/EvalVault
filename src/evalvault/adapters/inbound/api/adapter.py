@@ -15,6 +15,7 @@ from urllib.request import urlopen
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
 from evalvault.domain.entities.prompt import PromptSetBundle
+from evalvault.domain.services.cluster_map_builder import build_cluster_map
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
@@ -32,7 +33,7 @@ from evalvault.ports.inbound.web_port import (
 )
 
 if TYPE_CHECKING:
-    from evalvault.domain.entities import EvaluationRun
+    from evalvault.domain.entities import EvaluationRun, RunClusterMap, RunClusterMapInfo
     from evalvault.domain.entities.improvement import ImprovementReport
     from evalvault.domain.entities.stage import StageEvent, StageMetric
     from evalvault.ports.outbound.llm_port import LLMPort
@@ -680,8 +681,51 @@ class WebUIAdapter:
                     result.run_id,
                     prompt_bundle.prompt_set.prompt_set_id,
                 )
+            try:
+                self._auto_generate_cluster_map(result, llm_adapter)
+            except Exception as exc:
+                logger.warning("Cluster map auto-generation failed: %s", exc)
 
         return result
+
+    def _auto_generate_cluster_map(
+        self,
+        run: EvaluationRun,
+        llm_adapter: LLMPort | None,
+    ) -> None:
+        if self._storage is None:
+            return
+        settings = self._settings or Settings()
+        if not settings.cluster_map_auto_enabled:
+            return
+
+        mode = (settings.cluster_map_embedding_mode or "tfidf").strip().lower()
+        if mode not in {"model", "tfidf"}:
+            mode = "tfidf"
+
+        result = build_cluster_map(
+            run,
+            llm_adapter=llm_adapter,
+            embedding_mode=mode,  # type: ignore[arg-type]
+            min_cluster_size=settings.cluster_map_min_cluster_size,
+            max_clusters=settings.cluster_map_max_clusters,
+            text_max_chars=settings.cluster_map_text_max_chars,
+        )
+        if result is None or not result.mapping:
+            return
+
+        map_id = self._storage.save_run_cluster_map(
+            run.run_id,
+            result.mapping,
+            source=result.source,
+            metadata=result.metadata,
+        )
+        logger.info(
+            "Saved cluster map %s for run %s (%s items)",
+            map_id,
+            run.run_id,
+            len(result.mapping),
+        )
 
     def list_runs(
         self,
@@ -811,6 +855,39 @@ class WebUIAdapter:
             run.tracker_metadata = metadata
 
         return run
+
+    def get_run_cluster_map(self, run_id: str, map_id: str | None = None) -> RunClusterMap | None:
+        """런별 클러스터 맵 조회."""
+        if self._storage is None or not hasattr(self._storage, "get_run_cluster_map"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.get_run_cluster_map(run_id, map_id)
+
+    def save_run_cluster_map(
+        self,
+        run_id: str,
+        mapping: dict[str, str],
+        source: str | None = None,
+        map_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """런별 클러스터 맵 저장."""
+        if self._storage is None or not hasattr(self._storage, "save_run_cluster_map"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.save_run_cluster_map(
+            run_id, mapping, source, map_id, metadata=metadata
+        )
+
+    def list_run_cluster_maps(self, run_id: str) -> list[RunClusterMapInfo]:
+        """런별 클러스터 맵 버전 조회."""
+        if self._storage is None or not hasattr(self._storage, "list_run_cluster_maps"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.list_run_cluster_maps(run_id)
+
+    def delete_run_cluster_map(self, run_id: str, map_id: str) -> int:
+        """런별 클러스터 맵 삭제."""
+        if self._storage is None or not hasattr(self._storage, "delete_run_cluster_map"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.delete_run_cluster_map(run_id, map_id)
 
     def list_stage_events(self, run_id: str, *, stage_type: str | None = None) -> list[StageEvent]:
         """Stage 이벤트 목록 조회."""

@@ -46,10 +46,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Import and include routers here (to avoid circular imports)
-    from .routers import config, domain, knowledge, pipeline, runs
+    from .routers import benchmark, config, domain, knowledge, pipeline, runs
 
     app.include_router(runs.router, prefix="/api/v1/runs", tags=["runs"])
+    app.include_router(benchmark.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
     app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
     app.include_router(pipeline.router, prefix="/api/v1/pipeline", tags=["pipeline"])
     app.include_router(domain.router, prefix="/api/v1/domain", tags=["domain"])

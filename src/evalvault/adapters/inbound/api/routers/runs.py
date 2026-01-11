@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -110,6 +112,61 @@ class ModelItemResponse(BaseModel):
     supports_tools: bool | None = None
 
 
+class ClusterMapItemResponse(BaseModel):
+    test_case_id: str
+    cluster_id: str
+
+
+class ClusterMapFileResponse(BaseModel):
+    name: str
+    path: str
+    size: int
+
+
+class ClusterMapContentResponse(BaseModel):
+    source: str
+    items: list[ClusterMapItemResponse]
+
+
+class ClusterMapResponse(BaseModel):
+    run_id: str
+    dataset_name: str
+    map_id: str
+    source: str | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] | None = None
+    items: list[ClusterMapItemResponse]
+
+
+class ClusterMapSaveRequest(BaseModel):
+    source: str | None = None
+    metadata: dict[str, Any] | None = None
+    items: list[ClusterMapItemResponse]
+
+
+class ClusterMapVersionResponse(BaseModel):
+    map_id: str
+    source: str | None = None
+    created_at: str | None = None
+    item_count: int
+
+
+class ClusterMapSaveResponse(BaseModel):
+    run_id: str
+    map_id: str
+    source: str | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] | None = None
+    saved_count: int
+    skipped_count: int = 0
+
+
+class ClusterMapDeleteResponse(BaseModel):
+    run_id: str
+    map_id: str
+    deleted_count: int
+
+
 def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
     payload = {
         "summary": run.to_summary_dict(),
@@ -137,6 +194,96 @@ def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
     if prompt_set_detail:
         payload["prompt_set"] = prompt_set_detail
     return payload
+
+
+def _parse_cluster_map_csv(path: Path) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    with path.open("r", encoding="utf-8") as file:
+        reader = csv.reader(file)
+        rows = list(reader)
+    if not rows:
+        return mapping
+    start_index = 0
+    header = [cell.strip().lower() for cell in rows[0]]
+    if "test_case_id" in header and "cluster_id" in header:
+        start_index = 1
+    for row in rows[start_index:]:
+        if len(row) < 2:
+            continue
+        test_case_id = row[0].strip()
+        cluster_id = row[1].strip()
+        if not test_case_id or not cluster_id:
+            continue
+        mapping[test_case_id] = cluster_id
+    return mapping
+
+
+def _find_cluster_map_for_run(run: EvaluationRun) -> tuple[dict[str, str], str] | None:
+    if not run.results:
+        return None
+    dataset_name = (run.dataset_name or "").strip()
+    search_dirs = [Path("data/datasets"), Path("data/inputs")]
+    case_ids = {result.test_case_id for result in run.results}
+    candidate_basenames = {dataset_name, Path(dataset_name).stem} if dataset_name else set()
+    for base in candidate_basenames:
+        if not base:
+            continue
+        for dir_path in search_dirs:
+            candidate = dir_path / f"{base}_cluster_map.csv"
+            if candidate.exists():
+                mapping = _parse_cluster_map_csv(candidate)
+                if mapping:
+                    return mapping, candidate.name
+
+    best_match: tuple[float, int, dict[str, str], str] | None = None
+    for dir_path in search_dirs:
+        if not dir_path.exists():
+            continue
+        for candidate in dir_path.glob("*_cluster_map.csv"):
+            mapping = _parse_cluster_map_csv(candidate)
+            if not mapping:
+                continue
+            overlap = len(case_ids.intersection(mapping.keys()))
+            if overlap == 0:
+                continue
+            precision = overlap / max(1, len(mapping))
+            if best_match is None or (precision, overlap) > (best_match[0], best_match[1]):
+                best_match = (precision, overlap, mapping, candidate.name)
+
+    if best_match:
+        _, _, mapping, name = best_match
+        return mapping, name
+    return None
+
+
+def _list_cluster_map_files() -> list[ClusterMapFileResponse]:
+    files: list[ClusterMapFileResponse] = []
+    search_dirs = [Path("data/datasets"), Path("data/inputs")]
+    for dir_path in search_dirs:
+        if not dir_path.exists():
+            continue
+        for candidate in dir_path.glob("*_cluster_map.csv"):
+            files.append(
+                ClusterMapFileResponse(
+                    name=candidate.name,
+                    path=str(candidate.absolute()),
+                    size=candidate.stat().st_size,
+                )
+            )
+    return sorted(files, key=lambda item: item.name)
+
+
+def _resolve_cluster_map_path(file_name: str) -> Path | None:
+    if Path(file_name).name != file_name:
+        return None
+    if not file_name.endswith("_cluster_map.csv"):
+        return None
+    search_dirs = [Path("data/datasets"), Path("data/inputs")]
+    for dir_path in search_dirs:
+        candidate = dir_path / file_name
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _build_case_counts(base_run: EvaluationRun, target_run: EvaluationRun) -> dict[str, int]:
@@ -237,6 +384,28 @@ def list_metrics(adapter: AdapterDep):
     return adapter.get_available_metrics()
 
 
+@router.get("/options/cluster-maps", response_model=list[ClusterMapFileResponse])
+def list_cluster_maps():
+    """List available cluster map CSV files."""
+    return _list_cluster_map_files()
+
+
+@router.get("/options/cluster-maps/{file_name}", response_model=ClusterMapContentResponse)
+def get_cluster_map_file(file_name: str):
+    """Get cluster map content from a named CSV file."""
+    resolved = _resolve_cluster_map_path(file_name)
+    if resolved is None:
+        raise HTTPException(status_code=400, detail="Invalid cluster map file name")
+    if not resolved.exists():
+        raise HTTPException(status_code=404, detail="Cluster map not found")
+    mapping = _parse_cluster_map_csv(resolved)
+    items = [
+        ClusterMapItemResponse(test_case_id=test_case_id, cluster_id=cluster_id)
+        for test_case_id, cluster_id in mapping.items()
+    ]
+    return ClusterMapContentResponse(source=resolved.name, items=items)
+
+
 @router.get("/options/dataset-templates/{template_format}")
 def get_dataset_template(template_format: str) -> Response:
     """Download an empty dataset template."""
@@ -263,6 +432,192 @@ def get_dataset_template(template_format: str) -> Response:
             headers={"Content-Disposition": "attachment; filename=dataset_template.xlsx"},
         )
     raise HTTPException(status_code=400, detail="Unsupported template format")
+
+
+@router.get("/{run_id}/cluster-map", response_model=ClusterMapResponse)
+def get_cluster_map(run_id: str, adapter: AdapterDep):
+    """Get cluster map for a run if available."""
+    try:
+        run = adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    stored = None
+    try:
+        stored = adapter.get_run_cluster_map(run_id)
+    except RuntimeError:
+        stored = None
+
+    if stored:
+        mapping = stored.mapping
+        source = stored.source
+        items = [
+            ClusterMapItemResponse(test_case_id=test_case_id, cluster_id=cluster_id)
+            for test_case_id, cluster_id in mapping.items()
+        ]
+        return ClusterMapResponse(
+            run_id=run_id,
+            dataset_name=run.dataset_name,
+            map_id=stored.map_id,
+            source=source,
+            created_at=stored.created_at.isoformat() if stored.created_at else None,
+            metadata=stored.metadata,
+            items=items,
+        )
+
+    match = _find_cluster_map_for_run(run)
+    if not match:
+        raise HTTPException(status_code=404, detail="Cluster map not found")
+    mapping, source = match
+    try:
+        map_id = adapter.save_run_cluster_map(run_id, mapping, source)
+    except RuntimeError:
+        map_id = "legacy"
+    items = [
+        ClusterMapItemResponse(test_case_id=test_case_id, cluster_id=cluster_id)
+        for test_case_id, cluster_id in mapping.items()
+    ]
+    return ClusterMapResponse(
+        run_id=run_id,
+        dataset_name=run.dataset_name,
+        map_id=map_id,
+        source=source,
+        created_at=None,
+        metadata=None,
+        items=items,
+    )
+
+
+@router.post("/{run_id}/cluster-map", response_model=ClusterMapSaveResponse)
+def save_cluster_map(
+    run_id: str,
+    payload: ClusterMapSaveRequest,
+    adapter: AdapterDep,
+) -> ClusterMapSaveResponse:
+    """Save a cluster map for a run."""
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Cluster map is empty")
+    try:
+        run = adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    valid_ids = {result.test_case_id for result in run.results}
+    mapping: dict[str, str] = {}
+    skipped = 0
+    for item in payload.items:
+        if item.test_case_id in valid_ids:
+            mapping[item.test_case_id] = item.cluster_id
+        else:
+            skipped += 1
+
+    if not mapping:
+        raise HTTPException(status_code=400, detail="No matching test_case_id for run")
+
+    try:
+        map_id = adapter.save_run_cluster_map(
+            run_id,
+            mapping,
+            payload.source,
+            metadata=payload.metadata,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return ClusterMapSaveResponse(
+        run_id=run_id,
+        map_id=map_id,
+        source=payload.source,
+        created_at=datetime.now().isoformat(),
+        metadata=payload.metadata,
+        saved_count=len(mapping),
+        skipped_count=skipped,
+    )
+
+
+@router.post("/{run_id}/cluster-maps", response_model=ClusterMapSaveResponse)
+def save_cluster_map_version(
+    run_id: str,
+    payload: ClusterMapSaveRequest,
+    adapter: AdapterDep,
+) -> ClusterMapSaveResponse:
+    """Save a cluster map version for a run."""
+    return save_cluster_map(run_id, payload, adapter)
+
+
+@router.get("/{run_id}/cluster-maps", response_model=list[ClusterMapVersionResponse])
+def list_run_cluster_maps(run_id: str, adapter: AdapterDep) -> list[ClusterMapVersionResponse]:
+    """List cluster map versions for a run."""
+    try:
+        adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        maps = adapter.list_run_cluster_maps(run_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return [
+        ClusterMapVersionResponse(
+            map_id=entry.map_id,
+            source=entry.source,
+            created_at=entry.created_at.isoformat() if entry.created_at else None,
+            item_count=entry.item_count,
+        )
+        for entry in maps
+    ]
+
+
+@router.get("/{run_id}/cluster-maps/{map_id}", response_model=ClusterMapResponse)
+def get_cluster_map_version(run_id: str, map_id: str, adapter: AdapterDep) -> ClusterMapResponse:
+    """Get a specific cluster map version for a run."""
+    try:
+        run = adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        stored = adapter.get_run_cluster_map(run_id, map_id=map_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Cluster map not found")
+
+    items = [
+        ClusterMapItemResponse(test_case_id=test_case_id, cluster_id=cluster_id)
+        for test_case_id, cluster_id in stored.mapping.items()
+    ]
+    return ClusterMapResponse(
+        run_id=run_id,
+        dataset_name=run.dataset_name,
+        map_id=stored.map_id,
+        source=stored.source,
+        created_at=stored.created_at.isoformat() if stored.created_at else None,
+        metadata=stored.metadata,
+        items=items,
+    )
+
+
+@router.delete("/{run_id}/cluster-maps/{map_id}", response_model=ClusterMapDeleteResponse)
+def delete_cluster_map_version(
+    run_id: str, map_id: str, adapter: AdapterDep
+) -> ClusterMapDeleteResponse:
+    """Delete a cluster map version for a run."""
+    try:
+        adapter.get_run_details(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        deleted = adapter.delete_run_cluster_map(run_id, map_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Cluster map not found")
+
+    return ClusterMapDeleteResponse(run_id=run_id, map_id=map_id, deleted_count=deleted)
 
 
 # --- Endpoints ---
