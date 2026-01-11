@@ -50,6 +50,7 @@ from evalvault.domain.entities import (
     TestCaseResult,
 )
 from evalvault.domain.metrics.confidence import ConfidenceScore
+from evalvault.domain.metrics.contextual_relevancy import ContextualRelevancy
 from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.metrics.no_answer import NoAnswerAccuracy
@@ -132,6 +133,7 @@ class RagasEvaluator:
         "ndcg": NDCG,
         "hit_rate": HitRate,
         "confidence_score": ConfidenceScore,
+        "contextual_relevancy": ContextualRelevancy,
     }
 
     # Metrics that require embeddings
@@ -175,6 +177,7 @@ class RagasEvaluator:
         "summary_faithfulness": 0.9,
         "summary_score": 0.85,
         "entity_preservation": 0.9,
+        "contextual_relevancy": 0.35,
     }
     LANGUAGE_SAMPLE_LIMIT = 5
     ANSWER_RELEVANCY_KOREAN_INSTRUCTION = (
@@ -1552,10 +1555,18 @@ class RagasEvaluator:
                         contexts=test_case.contexts,
                     )
                 else:
-                    score = metric_instance.score(
-                        answer=test_case.answer,
-                        contexts=test_case.contexts,
-                    )
+                    if metric_name == "contextual_relevancy":
+                        score = metric_instance.score(
+                            question=test_case.question,
+                            answer=test_case.answer,
+                            ground_truth=test_case.ground_truth,
+                            contexts=test_case.contexts,
+                        )
+                    else:
+                        score = metric_instance.score(
+                            answer=test_case.answer,
+                            contexts=test_case.contexts,
+                        )
                 scores[metric_name] = score
 
             # Track end time and calculate latency

@@ -43,6 +43,7 @@ AVAILABLE_METRICS: list[str] = [
     "summary_faithfulness",
     "insurance_term_accuracy",
     "entity_preservation",
+    "contextual_relevancy",
 ]
 
 register_all_commands(app, console, available_metrics=AVAILABLE_METRICS)
