@@ -292,3 +292,24 @@ class EvaluationRun:
             avg = self.get_avg_score(metric)
             summary[f"avg_{metric}"] = avg
         return summary
+
+
+@dataclass
+class RunClusterMap:
+    """런별 클러스터 맵."""
+
+    map_id: str
+    mapping: dict[str, str] = field(default_factory=dict)
+    source: str | None = None
+    created_at: datetime | None = None
+    metadata: dict[str, Any] | None = None
+
+
+@dataclass
+class RunClusterMapInfo:
+    """클러스터 맵 버전 요약."""
+
+    map_id: str
+    item_count: int
+    source: str | None = None
+    created_at: datetime | None = None

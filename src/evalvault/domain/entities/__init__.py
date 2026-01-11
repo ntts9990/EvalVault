@@ -44,6 +44,8 @@ from evalvault.domain.entities.result import (
     EvaluationRun,
     MetricScore,
     MetricType,
+    RunClusterMap,
+    RunClusterMapInfo,
     TestCaseResult,
 )
 from evalvault.domain.entities.stage import (
@@ -115,5 +117,7 @@ __all__ = [
     "EvaluationRun",
     "MetricScore",
     "MetricType",
+    "RunClusterMap",
+    "RunClusterMapInfo",
     "TestCaseResult",
 ]

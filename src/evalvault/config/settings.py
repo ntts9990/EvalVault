@@ -115,6 +115,12 @@ class Settings(BaseSettings):
         description="Comma-separated list of Ollama models that support tool/function calling.",
     )
 
+    # Tokenizer Cache Configuration (for lm-eval benchmarks)
+    tokenizer_cache_path: str | None = Field(
+        default="data/tokenizers",
+        description="Local cache path for HuggingFace tokenizers (used by lm-eval benchmarks)",
+    )
+
     # vLLM Configuration (OpenAI-compatible server)
     vllm_base_url: str = Field(
         default="http://localhost:8001/v1",
@@ -196,6 +202,28 @@ class Settings(BaseSettings):
     tracker_provider: str = Field(
         default="langfuse",
         description="Tracker provider: 'langfuse', 'mlflow', or 'phoenix'",
+    )
+
+    # Cluster map configuration
+    cluster_map_auto_enabled: bool = Field(
+        default=True,
+        description="Auto-generate cluster maps after evaluation runs.",
+    )
+    cluster_map_embedding_mode: str = Field(
+        default="tfidf",
+        description="Cluster map embedding mode ('tfidf' or 'model').",
+    )
+    cluster_map_min_cluster_size: int = Field(
+        default=3,
+        description="Minimum cluster size when generating cluster maps.",
+    )
+    cluster_map_max_clusters: int = Field(
+        default=10,
+        description="Maximum cluster count when generating cluster maps.",
+    )
+    cluster_map_text_max_chars: int = Field(
+        default=800,
+        description="Max characters per test case when generating cluster maps.",
     )
 
     # PostgreSQL Configuration (optional)
