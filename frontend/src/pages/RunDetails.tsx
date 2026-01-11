@@ -12,7 +12,8 @@ import {
     Target,
     FileText,
     MessageSquare,
-    BookOpen
+    BookOpen,
+    ExternalLink,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
@@ -196,6 +197,13 @@ export function RunDetails() {
                         </p>
                     </div>
                     <div className="ml-auto flex items-center gap-6">
+                        <Link
+                            to={`/visualization/${summary.run_id}`}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                            시각화 열기
+                        </Link>
                         {/* Tab Navigation */}
                         <div className="tab-shell">
                             <button

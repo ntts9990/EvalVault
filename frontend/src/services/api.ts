@@ -43,6 +43,61 @@ export interface RunDetailsResponse {
     prompt_set?: PromptSetDetail;
 }
 
+export interface ClusterMapItem {
+    test_case_id: string;
+    cluster_id: string;
+}
+
+export interface ClusterMapResponse {
+    run_id: string;
+    dataset_name: string;
+    map_id: string;
+    source?: string | null;
+    created_at?: string | null;
+    metadata?: Record<string, unknown> | null;
+    items: ClusterMapItem[];
+}
+
+export interface ClusterMapFileInfo {
+    name: string;
+    path: string;
+    size: number;
+}
+
+export interface ClusterMapContentResponse {
+    source: string;
+    items: ClusterMapItem[];
+}
+
+export interface ClusterMapSaveRequest {
+    source?: string | null;
+    metadata?: Record<string, unknown> | null;
+    items: ClusterMapItem[];
+}
+
+export interface ClusterMapSaveResponse {
+    run_id: string;
+    map_id: string;
+    source?: string | null;
+    created_at?: string | null;
+    metadata?: Record<string, unknown> | null;
+    saved_count: number;
+    skipped_count: number;
+}
+
+export interface ClusterMapVersionInfo {
+    map_id: string;
+    source?: string | null;
+    created_at?: string | null;
+    item_count: number;
+}
+
+export interface ClusterMapDeleteResponse {
+    run_id: string;
+    map_id: string;
+    deleted_count: number;
+}
+
 export interface PromptSnapshotItem {
     role: string;
     order: number;
@@ -294,6 +349,88 @@ export async function fetchRunDetails(runId: string): Promise<RunDetailsResponse
     const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunClusterMap(runId: string): Promise<ClusterMapResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/cluster-map`);
+    if (response.status === 404) {
+        throw new Error("Cluster map not found");
+    }
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cluster map: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunClusterMaps(runId: string): Promise<ClusterMapVersionInfo[]> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/cluster-maps`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cluster map versions: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunClusterMapById(
+    runId: string,
+    mapId: string
+): Promise<ClusterMapResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/cluster-maps/${mapId}`);
+    if (response.status === 404) {
+        throw new Error("Cluster map not found");
+    }
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cluster map: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchClusterMapFiles(): Promise<ClusterMapFileInfo[]> {
+    const response = await fetch(`${API_BASE_URL}/runs/options/cluster-maps`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cluster map list: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchClusterMapFile(fileName: string): Promise<ClusterMapContentResponse> {
+    const response = await fetch(
+        `${API_BASE_URL}/runs/options/cluster-maps/${encodeURIComponent(fileName)}`
+    );
+    if (response.status === 404) {
+        throw new Error("Cluster map not found");
+    }
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cluster map file: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function saveRunClusterMap(
+    runId: string,
+    payload: ClusterMapSaveRequest
+): Promise<ClusterMapSaveResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/cluster-maps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to save cluster map: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function deleteRunClusterMap(
+    runId: string,
+    mapId: string
+): Promise<ClusterMapDeleteResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/cluster-maps/${mapId}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to delete cluster map: ${response.statusText}`);
     }
     return response.json();
 }

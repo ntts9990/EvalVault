@@ -7,6 +7,7 @@ import {
     PlayCircle,
     Brain,
     X,
+    Orbit,
     FlaskConical,
     FileText
 } from "lucide-react";
@@ -18,6 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     const navItems = [
         { icon: LayoutDashboard, label: "대시보드", href: "/" },
+        { icon: Orbit, label: "시각화", href: "/visualization" },
         { icon: PlayCircle, label: "평가 스튜디오", href: "/studio" },
         { icon: Brain, label: "도메인 메모리", href: "/domain" },
         { icon: Database, label: "지식 베이스", href: "/knowledge" },
@@ -56,7 +58,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         {isSidebarOpen ? "워크스페이스" : "..."}
                     </p>
                     {navItems.map((item) => {
-                        const isActive = location.pathname === item.href;
+                        const isActive =
+                            item.href === "/"
+                                ? location.pathname === "/"
+                                : location.pathname === item.href ||
+                                  location.pathname.startsWith(`${item.href}/`);
                         return (
                             <Link
                                 key={item.label}

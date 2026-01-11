@@ -10,6 +10,8 @@ import { AnalysisResultView } from './pages/AnalysisResultView';
 import { CompareRuns } from './pages/CompareRuns';
 import { Settings } from './pages/Settings';
 import { CustomerReport } from './pages/CustomerReport';
+import { Visualization } from './pages/Visualization';
+import { VisualizationHome } from './pages/VisualizationHome';
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
         <Route path="/analysis/compare" element={<AnalysisCompareView />} />
         <Route path="/analysis/results/:id" element={<AnalysisResultView />} />
         <Route path="/reports" element={<CustomerReport />} />
+        <Route path="/visualization" element={<VisualizationHome />} />
+        <Route path="/visualization/:id" element={<Visualization />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
