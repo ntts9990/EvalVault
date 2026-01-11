@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { fetchRunDetails, type RunDetailsResponse } from "../services/api";
 import { Layout } from "../components/Layout";
+import { InsightSpacePanel } from "../components/InsightSpacePanel";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
 import {
     ArrowLeft,
@@ -359,6 +360,7 @@ export function RunDetails() {
                             </div>
                         </div>
                         </div>
+                        <InsightSpacePanel runId={summary.run_id} />
                         {promptSet && (
                             <div className="surface-panel p-6 mb-8">
                                 <div className="flex flex-wrap items-center justify-between gap-3">

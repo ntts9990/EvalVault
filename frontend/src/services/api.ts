@@ -98,6 +98,69 @@ export interface ClusterMapDeleteResponse {
     deleted_count: number;
 }
 
+export type VisualSpaceGranularity = "run" | "case" | "cluster";
+export type VisualSpaceInclude = "summary" | "encoding" | "breakdown";
+
+export interface VisualSpaceQuery {
+    runId: string;
+    granularity?: VisualSpaceGranularity;
+    baseRunId?: string;
+    autoBase?: boolean;
+    include?: VisualSpaceInclude[];
+    limit?: number;
+    offset?: number;
+    clusterMap?: Record<string, string>;
+}
+
+export interface VisualSpaceAxis {
+    x: string;
+    y: string;
+    z: string;
+    normalization?: string;
+    targets?: Record<string, number>;
+}
+
+export interface VisualSpacePoint {
+    id: string;
+    coords: {
+        x: number | null;
+        y: number | null;
+        z?: number | null;
+    };
+    encoding?: {
+        color?: string;
+        size?: number;
+        shape?: string;
+        opacity?: number;
+        border?: string;
+    };
+    labels?: {
+        name?: string;
+        quadrant?: string | null;
+        guide_hint?: string | null;
+    };
+    stats?: Record<string, number>;
+    breakdown?: Record<string, number | null>;
+}
+
+export interface VisualSpaceResponse {
+    run_id: string;
+    granularity: VisualSpaceGranularity;
+    axis: VisualSpaceAxis;
+    points: VisualSpacePoint[];
+    warnings?: string[];
+    base?: {
+        run_id: string;
+        auto_selected: boolean;
+        criteria: Record<string, unknown>;
+    };
+    summary?: {
+        quadrant_counts?: Record<string, number>;
+        regressions?: number;
+        improvements?: number;
+    };
+}
+
 export interface PromptSnapshotItem {
     role: string;
     order: number;
@@ -382,6 +445,29 @@ export async function fetchRunClusterMapById(
     }
     if (!response.ok) {
         throw new Error(`Failed to fetch cluster map: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchVisualSpace(
+    runId: string,
+    payload: Omit<VisualSpaceQuery, "runId">
+): Promise<VisualSpaceResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/visual-space`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            granularity: payload.granularity,
+            base_run_id: payload.baseRunId,
+            auto_base: payload.autoBase,
+            include: payload.include,
+            limit: payload.limit,
+            offset: payload.offset,
+            cluster_map: payload.clusterMap,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch visual space: ${response.statusText}`);
     }
     return response.json();
 }
