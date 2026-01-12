@@ -113,6 +113,16 @@ class ModelItemResponse(BaseModel):
     supports_tools: bool | None = None
 
 
+class MetricSpecResponse(BaseModel):
+    name: str
+    description: str
+    requires_ground_truth: bool
+    requires_embeddings: bool
+    source: str
+    category: str
+    signal_group: str
+
+
 class ClusterMapItemResponse(BaseModel):
     test_case_id: str
     cluster_id: str
@@ -393,6 +403,12 @@ def list_models(
 def list_metrics(adapter: AdapterDep):
     """Get available metrics."""
     return adapter.get_available_metrics()
+
+
+@router.get("/options/metric-specs", response_model=list[MetricSpecResponse])
+def list_metric_specs(adapter: AdapterDep):
+    """Get available metrics with metadata."""
+    return adapter.get_metric_specs()
 
 
 @router.get("/options/cluster-maps", response_model=list[ClusterMapFileResponse])

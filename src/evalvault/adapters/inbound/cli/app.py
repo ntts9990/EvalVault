@@ -14,6 +14,8 @@ import typer
 from rich import print as rprint
 from rich.console import Console
 
+from evalvault.domain.metrics.registry import list_metric_names
+
 from .commands import attach_sub_apps, register_all_commands
 
 
@@ -32,19 +34,7 @@ app = typer.Typer(
 )
 console = Console()
 
-AVAILABLE_METRICS: list[str] = [
-    "faithfulness",
-    "answer_relevancy",
-    "context_precision",
-    "context_recall",
-    "factual_correctness",
-    "semantic_similarity",
-    "summary_score",
-    "summary_faithfulness",
-    "insurance_term_accuracy",
-    "entity_preservation",
-    "contextual_relevancy",
-]
+AVAILABLE_METRICS = list_metric_names()
 
 register_all_commands(app, console, available_metrics=AVAILABLE_METRICS)
 attach_sub_apps(app, console)

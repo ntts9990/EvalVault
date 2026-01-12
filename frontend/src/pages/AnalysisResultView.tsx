@@ -6,7 +6,14 @@ import { MarkdownContent } from "../components/MarkdownContent";
 import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
 import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
-import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
+import {
+    fetchAnalysisIntents,
+    fetchAnalysisMetricSpecs,
+    fetchAnalysisResult,
+    type AnalysisIntentInfo,
+    type AnalysisMetricSpec,
+    type SavedAnalysisResult,
+} from "../services/api";
 import { ANALYSIS_LARGE_REPORT_THRESHOLD } from "../config/ui";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import {
@@ -20,6 +27,45 @@ import {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
+
+const SIGNAL_GROUP_LABELS: Record<string, string> = {
+    groundedness: "근거성",
+    intent_alignment: "질문-답변 정합성",
+    retrieval_effectiveness: "검색 효과성",
+    summary_fidelity: "요약 품질",
+    embedding_quality: "임베딩 안정성",
+    efficiency: "효율/지연",
+};
+
+const SIGNAL_GROUP_ORDER = [
+    "groundedness",
+    "intent_alignment",
+    "retrieval_effectiveness",
+    "summary_fidelity",
+    "embedding_quality",
+    "efficiency",
+];
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+};
+
+const getNestedValue = (record: Record<string, unknown>, path: string[]) => {
+    let current: unknown = record;
+    for (const key of path) {
+        if (!isPlainRecord(current)) return null;
+        current = current[key];
+    }
+    return normalizeNumber(current);
+};
 
 const getNodeStatus = (node: unknown) => {
     if (!isRecord(node)) return "pending";
@@ -61,7 +107,12 @@ export function AnalysisResultView() {
     const [result, setResult] = useState<SavedAnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [analysisCatalog, setAnalysisCatalog] = useState<AnalysisIntentInfo[]>([]);
+    const [analysisCatalogError, setAnalysisCatalogError] = useState<string | null>(null);
+    const [analysisMetricSpecs, setAnalysisMetricSpecs] = useState<AnalysisMetricSpec[]>([]);
+    const [analysisMetricSpecError, setAnalysisMetricSpecError] = useState<string | null>(null);
     const [showRaw, setShowRaw] = useState(false);
+    const [showAnalysisMetrics, setShowAnalysisMetrics] = useState(false);
     const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
     const [renderMarkdown, setRenderMarkdown] = useState(true);
 
@@ -84,6 +135,46 @@ export function AnalysisResultView() {
         loadResult();
     }, [id]);
 
+    useEffect(() => {
+        let cancelled = false;
+        fetchAnalysisIntents()
+            .then((data) => {
+                if (!cancelled) {
+                    setAnalysisCatalog(data);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setAnalysisCatalogError(
+                        err instanceof Error ? err.message : "분석 카탈로그를 불러오지 못했습니다."
+                    );
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchAnalysisMetricSpecs()
+            .then((data) => {
+                if (!cancelled) {
+                    setAnalysisMetricSpecs(data);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setAnalysisMetricSpecError(
+                        err instanceof Error ? err.message : "분석 메트릭 스펙을 불러오지 못했습니다."
+                    );
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const reportText = useMemo(() => {
         if (!result?.final_output) return null;
         const reportEntry = (result.final_output as Record<string, any>).report;
@@ -98,6 +189,69 @@ export function AnalysisResultView() {
         }
         return null;
     }, [result]);
+
+    const safeNodeResults = useMemo(() => {
+        if (!result?.node_results || !isPlainRecord(result.node_results)) return null;
+        return result.node_results;
+    }, [result]);
+
+    const intentDefinition = useMemo(() => {
+        if (!result) return null;
+        return analysisCatalog.find((intent) => intent.intent === result.intent) ?? null;
+    }, [analysisCatalog, result]);
+
+    const analysisMetricGroups = useMemo(() => {
+        if (!analysisMetricSpecs.length || !safeNodeResults || !intentDefinition) return [];
+        const moduleNodes = new Map<string, string[]>();
+        intentDefinition.nodes.forEach((node) => {
+            const list = moduleNodes.get(node.module) || [];
+            list.push(node.id);
+            moduleNodes.set(node.module, list);
+        });
+
+        const groupMap = new Map<
+            string,
+            {
+                id: string;
+                label: string;
+                items: { spec: AnalysisMetricSpec; value: number; nodeId: string }[];
+            }
+        >();
+
+        analysisMetricSpecs.forEach((spec) => {
+            const nodeIds = moduleNodes.get(spec.module_id) || [];
+            nodeIds.forEach((nodeId) => {
+                const node = safeNodeResults[nodeId];
+                if (!isPlainRecord(node)) return;
+                const output = node.output;
+                if (!isPlainRecord(output)) return;
+                const value = getNestedValue(output, spec.output_path);
+                if (value === null) return;
+
+                const groupId = spec.signal_group;
+                const label = SIGNAL_GROUP_LABELS[groupId] || groupId;
+                if (!groupMap.has(groupId)) {
+                    groupMap.set(groupId, { id: groupId, label, items: [] });
+                }
+                groupMap.get(groupId)?.items.push({ spec, value, nodeId });
+            });
+        });
+
+        const orderIndex = new Map(
+            SIGNAL_GROUP_ORDER.map((group, index) => [group, index])
+        );
+
+        return Array.from(groupMap.values())
+            .map((group) => ({
+                ...group,
+                items: group.items.sort((a, b) => a.spec.label.localeCompare(b.spec.label)),
+            }))
+            .sort((left, right) => {
+                const leftOrder = orderIndex.get(left.id) ?? 999;
+                const rightOrder = orderIndex.get(right.id) ?? 999;
+                return leftOrder - rightOrder;
+            });
+    }, [analysisMetricSpecs, intentDefinition, safeNodeResults]);
 
     const reportIsLarge = (reportText?.length ?? 0) > ANALYSIS_LARGE_REPORT_THRESHOLD;
 
@@ -179,7 +333,7 @@ export function AnalysisResultView() {
     }, [result]);
 
     const nodeSummary = useMemo(() => {
-        if (!result?.node_results) return null;
+        if (!safeNodeResults) return null;
         const counts = {
             completed: 0,
             failed: 0,
@@ -188,7 +342,7 @@ export function AnalysisResultView() {
             pending: 0,
         };
         let failedCount = 0;
-        Object.values(result.node_results).forEach((node) => {
+        Object.values(safeNodeResults).forEach((node) => {
             const status = getNodeStatus(node);
             if (counts[status as keyof typeof counts] !== undefined) {
                 counts[status as keyof typeof counts] += 1;
@@ -199,7 +353,10 @@ export function AnalysisResultView() {
         });
         const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
         return { counts, total, failedCount };
-    }, [result]);
+    }, [safeNodeResults]);
+
+    const showAnalysisMetricSection =
+        analysisMetricGroups.length > 0 || Boolean(analysisMetricSpecError || analysisCatalogError);
 
     return (
         <Layout>
@@ -430,6 +587,71 @@ export function AnalysisResultView() {
 
                         {prioritySummary && (
                             <PrioritySummaryPanel summary={prioritySummary} />
+                        )}
+
+                        {showAnalysisMetricSection && (
+                            <div className="surface-panel p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-sm font-semibold">추가 분석 지표</h2>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            분석 모듈에서 추출된 지표를 신호 그룹으로 묶어 표시합니다.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAnalysisMetrics((prev) => !prev)}
+                                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showAnalysisMetrics ? "접기" : "표시"}
+                                    </button>
+                                </div>
+                                {analysisCatalogError && (
+                                    <p className="mt-2 text-xs text-rose-500">
+                                        {analysisCatalogError}
+                                    </p>
+                                )}
+                                {analysisMetricSpecError && (
+                                    <p className="mt-2 text-xs text-rose-500">
+                                        {analysisMetricSpecError}
+                                    </p>
+                                )}
+                                {!showAnalysisMetrics ? (
+                                    <p className="mt-3 text-xs text-muted-foreground">
+                                        추가 분석 지표는 선택 시에만 표시됩니다.
+                                    </p>
+                                ) : analysisMetricGroups.length === 0 ? (
+                                    <p className="mt-3 text-xs text-muted-foreground">
+                                        표시할 추가 분석 지표가 없습니다.
+                                    </p>
+                                ) : (
+                                    <div className="mt-4 space-y-4">
+                                        {analysisMetricGroups.map((group) => (
+                                            <div key={group.id} className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {group.label}
+                                                </p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                    {group.items.map((item) => (
+                                                        <div
+                                                            key={`${item.spec.key}-${item.nodeId}`}
+                                                            className="border border-border rounded-md px-2 py-2"
+                                                            title={item.spec.description}
+                                                        >
+                                                            <span className="text-muted-foreground">
+                                                                {item.spec.label}
+                                                            </span>
+                                                            <span className="ml-2 font-semibold text-foreground">
+                                                                {item.value.toFixed(4)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         <div>

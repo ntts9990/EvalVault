@@ -188,6 +188,10 @@ class WebUIPort(Protocol):
         """
         ...
 
+    def get_metric_specs(self) -> list[dict[str, object]]:
+        """메트릭 스펙 목록 조회."""
+        ...
+
     def list_stage_events(
         self,
         run_id: str,

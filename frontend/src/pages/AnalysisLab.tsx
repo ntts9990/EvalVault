@@ -10,12 +10,14 @@ import {
     fetchConfig,
     fetchAnalysisIntents,
     fetchAnalysisHistory,
+    fetchAnalysisMetricSpecs,
     fetchRuns,
     fetchImprovementGuide,
     runAnalysis,
     saveAnalysisResult,
     type AnalysisHistoryItem,
     type AnalysisIntentInfo,
+    type AnalysisMetricSpec,
     type AnalysisResult,
     type ImprovementReport,
     type RunSummary,
@@ -118,6 +120,24 @@ const RUN_REQUIRED_MODULES = new Set([
     "priority_summary",
 ]);
 
+const SIGNAL_GROUP_LABELS: Record<string, string> = {
+    groundedness: "근거성",
+    intent_alignment: "질문-답변 정합성",
+    retrieval_effectiveness: "검색 효과성",
+    summary_fidelity: "요약 품질",
+    embedding_quality: "임베딩 안정성",
+    efficiency: "효율/지연",
+};
+
+const SIGNAL_GROUP_ORDER = [
+    "groundedness",
+    "intent_alignment",
+    "retrieval_effectiveness",
+    "summary_fidelity",
+    "embedding_quality",
+    "efficiency",
+];
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
@@ -203,6 +223,24 @@ const extractEvidenceRecords = (record: Record<string, unknown>) => {
     return [];
 };
 
+const normalizeNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+};
+
+const getNestedValue = (record: Record<string, unknown>, path: string[]) => {
+    let current: unknown = record;
+    for (const key of path) {
+        if (!isPlainRecord(current)) return null;
+        current = current[key];
+    }
+    return normalizeNumber(current);
+};
+
 type ExecutionMeta = {
     query: string;
     intent: string;
@@ -222,6 +260,8 @@ type NextActionItem = {
 export function AnalysisLab() {
     const [catalog, setCatalog] = useState<AnalysisIntentInfo[]>([]);
     const [catalogError, setCatalogError] = useState<string | null>(null);
+    const [analysisMetricSpecs, setAnalysisMetricSpecs] = useState<AnalysisMetricSpec[]>([]);
+    const [analysisMetricSpecError, setAnalysisMetricSpecError] = useState<string | null>(null);
     const [runs, setRuns] = useState<RunSummary[]>([]);
     const [runError, setRunError] = useState<string | null>(null);
     const [selectedRunId, setSelectedRunId] = useState<string>("");
@@ -238,6 +278,7 @@ export function AnalysisLab() {
     const [saveError, setSaveError] = useState<string | null>(null);
     const [lastQuery, setLastQuery] = useState<string | null>(null);
     const [savedResultId, setSavedResultId] = useState<string | null>(null);
+    const [showAnalysisMetrics, setShowAnalysisMetrics] = useState(false);
     const [saveProfile, setSaveProfile] = useState("");
     const [saveTags, setSaveTags] = useState("");
     const [saveMetadataText, setSaveMetadataText] = useState("");
@@ -282,6 +323,20 @@ export function AnalysisLab() {
             }
         }
         loadCatalog();
+    }, []);
+
+    useEffect(() => {
+        async function loadAnalysisMetricSpecs() {
+            try {
+                const data = await fetchAnalysisMetricSpecs();
+                setAnalysisMetricSpecs(data);
+            } catch (err) {
+                setAnalysisMetricSpecError(
+                    err instanceof Error ? err.message : "Failed to load analysis metric specs"
+                );
+            }
+        }
+        loadAnalysisMetricSpecs();
     }, []);
 
     const refreshApiStatus = useCallback(async () => {
@@ -949,6 +1004,59 @@ export function AnalysisLab() {
 
         return entries.slice(0, 3);
     }, [result, safeNodeResults]);
+
+    const analysisMetricGroups = useMemo(() => {
+        if (!analysisMetricSpecs.length || !safeNodeResults || !intentDefinition) return [];
+        const moduleNodes = new Map<string, string[]>();
+        intentDefinition.nodes.forEach((node) => {
+            const list = moduleNodes.get(node.module) || [];
+            list.push(node.id);
+            moduleNodes.set(node.module, list);
+        });
+
+        const groupMap = new Map<
+            string,
+            {
+                id: string;
+                label: string;
+                items: { spec: AnalysisMetricSpec; value: number; nodeId: string }[];
+            }
+        >();
+
+        analysisMetricSpecs.forEach((spec) => {
+            const nodeIds = moduleNodes.get(spec.module_id) || [];
+            nodeIds.forEach((nodeId) => {
+                const node = safeNodeResults[nodeId];
+                if (!isPlainRecord(node)) return;
+                const output = node.output;
+                if (!isPlainRecord(output)) return;
+                const value = getNestedValue(output, spec.output_path);
+                if (value === null) return;
+
+                const groupId = spec.signal_group;
+                const label = SIGNAL_GROUP_LABELS[groupId] || groupId;
+                if (!groupMap.has(groupId)) {
+                    groupMap.set(groupId, { id: groupId, label, items: [] });
+                }
+                groupMap.get(groupId)?.items.push({ spec, value, nodeId });
+            });
+        });
+
+        const orderIndex = new Map(
+            SIGNAL_GROUP_ORDER.map((group, index) => [group, index])
+        );
+
+        return Array.from(groupMap.values())
+            .map((group) => ({
+                ...group,
+                items: group.items.sort((a, b) => a.spec.label.localeCompare(b.spec.label)),
+            }))
+            .sort((left, right) => {
+                const leftOrder = orderIndex.get(left.id) ?? 999;
+                const rightOrder = orderIndex.get(right.id) ?? 999;
+                return leftOrder - rightOrder;
+            });
+    }, [analysisMetricSpecs, intentDefinition, safeNodeResults]);
 
     const metricPreview = useMemo(() => {
         if (metricDistributions.length <= 6) return metricDistributions;
@@ -1737,6 +1845,57 @@ export function AnalysisLab() {
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {analysisMetricGroups.length > 0 && (
+                                        <div className="border border-border rounded-lg p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold">추가 분석 지표</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAnalysisMetrics((prev) => !prev)}
+                                                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                                                >
+                                                    {showAnalysisMetrics ? "접기" : "표시"}
+                                                </button>
+                                            </div>
+                                            {analysisMetricSpecError && (
+                                                <p className="text-xs text-rose-500">
+                                                    {analysisMetricSpecError}
+                                                </p>
+                                            )}
+                                            {!showAnalysisMetrics ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    분석 모듈에서 추출된 추가 지표를 표시합니다.
+                                                </p>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {analysisMetricGroups.map((group) => (
+                                                        <div key={group.id} className="space-y-2">
+                                                            <p className="text-xs font-semibold text-muted-foreground">
+                                                                {group.label}
+                                                            </p>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                                {group.items.map((item) => (
+                                                                    <div
+                                                                        key={`${item.spec.key}-${item.nodeId}`}
+                                                                        className="border border-border rounded-md px-2 py-2"
+                                                                        title={item.spec.description}
+                                                                    >
+                                                                        <span className="text-muted-foreground">
+                                                                            {item.spec.label}
+                                                                        </span>
+                                                                        <span className="ml-2 font-semibold text-foreground">
+                                                                            {item.value.toFixed(4)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

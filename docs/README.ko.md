@@ -79,6 +79,45 @@ Domain Memory를 켜면 자동 조정될 수 있습니다.
 
 ---
 
+## 검색 성능 평가 메트릭 흐름
+
+EvalVault의 검색 성능 메트릭은 크게 3갈래로 수집됩니다.
+1) 런타임 Stage 이벤트 기반 메트릭
+2) Ragas 커스텀 랭킹 메트릭
+3) 벤치마크/분석 파이프라인 메트릭
+
+```mermaid
+flowchart TD
+    A[입력 데이터셋/실행 결과\nquestion, answer, contexts, ground_truth] --> B[EvaluationRun]
+    B --> C[StageEvent]
+    C --> C1[StageMetricService\nretrieval.precision_at_k / recall_at_k\navg_score / score_gap / latency]
+    B --> D[RagasEvaluator (custom)]
+    D --> D1[MRR / NDCG / HitRate]
+    B --> E[Analysis Pipeline]
+    E --> E1[RetrievalAnalyzer\nkeyword_overlap / ground_truth_hit_rate]
+    E --> E2[BM25/Embedding/Hybrid Searcher\nrecall@k / avg_recall@k]
+    B --> F[Retrieval Benchmark Runner]
+    F --> F1[precision@k / recall@k / mrr / ndcg@k]
+    C1 --> G[Reports/Scorecard]
+    D1 --> G
+    E1 --> G
+    E2 --> G
+    F1 --> G
+```
+
+- Stage 메트릭: `StageEvent`의 `doc_ids/scores/top_k` + `relevance_map(test_case_id -> relevant docs)`로 계산
+- Ragas 커스텀 메트릭: `contexts` + `ground_truth` 기반으로 `mrr/ndcg/hit_rate` 산출
+- 벤치마크 메트릭: `documents` + `relevant_doc_ids`를 입력으로 `precision/recall/mrr/ndcg` 산출
+- 분석 파이프라인: 실행 결과로 검색 커버리지/키워드 오버랩/리트리버 비교 점수 요약
+
+참고 구현 위치:
+- Stage 메트릭 계산: `src/evalvault/domain/services/stage_metric_service.py`
+- 랭킹 메트릭(MRR/NDCG/HitRate): `src/evalvault/domain/metrics/retrieval_rank.py`
+- 벤치마크 계산(precision/recall/mrr/ndcg): `src/evalvault/domain/services/retrieval_metrics.py`
+- 분석 모듈: `src/evalvault/adapters/outbound/analysis/`
+
+---
+
 ## KG/GraphRAG 사용 (문서 기반)
 
 EvalVault에서 KG는 **평가 데이터셋이 아니라 문서 지식**에서 생성합니다.

@@ -219,6 +219,16 @@ export interface DatasetItem {
     size: number;
 }
 
+export interface MetricSpec {
+    name: string;
+    description: string;
+    requires_ground_truth: boolean;
+    requires_embeddings: boolean;
+    source: string;
+    category: string;
+    signal_group: string;
+}
+
 export interface ModelItem {
     id: string;
     name: string;
@@ -620,6 +630,12 @@ export async function fetchMetrics(): Promise<string[]> {
     return response.json();
 }
 
+export async function fetchMetricSpecs(): Promise<MetricSpec[]> {
+    const response = await fetch(`${API_BASE_URL}/runs/options/metric-specs`);
+    if (!response.ok) throw new Error("Failed to fetch metric specs");
+    return response.json();
+}
+
 export interface EvaluationProgressEvent {
     type: "progress" | "info" | "warning" | "error" | "result" | "step";
     data?: unknown;
@@ -790,6 +806,15 @@ export interface AnalysisIntentInfo {
     }[];
 }
 
+export interface AnalysisMetricSpec {
+    key: string;
+    label: string;
+    description: string;
+    signal_group: string;
+    module_id: string;
+    output_path: string[];
+}
+
 export interface SaveAnalysisResultRequest {
     intent: string;
     query?: string | null;
@@ -831,6 +856,12 @@ export interface SavedAnalysisResult extends AnalysisHistoryItem {
 export async function fetchAnalysisIntents(): Promise<AnalysisIntentInfo[]> {
     const response = await fetch(`${API_BASE_URL}/pipeline/intents`);
     if (!response.ok) throw new Error("Failed to fetch analysis intents");
+    return response.json();
+}
+
+export async function fetchAnalysisMetricSpecs(): Promise<AnalysisMetricSpec[]> {
+    const response = await fetch(`${API_BASE_URL}/pipeline/options/analysis-metric-specs`);
+    if (!response.ok) throw new Error("Failed to fetch analysis metric specs");
     return response.json();
 }
 

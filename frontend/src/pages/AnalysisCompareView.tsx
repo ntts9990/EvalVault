@@ -3,7 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { type PriorityCase, type PrioritySummary } from "../components/PrioritySummaryPanel";
 import { StatusBadge } from "../components/StatusBadge";
-import { fetchAnalysisResult, type SavedAnalysisResult } from "../services/api";
+import {
+    fetchAnalysisIntents,
+    fetchAnalysisMetricSpecs,
+    fetchAnalysisResult,
+    type AnalysisIntentInfo,
+    type AnalysisMetricSpec,
+    type SavedAnalysisResult,
+} from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import { Activity, AlertCircle, ArrowLeft, GitCompare } from "lucide-react";
 
@@ -23,6 +30,45 @@ const METRIC_EXCLUDE_KEYS = new Set([
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
+
+const SIGNAL_GROUP_LABELS: Record<string, string> = {
+    groundedness: "근거성",
+    intent_alignment: "질문-답변 정합성",
+    retrieval_effectiveness: "검색 효과성",
+    summary_fidelity: "요약 품질",
+    embedding_quality: "임베딩 안정성",
+    efficiency: "효율/지연",
+};
+
+const SIGNAL_GROUP_ORDER = [
+    "groundedness",
+    "intent_alignment",
+    "retrieval_effectiveness",
+    "summary_fidelity",
+    "embedding_quality",
+    "efficiency",
+];
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+};
+
+const getNestedValue = (record: Record<string, unknown>, path: string[]) => {
+    let current: unknown = record;
+    for (const key of path) {
+        if (!isPlainRecord(current)) return null;
+        current = current[key];
+    }
+    return normalizeNumber(current);
+};
 
 function extractNumericMetrics(output: Record<string, unknown> | null) {
     const metrics: Record<string, number> = {};
@@ -62,6 +108,47 @@ function extractNumericMetrics(output: Record<string, unknown> | null) {
 
     walk(output, "", 0);
     return metrics;
+}
+
+type AnalysisMetricEntry = {
+    key: string;
+    spec: AnalysisMetricSpec;
+    value: number;
+    nodeId: string;
+};
+
+function buildAnalysisMetricEntries(
+    result: SavedAnalysisResult | null,
+    intentDefinition: AnalysisIntentInfo | null,
+    specs: AnalysisMetricSpec[]
+): AnalysisMetricEntry[] {
+    if (!result || !intentDefinition || specs.length === 0) return [];
+    if (!result.node_results || !isPlainRecord(result.node_results)) return [];
+
+    const moduleNodes = new Map<string, string[]>();
+    intentDefinition.nodes.forEach((node) => {
+        const list = moduleNodes.get(node.module) || [];
+        list.push(node.id);
+        moduleNodes.set(node.module, list);
+    });
+
+    const entries: AnalysisMetricEntry[] = [];
+    const nodeResults = result.node_results;
+
+    specs.forEach((spec) => {
+        const nodeIds = moduleNodes.get(spec.module_id) || [];
+        nodeIds.forEach((nodeId) => {
+            const node = nodeResults[nodeId];
+            if (!isPlainRecord(node)) return;
+            const output = node.output;
+            if (!isPlainRecord(output)) return;
+            const value = getNestedValue(output, spec.output_path);
+            if (value === null) return;
+            entries.push({ key: `${spec.key}:${nodeId}`, spec, value, nodeId });
+        });
+    });
+
+    return entries;
 }
 
 function buildNodeMap(result: SavedAnalysisResult | null) {
@@ -242,6 +329,11 @@ export function AnalysisCompareView() {
     const [showOnlyDiff, setShowOnlyDiff] = useState(true);
     const [showAllMetrics, setShowAllMetrics] = useState(false);
     const [showOnlyMetricChanges, setShowOnlyMetricChanges] = useState(true);
+    const [analysisCatalog, setAnalysisCatalog] = useState<AnalysisIntentInfo[]>([]);
+    const [analysisCatalogError, setAnalysisCatalogError] = useState<string | null>(null);
+    const [analysisMetricSpecs, setAnalysisMetricSpecs] = useState<AnalysisMetricSpec[]>([]);
+    const [analysisMetricSpecError, setAnalysisMetricSpecError] = useState<string | null>(null);
+    const [showAnalysisMetrics, setShowAnalysisMetrics] = useState(false);
 
     useEffect(() => {
         async function loadResults() {
@@ -266,6 +358,46 @@ export function AnalysisCompareView() {
         }
         loadResults();
     }, [idA, idB]);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchAnalysisIntents()
+            .then((data) => {
+                if (!cancelled) {
+                    setAnalysisCatalog(data);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setAnalysisCatalogError(
+                        err instanceof Error ? err.message : "분석 카탈로그를 불러오지 못했습니다."
+                    );
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchAnalysisMetricSpecs()
+            .then((data) => {
+                if (!cancelled) {
+                    setAnalysisMetricSpecs(data);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setAnalysisMetricSpecError(
+                        err instanceof Error ? err.message : "분석 메트릭 스펙을 불러오지 못했습니다."
+                    );
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const prioritySummaryA = useMemo(() => extractPrioritySummary(resultA), [resultA]);
     const prioritySummaryB = useMemo(() => extractPrioritySummary(resultB), [resultB]);
@@ -296,6 +428,96 @@ export function AnalysisCompareView() {
 
         return rows;
     }, [resultA, resultB]);
+
+    const intentDefinitionA = useMemo(() => {
+        if (!resultA) return null;
+        return analysisCatalog.find((intent) => intent.intent === resultA.intent) ?? null;
+    }, [analysisCatalog, resultA]);
+
+    const intentDefinitionB = useMemo(() => {
+        if (!resultB) return null;
+        return analysisCatalog.find((intent) => intent.intent === resultB.intent) ?? null;
+    }, [analysisCatalog, resultB]);
+
+    const analysisEntriesA = useMemo(
+        () => buildAnalysisMetricEntries(resultA, intentDefinitionA, analysisMetricSpecs),
+        [resultA, intentDefinitionA, analysisMetricSpecs]
+    );
+
+    const analysisEntriesB = useMemo(
+        () => buildAnalysisMetricEntries(resultB, intentDefinitionB, analysisMetricSpecs),
+        [resultB, intentDefinitionB, analysisMetricSpecs]
+    );
+
+    const analysisMetricGroups = useMemo(() => {
+        if (analysisMetricSpecs.length === 0) return [];
+        const mapA = new Map<string, AnalysisMetricEntry>();
+        const mapB = new Map<string, AnalysisMetricEntry>();
+
+        analysisEntriesA.forEach((entry) => mapA.set(entry.key, entry));
+        analysisEntriesB.forEach((entry) => mapB.set(entry.key, entry));
+
+        const keys = new Set<string>([...mapA.keys(), ...mapB.keys()]);
+        const groupMap = new Map<
+            string,
+            {
+                id: string;
+                label: string;
+                items: {
+                    key: string;
+                    label: string;
+                    description: string;
+                    nodeId: string;
+                    aValue?: number;
+                    bValue?: number;
+                    delta: number | null;
+                }[];
+            }
+        >();
+
+        keys.forEach((key) => {
+            const entryA = mapA.get(key);
+            const entryB = mapB.get(key);
+            const spec = entryA?.spec ?? entryB?.spec;
+            if (!spec) {
+                return;
+            }
+            const nodeId = entryA?.nodeId ?? entryB?.nodeId ?? "";
+            const aValue = entryA?.value;
+            const bValue = entryB?.value;
+            const delta =
+                typeof aValue === "number" && typeof bValue === "number" ? bValue - aValue : null;
+            const groupId = spec.signal_group;
+            const label = SIGNAL_GROUP_LABELS[groupId] || groupId;
+            if (!groupMap.has(groupId)) {
+                groupMap.set(groupId, { id: groupId, label, items: [] });
+            }
+            groupMap.get(groupId)?.items.push({
+                key,
+                label: nodeId ? `${spec.label} (${nodeId})` : spec.label,
+                description: spec.description,
+                nodeId,
+                aValue,
+                bValue,
+                delta,
+            });
+        });
+
+        const orderIndex = new Map(
+            SIGNAL_GROUP_ORDER.map((group, index) => [group, index])
+        );
+
+        return Array.from(groupMap.values())
+            .map((group) => ({
+                ...group,
+                items: group.items.sort((a, b) => a.label.localeCompare(b.label)),
+            }))
+            .sort((left, right) => {
+                const leftOrder = orderIndex.get(left.id) ?? 999;
+                const rightOrder = orderIndex.get(right.id) ?? 999;
+                return leftOrder - rightOrder;
+            });
+    }, [analysisEntriesA, analysisEntriesB, analysisMetricSpecs]);
 
     const priorityDiff = useMemo(() => {
         const priorityA = prioritySummaryA;
@@ -438,6 +660,9 @@ export function AnalysisCompareView() {
         }
         return showAllMetrics ? rows : rows.slice(0, 20);
     }, [metricRows, showOnlyMetricChanges, showAllMetrics]);
+
+    const showAnalysisMetricSection =
+        analysisMetricGroups.length > 0 || Boolean(analysisMetricSpecError || analysisCatalogError);
 
     const durationDelta = useMemo(() => {
         if (!resultA || !resultB) return null;
@@ -719,6 +944,81 @@ export function AnalysisCompareView() {
                                 </div>
                             )}
                         </div>
+
+                        {showAnalysisMetricSection && (
+                            <div className="surface-panel p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                        <h3 className="text-sm font-semibold">추가 분석 지표 비교</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            분석 모듈 지표를 신호 그룹으로 묶어 A/B를 비교합니다.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAnalysisMetrics((prev) => !prev)}
+                                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showAnalysisMetrics ? "접기" : "표시"}
+                                    </button>
+                                </div>
+                                {analysisCatalogError && (
+                                    <p className="text-xs text-rose-500">{analysisCatalogError}</p>
+                                )}
+                                {analysisMetricSpecError && (
+                                    <p className="text-xs text-rose-500">{analysisMetricSpecError}</p>
+                                )}
+                                {!showAnalysisMetrics ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        추가 분석 지표는 선택 시에만 표시됩니다.
+                                    </p>
+                                ) : analysisMetricGroups.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        표시할 추가 분석 지표가 없습니다.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-4 text-xs">
+                                        {analysisMetricGroups.map((group) => (
+                                            <div key={group.id} className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {group.label}
+                                                </p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    {group.items.map((item) => (
+                                                        <div
+                                                            key={item.key}
+                                                            className="border border-border rounded-md px-2 py-2 space-y-1"
+                                                            title={item.description}
+                                                        >
+                                                            <p className="text-muted-foreground">
+                                                                {item.label}
+                                                            </p>
+                                                            <div className="flex items-center justify-between">
+                                                                <span>A {formatMetricValue(item.aValue)}</span>
+                                                                <span>B {formatMetricValue(item.bValue)}</span>
+                                                                <span
+                                                                    className={
+                                                                        item.delta === null
+                                                                            ? "text-muted-foreground"
+                                                                            : item.delta > 0
+                                                                                ? "text-emerald-600"
+                                                                                : item.delta < 0
+                                                                                    ? "text-rose-600"
+                                                                                    : "text-muted-foreground"
+                                                                    }
+                                                                >
+                                                                    Δ {formatSignedDelta(item.delta, 4)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="surface-panel p-4">
                             <div className="flex items-center justify-between mb-3">

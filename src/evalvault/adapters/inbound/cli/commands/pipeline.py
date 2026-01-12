@@ -13,6 +13,7 @@ from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdap
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings
 
+from ..utils.analysis_io import serialize_pipeline_result
 from ..utils.options import db_option
 
 
@@ -104,15 +105,10 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
                     console.print(f"  [red]{node_id}:[/red] {node_result.error}")
 
         if output:
-            data = {
-                "query": query,
-                "intent": result.intent.value if result.intent else None,
-                "is_complete": result.is_complete,
-                "duration_ms": result.total_duration_ms,
-                "final_output": result.final_output,
-            }
+            payload = serialize_pipeline_result(result)
+            payload["query"] = query
             with open(output, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(payload, f, ensure_ascii=False, indent=2)
             console.print(f"\n[green]Results saved to {output}[/green]")
 
         console.print()

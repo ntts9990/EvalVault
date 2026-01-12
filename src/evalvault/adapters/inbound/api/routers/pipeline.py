@@ -11,6 +11,7 @@ from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+from evalvault.domain.metrics.analysis_registry import list_analysis_metric_specs
 from evalvault.domain.services.pipeline_orchestrator import AnalysisPipelineService
 
 router = APIRouter(tags=["pipeline"])
@@ -220,6 +221,15 @@ class PipelineResultResponse(PipelineResultSummary):
     final_output: dict[str, Any] | None = None
 
 
+class AnalysisMetricSpecResponse(BaseModel):
+    key: str
+    label: str
+    description: str
+    signal_group: str
+    module_id: str
+    output_path: list[str]
+
+
 def _serialize_payload(value: Any) -> Any:
     try:
         return jsonable_encoder(value)
@@ -364,6 +374,12 @@ async def list_intents():
         return responses
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/options/analysis-metric-specs", response_model=list[AnalysisMetricSpecResponse])
+async def list_analysis_metric_specs_endpoint():
+    """List analysis metric specs for pipeline outputs."""
+    return [spec.to_dict() for spec in list_analysis_metric_specs()]
 
 
 @router.post("/results", response_model=PipelineResultSummary)

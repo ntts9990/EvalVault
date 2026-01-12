@@ -207,6 +207,7 @@ class TestWebUIAdapter:
         assert isinstance(metrics, list)
         assert "faithfulness" in metrics
         assert "answer_relevancy" in metrics
+        assert "mrr" in metrics
 
     def test_list_runs_empty(self, mock_storage, mock_evaluator):
         """빈 평가 목록 조회."""
@@ -233,6 +234,16 @@ class TestWebUIAdapter:
         assert isinstance(descriptions, dict)
         assert "faithfulness" in descriptions
         assert len(descriptions["faithfulness"]) > 0
+        assert "mrr" in descriptions
+
+    def test_get_metric_specs(self, mock_storage, mock_evaluator):
+        """메트릭 스펙 조회."""
+        from evalvault.adapters.inbound.api.adapter import WebUIAdapter
+
+        adapter = WebUIAdapter(storage=mock_storage, evaluator=mock_evaluator)
+        specs = adapter.get_metric_specs()
+        assert isinstance(specs, list)
+        assert any(spec["name"] == "mrr" for spec in specs)
 
 
 class TestWebUIAdapterRunEvaluation:

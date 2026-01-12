@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, Search, Sparkles } from "lucide-react";
+import { AlertCircle, ExternalLink, Search, Sparkles } from "lucide-react";
 import { Layout } from "../components/Layout";
 import { fetchRuns, type RunSummary } from "../services/api";
 import { PASS_RATE_COLOR_BANDS } from "../config/ui";
@@ -261,6 +261,15 @@ export function VisualizationHome() {
                                         className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90"
                                     >
                                         시각화 열기
+                                    </Link>
+                                    <Link
+                                        to={`/visualization/${run.run_id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-md border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50"
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                        새 창
                                     </Link>
                                     <Link
                                         to={`/runs/${run.run_id}`}

@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from evalvault.config.settings import Settings, apply_profile
+from evalvault.domain.metrics.registry import list_metric_specs
 
 
 def register_config_commands(app: typer.Typer, console: Console) -> None:
@@ -22,46 +23,9 @@ def register_config_commands(app: typer.Typer, console: Console) -> None:
         table.add_column("Description")
         table.add_column("Requires Ground Truth", justify="center")
 
-        table.add_row(
-            "faithfulness",
-            "Measures factual accuracy of the answer based on contexts",
-            "[red]No[/red]",
-        )
-        table.add_row(
-            "answer_relevancy",
-            "Measures how relevant the answer is to the question",
-            "[red]No[/red]",
-        )
-        table.add_row(
-            "context_precision",
-            "Measures ranking quality of retrieved contexts",
-            "[green]Yes[/green]",
-        )
-        table.add_row(
-            "context_recall",
-            "Measures if all relevant info is in retrieved contexts",
-            "[green]Yes[/green]",
-        )
-        table.add_row(
-            "summary_score",
-            "Measures summary coverage and conciseness against contexts",
-            "[red]No[/red]",
-        )
-        table.add_row(
-            "summary_faithfulness",
-            "Measures whether summary statements are grounded in contexts",
-            "[red]No[/red]",
-        )
-        table.add_row(
-            "entity_preservation",
-            "Measures preservation of key insurance entities in summaries",
-            "[red]No[/red]",
-        )
-        table.add_row(
-            "insurance_term_accuracy",
-            "Measures if insurance terms in answer are grounded in contexts",
-            "[red]No[/red]",
-        )
+        for spec in list_metric_specs():
+            needs_gt = "[green]Yes[/green]" if spec.requires_ground_truth else "[red]No[/red]"
+            table.add_row(spec.name, spec.description, needs_gt)
 
         console.print(table)
         console.print("\n[dim]Use --metrics flag with 'run' command to specify metrics.[/dim]")

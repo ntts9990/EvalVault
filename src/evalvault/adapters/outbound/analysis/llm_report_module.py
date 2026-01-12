@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
@@ -13,6 +14,7 @@ from evalvault.adapters.outbound.analysis.pipeline_helpers import (
     truncate_text,
 )
 from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.metrics.registry import get_metric_spec_map
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
@@ -54,6 +56,18 @@ class LLMReportModule(BaseAnalysisModule):
             report = self._llm_adapter.generate_text(
                 self._build_prompt(context, evidence),
             )
+            report_type = context.get("report_type") or "analysis"
+            is_valid, reasons = self._validate_report(
+                report,
+                report_type=report_type,
+                evidence=evidence,
+            )
+            if not is_valid:
+                output = self._fallback_report(context, evidence, llm_used=False)
+                output["llm_error"] = (
+                    "LLM report validation failed: " + "; ".join(reasons)
+                ).strip()
+                return output
             return self._build_output(context, evidence, report, llm_used=True)
         except Exception as exc:
             output = self._fallback_report(context, evidence, llm_used=False)
@@ -91,6 +105,18 @@ class LLMReportModule(BaseAnalysisModule):
                     self._llm_adapter.generate_text,
                     self._build_prompt(context, evidence),
                 )
+            report_type = context.get("report_type") or "analysis"
+            is_valid, reasons = self._validate_report(
+                report,
+                report_type=report_type,
+                evidence=evidence,
+            )
+            if not is_valid:
+                output = self._fallback_report(context, evidence, llm_used=False)
+                output["llm_error"] = (
+                    "LLM report validation failed: " + "; ".join(reasons)
+                ).strip()
+                return output
             return self._build_output(context, evidence, report, llm_used=True)
         except Exception as exc:
             output = self._fallback_report(context, evidence, llm_used=False)
@@ -367,6 +393,107 @@ class LLMReportModule(BaseAnalysisModule):
             )
         return scorecard
 
+    def _build_signal_group_summary(
+        self,
+        scorecard: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        spec_map = get_metric_spec_map()
+        summary: dict[str, dict[str, Any]] = {}
+        for row in scorecard:
+            metric = row.get("metric")
+            if not metric:
+                continue
+            spec = spec_map.get(metric)
+            group = spec.signal_group if spec else "unknown"
+            bucket = summary.setdefault(
+                group,
+                {
+                    "metrics": [],
+                    "mean_avg": None,
+                    "pass_rate_avg": None,
+                    "risk_count": 0,
+                    "total": 0,
+                    "_mean_values": [],
+                    "_pass_rates": [],
+                },
+            )
+            bucket["metrics"].append(metric)
+            mean = row.get("mean")
+            if isinstance(mean, int | float):
+                bucket["_mean_values"].append(float(mean))
+            pass_rate = row.get("pass_rate")
+            if isinstance(pass_rate, int | float):
+                bucket["_pass_rates"].append(float(pass_rate))
+            if row.get("status") == "risk":
+                bucket["risk_count"] += 1
+            bucket["total"] += 1
+
+        for bucket in summary.values():
+            mean_values = bucket.pop("_mean_values", [])
+            pass_rates = bucket.pop("_pass_rates", [])
+            bucket["mean_avg"] = round(safe_mean(mean_values), 4) if mean_values else None
+            bucket["pass_rate_avg"] = round(safe_mean(pass_rates), 4) if pass_rates else None
+        return summary
+
+    def _build_risk_metrics(
+        self,
+        scorecard: list[dict[str, Any]],
+        *,
+        limit: int = 6,
+    ) -> list[dict[str, Any]]:
+        risk_rows: list[dict[str, Any]] = []
+        for row in scorecard:
+            status = row.get("status")
+            pass_rate = row.get("pass_rate")
+            is_risk = status == "risk" or (
+                isinstance(pass_rate, int | float) and float(pass_rate) < 0.7
+            )
+            if not is_risk:
+                continue
+            risk_rows.append(
+                {
+                    "metric": row.get("metric"),
+                    "mean": row.get("mean"),
+                    "threshold": row.get("threshold"),
+                    "pass_rate": pass_rate,
+                    "gap": row.get("gap"),
+                    "status": status,
+                }
+            )
+
+        def _sort_key(item: dict[str, Any]) -> tuple[float, float]:
+            gap = item.get("gap")
+            gap_value = float(gap) if isinstance(gap, int | float) else 0.0
+            pass_rate = item.get("pass_rate")
+            pass_value = float(pass_rate) if isinstance(pass_rate, int | float) else 1.0
+            return (gap_value, -pass_value)
+
+        risk_rows.sort(key=_sort_key, reverse=True)
+        return risk_rows[:limit]
+
+    def _build_significant_changes(
+        self,
+        comparison_scorecard: list[dict[str, Any]],
+        *,
+        limit: int = 6,
+    ) -> list[dict[str, Any]]:
+        changes: list[dict[str, Any]] = []
+        for row in comparison_scorecard:
+            if not row.get("is_significant"):
+                continue
+            changes.append(
+                {
+                    "metric": row.get("metric"),
+                    "diff": row.get("diff"),
+                    "diff_percent": row.get("diff_percent"),
+                    "effect_size": row.get("effect_size"),
+                    "effect_level": row.get("effect_level"),
+                    "direction": row.get("direction"),
+                    "winner": row.get("winner"),
+                }
+            )
+        return changes[:limit]
+
     def _build_comparison_scorecard(
         self,
         comparison_details: dict[str, Any] | None,
@@ -396,6 +523,62 @@ class LLMReportModule(BaseAnalysisModule):
                 }
             )
         return scorecard
+
+    def _validate_report(
+        self,
+        report: str,
+        *,
+        report_type: str,
+        evidence: list[dict[str, Any]],
+    ) -> tuple[bool, list[str]]:
+        reasons: list[str] = []
+        normalized = report_type or "analysis"
+
+        if not re.search(r"[가-힣]", report):
+            reasons.append("한국어 본문 미검출")
+
+        required_sections = {
+            "comparison": [
+                "요약",
+                "변경 사항 요약",
+                "지표 비교 스코어카드",
+                "통계적 신뢰도",
+                "원인 분석",
+                "개선 제안",
+                "다음 단계",
+                "부록(산출물)",
+            ],
+            "summary": [
+                "요약",
+                "지표 스코어카드",
+                "개선 제안",
+                "다음 단계",
+                "부록(산출물)",
+            ],
+            "analysis": [
+                "요약",
+                "지표 스코어카드",
+                "데이터 품질/신뢰도",
+                "증거 기반 인사이트",
+                "원인 가설",
+                "개선 제안",
+                "다음 단계",
+                "부록(산출물)",
+            ],
+        }
+        for section in required_sections.get(normalized, []):
+            if section not in report:
+                reasons.append(f"섹션 누락: {section}")
+
+        if evidence:
+            if normalized == "comparison":
+                if not re.search(r"\[(A|B)\\d+\\]", report):
+                    reasons.append("증거 인용([A1]/[B1]) 누락")
+            else:
+                if not re.search(r"\\[E\\d+\\]", report):
+                    reasons.append("증거 인용([E1]) 누락")
+
+        return len(reasons) == 0, reasons
 
     def _build_priority_highlights(self, priority_summary: dict[str, Any] | None) -> dict[str, Any]:
         priority_summary = priority_summary or {}
@@ -598,6 +781,9 @@ class LLMReportModule(BaseAnalysisModule):
         priority_highlights = self._build_priority_highlights(context.get("priority_summary"))
         prompt_change_summary = self._summarize_prompt_changes(context.get("change_summary"))
         artifact_manifest = self._build_artifact_manifest(context.get("artifact_nodes") or [])
+        signal_group_summary = self._build_signal_group_summary(scorecard)
+        risk_metrics = self._build_risk_metrics(scorecard)
+        significant_changes = self._build_significant_changes(comparison_scorecard)
         change_summary = context.get("change_summary")
         if isinstance(change_summary, dict) and prompt_change_summary:
             change_summary = dict(change_summary)
@@ -635,12 +821,15 @@ class LLMReportModule(BaseAnalysisModule):
             "comparison": context.get("comparison"),
             "comparison_details": comparison_details,
             "comparison_scorecard": comparison_scorecard,
+            "significant_changes": significant_changes,
             "change_summary": change_summary,
             "priority_summary": context.get("priority_summary"),
             "priority_highlights": priority_highlights,
             "quality_checks": context.get("quality_checks"),
             "quality_summary": quality_summary,
             "scorecard": scorecard,
+            "signal_group_summary": signal_group_summary,
+            "risk_metrics": risk_metrics,
             "artifact_manifest": artifact_manifest,
         }
 
@@ -648,6 +837,19 @@ class LLMReportModule(BaseAnalysisModule):
         evidence_json = json.dumps(evidence, ensure_ascii=False, indent=2)
 
         report_type = context.get("report_type")
+        common_requirements = (
+            "공통 원칙:\n"
+            "1) 모든 주장/원인/개선안은 summary_json 또는 evidence에 근거해야 함\n"
+            "2) 숫자/지표는 scorecard, comparison_scorecard, risk_metrics에서 직접 인용\n"
+            "3) 근거가 부족하면 '추가 데이터 필요'를 명시하고 추측 금지\n"
+            "4) 2026-01 기준 널리 쓰이는 RAG 개선 패턴을 우선 고려하되, "
+            "현재 데이터 이슈와 연결되는 항목만 선택\n"
+            "4-1) 개선 패턴 예시: 하이브리드 검색+리랭커, 쿼리 재작성, "
+            "동적 청크/컨텍스트 압축, 메타데이터/필터링, 인용/검증 단계, "
+            "신뢰도 기반 답변 거절, 평가셋 확장/하드 네거티브, 피드백 루프\n"
+            "5) 개선안마다 기대되는 영향 지표, 검증 방법(실험/재평가), 리스크를 함께 서술\n"
+            "6) 신뢰도/타당성 제약(표본 수, 커버리지, 유의성, 데이터 변경)을 명시\n"
+        )
         if report_type == "comparison":
             requirements = (
                 "요구사항:\n"
@@ -656,9 +858,11 @@ class LLMReportModule(BaseAnalysisModule):
                 "3) 섹션: 요약, 변경 사항 요약, 지표 비교 스코어카드, 통계적 신뢰도, "
                 "원인 분석, 개선 제안, 다음 단계, 부록(산출물)\n"
                 "4) 요약은 한 문장 결론 + 핵심 3개 bullet(지표/변경 사항/사용자 영향)\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, A, B, diff, p-value, effect, 상태)\n"
+                "5) 스코어카드는 Markdown 표로 작성 (metric, A, B, diff, "
+                "p-value, effect, 상태)\n"
                 "6) 데이터셋 차이가 있으면 비교 해석 제한을 명확히 표기\n"
-                "7) 변경 사항이 없거나 근거가 약하면 '추가 데이터 필요'라고 명시\n"
+                "7) 유의한 변화는 significant_changes를 활용해 강조\n"
+                "8) 변경 사항이 없거나 근거가 약하면 '추가 데이터 필요'라고 명시\n"
             )
         elif report_type == "summary":
             requirements = (
@@ -667,8 +871,10 @@ class LLMReportModule(BaseAnalysisModule):
                 "2) 핵심 주장/개선안에는 evidence_id를 [E1] 형식으로 인용\n"
                 "3) 섹션: 요약, 지표 스코어카드, 개선 제안, 다음 단계, 부록(산출물)\n"
                 "4) 요약은 한 문장 결론 + 핵심 3개 bullet\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, pass_rate, 상태)\n"
-                "6) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, "
+                "pass_rate, 상태)\n"
+                "6) risk_metrics를 활용해 상위 위험 지표 3개를 명확히 언급\n"
+                "7) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
         else:
             requirements = (
@@ -678,15 +884,18 @@ class LLMReportModule(BaseAnalysisModule):
                 "3) 섹션: 요약, 지표 스코어카드, 데이터 품질/신뢰도, 증거 기반 인사이트, "
                 "원인 가설, 개선 제안, 다음 단계, 부록(산출물)\n"
                 "4) 요약은 한 문장 결론 + 핵심 3개 bullet(지표/원인/사용자 영향)\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, pass_rate, 상태)\n"
-                "6) 사용자 영향은 신뢰/이해/인지부하 관점으로 1~2문장\n"
-                "7) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, "
+                "pass_rate, 상태)\n"
+                "6) signal_group_summary로 축별 약점/강점을 분해\n"
+                "7) 사용자 영향은 신뢰/이해/인지부하 관점으로 1~2문장\n"
+                "8) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
 
         return (
             "당신은 RAG 평가 분석 보고서 작성자입니다. "
             "아래 데이터와 증거를 기반으로 Markdown 보고서를 작성하세요.\n"
             "\n"
+            f"{common_requirements}\n"
             f"{requirements}\n"
             "[요약 데이터]\n"
             f"{summary_json}\n"

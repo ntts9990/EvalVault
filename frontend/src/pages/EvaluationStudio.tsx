@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import {
     type DatasetItem,
+    type MetricSpec,
     type ModelItem,
     type SystemConfig,
     fetchDatasets,
     fetchDatasetTemplate,
+    fetchMetricSpecs,
     fetchModels,
     fetchMetrics,
     fetchRuns,
@@ -56,6 +58,8 @@ export function EvaluationStudio() {
     const [datasets, setDatasets] = useState<DatasetItem[]>([]);
     const [models, setModels] = useState<ModelItem[]>([]);
     const [availableMetrics, setAvailableMetrics] = useState<string[]>([]);
+    const [metricSpecs, setMetricSpecs] = useState<MetricSpec[]>([]);
+    const [metricSpecError, setMetricSpecError] = useState<string | null>(null);
 
     // Selections
     const [selectedDataset, setSelectedDataset] = useState<string>("");
@@ -107,6 +111,10 @@ export function EvaluationStudio() {
         etaSeconds: null as number | null,
         rate: null as number | null,
     });
+
+    const metricSpecMap = useMemo(() => {
+        return new Map(metricSpecs.map((spec) => [spec.name, spec]));
+    }, [metricSpecs]);
 
     const handleUpload = async () => {
         if (!uploadFile) return;
@@ -166,14 +174,21 @@ export function EvaluationStudio() {
     useEffect(() => {
         async function loadOptions() {
             try {
-                const [d, met, cfg, runList] = await Promise.all([
+                const [d, met, specs, cfg, runList] = await Promise.all([
                     fetchDatasets(),
-                    fetchMetrics(),
+                    fetchMetrics().catch(() => []),
+                    fetchMetricSpecs().catch((err) => {
+                        setMetricSpecError(
+                            err instanceof Error ? err.message : "Failed to fetch metric specs"
+                        );
+                        return [];
+                    }),
                     fetchConfig().catch(() => null),
                     fetchRuns().catch(() => [])
                 ]);
                 setDatasets(d);
-                setAvailableMetrics(met);
+                setMetricSpecs(specs);
+                setAvailableMetrics(specs.length ? specs.map((spec) => spec.name) : met);
                 const projects = Array.from(
                     new Set(
                         runList
@@ -603,6 +618,7 @@ export function EvaluationStudio() {
                                 const isSelected = selectedMetrics.has(metric);
                                 const isSummaryMetric = summaryMetricSet.has(metric);
                                 const isDisabled = summaryMode;
+                                const spec = metricSpecMap.get(metric);
                                 return (
                                     <button
                                         key={metric}
@@ -614,12 +630,27 @@ export function EvaluationStudio() {
                                             } ${summaryMode && isSummaryMetric ? "ring-1 ring-primary/40" : ""}`}
                                     >
                                         <span className="inline-flex items-center gap-2">
-                                            {metric}
+                                            <span title={spec?.description || metric}>{metric}</span>
+                                            {spec?.requires_ground_truth && (
+                                                <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                    GT
+                                                </span>
+                                            )}
+                                            {spec?.requires_embeddings && (
+                                                <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                    Emb
+                                                </span>
+                                            )}
                                         </span>
                                     </button>
                                 );
                             })}
                         </div>
+                        {metricSpecError && (
+                            <p className="mt-3 text-xs text-rose-500">
+                                {metricSpecError}
+                            </p>
+                        )}
                     </section>
                     {/* Advanced Configuration */}
                     <section className="surface-panel p-6">

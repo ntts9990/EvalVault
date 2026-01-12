@@ -22,10 +22,12 @@ import {
     fetchRunClusterMapById,
     fetchRunClusterMaps,
     fetchRunDetails,
+    fetchMetricSpecs,
     deleteRunClusterMap,
     saveRunClusterMap,
     type ClusterMapFileInfo,
     type ClusterMapVersionInfo,
+    type MetricSpec,
     type RunDetailsResponse,
 } from "../services/api";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
@@ -67,7 +69,80 @@ type ScatterPoint = {
     metrics: RunDetailsResponse["results"][number]["metrics"];
 };
 
-const AXIS_SPECS: AxisSpec[] = [
+const SIGNAL_GROUP_META: Record<
+    string,
+    {
+        label: string;
+        description: string;
+        detail: AxisSpec["detail"];
+    }
+> = {
+    groundedness: {
+        label: "근거성",
+        description: "답변이 컨텍스트/사실에 근거하는 정도",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "근거 기반으로 답변이 신뢰 가능한지 보여줍니다.",
+            effect: "낮으면 환각/근거 부족 리스크가 커집니다.",
+        },
+    },
+    intent_alignment: {
+        label: "질문-답변 정합성",
+        description: "질문 의도와 답변 내용의 정합 정도",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "질문 의도에 맞는 답변을 내는지 보여줍니다.",
+            effect: "낮으면 질문 해석/응답 방향이 어긋납니다.",
+        },
+    },
+    retrieval_effectiveness: {
+        label: "검색 효과성",
+        description: "검색된 컨텍스트의 적합/재현 품질",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "검색 결과가 답변을 뒷받침하는지 나타냅니다.",
+            effect: "낮으면 RAG 성능 저하가 발생합니다.",
+        },
+    },
+    summary_fidelity: {
+        label: "요약 품질",
+        description: "요약의 정보 보존과 충실도",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "요약이 핵심 정보를 보존하는지 보여줍니다.",
+            effect: "낮으면 요약 왜곡/누락 위험이 큽니다.",
+        },
+    },
+    embedding_quality: {
+        label: "임베딩 안정성",
+        description: "임베딩 분포와 품질 안정성",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "임베딩 품질의 안정성을 나타냅니다.",
+            effect: "낮으면 검색/유사도 품질이 흔들립니다.",
+        },
+    },
+    efficiency: {
+        label: "효율/지연",
+        description: "응답/검색 효율과 지연",
+        detail: {
+            calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+            meaning: "처리 효율과 지연 수준을 보여줍니다.",
+            effect: "낮으면 비용/지연 부담이 커집니다.",
+        },
+    },
+};
+
+const SIGNAL_GROUP_ORDER = [
+    "groundedness",
+    "intent_alignment",
+    "retrieval_effectiveness",
+    "summary_fidelity",
+    "embedding_quality",
+    "efficiency",
+];
+
+const FALLBACK_AXIS_SPECS: AxisSpec[] = [
     {
         key: "x",
         label: "근거성",
@@ -105,45 +180,45 @@ const AXIS_SPECS: AxisSpec[] = [
 
 const CHART_THRESHOLD = 0.7;
 
-const QUADRANT_HINTS: QuadrantSpec[] = [
+const createQuadrantHints = (xLabel: string, yLabel: string): QuadrantSpec[] => [
     {
         id: "ur",
         label: "우상단",
-        desc: "근거성과 관련성이 모두 높은 영역",
+        desc: `${xLabel}과 ${yLabel} 모두 높은 영역`,
         detail: {
-            calc: `근거성 ≥ ${CHART_THRESHOLD}, 관련성 ≥ ${CHART_THRESHOLD}`,
-            meaning: "증거 기반이고 질문과도 잘 맞는 안정 구간입니다.",
-            effect: "현재 전략을 유지하고 볼륨 확대에 유리합니다.",
+            calc: `${xLabel} ≥ ${CHART_THRESHOLD}, ${yLabel} ≥ ${CHART_THRESHOLD}`,
+            meaning: "두 축 모두 높은 안정 구간입니다.",
+            effect: "현재 전략을 유지하고 확대하기에 유리합니다.",
         },
     },
     {
         id: "ul",
         label: "좌상단",
-        desc: "관련성은 높지만 근거가 약한 영역",
+        desc: `${yLabel}은 높지만 ${xLabel}이 낮은 영역`,
         detail: {
-            calc: `근거성 < ${CHART_THRESHOLD}, 관련성 ≥ ${CHART_THRESHOLD}`,
-            meaning: "질문 의도는 맞지만 근거가 부족한 상태입니다.",
-            effect: "컨텍스트 보강/검증을 강화해야 합니다.",
+            calc: `${xLabel} < ${CHART_THRESHOLD}, ${yLabel} ≥ ${CHART_THRESHOLD}`,
+            meaning: "한 축은 안정적이지만 다른 축이 약한 상태입니다.",
+            effect: "약한 축의 개선 우선순위를 높게 잡는 것이 좋습니다.",
         },
     },
     {
         id: "lr",
         label: "우하단",
-        desc: "근거는 있으나 질문과 어긋나는 영역",
+        desc: `${xLabel}은 높지만 ${yLabel}이 낮은 영역`,
         detail: {
-            calc: `근거성 ≥ ${CHART_THRESHOLD}, 관련성 < ${CHART_THRESHOLD}`,
-            meaning: "근거는 있지만 질문 방향과 엇나간 답변입니다.",
-            effect: "질문 해석/프롬프트 정렬을 개선해야 합니다.",
+            calc: `${xLabel} ≥ ${CHART_THRESHOLD}, ${yLabel} < ${CHART_THRESHOLD}`,
+            meaning: "한 축은 안정적이지만 다른 축이 약한 상태입니다.",
+            effect: "약한 축의 개선 우선순위를 높게 잡는 것이 좋습니다.",
         },
     },
     {
         id: "ll",
         label: "좌하단",
-        desc: "근거와 관련성이 모두 낮은 영역",
+        desc: `${xLabel}과 ${yLabel} 모두 낮은 영역`,
         detail: {
-            calc: `근거성 < ${CHART_THRESHOLD}, 관련성 < ${CHART_THRESHOLD}`,
-            meaning: "근거와 관련성 모두 낮아 전반적 품질 위험이 큽니다.",
-            effect: "Retrieval부터 생성까지 파이프라인 재점검이 필요합니다.",
+            calc: `${xLabel} < ${CHART_THRESHOLD}, ${yLabel} < ${CHART_THRESHOLD}`,
+            meaning: "두 축 모두 낮아 전반적 품질 위험이 큽니다.",
+            effect: "검색부터 생성까지 파이프라인 재점검이 필요합니다.",
         },
     },
 ];
@@ -313,6 +388,8 @@ export function Visualization() {
     const [data, setData] = useState<RunDetailsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [metricSpecs, setMetricSpecs] = useState<MetricSpec[]>([]);
+    const [metricSpecError, setMetricSpecError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
     const [colorMode, setColorMode] = useState<"score" | "cluster">("score");
     const [clusterMap, setClusterMap] = useState<Map<string, string>>(new Map());
@@ -346,6 +423,27 @@ export function Visualization() {
         }
         loadDetails();
     }, [id]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setMetricSpecError(null);
+        fetchMetricSpecs()
+            .then((specs) => {
+                if (!cancelled) {
+                    setMetricSpecs(specs);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setMetricSpecError(
+                        err instanceof Error ? err.message : "메트릭 스펙을 불러오지 못했습니다."
+                    );
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -456,6 +554,92 @@ export function Visualization() {
         };
     }, [data, clusterSource]);
 
+    const availableMetricNames = useMemo(() => {
+        if (!data) {
+            return new Set<string>();
+        }
+        const names = new Set<string>();
+        data.results.forEach((result) => {
+            result.metrics.forEach((metric) => {
+                names.add(metric.name);
+            });
+        });
+        return names;
+    }, [data]);
+
+    const axisSpecs = useMemo(() => {
+        if (!metricSpecs.length || availableMetricNames.size === 0) {
+            return FALLBACK_AXIS_SPECS;
+        }
+
+        const groupMap = new Map<string, string[]>();
+        metricSpecs.forEach((spec) => {
+            if (!availableMetricNames.has(spec.name)) {
+                return;
+            }
+            const metrics = groupMap.get(spec.signal_group) || [];
+            metrics.push(spec.name);
+            groupMap.set(spec.signal_group, metrics);
+        });
+
+        if (groupMap.size === 0) {
+            return FALLBACK_AXIS_SPECS;
+        }
+
+        const orderIndex = new Map(
+            SIGNAL_GROUP_ORDER.map((group, index) => [group, index])
+        );
+        const groupEntries = Array.from(groupMap.entries()).map(([groupId, metrics]) => ({
+            groupId,
+            metrics: metrics.sort((a, b) => a.localeCompare(b)),
+            count: metrics.length,
+            order: orderIndex.get(groupId) ?? 999,
+        }));
+
+        groupEntries.sort((left, right) => {
+            if (right.count !== left.count) {
+                return right.count - left.count;
+            }
+            return left.order - right.order;
+        });
+
+        const axisKeys: AxisSpec["key"][] = ["x", "y", "z"];
+        const specs = groupEntries.slice(0, 3).map((entry, index) => {
+            const meta = SIGNAL_GROUP_META[entry.groupId];
+            const label = meta?.label ?? entry.groupId;
+            const description = meta?.description ?? `${label} 지표 평균`;
+            const detail = meta?.detail ?? {
+                calc: "그룹 내 사용 가능한 지표 평균 (누락 시 전체 평균으로 보정)",
+                meaning: "지표 묶음의 평균으로 축을 구성합니다.",
+                effect: "낮을수록 해당 영역 품질 리스크가 큽니다.",
+            };
+            return {
+                key: axisKeys[index],
+                label,
+                metrics: entry.metrics,
+                description,
+                detail,
+            };
+        });
+
+        while (specs.length < 3) {
+            const key = axisKeys[specs.length];
+            specs.push({
+                key,
+                label: "전체 평균",
+                metrics: [],
+                description: "전체 지표 평균",
+                detail: {
+                    calc: "전체 지표 평균",
+                    meaning: "지표 전체 평균으로 축을 구성합니다.",
+                    effect: "낮을수록 전반적 품질 리스크가 큽니다.",
+                },
+            });
+        }
+
+        return specs;
+    }, [metricSpecs, availableMetricNames]);
+
     const points = useMemo(() => {
         if (!data) return [];
         return data.results.map((result) => {
@@ -463,7 +647,7 @@ export function Visualization() {
                 result.metrics.map((metric) => [metric.name, { score: normalizeScore(metric.score) }])
             );
             const avgAll = safeAverage(result.metrics.map((metric) => normalizeScore(metric.score)));
-            const axisValues = AXIS_SPECS.map((axis) =>
+            const axisValues = axisSpecs.map((axis) =>
                 buildAxisValue(metricMap, axis.metrics, avgAll)
             );
             const passRate = result.metrics.length
@@ -484,7 +668,7 @@ export function Visualization() {
                 metrics: result.metrics,
             };
         });
-    }, [data, clusterMap]);
+    }, [data, clusterMap, axisSpecs]);
 
     const filteredPoints = useMemo(() => {
         if (clusterFilter.size === 0) {
@@ -517,6 +701,15 @@ export function Visualization() {
         });
         return palette;
     }, [points]);
+
+    const quadrantHints = useMemo(
+        () =>
+            createQuadrantHints(
+                axisSpecs[0]?.label ?? "X",
+                axisSpecs[1]?.label ?? "Y"
+            ),
+        [axisSpecs]
+    );
 
     const clusterSummary = useMemo(() => {
         const counts = new Map<string, number>();
@@ -895,6 +1088,11 @@ export function Visualization() {
                         클러스터 맵 버전을 불러오지 못했습니다: {runClusterMapsError}
                     </div>
                 )}
+                {metricSpecError && (
+                    <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-2">
+                        메트릭 스펙을 불러오지 못했습니다: {metricSpecError}
+                    </div>
+                )}
                 {hasClusters && (
                     <div className="text-xs text-muted-foreground">
                         {clusterSource === "auto"
@@ -924,6 +1122,9 @@ export function Visualization() {
                                     <p className="text-xs text-muted-foreground mt-1">
                                         점 위치는 지표 평균을 정규화하여 표시합니다.
                                     </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        축은 실행된 지표의 신호 그룹 기준으로 자동 구성됩니다.
+                                    </p>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                     기준선: {CHART_THRESHOLD.toFixed(2)}
@@ -931,7 +1132,7 @@ export function Visualization() {
                             </div>
                             {viewMode === "3d" && (
                                 <div className="mb-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    {AXIS_SPECS.map((axis) => (
+                                    {axisSpecs.map((axis) => (
                                         <span
                                             key={axis.key}
                                             className="px-2 py-1 rounded-full border border-border bg-background/70"
@@ -959,14 +1160,14 @@ export function Visualization() {
                                                 dataKey="x"
                                                 domain={[0, 1]}
                                                 tickFormatter={(value) => formatScore(value)}
-                                                label={{ value: AXIS_SPECS[0].label, position: "insideBottom", offset: -5 }}
+                                                label={{ value: axisSpecs[0].label, position: "insideBottom", offset: -5 }}
                                             />
                                             <YAxis
                                                 type="number"
                                                 dataKey="y"
                                                 domain={[0, 1]}
                                                 tickFormatter={(value) => formatScore(value)}
-                                                label={{ value: AXIS_SPECS[1].label, angle: -90, position: "insideLeft" }}
+                                                label={{ value: axisSpecs[1].label, angle: -90, position: "insideLeft" }}
                                             />
                                             <ZAxis dataKey="avg" range={[80, 360]} />
                                             <ReferenceLine x={CHART_THRESHOLD} stroke="rgba(148,163,184,0.6)" />
@@ -984,9 +1185,9 @@ export function Visualization() {
                                                             </p>
                                                             <div className="mt-2 space-y-1 text-muted-foreground">
                                                                 <p>
-                                                                    {AXIS_SPECS[0].label}: {formatScore(point.x)}
+                                                                    {axisSpecs[0].label}: {formatScore(point.x)}
                                                                     {" • "}
-                                                                    {AXIS_SPECS[1].label}: {formatScore(point.y)}
+                                                                    {axisSpecs[1].label}: {formatScore(point.y)}
                                                                 </p>
                                                                 <p>
                                                                     평균 {formatScore(point.avg)} · 통과율{" "}
@@ -1021,7 +1222,7 @@ export function Visualization() {
                                 ) : (
                                     <VisualizationPlot
                                         points={filteredPoints}
-                                        axisSpecs={AXIS_SPECS}
+                                        axisSpecs={axisSpecs}
                                         colorMode={colorMode}
                                         clusterPalette={clusterPalette}
                                         onSelect={setSelectedPoint}
@@ -1033,7 +1234,7 @@ export function Visualization() {
                         <div className="surface-panel p-5">
                             <h3 className="text-base font-semibold mb-3">축 정의 & 사분면 해석</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {AXIS_SPECS.map((axis) => {
+                                {axisSpecs.map((axis) => {
                                     const detailKey = `axis-${axis.key}`;
                                     return (
                                         <div
@@ -1057,7 +1258,9 @@ export function Visualization() {
                                                 {axis.description}
                                             </p>
                                             <p className="text-xs text-muted-foreground mt-2">
-                                                {axis.metrics.join(", ")}
+                                                {axis.metrics.length
+                                                    ? axis.metrics.join(", ")
+                                                    : "사용 가능한 지표 없음"}
                                             </p>
                                             {activeDetail === detailKey && (
                                                 <div className="absolute left-0 top-full mt-2 w-72 rounded-lg border border-border bg-background p-3 shadow-lg z-20">
@@ -1100,7 +1303,7 @@ export function Visualization() {
                                 })}
                             </div>
                             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
-                                {QUADRANT_HINTS.map((hint) => {
+                                {quadrantHints.map((hint) => {
                                     const detailKey = `quad-${hint.id}`;
                                     return (
                                         <div
@@ -1188,13 +1391,13 @@ export function Visualization() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                         <div className="rounded-md border border-border p-2">
-                                            {AXIS_SPECS[0].label}: {formatScore(selectedPoint.x)}
+                                            {axisSpecs[0].label}: {formatScore(selectedPoint.x)}
                                         </div>
                                         <div className="rounded-md border border-border p-2">
-                                            {AXIS_SPECS[1].label}: {formatScore(selectedPoint.y)}
+                                            {axisSpecs[1].label}: {formatScore(selectedPoint.y)}
                                         </div>
                                         <div className="rounded-md border border-border p-2">
-                                            {AXIS_SPECS[2].label}: {formatScore(selectedPoint.z)}
+                                            {axisSpecs[2].label}: {formatScore(selectedPoint.z)}
                                         </div>
                                         <div className="rounded-md border border-border p-2">
                                             평균: {formatScore(selectedPoint.avg)}

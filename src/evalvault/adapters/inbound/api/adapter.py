@@ -15,6 +15,13 @@ from urllib.request import urlopen
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
 from evalvault.domain.entities.prompt import PromptSetBundle
+from evalvault.domain.metrics.registry import (
+    get_metric_descriptions as registry_metric_descriptions,
+)
+from evalvault.domain.metrics.registry import (
+    list_metric_names,
+    list_metric_specs,
+)
 from evalvault.domain.services.cluster_map_builder import build_cluster_map
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
@@ -41,21 +48,6 @@ if TYPE_CHECKING:
     from evalvault.ports.outbound.storage_port import StoragePort
 
 logger = logging.getLogger(__name__)
-
-# 지원하는 메트릭 목록
-AVAILABLE_METRICS = [
-    "faithfulness",
-    "answer_relevancy",
-    "context_precision",
-    "context_recall",
-    "factual_correctness",
-    "semantic_similarity",
-    "summary_score",
-    "summary_faithfulness",
-    "insurance_term_accuracy",
-    "entity_preservation",
-    "contextual_relevancy",
-]
 
 
 @dataclass
@@ -978,19 +970,15 @@ class WebUIAdapter:
 
     def get_available_metrics(self) -> list[str]:
         """사용 가능한 메트릭 목록 반환."""
-        return AVAILABLE_METRICS.copy()
+        return list_metric_names()
+
+    def get_metric_specs(self) -> list[dict[str, object]]:
+        """메트릭 스펙 목록 반환."""
+        return [spec.to_dict() for spec in list_metric_specs()]
 
     def get_metric_descriptions(self) -> dict[str, str]:
         """메트릭별 설명 반환."""
-        return {
-            "faithfulness": "답변이 컨텍스트에 충실한지 평가",
-            "answer_relevancy": "답변이 질문과 관련있는지 평가",
-            "context_precision": "검색된 컨텍스트의 정밀도 평가",
-            "context_recall": "필요한 정보가 검색되었는지 평가",
-            "factual_correctness": "ground_truth 대비 사실적 정확성 평가",
-            "semantic_similarity": "답변과 ground_truth 간 의미적 유사도 평가",
-            "insurance_term_accuracy": "보험 용어 정확성 평가",
-        }
+        return registry_metric_descriptions()
 
     def create_dataset_from_upload(
         self,
