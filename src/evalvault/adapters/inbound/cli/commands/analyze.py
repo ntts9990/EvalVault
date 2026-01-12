@@ -1,4 +1,4 @@
-"""Analyze-related commands for the EvalVault CLI."""
+"""EvalVault CLI의 분석 관련 명령."""
 
 from __future__ import annotations
 
@@ -52,40 +52,41 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
 
     @app.command()
     def analyze(  # noqa: PLR0913 - CLI 옵션 다양성을 위한 길이 허용
-        run_id: str = typer.Argument(..., help="Run ID to analyze"),
-        nlp: bool = typer.Option(False, "--nlp", "-N", help="Include NLP analysis"),
-        causal: bool = typer.Option(False, "--causal", "-c", help="Include causal analysis"),
+        run_id: str = typer.Argument(..., help="분석할 Run ID"),
+        nlp: bool = typer.Option(False, "--nlp", "-N", help="NLP 분석 포함"),
+        causal: bool = typer.Option(False, "--causal", "-c", help="인과 분석 포함"),
         playbook: bool = typer.Option(
-            False, "--playbook", "-B", help="Include playbook-based improvement analysis"
+            False, "--playbook", "-B", help="플레이북 기반 개선 분석 포함"
         ),
         enable_llm: bool = typer.Option(
             False,
             "--enable-llm",
             "-L",
-            help="Enable LLM-based insight generation for playbook analysis",
+            help="플레이북 분석에서 LLM 인사이트 생성",
         ),
-        output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
+        output: Path | None = typer.Option(None, "--output", "-o", help="JSON 출력 파일"),
         report: Path | None = typer.Option(
-            None, "--report", "-r", help="Output report file (*.md or *.html)"
+            None, "--report", "-r", help="리포트 출력 파일 (*.md 또는 *.html)"
         ),
-        save: bool = typer.Option(False, "--save", "-S", help="Save analysis to database"),
-        db_path: Path = db_option(help_text="Database path"),
+        save: bool = typer.Option(False, "--save", "-S", help="분석 결과 DB 저장"),
+        db_path: Path | None = db_option(help_text="DB 경로"),
         profile: str | None = profile_option(
-            help_text="Model profile for NLP embeddings (dev, prod, openai)",
+            help_text="NLP 임베딩용 모델 프로필 (dev, prod, openai)",
         ),
     ) -> None:
-        """Analyze an evaluation run and show statistical insights."""
+        """평가 실행 결과를 분석하고 통계 인사이트를 표시합니다."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = db_path or Settings().evalvault_db_path
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
 
         try:
             run = storage.get_run(run_id)
         except KeyError:
-            _console.print(f"[red]Error: Run not found: {run_id}[/red]")
+            _console.print(f"[red]오류: Run을 찾을 수 없습니다: {run_id}[/red]")
             raise typer.Exit(1)
 
         if not run.results:
-            _console.print("[yellow]Warning: No test case results to analyze.[/yellow]")
+            _console.print("[yellow]경고: 분석할 테스트 케이스 결과가 없습니다.[/yellow]")
             raise typer.Exit(0)
         trace_url = get_phoenix_trace_url(getattr(run, "tracker_metadata", None))
 
@@ -117,14 +118,14 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             cache_adapter=cache_adapter,
         )
 
-        _console.print(f"\n[bold]Analyzing run: {run_id}[/bold]")
+        _console.print(f"\n[bold]분석 시작: {run_id}[/bold]")
         if trace_url:
-            _console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
+            _console.print(f"[dim]Phoenix 트레이스: {trace_url}[/dim]")
         _console.print()
         bundle = service.analyze_run(run, include_nlp=nlp, include_causal=causal)
 
         if not bundle.statistical:
-            _console.print("[yellow]No statistical analysis available.[/yellow]")
+            _console.print("[yellow]통계 분석 결과가 없습니다.[/yellow]")
             raise typer.Exit(0)
 
         analysis = bundle.statistical
@@ -145,8 +146,8 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             stage_metrics = storage.list_stage_metrics(run_id)
             if not stage_metrics:
                 _console.print(
-                    "[yellow]No stage metrics found. "
-                    "Run `evalvault stage compute-metrics <run_id>` to include stage guidance."
+                    "[yellow]스테이지 메트릭이 없습니다. "
+                    "`evalvault stage compute-metrics <run_id>` 실행 후 가이드를 포함하세요."
                     "[/yellow]"
                 )
             improvement_report = _perform_playbook_analysis(
@@ -158,49 +159,46 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
 
         if save:
             storage.save_analysis(analysis)
-            _console.print(f"\n[green]Analysis saved to database: {db_path}[/green]")
+            _console.print(f"\n[green]분석 결과 DB 저장: {resolved_db_path}[/green]")
 
         if output:
             _export_analysis_json(analysis, output, bundle.nlp if nlp else None, improvement_report)
-            _console.print(f"\n[green]Analysis exported to: {output}[/green]")
+            _console.print(f"\n[green]분석 결과 내보냄: {output}[/green]")
 
         if report:
             _generate_report(bundle, report, include_nlp=nlp, improvement_report=improvement_report)
-            _console.print(f"\n[green]Report generated: {report}[/green]")
+            _console.print(f"\n[green]리포트 생성: {report}[/green]")
 
     @app.command(name="analyze-compare")
     def analyze_compare(
-        run_id1: str = typer.Argument(..., help="First run ID"),
-        run_id2: str = typer.Argument(..., help="Second run ID"),
+        run_id1: str = typer.Argument(..., help="첫 번째 Run ID"),
+        run_id2: str = typer.Argument(..., help="두 번째 Run ID"),
         metrics: str | None = typer.Option(
-            None, "--metrics", "-m", help="Comma-separated metrics to compare"
+            None, "--metrics", "-m", help="비교할 메트릭(쉼표 구분)"
         ),
-        test: str = typer.Option(
-            "t-test", "--test", "-t", help="Statistical test (t-test, mann-whitney)"
-        ),
-        output: Path | None = typer.Option(None, "--output", "-o", help="Output JSON file"),
-        report: Path | None = typer.Option(
-            None, "--report", "-r", help="Output report file (*.md)"
-        ),
+        test: str = typer.Option("t-test", "--test", "-t", help="통계 검정 (t-test, mann-whitney)"),
+        output: Path | None = typer.Option(None, "--output", "-o", help="JSON 출력 파일"),
+        report: Path | None = typer.Option(None, "--report", "-r", help="리포트 출력 파일 (*.md)"),
         output_dir: Path | None = typer.Option(
             None,
             "--output-dir",
-            help="Output directory for comparison artifacts (default: reports/comparison).",
+            help="비교 산출물 저장 디렉터리 (기본: reports/comparison)",
         ),
-        db_path: Path = db_option(help_text="Database path"),
+        db_path: Path | None = db_option(help_text="DB 경로"),
         profile: str | None = profile_option(
-            help_text="Model profile for comparison report LLM (dev, prod, openai).",
+            help_text="비교 리포트용 LLM 프로필 (dev, prod, openai)",
         ),
     ) -> None:
-        """Compare two evaluation runs statistically."""
+        """두 실행을 통계적으로 비교합니다."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = db_path or Settings().evalvault_db_path
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
 
         try:
             run_a = storage.get_run(run_id1)
             run_b = storage.get_run(run_id2)
         except KeyError as exc:
-            _console.print(f"[red]Error: {exc}[/red]")
+            _console.print(f"[red]오류: {exc}[/red]")
             raise typer.Exit(1) from exc
 
         metric_list = parse_csv_option(metrics)
@@ -213,30 +211,30 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         trace_a = get_phoenix_trace_url(getattr(run_a, "tracker_metadata", None))
         trace_b = get_phoenix_trace_url(getattr(run_b, "tracker_metadata", None))
 
-        _console.print("\n[bold]Comparing runs:[/bold]")
-        _console.print(f"  Run A: {run_id1}")
+        _console.print("\n[bold]실행 비교:[/bold]")
+        _console.print(f"  실행 A: {run_id1}")
         if trace_a:
-            _console.print(f"    Phoenix Trace: {trace_a}")
-        _console.print(f"  Run B: {run_id2}")
+            _console.print(f"    Phoenix 트레이스: {trace_a}")
+        _console.print(f"  실행 B: {run_id2}")
         if trace_b:
-            _console.print(f"    Phoenix Trace: {trace_b}")
-        _console.print(f"  Test: {test}\n")
+            _console.print(f"    Phoenix 트레이스: {trace_b}")
+        _console.print(f"  검정: {test}\n")
 
         comparisons = service.compare_runs(run_a, run_b, metrics=metric_list, test_type=test)
 
         if not comparisons:
-            _console.print("[yellow]No common metrics to compare.[/yellow]")
+            _console.print("[yellow]비교할 공통 메트릭이 없습니다.[/yellow]")
             raise typer.Exit(0)
 
-        table = Table(title="Statistical Comparison", show_header=True, header_style="bold cyan")
-        table.add_column("Metric")
-        table.add_column("Run A (Mean)", justify="right")
-        table.add_column("Run B (Mean)", justify="right")
-        table.add_column("Diff (%)", justify="right")
-        table.add_column("p-value", justify="right")
-        table.add_column("Effect Size", justify="right")
-        table.add_column("Significant")
-        table.add_column("Winner")
+        table = Table(title="통계 비교", show_header=True, header_style="bold cyan")
+        table.add_column("메트릭")
+        table.add_column("실행 A (평균)", justify="right")
+        table.add_column("실행 B (평균)", justify="right")
+        table.add_column("변화 (%)", justify="right")
+        table.add_column("p-값", justify="right")
+        table.add_column("효과 크기", justify="right")
+        table.add_column("유의")
+        table.add_column("승자")
 
         for comparison in comparisons:
             sig_style = "green" if comparison.is_significant else "dim"
@@ -248,7 +246,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                 f"{comparison.diff_percent:+.1f}%",
                 f"{comparison.p_value:.4f}",
                 f"{comparison.effect_size:.2f} ({comparison.effect_level.value})",
-                f"[{sig_style}]{'Yes' if comparison.is_significant else 'No'}[/{sig_style}]",
+                f"[{sig_style}]{'예' if comparison.is_significant else '아니오'}[/{sig_style}]",
                 winner,
             )
 
@@ -272,7 +270,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         try:
             llm_adapter = get_llm_adapter(settings)
         except Exception as exc:
-            _console.print(f"[yellow]Warning: LLM adapter initialization failed ({exc})[/yellow]")
+            _console.print(f"[yellow]경고: LLM 어댑터 초기화 실패 ({exc})[/yellow]")
 
         pipeline_service = build_analysis_pipeline_service(
             storage=storage,
@@ -323,16 +321,16 @@ def _display_analysis_summary(analysis) -> None:
     """Display analysis summary panel."""
 
     panel = Panel(
-        f"""[bold]Analysis Summary[/bold]
-Run ID: {analysis.run_id}
-Analysis Type: {analysis.analysis_type.value}
-Created: {analysis.created_at.strftime("%Y-%m-%d %H:%M:%S")}
+        f"""[bold]분석 요약[/bold]
+실행 ID: {analysis.run_id}
+분석 유형: {analysis.analysis_type.value}
+생성 시각: {analysis.created_at.strftime("%Y-%m-%d %H:%M:%S")}
 
-Overall Pass Rate: [{"green" if analysis.overall_pass_rate >= 0.7 else "yellow" if analysis.overall_pass_rate >= 0.5 else "red"}]{analysis.overall_pass_rate:.1%}[/]
-Metrics Analyzed: {len(analysis.metrics_summary)}
-Significant Correlations: {len(analysis.significant_correlations)}
-Low Performers Found: {len(analysis.low_performers)}""",
-        title="[bold cyan]Statistical Analysis[/bold cyan]",
+전체 통과율: [{"green" if analysis.overall_pass_rate >= 0.7 else "yellow" if analysis.overall_pass_rate >= 0.5 else "red"}]{analysis.overall_pass_rate:.1%}[/]
+분석 메트릭 수: {len(analysis.metrics_summary)}
+유의미한 상관관계: {len(analysis.significant_correlations)}
+저성능 케이스: {len(analysis.low_performers)}""",
+        title="[bold cyan]통계 분석[/bold cyan]",
         border_style="cyan",
     )
     _console.print(panel)
@@ -344,14 +342,14 @@ def _display_metric_stats(analysis) -> None:
     if not analysis.metrics_summary:
         return
 
-    table = Table(title="Metric Statistics", show_header=True, header_style="bold cyan")
-    table.add_column("Metric")
-    table.add_column("Mean", justify="right")
-    table.add_column("Std", justify="right")
-    table.add_column("Min", justify="right")
-    table.add_column("Max", justify="right")
-    table.add_column("Median", justify="right")
-    table.add_column("Pass Rate", justify="right")
+    table = Table(title="메트릭 통계", show_header=True, header_style="bold cyan")
+    table.add_column("메트릭")
+    table.add_column("평균", justify="right")
+    table.add_column("표준편차", justify="right")
+    table.add_column("최소", justify="right")
+    table.add_column("최대", justify="right")
+    table.add_column("중앙값", justify="right")
+    table.add_column("통과율", justify="right")
 
     for metric_name, stats in analysis.metrics_summary.items():
         pass_rate = analysis.metric_pass_rates.get(metric_name, 0)
@@ -396,8 +394,8 @@ def _display_pipeline_comparison_summary(pipeline_result, run_id1: str, run_id2:
     prompt_summary = prompt_changes.get("summary", {}) if isinstance(prompt_changes, dict) else {}
 
     _console.print("\n[bold]비교 분석 요약[/bold]")
-    _console.print(f"- Run A: {run_id1} ({model_a}, {dataset_a})")
-    _console.print(f"- Run B: {run_id2} ({model_b}, {dataset_b})")
+    _console.print(f"- 실행 A: {run_id1} ({model_a}, {dataset_a})")
+    _console.print(f"- 실행 B: {run_id2} ({model_b}, {dataset_b})")
     _console.print(f"- 통과율 변화: {_format_percent(pass_rate_diff, signed=True)}")
     _console.print(f"- 평균 점수 변화: {_format_float(avg_score_diff, signed=True)}")
     _console.print(
@@ -408,7 +406,7 @@ def _display_pipeline_comparison_summary(pipeline_result, run_id1: str, run_id2:
     )
     _console.print(
         "- 프롬프트 변경: "
-        f"{prompt_summary.get('changed', 0)}건 (상태: {prompt_changes.get('status', 'unknown')})"
+        f"{prompt_summary.get('changed', 0)}건 (상태: {prompt_changes.get('status', '알 수 없음')})"
     )
 
     scorecard = build_comparison_scorecard(comparison_output)
@@ -417,19 +415,19 @@ def _display_pipeline_comparison_summary(pipeline_result, run_id1: str, run_id2:
         return
 
     table = Table(title="비교 스코어카드", show_header=True, header_style="bold cyan")
-    table.add_column("Metric")
+    table.add_column("메트릭")
     table.add_column("A", justify="right")
     table.add_column("B", justify="right")
-    table.add_column("Diff", justify="right")
-    table.add_column("p-value", justify="right")
-    table.add_column("Effect", justify="right")
-    table.add_column("Significant")
+    table.add_column("차이", justify="right")
+    table.add_column("p-값", justify="right")
+    table.add_column("효과 크기", justify="right")
+    table.add_column("유의 여부")
 
     for row in scorecard:
         effect_size = _format_float(row.get("effect_size"), precision=2)
         effect_level = row.get("effect_level")
         effect_text = f"{effect_size} ({effect_level})" if effect_level else f"{effect_size}"
-        significant = "Yes" if row.get("is_significant") else "No"
+        significant = "예" if row.get("is_significant") else "아니오"
         table.add_row(
             str(row.get("metric") or "-"),
             _format_float(row.get("mean_a")),
@@ -472,7 +470,7 @@ def _display_correlations(analysis) -> None:
     if not analysis.significant_correlations:
         return
 
-    _console.print("[bold]Significant Correlations:[/bold]")
+    _console.print("[bold]유의미한 상관관계:[/bold]")
     for corr in analysis.significant_correlations[:5]:
         direction = "[green]+" if corr.correlation > 0 else "[red]-"
         _console.print(
@@ -489,14 +487,14 @@ def _display_low_performers(analysis) -> None:
     if not analysis.low_performers:
         return
 
-    _console.print(f"[bold]Low Performing Test Cases ({len(analysis.low_performers)}):[/bold]")
+    _console.print(f"[bold]저성능 테스트 케이스 ({len(analysis.low_performers)}):[/bold]")
 
     table = Table(show_header=True, header_style="bold yellow")
-    table.add_column("Test Case")
-    table.add_column("Metric")
-    table.add_column("Score", justify="right")
-    table.add_column("Threshold", justify="right")
-    table.add_column("Potential Causes")
+    table.add_column("테스트 케이스")
+    table.add_column("메트릭")
+    table.add_column("점수", justify="right")
+    table.add_column("임계값", justify="right")
+    table.add_column("가능한 원인")
 
     for low_perf in analysis.low_performers[:10]:
         causes = ", ".join(low_perf.potential_causes[:2]) if low_perf.potential_causes else "-"
@@ -520,7 +518,7 @@ def _display_insights(analysis) -> None:
     if not analysis.insights:
         return
 
-    _console.print("[bold]Insights:[/bold]")
+    _console.print("[bold]인사이트:[/bold]")
     for insight in analysis.insights:
         _console.print(f"  • {insight}")
     _console.print()
@@ -529,32 +527,32 @@ def _display_insights(analysis) -> None:
 def _display_nlp_analysis(nlp_analysis) -> None:
     """Display NLP analysis results."""
 
-    _console.print("\n[bold cyan]NLP Analysis[/bold cyan]\n")
+    _console.print("\n[bold cyan]NLP 분석[/bold cyan]\n")
 
     if nlp_analysis.question_stats:
-        _console.print("[bold]Text Statistics (Questions):[/bold]")
+        _console.print("[bold]텍스트 통계(질문):[/bold]")
         stats = nlp_analysis.question_stats
         table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Metric", style="bold")
-        table.add_column("Value", justify="right")
+        table.add_column("지표", style="bold")
+        table.add_column("값", justify="right")
 
-        table.add_row("Total Characters", str(stats.char_count))
-        table.add_row("Total Words", str(stats.word_count))
-        table.add_row("Total Sentences", str(stats.sentence_count))
-        table.add_row("Avg Word Length", f"{stats.avg_word_length:.2f}")
-        table.add_row("Vocabulary Diversity", f"{stats.unique_word_ratio:.1%}")
-        table.add_row("Avg Sentence Length", f"{stats.avg_sentence_length:.1f} words")
+        table.add_row("전체 문자 수", str(stats.char_count))
+        table.add_row("전체 단어 수", str(stats.word_count))
+        table.add_row("전체 문장 수", str(stats.sentence_count))
+        table.add_row("평균 단어 길이", f"{stats.avg_word_length:.2f}")
+        table.add_row("어휘 다양성", f"{stats.unique_word_ratio:.1%}")
+        table.add_row("평균 문장 길이", f"{stats.avg_sentence_length:.1f} 단어")
 
         _console.print(table)
         _console.print()
 
     if nlp_analysis.question_types:
-        _console.print("[bold]Question Type Distribution:[/bold]")
+        _console.print("[bold]질문 유형 분포:[/bold]")
         table = Table(show_header=True, header_style="bold")
-        table.add_column("Type")
-        table.add_column("Count", justify="right")
-        table.add_column("Percentage", justify="right")
-        table.add_column("Avg Scores")
+        table.add_column("유형")
+        table.add_column("개수", justify="right")
+        table.add_column("비율", justify="right")
+        table.add_column("평균 점수")
 
         for question_type in nlp_analysis.question_types:
             avg_scores_str = ", ".join(
@@ -571,11 +569,11 @@ def _display_nlp_analysis(nlp_analysis) -> None:
         _console.print()
 
     if nlp_analysis.top_keywords:
-        _console.print("[bold]Top Keywords:[/bold]")
+        _console.print("[bold]상위 키워드:[/bold]")
         table = Table(show_header=True, header_style="bold")
-        table.add_column("Keyword")
-        table.add_column("Frequency", justify="right")
-        table.add_column("TF-IDF Score", justify="right")
+        table.add_column("키워드")
+        table.add_column("빈도", justify="right")
+        table.add_column("TF-IDF 점수", justify="right")
 
         for keyword in nlp_analysis.top_keywords[:10]:
             table.add_row(keyword.keyword, str(keyword.frequency), f"{keyword.tfidf_score:.3f}")
@@ -584,7 +582,7 @@ def _display_nlp_analysis(nlp_analysis) -> None:
         _console.print()
 
     if nlp_analysis.insights:
-        _console.print("[bold]NLP Insights:[/bold]")
+        _console.print("[bold]NLP 인사이트:[/bold]")
         for insight in nlp_analysis.insights:
             _console.print(f"  • {insight}")
         _console.print()
@@ -593,18 +591,18 @@ def _display_nlp_analysis(nlp_analysis) -> None:
 def _display_causal_analysis(causal_analysis) -> None:
     """Display causal analysis results."""
 
-    _console.print("\n[bold magenta]Causal Analysis[/bold magenta]\n")
+    _console.print("\n[bold magenta]인과 분석[/bold magenta]\n")
 
     significant_impacts = causal_analysis.significant_impacts
     if significant_impacts:
-        _console.print("[bold]Significant Factor-Metric Relationships:[/bold]")
+        _console.print("[bold]유의미한 요인-메트릭 관계:[/bold]")
         table = Table(show_header=True, header_style="bold")
-        table.add_column("Factor")
-        table.add_column("Metric")
-        table.add_column("Direction")
-        table.add_column("Strength")
-        table.add_column("Correlation", justify="right")
-        table.add_column("p-value", justify="right")
+        table.add_column("요인")
+        table.add_column("메트릭")
+        table.add_column("방향")
+        table.add_column("강도")
+        table.add_column("상관계수", justify="right")
+        table.add_column("p-값", justify="right")
 
         for impact in significant_impacts[:10]:
             direction_style = "green" if impact.direction.value == "positive" else "red"
@@ -622,41 +620,41 @@ def _display_causal_analysis(causal_analysis) -> None:
 
     strong_relationships = causal_analysis.strong_relationships
     if strong_relationships:
-        _console.print("[bold]Strong Causal Relationships (confidence > 0.7):[/bold]")
+        _console.print("[bold]강한 인과 관계 (신뢰도 > 0.7):[/bold]")
         for rel in strong_relationships[:5]:
             direction_arrow = "↑" if rel.direction.value == "positive" else "↓"
             _console.print(
                 f"  • {rel.cause.value} → {rel.effect_metric} {direction_arrow} "
-                f"(confidence: {rel.confidence:.2f})"
+                f"(신뢰도: {rel.confidence:.2f})"
             )
         _console.print()
 
     if causal_analysis.root_causes:
-        _console.print("[bold]Root Cause Analysis:[/bold]")
+        _console.print("[bold]근본 원인 분석:[/bold]")
         for rc in causal_analysis.root_causes:
             primary_str = ", ".join(f.value for f in rc.primary_causes)
             _console.print(f"  [bold]{rc.metric_name}:[/bold]")
-            _console.print(f"    Primary causes: {primary_str}")
+            _console.print(f"    주요 원인: {primary_str}")
             if rc.contributing_factors:
                 contributing_str = ", ".join(f.value for f in rc.contributing_factors)
-                _console.print(f"    Contributing factors: {contributing_str}")
+                _console.print(f"    기여 요인: {contributing_str}")
             if rc.explanation:
-                _console.print(f"    Explanation: {rc.explanation}")
+                _console.print(f"    설명: {rc.explanation}")
         _console.print()
 
     if causal_analysis.interventions:
-        _console.print("[bold]Recommended Interventions:[/bold]")
+        _console.print("[bold]권장 개입:[/bold]")
         for intervention in causal_analysis.interventions[:5]:
-            priority_str = {1: "🔴 High", 2: "🟡 Medium", 3: "🟢 Low"}.get(
-                intervention.priority, f"Priority {intervention.priority}"
+            priority_str = {1: "🔴 높음", 2: "🟡 중간", 3: "🟢 낮음"}.get(
+                intervention.priority, f"우선순위 {intervention.priority}"
             )
             _console.print(f"  [{priority_str}] {intervention.intervention}")
-            _console.print(f"      Target: {intervention.target_metric}")
-            _console.print(f"      Expected: {intervention.expected_impact}")
+            _console.print(f"      대상: {intervention.target_metric}")
+            _console.print(f"      기대 효과: {intervention.expected_impact}")
         _console.print()
 
     if causal_analysis.insights:
-        _console.print("[bold]Causal Insights:[/bold]")
+        _console.print("[bold]인과 인사이트:[/bold]")
         for insight in causal_analysis.insights:
             _console.print(f"  • {insight}")
         _console.print()
@@ -735,7 +733,7 @@ def _perform_playbook_analysis(
     )
     from evalvault.domain.services.improvement_guide_service import ImprovementGuideService
 
-    _console.print("\n[bold cyan]Playbook-based Improvement Analysis[/bold cyan]\n")
+    _console.print("\n[bold cyan]플레이북 기반 개선 분석[/bold cyan]\n")
 
     playbook = get_default_playbook()
     detector = PatternDetector(playbook=playbook)
@@ -749,7 +747,7 @@ def _perform_playbook_analysis(
 
         llm_adapter = get_llm_adapter(settings)
         insight_generator = InsightGenerator(llm_adapter=llm_adapter)
-        _console.print("[dim]LLM-based insight generation enabled[/dim]")
+        _console.print("[dim]LLM 기반 인사이트 생성 활성화[/dim]")
 
     stage_metric_playbook = StageMetricPlaybookLoader().load()
 
@@ -761,7 +759,7 @@ def _perform_playbook_analysis(
         enable_llm_enrichment=enable_llm,
     )
 
-    with _console.status("[bold green]Analyzing patterns and generating recommendations..."):
+    with _console.status("[bold green]패턴 분석 및 권장사항 생성 중..."):
         report = service.generate_report(
             run,
             include_llm_analysis=enable_llm,
@@ -777,43 +775,41 @@ def _display_improvement_report(report) -> None:
 
     from evalvault.domain.entities.improvement import ImprovementPriority
 
-    summary = f"""[bold]Improvement Analysis Summary[/bold]
-Run ID: {report.run_id}
-Total Test Cases: {report.total_test_cases}
-Guides Generated: {len(report.guides)}
-Analysis Methods: {", ".join(m.value for m in report.analysis_methods_used)}
+    summary = f"""[bold]개선 분석 요약[/bold]
+실행 ID: {report.run_id}
+전체 테스트 케이스: {report.total_test_cases}
+생성된 가이드: {len(report.guides)}
+분석 방법: {", ".join(m.value for m in report.analysis_methods_used)}
 
-[bold]Metric Performance vs Thresholds[/bold]"""
+[bold]메트릭 성능 vs 임계값[/bold]"""
 
     for metric, score in report.metric_scores.items():
         gap = report.metric_gaps.get(metric, 0)
-        status = "[red]Below threshold[/red]" if gap > 0 else "[green]Meeting threshold[/green]"
+        status = "[red]임계값 미달[/red]" if gap > 0 else "[green]임계값 충족[/green]"
         summary += f"\n  {metric}: {score:.3f} ({status})"
         if gap > 0:
-            summary += f" [dim](gap: -{gap:.3f})[/dim]"
+            summary += f" [dim](격차: -{gap:.3f})[/dim]"
 
-    _console.print(
-        Panel(summary, title="[bold cyan]Improvement Analysis[/bold cyan]", border_style="cyan")
-    )
+    _console.print(Panel(summary, title="[bold cyan]개선 분석[/bold cyan]", border_style="cyan"))
 
     stage_summary = report.metadata.get("stage_metrics_summary")
     if stage_summary:
         pass_rate = stage_summary.get("pass_rate")
         pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "-"
         _console.print(
-            "\n[bold]Stage Metrics Summary[/bold] "
-            f"(evaluated: {stage_summary.get('evaluated', 0)}, "
-            f"passed: {stage_summary.get('passed', 0)}, "
-            f"failed: {stage_summary.get('failed', 0)}, "
-            f"pass rate: {pass_rate_text})"
+            "\n[bold]스테이지 메트릭 요약[/bold] "
+            f"(평가됨: {stage_summary.get('evaluated', 0)}, "
+            f"통과: {stage_summary.get('passed', 0)}, "
+            f"실패: {stage_summary.get('failed', 0)}, "
+            f"통과율: {pass_rate_text})"
         )
         top_failures = stage_summary.get("top_failures", [])
         if top_failures:
             table = Table(show_header=True, header_style="bold cyan")
-            table.add_column("Metric")
-            table.add_column("Failures", justify="right")
-            table.add_column("Avg Score", justify="right")
-            table.add_column("Threshold", justify="right")
+            table.add_column("메트릭")
+            table.add_column("실패 건수", justify="right")
+            table.add_column("평균 점수", justify="right")
+            table.add_column("임계값", justify="right")
             for item in top_failures:
                 threshold = item.get("threshold")
                 threshold_text = f"{threshold:.3f}" if threshold is not None else "-"
@@ -825,27 +821,27 @@ Analysis Methods: {", ".join(m.value for m in report.analysis_methods_used)}
                 )
             _console.print(table)
         else:
-            _console.print("[green]No stage metric failures detected.[/green]")
+            _console.print("[green]스테이지 메트릭 실패가 없습니다.[/green]")
 
     if not report.guides:
-        _console.print("[yellow]No improvement guides generated.[/yellow]")
+        _console.print("[yellow]개선 가이드가 생성되지 않았습니다.[/yellow]")
         return
 
     critical_guides = report.get_critical_guides()
     if critical_guides:
-        _console.print("\n[bold red]Critical Issues (P0)[/bold red]")
+        _console.print("\n[bold red]치명적 이슈 (P0)[/bold red]")
         for guide in critical_guides:
             _display_guide(guide)
 
     high_priority = [g for g in report.guides if g.priority == ImprovementPriority.P1_HIGH]
     if high_priority:
-        _console.print("\n[bold yellow]High Priority (P1)[/bold yellow]")
+        _console.print("\n[bold yellow]높은 우선순위 (P1)[/bold yellow]")
         for guide in high_priority[:3]:
             _display_guide(guide)
 
     medium_priority = [g for g in report.guides if g.priority == ImprovementPriority.P2_MEDIUM]
     if medium_priority:
-        _console.print("\n[bold blue]Medium Priority (P2)[/bold blue]")
+        _console.print("\n[bold blue]중간 우선순위 (P2)[/bold blue]")
         for guide in medium_priority[:2]:
             _display_guide(guide)
 
@@ -871,20 +867,23 @@ def _display_guide(guide) -> None:
     if guide.evidence:
         primary = guide.evidence.primary_pattern
         if primary:
-            _console.print(f"     Pattern: {primary.pattern_type.value}")
+            _console.print(f"     패턴: {primary.pattern_type.value}")
             _console.print(
-                f"     Affected: {primary.affected_count}/{primary.total_count} test cases "
+                f"     영향: {primary.affected_count}/{primary.total_count} 테스트 케이스 "
                 f"({primary.affected_ratio:.1%})"
             )
         elif guide.evidence.total_failures > 0:
-            _console.print(f"     Failures: {guide.evidence.total_failures} test cases")
-            _console.print(f"     Avg Score (failures): {guide.evidence.avg_score_failures:.3f}")
+            _console.print(f"     실패: {guide.evidence.total_failures} 테스트 케이스")
+            _console.print(f"     실패 평균 점수: {guide.evidence.avg_score_failures:.3f}")
 
     if guide.actions:
-        _console.print("     [bold]Recommended Actions:[/bold]")
+        _console.print("     [bold]권장 조치:[/bold]")
         for action in guide.actions[:3]:
             effort_color = {"low": "green", "medium": "yellow", "high": "red"}.get(
                 action.effort, "white"
+            )
+            effort_label = {"low": "낮음", "medium": "중간", "high": "높음"}.get(
+                action.effort, action.effort
             )
             _console.print(f"       • {action.title}")
             if action.description:
@@ -893,12 +892,12 @@ def _display_guide(guide) -> None:
                 else:
                     _console.print(f"         [dim]{action.description}[/dim]")
             _console.print(
-                f"         Expected: +{action.expected_improvement:.1%} | Effort: "
-                f"[{effort_color}]{action.effort}[/{effort_color}]"
+                f"         기대 개선: +{action.expected_improvement:.1%} | 노력도: "
+                f"[{effort_color}]{effort_label}[/{effort_color}]"
             )
 
     if guide.verification_command:
-        _console.print(f"     [dim]Verify: {guide.verification_command}[/dim]")
+        _console.print(f"     [dim]검증: {guide.verification_command}[/dim]")
 
 
 def _generate_report(
@@ -917,19 +916,19 @@ def _generate_report(
         stage_summary = improvement_report.metadata.get("stage_metrics_summary")
         if stage_summary:
             pass_rate = stage_summary.get("pass_rate")
-            pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "n/a"
-            content += "\n\n## Stage Metrics Summary\n"
-            content += f"\n- Total metrics: {stage_summary.get('total', 0)}"
-            content += f"\n- Evaluated: {stage_summary.get('evaluated', 0)}"
+            pass_rate_text = f"{pass_rate:.1%}" if pass_rate is not None else "해당 없음"
+            content += "\n\n## 스테이지 메트릭 요약\n"
+            content += f"\n- 전체 메트릭: {stage_summary.get('total', 0)}"
+            content += f"\n- 평가됨: {stage_summary.get('evaluated', 0)}"
             content += (
-                f"\n- Passed: {stage_summary.get('passed', 0)} / "
-                f"Failed: {stage_summary.get('failed', 0)}"
+                f"\n- 통과: {stage_summary.get('passed', 0)} / "
+                f"실패: {stage_summary.get('failed', 0)}"
             )
-            content += f"\n- Pass rate: {pass_rate_text}\n"
+            content += f"\n- 통과율: {pass_rate_text}\n"
             top_failures = stage_summary.get("top_failures", [])
             if top_failures:
-                content += "\n| Metric | Failures | Avg Score | Threshold |\n"
-                content += "|--------|----------|-----------|-----------|\n"
+                content += "\n| 메트릭 | 실패 건수 | 평균 점수 | 임계값 |\n"
+                content += "|--------|----------|-----------|--------|\n"
                 for item in top_failures:
                     threshold = item.get("threshold")
                     threshold_text = f"{threshold:.3f}" if threshold is not None else "-"

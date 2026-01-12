@@ -467,7 +467,7 @@ class LLMReport:
             "",
             "---",
             "",
-            "## Executive Summary",
+            "## 요약",
             "",
             self.executive_summary,
             "",
@@ -495,7 +495,7 @@ class LLMReport:
                 ]
             )
             if section.score is not None and section.threshold is not None:
-                status = "✅ Pass" if section.score >= section.threshold else "❌ Fail"
+                status = "✅ 통과" if section.score >= section.threshold else "❌ 실패"
                 lines.extend(
                     [
                         f"**점수**: {section.score:.3f} / {section.threshold:.2f} ({status})",
@@ -515,7 +515,7 @@ class LLMReport:
             [
                 "",
                 "*본 보고서는 AI가 생성한 분석입니다. 전문가 검토를 권장합니다.*",
-                "*EvalVault v1.3.0 | Powered by Ragas + LLM Analysis*",
+                "*EvalVault v1.3.0 | Ragas + LLM 분석 기반*",
             ]
         )
 
@@ -700,7 +700,7 @@ class LLMReportGenerator:
             return await self._llm_adapter.agenerate_text(prompt)
         except Exception as e:
             logger.error(f"Failed to generate executive summary: {e}")
-            return f"*Executive Summary 생성 실패: {e}*"
+            return f"*요약 생성 실패: {e}*"
 
     def generate_report_sync(
         self,
