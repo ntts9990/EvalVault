@@ -1197,6 +1197,7 @@ Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며
 - [STATUS.md](../STATUS.md) - 1페이지 상태 요약
 - [ROADMAP.md](../ROADMAP.md) - 공개 로드맵
 - [DEV_GUIDE.md](DEV_GUIDE.md) - 개발/테스트 루틴
+- [CLI_MCP_PLAN.md](CLI_MCP_PLAN.md) - CLI→MCP 이식 계획
 - [new_whitepaper/INDEX.md](../new_whitepaper/INDEX.md) - 개발 백서(설계/운영/품질 기준)
 - [open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md) - Open RAG Trace 표준
 - [open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md) - Collector 구성 가이드

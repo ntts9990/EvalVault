@@ -15,6 +15,7 @@
 - 설치: `getting-started/INSTALLATION.md`
 - 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
 - 개발/기여: `guides/DEV_GUIDE.md`
+- CLI→MCP 이식 계획: `guides/CLI_MCP_PLAN.md`
 - 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
 - 상태 요약: `STATUS.md`
 - 로드맵: `ROADMAP.md`
@@ -34,6 +35,7 @@ docs/
 ├── guides/
 │   ├── USER_GUIDE.md            # 사용/운영 종합 가이드
 │   ├── DEV_GUIDE.md             # 개발 루틴/테스트/품질
+│   ├── CLI_MCP_PLAN.md          # CLI→MCP 이식 계획 (Living Doc)
 │   ├── RELEASE_CHECKLIST.md     # 배포 체크리스트
 │   ├── open-rag-trace-*.md      # Open RAG Trace 샘플/내부 래퍼
 │   └── open-rag-trace-*.md

@@ -73,4 +73,5 @@ npm run dev
 ## 더 자세한 정보
 
 - 설계/컴포넌트/운영 기준: `docs/new_whitepaper/INDEX.md`
+- CLI→MCP 이식 계획: `docs/guides/CLI_MCP_PLAN.md`
 - Open RAG Trace 스펙/샘플: `docs/architecture/open-rag-trace-spec.md`, `docs/guides/open-rag-trace-samples.md`

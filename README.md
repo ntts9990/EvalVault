@@ -112,6 +112,7 @@ npm run dev
 - 필수 필드: `id`, `question`, `answer`, `contexts`
 - `ground_truth`는 일부 메트릭에서 필요합니다.
 - 템플릿: `docs/templates/dataset_template.json`, `docs/templates/dataset_template.csv`, `docs/templates/dataset_template.xlsx`
+- 관련 문서: `docs/guides/USER_GUIDE.md`
 
 ---
 
@@ -124,6 +125,42 @@ npm run dev
 
 ---
 
+## RAGAS 0.4.2 데이터 전처리/후처리 (중요)
+
+아래 항목은 **RAGAS 0.4.2 기준**으로 EvalVault가 데이터와 점수를 안정화하기 위해 수행하는 처리들입니다. 모두 재현성과 품질 저하 방지를 위해 의도적으로 설계되었습니다.
+
+### 1) 데이터 전처리 (입력 안정화)
+- **빈 질문/답변/컨텍스트 제거**: 평가 불가능한 케이스를 사전에 제거합니다. (`src/evalvault/domain/services/dataset_preprocessor.py`)
+- **컨텍스트 정규화**: 공백 정리, 중복 제거, 길이 제한을 통해 컨텍스트 품질을 표준화합니다. (`src/evalvault/domain/services/dataset_preprocessor.py`)
+- **레퍼런스 보완**: 레퍼런스가 필요한 메트릭에서 부족할 경우 질문/답변/컨텍스트 기반으로 보완합니다. (`src/evalvault/domain/services/dataset_preprocessor.py`)
+
+**이유**: 입력 품질 편차로 인해 RAGAS 점수 분산이 커지는 것을 방지하고, 메트릭 실행 실패/왜곡을 줄입니다.
+
+### 2) 한국어/비영어권 대응 (프롬프트 언어 정렬)
+- **한국어 데이터셋 자동 감지** 후 `answer_relevancy`, `factual_correctness`에 한국어 프롬프트를 기본 적용합니다. (`src/evalvault/domain/services/evaluator.py`)
+- **사용자 프롬프트 오버라이드 지원**: 필요 시 YAML로 메트릭별 프롬프트를 덮어쓸 수 있습니다. (`src/evalvault/domain/services/ragas_prompt_overrides.py`)
+- **외부 근거(비영어권 이슈)**:
+  - https://github.com/explodinggradients/ragas/issues/1829
+  - https://github.com/explodinggradients/ragas/issues/402
+- **공식 문서(언어 이슈 직접 언급)**:
+  - https://docs.ragas.io/en/stable/howtos/customizations/metrics/_metrics_language_adaptation/
+
+**이유**: 질문 생성/판정 프롬프트가 영어에 고정될 경우, 비영어 입력에서 언어 불일치로 점수 왜곡이 발생할 수 있으므로 이를 최소화합니다.
+
+### 3) 점수 후처리 (안정성 확보)
+- **비숫자/NaN 점수는 0.0 처리**: 메트릭 실패가 전체 파이프라인을 중단시키지 않도록 방어합니다. (`src/evalvault/domain/services/evaluator.py`)
+- **Faithfulness 폴백**: RAGAS가 실패하거나 한국어 텍스트에서 불안정할 경우, 한국어 전용 claim-level 분석으로 점수를 재구성합니다. (`src/evalvault/domain/services/evaluator.py`)
+
+**이유**: LLM/임베딩 실패나 NaN으로 인해 결과가 끊기는 문제를 방지하고, 한국어에서 최소한의 신뢰도를 확보하기 위해서입니다.
+
+### 4) 요약/시각화 후처리 (비교 가능성 강화)
+- **임계값 기준 정규화**: threshold를 0점 기준으로 정규화하여 성능 개선/악화를 직관적으로 표시합니다. (`src/evalvault/domain/services/visual_space_service.py`)
+- **가중 합산**: `faithfulness`, `factual_correctness`, `answer_relevancy` 등을 가중 결합하여 축/지표로 요약합니다. (`src/evalvault/domain/services/visual_space_service.py`)
+
+**이유**: 단일 지표만으로는 해석이 어려운 경우가 많아, 정책적 기준(임계값)과 함께 비교 가능한 요약 점수로 제공하기 위함입니다.
+
+---
+
 ## 모델/프로필 설정(요약)
 
 - 프로필 정의: `config/models.yaml`
@@ -131,6 +168,7 @@ npm run dev
   - `EVALVAULT_PROFILE`
   - `EVALVAULT_DB_PATH`
   - `OPENAI_API_KEY` 또는 `OLLAMA_BASE_URL` 등
+- 관련 문서: `docs/guides/USER_GUIDE.md`, `docs/guides/DEV_GUIDE.md`, `config/models.yaml`
 
 ---
 
@@ -141,6 +179,7 @@ EvalVault는 OpenTelemetry + OpenInference 기반의 **Open RAG Trace** 스키�
 - 스펙: `docs/architecture/open-rag-trace-spec.md`
 - Collector: `docs/architecture/open-rag-trace-collector.md`
 - 샘플/내부 래퍼: `docs/guides/open-rag-trace-samples.md`, `docs/guides/open-rag-trace-internal-adapter.md`
+- 관련 문서: `docs/INDEX.md`, `docs/architecture/open-rag-trace-collector.md`
 
 ---
 
@@ -154,6 +193,7 @@ uv run pytest tests -v
 
 - 기여 가이드: `CONTRIBUTING.md`
 - 개발 루틴: `docs/guides/DEV_GUIDE.md`
+- 관련 문서: `docs/STATUS.md`, `docs/ROADMAP.md`
 
 ---
 
