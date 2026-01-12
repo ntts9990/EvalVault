@@ -886,7 +886,7 @@ def register_run_commands(
                     details=str(exc),
                     fixes=[
                         "Ollama가 실행 중인지 확인하세요: `ollama serve` (또는 데스크톱 앱 실행).",
-                        "필요 모델을 받아두세요: `ollama pull gemma3:1b`, `ollama pull qwen3-embedding:0.6b`.",
+                        "필요 모델을 받아두세요: `ollama pull gpt-oss-safeguard:20b`, `ollama pull qwen3-embedding:0.6b`.",
                         "서버 URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
                     ],
                 )
@@ -1461,7 +1461,7 @@ def register_run_commands(
                 if provider == "ollama":
                     fixes = [
                         "Ollama 서버가 실행 중인지 확인하세요 (기본: http://localhost:11434).",
-                        "필요 모델을 받아두세요: `ollama pull gemma3:1b` 및 `ollama pull qwen3-embedding:0.6b`.",
+                        "필요 모델을 받아두세요: `ollama pull gpt-oss-safeguard:20b` 및 `ollama pull qwen3-embedding:0.6b`.",
                         "URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
                     ]
                 elif provider == "openai":

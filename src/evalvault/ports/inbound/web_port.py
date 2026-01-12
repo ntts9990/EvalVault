@@ -18,7 +18,7 @@ class EvalRequest:
 
     dataset_path: str
     metrics: list[str]
-    model_name: str = "ollama/gemma3:1b"
+    model_name: str = "ollama/gpt-oss-safeguard:20b"
     evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)

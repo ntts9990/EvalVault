@@ -105,7 +105,7 @@ class Settings(BaseSettings):
         description="Ollama server URL",
     )
     ollama_model: str = Field(
-        default="gemma3:1b",
+        default="gpt-oss-safeguard:20b",
         description="Ollama model name for evaluation",
     )
     ollama_embedding_model: str = Field(

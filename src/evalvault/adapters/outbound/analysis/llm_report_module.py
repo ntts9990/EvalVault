@@ -57,6 +57,21 @@ class LLMReportModule(BaseAnalysisModule):
                 self._build_prompt(context, evidence),
             )
             report_type = context.get("report_type") or "analysis"
+            assets = self._build_report_assets(context, evidence)
+            payload, schema_errors = self._parse_structured_report(
+                report,
+                report_type=report_type,
+                evidence=evidence,
+            )
+            if payload is not None:
+                report = self._render_structured_report(
+                    payload,
+                    context=context,
+                    evidence=evidence,
+                    assets=assets,
+                )
+                return self._build_output(context, evidence, report, llm_used=True)
+
             is_valid, reasons = self._validate_report(
                 report,
                 report_type=report_type,
@@ -64,9 +79,11 @@ class LLMReportModule(BaseAnalysisModule):
             )
             if not is_valid:
                 output = self._fallback_report(context, evidence, llm_used=False)
-                output["llm_error"] = (
-                    "LLM report validation failed: " + "; ".join(reasons)
-                ).strip()
+                combined = []
+                if schema_errors:
+                    combined.append("Schema parse failed: " + "; ".join(schema_errors))
+                combined.append("LLM report validation failed: " + "; ".join(reasons))
+                output["llm_error"] = "; ".join(combined).strip()
                 return output
             return self._build_output(context, evidence, report, llm_used=True)
         except Exception as exc:
@@ -106,6 +123,21 @@ class LLMReportModule(BaseAnalysisModule):
                     self._build_prompt(context, evidence),
                 )
             report_type = context.get("report_type") or "analysis"
+            assets = self._build_report_assets(context, evidence)
+            payload, schema_errors = self._parse_structured_report(
+                report,
+                report_type=report_type,
+                evidence=evidence,
+            )
+            if payload is not None:
+                report = self._render_structured_report(
+                    payload,
+                    context=context,
+                    evidence=evidence,
+                    assets=assets,
+                )
+                return self._build_output(context, evidence, report, llm_used=True)
+
             is_valid, reasons = self._validate_report(
                 report,
                 report_type=report_type,
@@ -113,9 +145,11 @@ class LLMReportModule(BaseAnalysisModule):
             )
             if not is_valid:
                 output = self._fallback_report(context, evidence, llm_used=False)
-                output["llm_error"] = (
-                    "LLM report validation failed: " + "; ".join(reasons)
-                ).strip()
+                combined = []
+                if schema_errors:
+                    combined.append("Schema parse failed: " + "; ".join(schema_errors))
+                combined.append("LLM report validation failed: " + "; ".join(reasons))
+                output["llm_error"] = "; ".join(combined).strip()
                 return output
             return self._build_output(context, evidence, report, llm_used=True)
         except Exception as exc:
@@ -524,20 +558,491 @@ class LLMReportModule(BaseAnalysisModule):
             )
         return scorecard
 
-    def _validate_report(
+    def _build_report_assets(
+        self,
+        context: dict[str, Any],
+        evidence: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        run = context.get("run")
+        stats_detail = (
+            context.get("stats_detail") if isinstance(context.get("stats_detail"), dict) else {}
+        )
+        pass_rates = (
+            context.get("metric_pass_rates")
+            if isinstance(context.get("metric_pass_rates"), dict)
+            else {}
+        )
+        ragas_metrics = (
+            context.get("ragas_metrics") if isinstance(context.get("ragas_metrics"), dict) else {}
+        )
+        comparison_details = (
+            context.get("comparison_details")
+            if isinstance(context.get("comparison_details"), dict)
+            else {}
+        )
+        scorecard = self._build_metric_scorecard(
+            run,
+            stats_detail,
+            pass_rates,
+            ragas_metrics,
+        )
+        comparison_scorecard = self._build_comparison_scorecard(comparison_details)
+        quality_summary = self._build_quality_summary(context)
+        artifact_manifest = self._build_artifact_manifest(context.get("artifact_nodes") or [])
+        evidence_index = self._index_evidence_by_metric(evidence)
+        risk_metrics = self._build_risk_metrics(scorecard)
+        return {
+            "scorecard": scorecard,
+            "comparison_scorecard": comparison_scorecard,
+            "quality_summary": quality_summary,
+            "artifact_manifest": artifact_manifest,
+            "evidence_index": evidence_index,
+            "risk_metrics": risk_metrics,
+        }
+
+    @staticmethod
+    def _coerce_str(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        return str(value).strip()
+
+    @staticmethod
+    def _coerce_list(value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            stripped = value.strip()
+            return [stripped] if stripped else []
+        if isinstance(value, list):
+            items: list[str] = []
+            for item in value:
+                if item is None:
+                    continue
+                text = str(item).strip()
+                if text:
+                    items.append(text)
+            return items
+        return []
+
+    @staticmethod
+    def _extract_json_payload(text: str) -> dict[str, Any] | None:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"```$", "", cleaned).strip()
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        candidate = cleaned[start : end + 1]
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    @staticmethod
+    def _index_evidence_by_metric(evidence: list[dict[str, Any]]) -> dict[str, list[str]]:
+        index: dict[str, list[str]] = {}
+        for item in evidence:
+            evidence_id = item.get("evidence_id")
+            if not evidence_id:
+                continue
+            for metric in item.get("failed_metrics") or []:
+                if not metric:
+                    continue
+                index.setdefault(metric, []).append(evidence_id)
+        return index
+
+    @staticmethod
+    def _format_evidence_refs(
+        evidence_ids: list[str] | None,
+        *,
+        max_items: int = 2,
+    ) -> str:
+        if not evidence_ids:
+            return ""
+        unique = list(dict.fromkeys(evidence_ids))
+        refs = [f"[{item}]" for item in unique[:max_items] if item]
+        return " ".join(refs)
+
+    def _build_fallback_insights(
+        self,
+        scorecard: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+    ) -> list[str]:
+        evidence_index = self._index_evidence_by_metric(evidence)
+        risk_metrics = self._build_risk_metrics(scorecard, limit=4)
+        lines: list[str] = []
+        for row in risk_metrics:
+            metric = row.get("metric")
+            if not metric:
+                continue
+            mean = self._format_float(row.get("mean"))
+            threshold = self._format_float(row.get("threshold"))
+            pass_rate = self._format_percent(row.get("pass_rate"))
+            refs = self._format_evidence_refs(evidence_index.get(metric, []))
+            suffix = f" {refs}" if refs else " (추가 데이터 필요)"
+            lines.append(
+                f"{metric} 평균 {mean} < threshold {threshold}, pass_rate {pass_rate}{suffix}"
+            )
+        if lines:
+            return lines
+
+        for item in evidence[:3]:
+            evidence_id = item.get("evidence_id")
+            avg_score = self._format_float(item.get("avg_score"))
+            failed = ", ".join(item.get("failed_metrics") or [])
+            refs = f"[{evidence_id}]" if evidence_id else ""
+            refs_text = f"{refs} " if refs else ""
+            lines.append(
+                f"{refs_text}{item.get('test_case_id', 'unknown')}: "
+                f"avg {avg_score}, 실패: {failed or '-'}"
+            )
+        return lines
+
+    def _build_root_cause_hypotheses(
+        self,
+        scorecard: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+    ) -> list[str]:
+        templates = {
+            "contextual_relevancy": "질문 의도와 컨텍스트 매칭/필터링이 약함",
+            "context_precision": "상위 문서 랭킹 품질이 불안정",
+            "context_recall": "관련 문서 누락 또는 필터링 과도",
+            "mrr": "정답 문서가 상위 랭크에 늦게 등장",
+            "ndcg": "문서 순위 품질 저하로 가중 순위 손실",
+            "hit_rate": "상위 K에 관련 문서 포함률 부족",
+            "answer_relevancy": "답변이 질문 의도와 어긋나거나 장황함",
+            "semantic_similarity": "정답과 답변 의미가 불일치",
+            "faithfulness": "컨텍스트 기반 근거 추출이 약함",
+            "factual_correctness": "정답/근거와 상충되는 사실 포함",
+            "summary_score": "요약 커버리지/간결성 균형 부족",
+            "summary_faithfulness": "요약 근거성이 낮음",
+            "entity_preservation": "핵심 엔티티 누락 또는 변형",
+            "insurance_term_accuracy": "도메인 용어 근거성 부족",
+        }
+        evidence_index = self._index_evidence_by_metric(evidence)
+        risk_metrics = self._build_risk_metrics(scorecard, limit=4)
+        lines: list[str] = []
+        for row in risk_metrics:
+            metric = row.get("metric")
+            if not metric:
+                continue
+            hypothesis = templates.get(metric, "추가 데이터가 필요합니다.")
+            refs = self._format_evidence_refs(evidence_index.get(metric, []))
+            suffix = f" {refs}" if refs else " (추가 데이터 필요)"
+            lines.append(f"{metric}: {hypothesis}{suffix}")
+        return lines
+
+    def _build_comparison_stat_notes(
+        self,
+        comparison_scorecard: list[dict[str, Any]],
+    ) -> list[str]:
+        significant = [row for row in comparison_scorecard if row.get("is_significant")]
+        lines = [f"유의미한 변화: {len(significant)}개"]
+        for row in significant[:3]:
+            metric = row.get("metric", "-")
+            diff = self._format_float(row.get("diff"))
+            p_value = self._format_float(row.get("p_value"))
+            effect = self._format_float(row.get("effect_size"), 3)
+            lines.append(f"{metric}: diff {diff}, p-value {p_value}, effect {effect}")
+        if not significant:
+            lines.append("유의미한 변화가 없음 (추가 데이터 필요)")
+        return lines
+
+    def _build_comparison_root_causes(
+        self,
+        change_summary: dict[str, Any] | None,
+        evidence: list[dict[str, Any]],
+    ) -> list[str]:
+        change_summary = change_summary or {}
+        dataset_changes = change_summary.get("dataset_changes", [])
+        config_changes = change_summary.get("config_changes", [])
+        prompt_changes = change_summary.get("prompt_changes", {})
+        evidence_ids = [item.get("evidence_id") for item in evidence if item.get("evidence_id")]
+        refs = self._format_evidence_refs(evidence_ids, max_items=2)
+        refs_text = f" {refs}" if refs else ""
+        lines: list[str] = []
+        if isinstance(dataset_changes, list) and dataset_changes:
+            lines.append(f"데이터셋 변경이 성능 차이에 영향 가능{refs_text}")
+        if isinstance(config_changes, list) and config_changes:
+            lines.append(f"설정 변경이 지표 변동에 영향 가능{refs_text}")
+        if isinstance(prompt_changes, dict) and prompt_changes.get("status"):
+            status = prompt_changes.get("status")
+            lines.append(f"프롬프트 변경 상태: {status}{refs_text}")
+        if not lines:
+            lines.append("원인 분석 근거가 부족합니다. (추가 데이터 필요)")
+        return lines
+
+    def _merge_recommendations(self, context: dict[str, Any]) -> list[str]:
+        recommendations: list[str] = []
+        for item in context.get("recommendations") or []:
+            if item:
+                recommendations.append(item)
+        for item in context.get("diagnostic_recommendations") or []:
+            if item:
+                recommendations.append(item)
+        return list(dict.fromkeys(recommendations))
+
+    def _build_schema_template(self, report_type: str) -> str:
+        if report_type == "comparison":
+            template = {
+                "summary_sentence": "<한 문장 결론>",
+                "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
+                "change_summary": ["<변경 사항 1>", "<변경 사항 2>"],
+                "statistical_notes": ["<통계적 신뢰도 1>"],
+                "root_causes": ["<원인 분석 1>"],
+                "recommendations": ["<개선 제안 1>"],
+                "next_steps": ["<다음 단계 1>"],
+                "appendix": ["<부록 항목 1>"],
+            }
+        elif report_type == "summary":
+            template = {
+                "summary_sentence": "<한 문장 결론>",
+                "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
+                "recommendations": ["<개선 제안 1>"],
+                "next_steps": ["<다음 단계 1>"],
+                "appendix": ["<부록 항목 1>"],
+            }
+        else:
+            template = {
+                "summary_sentence": "<한 문장 결론>",
+                "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
+                "insights": ["<증거 기반 인사이트 1>"],
+                "root_causes": ["<원인 가설 1>"],
+                "recommendations": ["<개선 제안 1>"],
+                "next_steps": ["<다음 단계 1>"],
+                "appendix": ["<부록 항목 1>"],
+            }
+        return json.dumps(template, ensure_ascii=False, indent=2)
+
+    def _contains_evidence_reference(
+        self,
+        payload: dict[str, Any],
+        report_type: str,
+    ) -> bool:
+        if report_type == "comparison":
+            pattern = re.compile(r"(\\[(?:A|B)\\d+\\]|\\((?:A|B)\\d+\\))")
+        else:
+            pattern = re.compile(r"(\\[E\\d+\\]|\\(E\\d+\\))")
+
+        values: list[str] = []
+        for value in payload.values():
+            if isinstance(value, str):
+                values.append(value)
+            elif isinstance(value, list):
+                values.extend([str(item) for item in value if item is not None])
+        return any(pattern.search(text) for text in values)
+
+    def _parse_structured_report(
         self,
         report: str,
         *,
         report_type: str,
         evidence: list[dict[str, Any]],
-    ) -> tuple[bool, list[str]]:
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        payload = self._extract_json_payload(report)
+        if payload is None:
+            return None, ["JSON payload not found"]
+
+        normalized = {
+            "summary_sentence": self._coerce_str(payload.get("summary_sentence")),
+            "summary_bullets": self._coerce_list(payload.get("summary_bullets")),
+            "insights": self._coerce_list(payload.get("insights")),
+            "root_causes": self._coerce_list(payload.get("root_causes")),
+            "recommendations": self._coerce_list(payload.get("recommendations")),
+            "next_steps": self._coerce_list(payload.get("next_steps")),
+            "change_summary": self._coerce_list(payload.get("change_summary")),
+            "statistical_notes": self._coerce_list(payload.get("statistical_notes")),
+            "appendix": self._coerce_list(payload.get("appendix")),
+        }
+
+        required_map = {
+            "analysis": [
+                "summary_sentence",
+                "summary_bullets",
+                "insights",
+                "root_causes",
+                "recommendations",
+                "next_steps",
+            ],
+            "summary": ["summary_sentence", "summary_bullets", "recommendations", "next_steps"],
+            "comparison": [
+                "summary_sentence",
+                "summary_bullets",
+                "change_summary",
+                "statistical_notes",
+                "root_causes",
+                "recommendations",
+                "next_steps",
+            ],
+        }
+        required = required_map.get(report_type, required_map["analysis"])
+        missing = [key for key in required if not normalized.get(key)]
         reasons: list[str] = []
-        normalized = report_type or "analysis"
+        if missing:
+            reasons.append(f"필수 필드 누락: {', '.join(missing)}")
+        if normalized["summary_sentence"] and not re.search(
+            r"[가-힣]",
+            normalized["summary_sentence"],
+        ):
+            reasons.append("summary_sentence 한국어 미검출")
+        if evidence and not self._contains_evidence_reference(normalized, report_type):
+            reasons.append("증거 인용 미검출")
 
-        if not re.search(r"[가-힣]", report):
-            reasons.append("한국어 본문 미검출")
+        if reasons:
+            return None, reasons
+        return normalized, []
 
-        required_sections = {
+    def _render_structured_report(
+        self,
+        payload: dict[str, Any],
+        *,
+        context: dict[str, Any],
+        evidence: list[dict[str, Any]],
+        assets: dict[str, Any],
+    ) -> str:
+        report_type = context.get("report_type") or "analysis"
+        if report_type == "comparison":
+            title = "# 비교 분석 보고서"
+        elif report_type == "summary":
+            title = "# 요약 보고서"
+        else:
+            title = "# 분석 보고서"
+
+        scorecard = assets.get("scorecard", [])
+        comparison_scorecard = assets.get("comparison_scorecard", [])
+        quality_summary = assets.get("quality_summary", {})
+        artifact_manifest = assets.get("artifact_manifest", [])
+
+        lines = [title, "", "## 요약"]
+        summary_sentence = payload.get("summary_sentence")
+        if summary_sentence:
+            lines.append(f"- {summary_sentence}")
+        for bullet in payload.get("summary_bullets") or []:
+            lines.append(f"- {bullet}")
+        lines.append("")
+
+        if report_type == "comparison":
+            lines.append("## 변경 사항 요약")
+            change_notes = payload.get("change_summary") or []
+            if not change_notes:
+                change_notes = self._build_comparison_root_causes(
+                    context.get("change_summary"),
+                    evidence,
+                )
+            for note in change_notes:
+                lines.append(f"- {note}")
+            lines.append("")
+
+            lines.append("## 지표 비교 스코어카드")
+            lines.extend(self._render_comparison_table(comparison_scorecard))
+            lines.append("")
+
+            lines.append("## 통계적 신뢰도")
+            stat_notes = payload.get("statistical_notes") or self._build_comparison_stat_notes(
+                comparison_scorecard
+            )
+            for note in stat_notes:
+                lines.append(f"- {note}")
+            lines.append("")
+
+            lines.append("## 원인 분석")
+            root_causes = payload.get("root_causes") or self._build_comparison_root_causes(
+                context.get("change_summary"),
+                evidence,
+            )
+            for cause in root_causes:
+                lines.append(f"- {cause}")
+            lines.append("")
+        else:
+            lines.append("## 지표 스코어카드")
+            lines.extend(self._render_scorecard_table(scorecard))
+            lines.append("")
+
+            if report_type != "summary":
+                lines.append("## 데이터 품질/신뢰도")
+                lines.extend(
+                    [
+                        f"- 전체 케이스: {quality_summary.get('total_cases', '-')}",
+                        f"- 평가 샘플: {quality_summary.get('sample_count', '-')}",
+                        f"- 커버리지: {self._format_percent(quality_summary.get('coverage'))}",
+                    ]
+                )
+                for flag in quality_summary.get("flags", []):
+                    lines.append(f"- 주의: {flag}")
+                lines.append("")
+
+                lines.append("## 증거 기반 인사이트")
+                insights = payload.get("insights") or self._build_fallback_insights(
+                    scorecard,
+                    evidence,
+                )
+                if insights:
+                    for insight in insights:
+                        lines.append(f"- {insight}")
+                else:
+                    lines.append("- 증거 기반 인사이트가 부족합니다. (추가 데이터 필요)")
+                lines.append("")
+
+                lines.append("## 원인 가설")
+                root_causes = payload.get("root_causes") or self._build_root_cause_hypotheses(
+                    scorecard,
+                    evidence,
+                )
+                if root_causes:
+                    for cause in root_causes:
+                        lines.append(f"- {cause}")
+                else:
+                    lines.append("- 원인 가설을 도출하기 위한 근거가 부족합니다.")
+                lines.append("")
+
+        lines.append("## 개선 제안")
+        recommendations = payload.get("recommendations") or self._merge_recommendations(context)
+        if recommendations:
+            for rec in recommendations[:5]:
+                lines.append(f"- {rec}")
+        else:
+            lines.append("- 추가 데이터 및 LLM 분석을 통해 상세 원인을 도출하세요.")
+
+        lines.append("")
+        lines.append("## 다음 단계")
+        next_steps = payload.get("next_steps") or [
+            "우선순위 케이스를 대상으로 실험/재평가를 진행하세요."
+        ]
+        for item in next_steps:
+            lines.append(f"- {item}")
+
+        lines.append("")
+        lines.append("## 부록(산출물)")
+        appendix = payload.get("appendix") or artifact_manifest
+        if appendix:
+            for item in appendix:
+                lines.append(f"- {item}")
+        else:
+            lines.append("- 산출물 정보가 없습니다.")
+
+        return "\n".join(lines)
+
+    def _section_aliases(self, report_type: str) -> dict[str, list[str]]:
+        aliases = {
+            "요약": ["요약", "핵심 요약", "요약본"],
+            "변경 사항 요약": ["변경 사항 요약", "변경사항 요약", "변경 요약"],
+            "지표 비교 스코어카드": ["지표 비교 스코어카드", "비교 스코어카드", "지표 비교표"],
+            "통계적 신뢰도": ["통계적 신뢰도", "통계 신뢰도", "통계적 검증"],
+            "원인 분석": ["원인 분석", "원인", "원인 가설"],
+            "지표 스코어카드": ["지표 스코어카드", "스코어카드", "지표 요약"],
+            "데이터 품질/신뢰도": ["데이터 품질/신뢰도", "데이터 품질", "신뢰도"],
+            "증거 기반 인사이트": ["증거 기반 인사이트", "증거 인사이트", "증거 기반", "증거"],
+            "원인 가설": ["원인 가설", "원인 분석", "원인"],
+            "개선 제안": ["개선 제안", "개선안", "개선 사항"],
+            "다음 단계": ["다음 단계", "후속 단계", "다음 액션"],
+            "부록(산출물)": ["부록(산출물)", "부록", "산출물"],
+        }
+        required = {
             "comparison": [
                 "요약",
                 "변경 사항 요약",
@@ -566,16 +1071,43 @@ class LLMReportModule(BaseAnalysisModule):
                 "부록(산출물)",
             ],
         }
-        for section in required_sections.get(normalized, []):
-            if section not in report:
+        keys = required.get(report_type, required["analysis"])
+        return {key: aliases[key] for key in keys}
+
+    @staticmethod
+    def _has_section(report: str, aliases: list[str]) -> bool:
+        for alias in aliases:
+            heading_pattern = rf"^\\s*#{{1,3}}\\s*{re.escape(alias)}\\s*$"
+            if re.search(heading_pattern, report, flags=re.MULTILINE):
+                return True
+            inline_pattern = rf"^\\s*{re.escape(alias)}\\s*[:\\-]"
+            if re.search(inline_pattern, report, flags=re.MULTILINE):
+                return True
+        return False
+
+    def _validate_report(
+        self,
+        report: str,
+        *,
+        report_type: str,
+        evidence: list[dict[str, Any]],
+    ) -> tuple[bool, list[str]]:
+        reasons: list[str] = []
+        normalized = report_type or "analysis"
+
+        if not re.search(r"[가-힣]", report):
+            reasons.append("한국어 본문 미검출")
+
+        for section, aliases in self._section_aliases(normalized).items():
+            if not self._has_section(report, aliases):
                 reasons.append(f"섹션 누락: {section}")
 
         if evidence:
             if normalized == "comparison":
-                if not re.search(r"\[(A|B)\\d+\\]", report):
+                if not re.search(r"(\\[(A|B)\\d+\\]|\\((A|B)\\d+\\))", report):
                     reasons.append("증거 인용([A1]/[B1]) 누락")
             else:
-                if not re.search(r"\\[E\\d+\\]", report):
+                if not re.search(r"(\\[E\\d+\\]|\\(E\\d+\\))", report):
                     reasons.append("증거 인용([E1]) 누락")
 
         return len(reasons) == 0, reasons
@@ -836,56 +1368,55 @@ class LLMReportModule(BaseAnalysisModule):
         summary_json = json.dumps(summary_payload, ensure_ascii=False, indent=2)
         evidence_json = json.dumps(evidence, ensure_ascii=False, indent=2)
 
-        report_type = context.get("report_type")
+        report_type = context.get("report_type") or "analysis"
+        schema_template = self._build_schema_template(report_type)
         common_requirements = (
             "공통 원칙:\n"
-            "1) 모든 주장/원인/개선안은 summary_json 또는 evidence에 근거해야 함\n"
-            "2) 숫자/지표는 scorecard, comparison_scorecard, risk_metrics에서 직접 인용\n"
-            "3) 근거가 부족하면 '추가 데이터 필요'를 명시하고 추측 금지\n"
-            "4) 2026-01 기준 널리 쓰이는 RAG 개선 패턴을 우선 고려하되, "
+            "1) 출력은 JSON만 허용 (Markdown/코드블록 금지)\n"
+            "2) 모든 주장/원인/개선안은 summary_json 또는 evidence에 근거해야 함\n"
+            "3) 숫자/지표는 scorecard, comparison_scorecard, risk_metrics에서 직접 인용\n"
+            "4) 근거가 부족하면 '추가 데이터 필요'를 명시하고 추측 금지\n"
+            "5) 2026-01 기준 널리 쓰이는 RAG 개선 패턴을 우선 고려하되, "
             "현재 데이터 이슈와 연결되는 항목만 선택\n"
-            "4-1) 개선 패턴 예시: 하이브리드 검색+리랭커, 쿼리 재작성, "
+            "5-1) 개선 패턴 예시: 하이브리드 검색+리랭커, 쿼리 재작성, "
             "동적 청크/컨텍스트 압축, 메타데이터/필터링, 인용/검증 단계, "
             "신뢰도 기반 답변 거절, 평가셋 확장/하드 네거티브, 피드백 루프\n"
-            "5) 개선안마다 기대되는 영향 지표, 검증 방법(실험/재평가), 리스크를 함께 서술\n"
-            "6) 신뢰도/타당성 제약(표본 수, 커버리지, 유의성, 데이터 변경)을 명시\n"
+            "6) 개선안마다 기대되는 영향 지표, 검증 방법(실험/재평가), 리스크를 함께 서술\n"
+            "7) 신뢰도/타당성 제약(표본 수, 커버리지, 유의성, 데이터 변경)을 명시\n"
+            "8) appendix는 선택이며 비어 있으면 산출물 목록을 자동 추가\n"
         )
         if report_type == "comparison":
             requirements = (
                 "요구사항:\n"
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/원인/개선안에는 evidence_id를 [A1]/[B1] 형식으로 인용\n"
-                "3) 섹션: 요약, 변경 사항 요약, 지표 비교 스코어카드, 통계적 신뢰도, "
-                "원인 분석, 개선 제안, 다음 단계, 부록(산출물)\n"
-                "4) 요약은 한 문장 결론 + 핵심 3개 bullet(지표/변경 사항/사용자 영향)\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, A, B, diff, "
-                "p-value, effect, 상태)\n"
-                "6) 데이터셋 차이가 있으면 비교 해석 제한을 명확히 표기\n"
-                "7) 유의한 변화는 significant_changes를 활용해 강조\n"
-                "8) 변경 사항이 없거나 근거가 약하면 '추가 데이터 필요'라고 명시\n"
+                "3) JSON 필수 키: summary_sentence, summary_bullets, change_summary, "
+                "statistical_notes, root_causes, recommendations, next_steps\n"
+                "4) summary_bullets는 3개 권장(지표/변경 사항/사용자 영향)\n"
+                "5) change_summary에는 데이터셋/설정/프롬프트 변경을 명시\n"
+                "6) statistical_notes에는 유의한 변화 및 한계(표본/유의성) 포함\n"
+                "7) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
         elif report_type == "summary":
             requirements = (
                 "요구사항:\n"
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/개선안에는 evidence_id를 [E1] 형식으로 인용\n"
-                "3) 섹션: 요약, 지표 스코어카드, 개선 제안, 다음 단계, 부록(산출물)\n"
-                "4) 요약은 한 문장 결론 + 핵심 3개 bullet\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, "
-                "pass_rate, 상태)\n"
-                "6) risk_metrics를 활용해 상위 위험 지표 3개를 명확히 언급\n"
-                "7) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "3) JSON 필수 키: summary_sentence, summary_bullets, "
+                "recommendations, next_steps\n"
+                "4) summary_bullets는 3개 권장\n"
+                "5) risk_metrics를 활용해 상위 위험 지표 3개를 명확히 언급\n"
+                "6) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
         else:
             requirements = (
                 "요구사항:\n"
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/원인/개선안에는 evidence_id를 [E1] 형식으로 인용\n"
-                "3) 섹션: 요약, 지표 스코어카드, 데이터 품질/신뢰도, 증거 기반 인사이트, "
-                "원인 가설, 개선 제안, 다음 단계, 부록(산출물)\n"
-                "4) 요약은 한 문장 결론 + 핵심 3개 bullet(지표/원인/사용자 영향)\n"
-                "5) 스코어카드는 Markdown 표로 작성 (metric, 평균, threshold, "
-                "pass_rate, 상태)\n"
+                "3) JSON 필수 키: summary_sentence, summary_bullets, insights, "
+                "root_causes, recommendations, next_steps\n"
+                "4) insights/root_causes에는 evidence_id를 포함\n"
+                "5) summary_bullets는 3개 권장(지표/원인/사용자 영향)\n"
                 "6) signal_group_summary로 축별 약점/강점을 분해\n"
                 "7) 사용자 영향은 신뢰/이해/인지부하 관점으로 1~2문장\n"
                 "8) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
@@ -893,10 +1424,13 @@ class LLMReportModule(BaseAnalysisModule):
 
         return (
             "당신은 RAG 평가 분석 보고서 작성자입니다. "
-            "아래 데이터와 증거를 기반으로 Markdown 보고서를 작성하세요.\n"
+            "아래 데이터와 증거를 기반으로 JSON 보고서를 작성하세요.\n"
             "\n"
             f"{common_requirements}\n"
             f"{requirements}\n"
+            "[출력 JSON 스키마]\n"
+            f"{schema_template}\n"
+            "\n"
             "[요약 데이터]\n"
             f"{summary_json}\n"
             "\n"
@@ -1028,12 +1562,22 @@ class LLMReportModule(BaseAnalysisModule):
             report_lines.append("## 지표 비교 스코어카드")
             report_lines.extend(self._render_comparison_table(comparison_scorecard))
             report_lines.append("")
+
+            report_lines.append("## 통계적 신뢰도")
+            for note in self._build_comparison_stat_notes(comparison_scorecard):
+                report_lines.append(f"- {note}")
+            report_lines.append("")
+
+            report_lines.append("## 원인 분석")
+            for cause in self._build_comparison_root_causes(change_summary, evidence):
+                report_lines.append(f"- {cause}")
+            report_lines.append("")
         else:
             report_lines.append("## 지표 스코어카드")
             report_lines.extend(self._render_scorecard_table(scorecard))
             report_lines.append("")
 
-        if report_type != "summary":
+        if report_type == "analysis":
             report_lines.append("## 데이터 품질/신뢰도")
             report_lines.extend(
                 [
@@ -1046,26 +1590,25 @@ class LLMReportModule(BaseAnalysisModule):
                 report_lines.append(f"- 주의: {flag}")
             report_lines.append("")
 
-            report_lines.append("## 증거 샘플")
-            if evidence:
-                for idx, item in enumerate(evidence, start=1):
-                    evidence_id = item.get("evidence_id") or f"E{idx}"
-                    report_lines.append(
-                        f"- [{evidence_id}] {item.get('test_case_id', 'unknown')}: "
-                        f"avg {self._format_float(item.get('avg_score'))}"
-                    )
+            report_lines.append("## 증거 기반 인사이트")
+            insights = self._build_fallback_insights(scorecard, evidence)
+            if insights:
+                for insight in insights:
+                    report_lines.append(f"- {insight}")
             else:
-                report_lines.append("- 증거 데이터가 없습니다. (추가 데이터 필요)")
+                report_lines.append("- 증거 기반 인사이트가 없습니다. (추가 데이터 필요)")
             report_lines.append("")
 
-        recommendations = []
-        for item in context.get("recommendations") or []:
-            if item:
-                recommendations.append(item)
-        for item in context.get("diagnostic_recommendations") or []:
-            if item:
-                recommendations.append(item)
-        recommendations = list(dict.fromkeys(recommendations))
+            report_lines.append("## 원인 가설")
+            root_causes = self._build_root_cause_hypotheses(scorecard, evidence)
+            if root_causes:
+                for cause in root_causes:
+                    report_lines.append(f"- {cause}")
+            else:
+                report_lines.append("- 원인 가설을 도출하기 위한 근거가 부족합니다.")
+            report_lines.append("")
+
+        recommendations = self._merge_recommendations(context)
 
         report_lines.append("## 개선 제안")
         if recommendations:
