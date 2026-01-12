@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
-from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
 from evalvault.config.settings import Settings
 from evalvault.domain.services.benchmark_runner import KoreanRAGBenchmarkRunner
@@ -62,6 +61,8 @@ class RetrievalBenchmarkModule(BaseAnalysisModule):
         ollama_adapter = None
         if embedding_profile in {"dev", "prod"}:
             try:
+                from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+
                 settings = Settings()
                 ollama_adapter = OllamaAdapter(settings)
             except Exception as exc:
@@ -204,7 +205,7 @@ class RetrievalBenchmarkModule(BaseAnalysisModule):
         metrics_avg: dict[str, float] = {}
         for metric, payload in metrics_summary.items():
             average = payload.get("average")
-            if isinstance(average, (int, float)):
+            if isinstance(average, int | float):
                 metrics_avg[metric] = round(float(average), 4)
         return metrics_summary, metrics_avg
 

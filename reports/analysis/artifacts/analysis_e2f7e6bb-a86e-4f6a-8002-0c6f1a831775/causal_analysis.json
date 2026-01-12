@@ -1,0 +1,37 @@
+{
+  "node_id": "causal_analysis",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "analysis": {
+      "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+      "analysis_id": "b5eb9158-699c-4cb4-9487-4c13e8512b29",
+      "created_at": "2026-01-11T19:25:37.519719",
+      "factor_stats": {},
+      "factor_impacts": [],
+      "causal_relationships": [],
+      "root_causes": [],
+      "interventions": [],
+      "insights": [
+        "Insufficient samples for causal analysis (5 < 10)"
+      ]
+    },
+    "summary": {
+      "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+      "factor_count": 0,
+      "significant_impact_count": 0,
+      "root_cause_count": 0
+    },
+    "statistics": {},
+    "insights": [
+      "Insufficient samples for causal analysis (5 < 10)"
+    ],
+    "analysis_id": "b5eb9158-699c-4cb4-9487-4c13e8512b29",
+    "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+    "factor_stats": {},
+    "significant_impacts": [],
+    "root_causes": [],
+    "interventions": []
+  }
+}

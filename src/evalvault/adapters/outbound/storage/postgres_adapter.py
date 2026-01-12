@@ -998,7 +998,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         """JSONB 값을 파이썬 타입으로 변환."""
         if value is None:
             return None
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             return value
         if isinstance(value, str):
             return json.loads(value)

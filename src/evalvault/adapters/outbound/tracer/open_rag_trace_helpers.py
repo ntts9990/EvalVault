@@ -91,15 +91,15 @@ def _extra_attributes(extra: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _as_otel_value(value: Any) -> Any:
-    if isinstance(value, (bool, int, float, str, bytes)):
+    if isinstance(value, bool | int | float | str | bytes):
         return value
-    if isinstance(value, (list, tuple)):
-        if all(isinstance(item, (bool, int, float, str, bytes)) for item in value):
+    if isinstance(value, list | tuple):
+        if all(isinstance(item, bool | int | float | str | bytes) for item in value):
             return list(value)
         return serialize_json(value)
     if isinstance(value, Mapping):
         return serialize_json(value)
-    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+    if isinstance(value, Iterable) and not isinstance(value, str | bytes):
         return serialize_json(list(value))
     return serialize_json(value)
 

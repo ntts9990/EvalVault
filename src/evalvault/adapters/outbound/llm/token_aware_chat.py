@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from instructor.processing.function_calls import extract_json_from_codeblock
+from instructor.function_calls import extract_json_from_codeblock
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from evalvault.adapters.outbound.llm.base import TokenUsage

@@ -1,0 +1,108 @@
+{
+  "pipeline_id": "906cbaa3-5d10-458f-8ce2-d88baf00c008",
+  "intent": "generate_detailed",
+  "duration_ms": 18709,
+  "started_at": "2026-01-11T19:24:03.741496",
+  "finished_at": "2026-01-11T19:24:22.450567",
+  "nodes": [
+    {
+      "node_id": "load_data",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/load_data.json"
+    },
+    {
+      "node_id": "load_runs",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/load_runs.json"
+    },
+    {
+      "node_id": "statistics",
+      "status": "completed",
+      "duration_ms": 1,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/statistics.json"
+    },
+    {
+      "node_id": "ragas_eval",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/ragas_eval.json"
+    },
+    {
+      "node_id": "nlp_analysis",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/nlp_analysis.json"
+    },
+    {
+      "node_id": "time_series",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/time_series.json"
+    },
+    {
+      "node_id": "causal_analysis",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/causal_analysis.json"
+    },
+    {
+      "node_id": "low_samples",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/low_samples.json"
+    },
+    {
+      "node_id": "diagnostic",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/diagnostic.json"
+    },
+    {
+      "node_id": "priority_summary",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/priority_summary.json"
+    },
+    {
+      "node_id": "pattern_detection",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/pattern_detection.json"
+    },
+    {
+      "node_id": "trend_detection",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/trend_detection.json"
+    },
+    {
+      "node_id": "root_cause",
+      "status": "completed",
+      "duration_ms": 0,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/root_cause.json"
+    },
+    {
+      "node_id": "report",
+      "status": "completed",
+      "duration_ms": 18704,
+      "error": null,
+      "path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/report.json"
+    }
+  ],
+  "final_output_path": "reports/analysis/artifacts/analysis_4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb/final_output.json"
+}

@@ -250,7 +250,7 @@ class LMEvalAdapter(BenchmarkPort):
             )
 
             for metric_key, value in task_metrics.items():
-                if isinstance(value, (int, float)) and not metric_key.endswith("_stderr"):
+                if isinstance(value, int | float) and not metric_key.endswith("_stderr"):
                     task_result.metrics[metric_key] = float(value)
 
             if "alias" in task_metrics:

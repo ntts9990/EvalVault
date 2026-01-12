@@ -1,0 +1,165 @@
+{
+  "node_id": "priority_summary",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "bottom_percentile": 10.0,
+    "impact_count": 3,
+    "total_cases": 5,
+    "bottom_count": 1,
+    "bottom_cases": [
+      {
+        "test_case_id": "kr-002",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "answer_relevancy": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.584,
+        "worst_metric": "answer_relevancy",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "reasoning",
+        "question_type_label": "추론/이유",
+        "question_preview": "보험료 납입 기간은 어떻게 되나요?",
+        "analysis_hints": [
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 추론/이유"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      }
+    ],
+    "impact_cases": [
+      {
+        "test_case_id": "kr-003",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "answer_relevancy": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.604,
+        "worst_metric": "answer_relevancy",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "factual",
+        "question_type_label": "사실",
+        "question_preview": "암 진단비는 얼마를 받을 수 있나요?",
+        "analysis_hints": [
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 사실"
+        ],
+        "metadata": null,
+        "tags": [
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "kr-002",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "answer_relevancy": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.584,
+        "worst_metric": "answer_relevancy",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "reasoning",
+        "question_type_label": "추론/이유",
+        "question_preview": "보험료 납입 기간은 어떻게 되나요?",
+        "analysis_hints": [
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 추론/이유"
+        ],
+        "metadata": null,
+        "tags": [
+          "bottom_percentile",
+          "high_impact"
+        ]
+      },
+      {
+        "test_case_id": "kr-005",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "failed_metric_count": 1,
+        "gap_by_metric": {
+          "answer_relevancy": 0.7
+        },
+        "shortfall": 0.7,
+        "impact_score": 0.584,
+        "worst_metric": "answer_relevancy",
+        "worst_score": 0.0,
+        "worst_gap": 0.7,
+        "question_type": "reasoning",
+        "question_type_label": "추론/이유",
+        "question_preview": "입원비 보장은 어떻게 되나요?",
+        "analysis_hints": [
+          "질문 의도와 답변 불일치 가능성",
+          "질문 유형: 추론/이유"
+        ],
+        "metadata": null,
+        "tags": [
+          "high_impact"
+        ]
+      }
+    ],
+    "run_metadata": {
+      "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+      "dataset_name": "insurance-qa-korean",
+      "dataset_version": "1.0.0",
+      "model_name": "ollama/gemma3:1b",
+      "started_at": "2026-01-11T19:24:33.411290",
+      "finished_at": "2026-01-11T19:25:37.475751",
+      "total_test_cases": 5,
+      "passed_test_cases": 1,
+      "pass_rate": 0.2,
+      "total_tokens": 20842,
+      "total_cost_usd": 0.0640525,
+      "duration_seconds": 64.064461,
+      "tracker_metadata": {
+        "ragas_config": {
+          "embedding_model": "qwen3-embedding:0.6b",
+          "temperature": null
+        },
+        "run_mode": "simple",
+        "phoenix": {
+          "trace_id": "7ce7bfd8-b188-417f-9034-15fa5bce2027",
+          "endpoint": "http://localhost:6006/v1/traces",
+          "trace_url": "http://localhost:6006/#/traces/7ce7bfd8-b188-417f-9034-15fa5bce2027",
+          "schema_version": 2
+        }
+      },
+      "metrics_evaluated": [
+        "faithfulness",
+        "answer_relevancy"
+      ],
+      "phoenix_trace_url": "http://localhost:6006/#/traces/7ce7bfd8-b188-417f-9034-15fa5bce2027",
+      "run_mode": "simple",
+      "thresholds": {
+        "faithfulness": 0.7,
+        "answer_relevancy": 0.7
+      },
+      "avg_faithfulness": 1.0,
+      "avg_answer_relevancy": 0.22023630582446163
+    }
+  }
+}

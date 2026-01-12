@@ -45,7 +45,14 @@ class OllamaAdapter(BaseLLMAdapter):
         self._settings = settings
         self._ollama_model = settings.ollama_model
         self._embedding_model_name = settings.ollama_embedding_model
-        self._base_url = settings.ollama_base_url
+        base_url = settings.ollama_base_url
+        if not isinstance(base_url, str) or not base_url.strip():
+            base_url = "http://localhost:11434"
+        else:
+            base_url = base_url.strip()
+            if "://" not in base_url:
+                base_url = f"http://{base_url}"
+        self._base_url = base_url
         self._timeout = settings.ollama_timeout
         self._think_level = settings.ollama_think_level
         thinking_config = ThinkingConfig(

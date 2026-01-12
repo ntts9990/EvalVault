@@ -36,9 +36,19 @@ class AnalysisIntent(str, Enum):
     COMPARE_RUNS = "compare_runs"  # 실행 결과 비교
 
     # 분석 (Analysis)
-    ANALYZE_LOW_METRICS = "analyze_low_metrics"  # 낮은 메트릭 원인 분석
-    ANALYZE_PATTERNS = "analyze_patterns"  # 패턴 분석
-    ANALYZE_TRENDS = "analyze_trends"  # 시계열 추세 분석
+    ANALYZE_LOW_METRICS = "analyze_low_metrics"
+    ANALYZE_PATTERNS = "analyze_patterns"
+    ANALYZE_TRENDS = "analyze_trends"
+    ANALYZE_STATISTICAL = "analyze_statistical"
+    ANALYZE_NLP = "analyze_nlp"
+    ANALYZE_CAUSAL = "analyze_causal"
+    ANALYZE_NETWORK = "analyze_network"
+    ANALYZE_PLAYBOOK = "analyze_playbook"
+
+    DETECT_ANOMALIES = "detect_anomalies"
+    FORECAST_PERFORMANCE = "forecast_performance"
+
+    GENERATE_HYPOTHESES = "generate_hypotheses"
 
     # 벤치마크 (Benchmark)
     BENCHMARK_RETRIEVAL = "benchmark_retrieval"  # 검색 벤치마크

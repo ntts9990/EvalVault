@@ -9,7 +9,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -131,10 +131,10 @@ class Playbook(PlaybookPort):
 
     version: str
     global_config: dict[str, Any]
-    metrics: dict[str, MetricPlaybook]
+    metrics: dict[str, MetricPlaybookProtocol]
     verification_commands: dict[str, str]
 
-    def get_metric_playbook(self, metric: str) -> MetricPlaybook | None:
+    def get_metric_playbook(self, metric: str) -> MetricPlaybookProtocol | None:
         """특정 메트릭의 플레이북 조회."""
         return self.metrics.get(metric)
 

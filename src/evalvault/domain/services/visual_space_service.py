@@ -591,7 +591,7 @@ def _resolve_result_count_norm(stage_events: list[StageEvent]) -> float | None:
         if isinstance(doc_ids, list):
             counts.append(len(doc_ids))
             top_k = event.attributes.get("top_k")
-            if isinstance(top_k, (int, float)) and top_k > 0:
+            if isinstance(top_k, int | float) and top_k > 0:
                 top_ks.append(int(top_k))
             else:
                 top_ks.append(len(doc_ids))

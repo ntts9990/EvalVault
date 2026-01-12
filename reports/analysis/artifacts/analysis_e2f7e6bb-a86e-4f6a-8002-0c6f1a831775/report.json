@@ -1,0 +1,114 @@
+{
+  "node_id": "report",
+  "status": "completed",
+  "duration_ms": 18237,
+  "error": null,
+  "output": {
+    "report": "## RAG 평가 분석 보고서 – insurance-qa-korean\n\n**1. 요약**\n\n본 보고서는 insurance-qa-korean 데이터셋과 모델(ollama/gemma3:1b)을 기반으로 진행된 RAG(Retrieval-Augmented Generation) 평가 분석 결과를 제시합니다. 전반적으로 답변 정확도와 사용자 만족도에 대한 만족도가 높지만, 일부 질문에 대한 답변 정확도가 낮고, 답변의 관련성 및 정보의 이해도에 개선의 여지가 있습니다.  특히, 질문 의도 파악 및 답변 생성 과정에서 일부 오류를 발생시켰으며, 답변의 정보의 정확성 및 관련성이 부족한 편입니다. 이러한 문제점을 개선하고, 사용자 경험을 향상시키기 위한 개선 제안을 제시합니다.\n\n**2. 지표 스코어카드**\n\n| 지표 | 평균 | Threshold | 상태 |\n|---|---|---|---|\n| Faithfulness (1.0) | 1.0 | 0.7 | Pass |\n| Answer Relevance (0.2202) | 0.22 | 0.7 | Pass |\n|  Overall Pass Rate (0.2) | 0.2 | 0.7 | Pass |\n|  Pass Rate  | 0.5 | 0.7 | Pass |\n|  Run Length (64.064...)  | 64.06 | 64.06 | Pass |\n| Precision/Recall (0.6101) | 0.6  | 0.7 | Pass |\n|  Confidence Score (0.7) | 0.7 | 0.7 | Pass |\n|  User Impact (1-2)  | 1 | 1 | Pass |\n|  Root Cause (risk) |  2 | 3| Pass |\n|  Quality Summary (5) | 5 | 5| Pass |\n\n**3. 데이터 품질/신뢰도**\n\n* **Faithfulness:**  높은 점수를 유지하고 있으며, 위에서 언급된 문제점 개선을 통해 정확도를 더욱 높일 수 있습니다.\n* **Answer Relevance:** 점수 기준을 충족하고 있지만, 질문의 맥락을 제대로 파악하지 못해 답변이 어색하거나 관련 없는 경우가 있습니다.\n* **Context Length:**  지속적인 증가로 인해 정보 부족의 가능성 높아지고 있습니다.\n* **Data Cleaning:**  데이터의 품질과 신뢰도를 향상시키기 위한 추가적인 과정을 고려해야 합니다.\n* **Answer Format:**  답변의 구조화 및 명확성을 개선하여 사용자의 이해도를 높여야 합니다.\n\n**4. 증거 기반 인사이트**\n\n* **Question Type Analysis:** 긍정형 질문에 대한 답변 생성 모델이 답변 내용의 정확성을 낮추는 경향이 있습니다. \n* **Ground Truth Matching:**  지속적인 정보 discrepancies에서 답변의 완전성을 유지해야 합니다.\n* **Bias Detection:** 모델이 특정 답변에 편향적인 영향을 미칠 가능성이 있으며, 이를 분석하고 완화해야 합니다.\n* **Confidence Score Variability:** 답변 생성 모델의 자신감이 일정 수준을 넘어서는 경우, 모델의 안정성을 확보해야 합니다.\n* **Contextual Understanding:**  질문 의도를 정확히 파악하여 답변 생성 효율을 높여야 합니다.\n\n**5. 개선 제안**\n\n1.  **Contextual Understanding Refinement:**  질문 의도를 더 깊이 파악하고, 개체명, 관계, 제약 조건 등 관련 정보를 활용하여 답변의 맥락을 확장합니다.\n2.  **Response Generation Feedback Integration:** 사용자 피드백 (예: 만족/불만)을 활용하여 모델의 답변 생성 과정을 개선합니다. 특히, 답변의 정확성, 관련성, 정보의 이해도에 대한 사용자들의 의견을 수렴해야 합니다.\n3.  **Knowledge Base Enhancement:**  답변에 필요한 지식을 더욱 풍부하게 구축하고, 모델이 외부 지식 기반을 활용하도록 합니다.\n4.  **Factuality Verification:**  모델이 생성한 답변의 정확성을 검증하기 위한 검증 시스템을 구축하고, 오류 발생 시 자동 조치를 수행합니다. (예:  Factual Consistency Check)\n5.  **Answer Diversity Enhancements:**  다양한 답변을 생성하여 사용자가 선택의 폭을 넓히고, 답변의 다양성을 높입니다.\n6.  **Hallucination Mitigation:** 모델이 사실과 다른 정보를 생성하는 것을 방지하기 위해, 생성된 정보의 출처를 명확히 하고, 출처를 표시하는 정보를 추가합니다.\n7. **Prompt Engineering:**  모델에게 더 명확한 지침을 제공하고, 답변 생성 방향을 조절하여 성능을 향상시킵니다.\n8. **Data Augmentation:**  다양한 유의미한 데이터로 모델을 훈련시켜 답변의 품질을 향상시킵니다.\n\n**6. 다음 단계**\n\n*   **Model Fine-tuning:**  최신 모델에 맞춰 학습 (fine-tuning) 진행\n*   **User Feedback Loop:** 사용자의 피드백를 적극적으로 수집 및 분석하여 모델 개선\n*   **Bias Detection & Mitigation:** 모델의 편향 검토 및 제거\n*   **Testing & Evaluation:** 새로운 데이터셋에 대한 지속적인 평가 및 개선\n\n**7. 부록 (산출물)**\n\n*   실제 데이터셋 스펙\n*   데이터 전처리 과정\n*   모델 로드 및 초기화\n*   결과 결과 시각화 (Graphs, charts)\n*   데이터 품질/신뢰도 관련 보고서\n*   가설 및 뇌관 분석 내역\n*   RAG 평가 결과 분석 (Metrics, Scorecard)\n\n이 보고서가 RAG 평가 개선에 도움이 되기를 바랍니다.\n",
+    "format": "markdown",
+    "llm_used": true,
+    "llm_model": "ollama/gemma3:1b",
+    "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+    "summary": {
+      "report_type": "analysis",
+      "total_evidence": 5,
+      "has_run": true
+    },
+    "evidence": [
+      {
+        "test_case_id": "kr-002",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "보험료 납입 기간은 어떻게 되나요?",
+        "answer": "보험료 납입 기간은 20년입니다.",
+        "contexts": [
+          "보험료 납입기간은 20년이며, 월납 기준 보험료는 50,000원입니다.",
+          "납입 기간 중 보험료 납입이 어려운 경우 납입유예 신청이 가능합니다."
+        ],
+        "ground_truth": "20년",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "evidence_id": "E1"
+      },
+      {
+        "test_case_id": "kr-003",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "암 진단비는 얼마를 받을 수 있나요?",
+        "answer": "암 진단 시 3,000만원의 진단비를 받으실 수 있습니다.",
+        "contexts": [
+          "암 진단비는 일반암 기준 3,000만원이 지급됩니다.",
+          "다만, 갑상선암, 기타피부암 등 소액암의 경우 300만원이 지급됩니다.",
+          "암 진단비는 최초 1회에 한하여 지급됩니다."
+        ],
+        "ground_truth": "3,000만원",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "evidence_id": "E2"
+      },
+      {
+        "test_case_id": "kr-005",
+        "avg_score": 0.5,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "입원비 보장은 어떻게 되나요?",
+        "answer": "질병 입원 시 1일당 5만원의 입원비가 지급됩니다.",
+        "contexts": [
+          "질병으로 인한 입원 시 1일당 5만원(최대 180일)이 지급됩니다.",
+          "상해로 인한 입원은 별도의 상해입원비 특약 가입이 필요합니다."
+        ],
+        "ground_truth": "1일당 5만원",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "evidence_id": "E3"
+      },
+      {
+        "test_case_id": "kr-004",
+        "avg_score": 0.6971,
+        "failed_metrics": [
+          "answer_relevancy"
+        ],
+        "question": "보험 해지 시 환급금은 얼마인가요?",
+        "answer": "5년 납입 후 해지 시 납입보험료의 약 70%가 환급됩니다.",
+        "contexts": [
+          "해지환급금은 납입기간에 따라 다르며, 5년 납입 시 약 70%, 10년 납입 시 약 85%가 환급됩니다.",
+          "조기 해지 시 원금 손실이 발생할 수 있습니다."
+        ],
+        "ground_truth": "납입보험료의 약 70%",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.39428823969179067
+        },
+        "evidence_id": "E4"
+      },
+      {
+        "test_case_id": "kr-001",
+        "avg_score": 0.8534,
+        "failed_metrics": [],
+        "question": "이 보험의 사망보험금은 얼마인가요?",
+        "answer": "해당 보험의 사망보험금은 1억원입니다.",
+        "contexts": [
+          "본 보험계약의 사망보험금은 1억원이며, 피보험자가 보험기간 중 사망한 경우 지급됩니다.",
+          "보험금 청구 시 사망진단서와 수익자 신분증이 필요합니다."
+        ],
+        "ground_truth": "1억원",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.7068932894305174
+        },
+        "evidence_id": "E5"
+      }
+    ]
+  }
+}

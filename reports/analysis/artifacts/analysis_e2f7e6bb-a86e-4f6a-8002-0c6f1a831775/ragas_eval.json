@@ -1,0 +1,65 @@
+{
+  "node_id": "ragas_eval",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "summary": {
+      "metric_count": 2,
+      "sample_count": 5,
+      "overall_score": 0.6101,
+      "recomputed": false
+    },
+    "metrics": {
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.22023630582446163
+    },
+    "per_case": [
+      {
+        "test_case_id": "kr-001",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.7068932894305174
+        },
+        "avg_score": 0.8534,
+        "question_preview": "이 보험의 사망보험금은 얼마인가요?"
+      },
+      {
+        "test_case_id": "kr-002",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "avg_score": 0.5,
+        "question_preview": "보험료 납입 기간은 어떻게 되나요?"
+      },
+      {
+        "test_case_id": "kr-003",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "avg_score": 0.5,
+        "question_preview": "암 진단비는 얼마를 받을 수 있나요?"
+      },
+      {
+        "test_case_id": "kr-004",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.39428823969179067
+        },
+        "avg_score": 0.6971,
+        "question_preview": "보험 해지 시 환급금은 얼마인가요?"
+      },
+      {
+        "test_case_id": "kr-005",
+        "metrics": {
+          "faithfulness": 1.0,
+          "answer_relevancy": 0.0
+        },
+        "avg_score": 0.5,
+        "question_preview": "입원비 보장은 어떻게 되나요?"
+      }
+    ]
+  }
+}

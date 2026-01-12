@@ -626,7 +626,7 @@ class RagasEvaluator:
                 return normalized
 
         languages = metadata.get("languages")
-        if isinstance(languages, (list, tuple, set)):
+        if isinstance(languages, list | tuple | set):
             for entry in languages:
                 normalized = self._normalize_language_hint(entry)
                 if normalized:

@@ -21,6 +21,7 @@ from evalvault.ports.outbound.improvement_port import ClaimImprovementProtocol
 
 if TYPE_CHECKING:
     from evalvault.ports.outbound import LLMPort
+    from evalvault.ports.outbound.improvement_port import ClaimImprovementProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -237,11 +238,12 @@ class InsightGenerator:
             metric_scores=metric_scores_text or "(없음)",
         )
 
+        llm_adapter = self._llm_adapter
+        if llm_adapter is None:
+            return self._fallback_single_analysis(failure)
+        assert llm_adapter is not None
+
         try:
-            llm_adapter = self._llm_adapter
-            if llm_adapter is None:
-                raise RuntimeError("LLM adapter is not configured")
-            # LLM adapter의 generate_text 사용 (JSON 모드)
             response = llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_single_response(response)
         except Exception as e:
@@ -254,7 +256,7 @@ class InsightGenerator:
         metric_name: str,
         avg_score: float,
         threshold: float,
-    ) -> BatchPatternInsight:
+    ) -> ClaimImprovementProtocol:
         """배치 실패 사례 분석.
 
         Args:
@@ -270,7 +272,7 @@ class InsightGenerator:
             return self._fallback_batch_analysis(failures, metric_name)
 
         # 샘플 수 제한
-        sample_failures = failures[: self._max_samples]
+        sample_failures = list(failures)[: self._max_samples]
 
         # 실패 사례 텍스트 구성
         cases_text = []
@@ -291,11 +293,12 @@ class InsightGenerator:
             failure_cases="\n".join(cases_text),
         )
 
+        llm_adapter = self._llm_adapter
+        if llm_adapter is None:
+            return self._fallback_batch_analysis(failures, metric_name)
+        assert llm_adapter is not None
+
         try:
-            llm_adapter = self._llm_adapter
-            if llm_adapter is None:
-                raise RuntimeError("LLM adapter is not configured")
-            # LLM adapter의 generate_text 사용 (JSON 모드)
             response = llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_batch_response(response)
         except Exception as e:

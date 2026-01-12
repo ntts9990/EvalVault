@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.analysis import (
@@ -116,7 +116,7 @@ class AnalysisService:
         run_a: EvaluationRun,
         run_b: EvaluationRun,
         metrics: list[str] | None = None,
-        test_type: str = "t-test",
+        test_type: Literal["t-test", "mann-whitney"] = "t-test",
     ) -> list[ComparisonResult]:
         """두 평가 실행을 비교합니다.
 
@@ -142,7 +142,7 @@ class AnalysisService:
         self,
         runs: list[EvaluationRun],
         metrics: list[str] | None = None,
-        test_type: str = "t-test",
+        test_type: Literal["t-test", "mann-whitney"] = "t-test",
     ) -> MetaAnalysisResult:
         """여러 평가 실행에 대한 메타 분석을 수행합니다.
 

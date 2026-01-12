@@ -394,6 +394,8 @@ class TestCLIRun:
         mock_settings.llm_provider = "openai"
         mock_settings.evalvault_profile = None
         mock_settings.ollama_model = "gemma3:1b"
+        mock_settings.ollama_embedding_model = "qwen3-embedding:0.6b"
+        mock_settings.ollama_base_url = "http://localhost:11434"
         mock_settings_cls.return_value = mock_settings
 
         mock_loader = MagicMock()
@@ -1454,7 +1456,9 @@ class TestCLIRunModes:
 
         mock_settings = MagicMock()
         mock_settings.openai_api_key = None
-        mock_settings.ollama_model = "llama2"
+        mock_settings.ollama_model = "gemma3:1b"
+        mock_settings.ollama_embedding_model = "qwen3-embedding:0.6b"
+        mock_settings.ollama_base_url = "http://localhost:11434"
         mock_settings.llm_provider = "ollama"
         mock_settings.evalvault_profile = None
         mock_settings_cls.return_value = mock_settings
@@ -1474,7 +1478,7 @@ class TestCLIRunModes:
         mock_run = EvaluationRun(
             dataset_name="test",
             dataset_version="1.0.0",
-            model_name="ollama/llama2",
+            model_name="ollama/gemma3:1b",
             metrics_evaluated=["faithfulness"],
             started_at=start,
             finished_at=start + timedelta(seconds=1),
@@ -1494,7 +1498,7 @@ class TestCLIRunModes:
         test_file.write_text("id,question,answer,contexts\n")
 
         result = runner.invoke(app, ["run", str(test_file), "--metrics", "faithfulness"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.stdout
         assert "ollama" in result.stdout.lower()
 
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
@@ -2667,7 +2671,7 @@ class TestCLIAnalyzeNLP:
             ["analyze", "nonexistent-run", "--db", str(tmp_path / "test.db")],
         )
         assert result.exit_code == 1
-        assert "not found" in result.stdout.lower()
+        assert "찾을 수 없습니다" in result.stdout
 
     @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")

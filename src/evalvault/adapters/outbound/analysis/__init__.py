@@ -42,6 +42,9 @@ from evalvault.adapters.outbound.analysis.hybrid_rrf_module import HybridRRFModu
 from evalvault.adapters.outbound.analysis.hybrid_weighted_module import (
     HybridWeightedModule,
 )
+from evalvault.adapters.outbound.analysis.hypothesis_generator_module import (
+    HypothesisGeneratorModule,
+)
 from evalvault.adapters.outbound.analysis.llm_report_module import LLMReportModule
 from evalvault.adapters.outbound.analysis.low_performer_extractor_module import (
     LowPerformerExtractorModule,
@@ -52,6 +55,9 @@ from evalvault.adapters.outbound.analysis.morpheme_analyzer_module import (
 )
 from evalvault.adapters.outbound.analysis.morpheme_quality_checker_module import (
     MorphemeQualityCheckerModule,
+)
+from evalvault.adapters.outbound.analysis.network_analyzer_module import (
+    NetworkAnalyzerModule,
 )
 from evalvault.adapters.outbound.analysis.nlp_adapter import NLPAnalysisAdapter
 from evalvault.adapters.outbound.analysis.nlp_analyzer_module import NLPAnalyzerModule
@@ -103,6 +109,9 @@ from evalvault.adapters.outbound.analysis.summary_report_module import (
 from evalvault.adapters.outbound.analysis.time_series_analyzer_module import (
     TimeSeriesAnalyzerModule,
 )
+from evalvault.adapters.outbound.analysis.timeseries_advanced_module import (
+    TimeSeriesAdvancedModule,
+)
 from evalvault.adapters.outbound.analysis.trend_detector_module import (
     TrendDetectorModule,
 )
@@ -111,16 +120,16 @@ from evalvault.adapters.outbound.analysis.verification_report_module import (
 )
 
 __all__ = [
-    # Phase 2-3
-    "CausalAnalysisAdapter",
+    "TimeSeriesAdvancedModule",
+    "NetworkAnalyzerModule",
     "NLPAnalysisAdapter",
     "StatisticalAnalysisAdapter",
     "BaseAnalysisAdapter",
     "AnalysisDataProcessor",
-    # Phase 14
     "BaseAnalysisModule",
     "AnalysisReportModule",
     "BM25SearcherModule",
+    "CausalAnalysisAdapter",
     "CausalAnalyzerModule",
     "ComparisonReportModule",
     "DataLoaderModule",
@@ -131,6 +140,7 @@ __all__ = [
     "EmbeddingSearcherModule",
     "HybridRRFModule",
     "HybridWeightedModule",
+    "HypothesisGeneratorModule",
     "LowPerformerExtractorModule",
     "LLMReportModule",
     "ModelAnalyzerModule",

@@ -29,6 +29,15 @@ def _resolve_storage_path(path_value: str) -> str:
     return str((base / candidate).resolve())
 
 
+def _ensure_http_scheme(url_value: str) -> str:
+    value = url_value.strip()
+    if not value:
+        return url_value
+    if "://" in value:
+        return value
+    return f"http://{value}"
+
+
 class Settings(BaseSettings):
     """Application configuration settings."""
 
@@ -61,6 +70,7 @@ class Settings(BaseSettings):
     def model_post_init(self, __context: Any) -> None:
         self.evalvault_db_path = _resolve_storage_path(self.evalvault_db_path)
         self.evalvault_memory_db_path = _resolve_storage_path(self.evalvault_memory_db_path)
+        self.ollama_base_url = _ensure_http_scheme(self.ollama_base_url)
 
     # LLM Provider Selection
     llm_provider: str = Field(

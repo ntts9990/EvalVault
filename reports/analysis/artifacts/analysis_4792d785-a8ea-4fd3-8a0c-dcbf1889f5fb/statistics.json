@@ -1,0 +1,205 @@
+{
+  "node_id": "statistics",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "analysis": {
+      "analysis_id": "c7c4c677-8b2a-4723-9037-4cf032e1b023",
+      "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+      "analysis_type": "statistical",
+      "created_at": "2026-01-11T19:24:03.744624",
+      "metadata": {},
+      "metrics_summary": {
+        "faithfulness": {
+          "mean": 1.0,
+          "std": 0.0,
+          "min": 1.0,
+          "max": 1.0,
+          "median": 1.0,
+          "percentile_25": 1.0,
+          "percentile_75": 1.0,
+          "count": 5
+        },
+        "answer_relevancy": {
+          "mean": 0.22023630582446163,
+          "std": 0.2872772829811363,
+          "min": 0.0,
+          "max": 0.7068932894305174,
+          "median": 0.0,
+          "percentile_25": 0.0,
+          "percentile_75": 0.39428823969179067,
+          "count": 5
+        }
+      },
+      "correlation_matrix": [
+        [
+          1.0,
+          NaN
+        ],
+        [
+          NaN,
+          1.0
+        ]
+      ],
+      "correlation_metrics": [
+        "faithfulness",
+        "answer_relevancy"
+      ],
+      "significant_correlations": [],
+      "low_performers": [
+        {
+          "test_case_id": "kr-002",
+          "metric_name": "answer_relevancy",
+          "score": 0.0,
+          "threshold": 0.7,
+          "question_preview": "보험료 납입 기간은 어떻게 되나요?",
+          "potential_causes": [
+            "Answer does not address the question"
+          ]
+        },
+        {
+          "test_case_id": "kr-003",
+          "metric_name": "answer_relevancy",
+          "score": 0.0,
+          "threshold": 0.7,
+          "question_preview": "암 진단비는 얼마를 받을 수 있나요?",
+          "potential_causes": [
+            "Answer does not address the question"
+          ]
+        },
+        {
+          "test_case_id": "kr-005",
+          "metric_name": "answer_relevancy",
+          "score": 0.0,
+          "threshold": 0.7,
+          "question_preview": "입원비 보장은 어떻게 되나요?",
+          "potential_causes": [
+            "Answer does not address the question"
+          ]
+        },
+        {
+          "test_case_id": "kr-004",
+          "metric_name": "answer_relevancy",
+          "score": 0.39428823969179067,
+          "threshold": 0.7,
+          "question_preview": "보험 해지 시 환급금은 얼마인가요?",
+          "potential_causes": [
+            "Answer partially addresses the question"
+          ]
+        }
+      ],
+      "insights": [
+        "Low pass rate requires attention: 20.0%",
+        "Best performing metric: faithfulness (mean: 1.000)",
+        "Worst performing metric: answer_relevancy (mean: 0.220)",
+        "High variance metrics (std > 0.2): answer_relevancy",
+        "Found 4 low-performing test cases (score < threshold)",
+        "Most problematic metric: answer_relevancy (4 low performers)"
+      ],
+      "overall_pass_rate": 0.2,
+      "metric_pass_rates": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.2
+      }
+    },
+    "summary": {
+      "total_metrics": 2,
+      "average_score": 0.6101,
+      "overall_pass_rate": 0.2
+    },
+    "statistics": {
+      "faithfulness": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0,
+        "median": 1.0,
+        "percentile_25": 1.0,
+        "percentile_75": 1.0,
+        "count": 5
+      },
+      "answer_relevancy": {
+        "mean": 0.22023630582446163,
+        "std": 0.2872772829811363,
+        "min": 0.0,
+        "max": 0.7068932894305174,
+        "median": 0.0,
+        "percentile_25": 0.0,
+        "percentile_75": 0.39428823969179067,
+        "count": 5
+      }
+    },
+    "insights": [
+      "Low pass rate requires attention: 20.0%",
+      "Best performing metric: faithfulness (mean: 1.000)",
+      "Worst performing metric: answer_relevancy (mean: 0.220)",
+      "High variance metrics (std > 0.2): answer_relevancy",
+      "Found 4 low-performing test cases (score < threshold)",
+      "Most problematic metric: answer_relevancy (4 low performers)"
+    ],
+    "analysis_id": "c7c4c677-8b2a-4723-9037-4cf032e1b023",
+    "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+    "correlation_metrics": [
+      "faithfulness",
+      "answer_relevancy"
+    ],
+    "correlation_matrix": [
+      [
+        1.0,
+        NaN
+      ],
+      [
+        NaN,
+        1.0
+      ]
+    ],
+    "significant_correlations": [],
+    "low_performers": [
+      {
+        "test_case_id": "kr-002",
+        "metric_name": "answer_relevancy",
+        "score": 0.0,
+        "threshold": 0.7,
+        "question_preview": "보험료 납입 기간은 어떻게 되나요?",
+        "potential_causes": [
+          "Answer does not address the question"
+        ]
+      },
+      {
+        "test_case_id": "kr-003",
+        "metric_name": "answer_relevancy",
+        "score": 0.0,
+        "threshold": 0.7,
+        "question_preview": "암 진단비는 얼마를 받을 수 있나요?",
+        "potential_causes": [
+          "Answer does not address the question"
+        ]
+      },
+      {
+        "test_case_id": "kr-005",
+        "metric_name": "answer_relevancy",
+        "score": 0.0,
+        "threshold": 0.7,
+        "question_preview": "입원비 보장은 어떻게 되나요?",
+        "potential_causes": [
+          "Answer does not address the question"
+        ]
+      },
+      {
+        "test_case_id": "kr-004",
+        "metric_name": "answer_relevancy",
+        "score": 0.39428823969179067,
+        "threshold": 0.7,
+        "question_preview": "보험 해지 시 환급금은 얼마인가요?",
+        "potential_causes": [
+          "Answer partially addresses the question"
+        ]
+      }
+    ],
+    "metric_pass_rates": {
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.2
+    }
+  }
+}

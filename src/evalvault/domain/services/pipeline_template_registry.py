@@ -51,136 +51,22 @@ class PipelineTemplateRegistry:
         )
         self._templates[AnalysisIntent.ANALYZE_PATTERNS] = self._create_analyze_patterns_template()
         self._templates[AnalysisIntent.ANALYZE_TRENDS] = self._create_analyze_trends_template()
+        self._templates[AnalysisIntent.ANALYZE_STATISTICAL] = (
+            self._create_analyze_statistical_template()
+        )
+        self._templates[AnalysisIntent.ANALYZE_NLP] = self._create_analyze_nlp_template()
+        self._templates[AnalysisIntent.ANALYZE_CAUSAL] = self._create_analyze_causal_template()
+        self._templates[AnalysisIntent.ANALYZE_NETWORK] = self._create_analyze_network_template()
+        self._templates[AnalysisIntent.ANALYZE_PLAYBOOK] = self._create_analyze_playbook_template()
+        self._templates[AnalysisIntent.DETECT_ANOMALIES] = self._create_detect_anomalies_template()
+        self._templates[AnalysisIntent.FORECAST_PERFORMANCE] = (
+            self._create_forecast_performance_template()
+        )
+        self._templates[AnalysisIntent.GENERATE_HYPOTHESES] = (
+            self._create_generate_hypotheses_template()
+        )
         self._templates[AnalysisIntent.BENCHMARK_RETRIEVAL] = (
             self._create_benchmark_retrieval_template()
-        )
-
-        # 보고서 템플릿
-        self._templates[AnalysisIntent.GENERATE_SUMMARY] = self._create_generate_summary_template()
-        self._templates[AnalysisIntent.GENERATE_DETAILED] = (
-            self._create_generate_detailed_template()
-        )
-        self._templates[AnalysisIntent.GENERATE_COMPARISON] = (
-            self._create_generate_comparison_template()
-        )
-
-    def get_template(self, intent: AnalysisIntent) -> AnalysisPipeline | None:
-        """의도에 대한 템플릿 조회.
-
-        Args:
-            intent: 분석 의도
-
-        Returns:
-            파이프라인 템플릿 또는 None
-        """
-        return self._templates.get(intent)
-
-    def list_all(self) -> list[tuple[AnalysisIntent, AnalysisPipeline]]:
-        """모든 템플릿 목록.
-
-        Returns:
-            (의도, 템플릿) 튜플 목록
-        """
-        return list(self._templates.items())
-
-    # =========================================================================
-    # Verification Templates
-    # =========================================================================
-
-    def _create_verify_morpheme_template(self) -> AnalysisPipeline:
-        """형태소 분석 검증 템플릿."""
-        nodes = [
-            AnalysisNode(
-                id="load_data",
-                name="데이터 로드",
-                module="data_loader",
-            ),
-            AnalysisNode(
-                id="morpheme_analysis",
-                name="형태소 분석",
-                module="morpheme_analyzer",
-                depends_on=["load_data"],
-            ),
-            AnalysisNode(
-                id="quality_check",
-                name="품질 검사",
-                module="morpheme_quality_checker",
-                depends_on=["morpheme_analysis"],
-            ),
-            AnalysisNode(
-                id="report",
-                name="검증 보고서",
-                module="verification_report",
-                depends_on=["quality_check"],
-            ),
-        ]
-        return AnalysisPipeline(
-            intent=AnalysisIntent.VERIFY_MORPHEME,
-            nodes=nodes,
-        )
-
-    def _create_verify_embedding_template(self) -> AnalysisPipeline:
-        """임베딩 품질 검증 템플릿."""
-        nodes = [
-            AnalysisNode(
-                id="load_data",
-                name="데이터 로드",
-                module="data_loader",
-            ),
-            AnalysisNode(
-                id="embedding_analysis",
-                name="임베딩 분석",
-                module="embedding_analyzer",
-                depends_on=["load_data"],
-            ),
-            AnalysisNode(
-                id="distribution_check",
-                name="분포 검사",
-                module="embedding_distribution",
-                depends_on=["embedding_analysis"],
-            ),
-            AnalysisNode(
-                id="report",
-                name="검증 보고서",
-                module="verification_report",
-                depends_on=["distribution_check"],
-            ),
-        ]
-        return AnalysisPipeline(
-            intent=AnalysisIntent.VERIFY_EMBEDDING,
-            nodes=nodes,
-        )
-
-    def _create_verify_retrieval_template(self) -> AnalysisPipeline:
-        """검색 품질 검증 템플릿."""
-        nodes = [
-            AnalysisNode(
-                id="load_data",
-                name="데이터 로드",
-                module="data_loader",
-            ),
-            AnalysisNode(
-                id="retrieval_analysis",
-                name="검색 분석",
-                module="retrieval_analyzer",
-                depends_on=["load_data"],
-            ),
-            AnalysisNode(
-                id="quality_check",
-                name="품질 검사",
-                module="retrieval_quality_checker",
-                depends_on=["retrieval_analysis"],
-            ),
-            AnalysisNode(
-                id="report",
-                name="검증 보고서",
-                module="verification_report",
-                depends_on=["quality_check"],
-            ),
-        ]
-        return AnalysisPipeline(
-            intent=AnalysisIntent.VERIFY_RETRIEVAL,
-            nodes=nodes,
         )
 
     # =========================================================================
@@ -438,6 +324,190 @@ class PipelineTemplateRegistry:
         ]
         return AnalysisPipeline(
             intent=AnalysisIntent.ANALYZE_TRENDS,
+            nodes=nodes,
+        )
+
+    def _create_analyze_statistical_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="statistics",
+                name="통계 분석",
+                module="statistical_analyzer",
+                depends_on=["load_data"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_STATISTICAL,
+            nodes=nodes,
+        )
+
+    def _create_analyze_nlp_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="nlp_analysis",
+                name="NLP 분석",
+                module="nlp_analyzer",
+                depends_on=["load_data"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_NLP,
+            nodes=nodes,
+        )
+
+    def _create_analyze_causal_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="statistics",
+                name="통계 분석",
+                module="statistical_analyzer",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="causal_analysis",
+                name="인과 분석",
+                module="causal_analyzer",
+                depends_on=["load_data", "statistics"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_CAUSAL,
+            nodes=nodes,
+        )
+
+    def _create_analyze_network_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="statistics",
+                name="통계 분석",
+                module="statistical_analyzer",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="network_analysis",
+                name="네트워크 분석",
+                module="network_analyzer",
+                depends_on=["statistics"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_NETWORK,
+            nodes=nodes,
+        )
+
+    def _create_analyze_playbook_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="diagnostic",
+                name="진단 분석",
+                module="diagnostic_playbook",
+                depends_on=["load_data"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_PLAYBOOK,
+            nodes=nodes,
+        )
+
+    def _create_detect_anomalies_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_runs",
+                name="실행 기록 로드",
+                module="run_loader",
+            ),
+            AnalysisNode(
+                id="anomaly_detection",
+                name="이상 탐지",
+                module="timeseries_advanced",
+                params={"mode": "anomaly"},
+                depends_on=["load_runs"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.DETECT_ANOMALIES,
+            nodes=nodes,
+        )
+
+    def _create_forecast_performance_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_runs",
+                name="실행 기록 로드",
+                module="run_loader",
+            ),
+            AnalysisNode(
+                id="forecast",
+                name="성능 예측",
+                module="timeseries_advanced",
+                params={"mode": "forecast"},
+                depends_on=["load_runs"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.FORECAST_PERFORMANCE,
+            nodes=nodes,
+        )
+
+    def _create_generate_hypotheses_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="statistics",
+                name="통계 분석",
+                module="statistical_analyzer",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="ragas_eval",
+                name="RAGAS 평가",
+                module="ragas_evaluator",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
+                id="low_samples",
+                name="낮은 성능 케이스 추출",
+                module="low_performer_extractor",
+                depends_on=["ragas_eval"],
+            ),
+            AnalysisNode(
+                id="hypothesis",
+                name="가설 생성",
+                module="hypothesis_generator",
+                depends_on=["statistics", "low_samples"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.GENERATE_HYPOTHESES,
             nodes=nodes,
         )
 

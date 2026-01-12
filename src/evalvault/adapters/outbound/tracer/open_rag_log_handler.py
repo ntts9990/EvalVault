@@ -87,10 +87,10 @@ def _extract_record_data(record: logging.LogRecord) -> dict[str, Any]:
 def _coerce_attribute_value(value: Any) -> Any:
     if value is None:
         return None
-    if isinstance(value, (bool, int, float, str, bytes)):
+    if isinstance(value, bool | int | float | str | bytes):
         return value
-    if isinstance(value, (list, tuple)):
-        if all(isinstance(item, (bool, int, float, str, bytes)) for item in value):
+    if isinstance(value, list | tuple):
+        if all(isinstance(item, bool | int | float | str | bytes) for item in value):
             return list(value)
         return json.dumps(value, ensure_ascii=False, default=str)
     return json.dumps(value, ensure_ascii=False, default=str)

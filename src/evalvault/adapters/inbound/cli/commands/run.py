@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable, Sequence
 from datetime import date, datetime
 from pathlib import Path
@@ -794,6 +795,12 @@ def register_run_commands(
             )
             raise typer.Exit(1)
 
+        ollama_env_url = os.environ.get("OLLAMA_BASE_URL")
+        if ollama_env_url:
+            normalized_url = ollama_env_url.strip()
+            if normalized_url and "://" not in normalized_url:
+                os.environ["OLLAMA_BASE_URL"] = f"http://{normalized_url}"
+
         settings = Settings()
 
         # Apply profile (CLI > .env > default)
@@ -915,6 +922,15 @@ def register_run_commands(
                 raise typer.Exit(1) from exc
 
         if settings.llm_provider == "ollama":
+            base_url = getattr(settings, "ollama_base_url", "")
+            if not isinstance(base_url, str):
+                base_url = ""
+            base_url = base_url.strip()
+            if not base_url:
+                base_url = "http://localhost:11434"
+            elif "://" not in base_url:
+                base_url = f"http://{base_url}"
+            settings.ollama_base_url = base_url
             display_model = f"ollama/{settings.ollama_model}"
         elif settings.llm_provider == "vllm":
             display_model = f"vllm/{settings.vllm_model}"
@@ -1421,37 +1437,55 @@ def register_run_commands(
             ensure_phoenix_instrumentation(settings, console=console, force=True)
 
         evaluator = RagasEvaluator()
+        llm_adapter = None
         try:
             llm_adapter = get_llm_adapter(settings)
         except Exception as exc:
             provider = str(getattr(settings, "llm_provider", "")).strip().lower()
-            fixes: list[str] = []
-            if provider == "ollama":
-                fixes = [
-                    "Ollama 서버가 실행 중인지 확인하세요 (기본: http://localhost:11434).",
-                    "필요 모델을 받아두세요: `ollama pull gemma3:1b` 및 `ollama pull qwen3-embedding:0.6b`.",
-                    "URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
-                ]
-            elif provider == "openai":
-                fixes = [
-                    "`.env`에 `OPENAI_API_KEY`를 설정하세요.",
-                    "프록시/네트워크가 필요한 환경이면 연결 가능 여부를 확인하세요.",
-                ]
-            elif provider == "vllm":
-                fixes = [
-                    "`.env`의 `VLLM_BASE_URL`/`VLLM_MODEL` 설정을 확인하세요.",
-                    "vLLM 서버가 OpenAI 호환 API로 실행 중인지 확인하세요.",
-                ]
-            else:
-                fixes = ["--profile 또는 환경변수 설정을 확인하세요."]
+            recovered = False
+            if provider == "ollama" and "http://" in str(exc):
+                base_url = getattr(settings, "ollama_base_url", "")
+                if not isinstance(base_url, str) or not base_url.strip():
+                    base_url = "http://localhost:11434"
+                elif "://" not in base_url:
+                    base_url = f"http://{base_url.strip()}"
+                settings.ollama_base_url = base_url
+                try:
+                    llm_adapter = get_llm_adapter(settings)
+                    recovered = True
+                except Exception as retry_exc:
+                    exc = retry_exc
 
-            print_cli_error(
-                console,
-                "LLM/임베딩 어댑터를 초기화하지 못했습니다.",
-                details=str(exc),
-                fixes=fixes,
-            )
-            raise typer.Exit(1) from exc
+            if not recovered:
+                fixes: list[str] = []
+                if provider == "ollama":
+                    fixes = [
+                        "Ollama 서버가 실행 중인지 확인하세요 (기본: http://localhost:11434).",
+                        "필요 모델을 받아두세요: `ollama pull gemma3:1b` 및 `ollama pull qwen3-embedding:0.6b`.",
+                        "URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
+                    ]
+                elif provider == "openai":
+                    fixes = [
+                        "`.env`에 `OPENAI_API_KEY`를 설정하세요.",
+                        "프록시/네트워크가 필요한 환경이면 연결 가능 여부를 확인하세요.",
+                    ]
+                elif provider == "vllm":
+                    fixes = [
+                        "`.env`의 `VLLM_BASE_URL`/`VLLM_MODEL` 설정을 확인하세요.",
+                        "vLLM 서버가 OpenAI 호환 API로 실행 중인지 확인하세요.",
+                    ]
+                else:
+                    fixes = ["--profile 또는 환경변수 설정을 확인하세요."]
+
+                print_cli_error(
+                    console,
+                    "LLM/임베딩 어댑터를 초기화하지 못했습니다.",
+                    details=str(exc),
+                    fixes=fixes,
+                )
+                raise typer.Exit(1) from exc
+
+        assert llm_adapter is not None
 
         memory_adapter: SQLiteDomainMemoryAdapter | None = None
         memory_evaluator: MemoryAwareEvaluator | None = None

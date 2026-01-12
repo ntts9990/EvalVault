@@ -36,7 +36,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             "-o",
             help="Output file for results (JSON format).",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Analyze evaluation results using natural language query."""
         from evalvault.adapters.outbound.analysis.pipeline_factory import (
@@ -51,6 +51,10 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
         settings = Settings()
         if settings.phoenix_enabled:
             ensure_phoenix_instrumentation(settings, console=console)
+
+        if db_path is None:
+            console.print("[red]Error: Database path is not configured.[/red]")
+            raise typer.Exit(1)
 
         storage = SQLiteStorageAdapter(db_path=db_path)
         llm_adapter = None

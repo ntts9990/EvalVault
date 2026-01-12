@@ -187,9 +187,9 @@ def build_metric_scorecard(
         threshold = _resolve_threshold(run, metric)
         pass_rate = pass_rates.get(metric) if isinstance(pass_rates, dict) else None
         status = "unknown"
-        if isinstance(mean, (int, float)):
+        if isinstance(mean, int | float):
             status = "pass" if float(mean) >= threshold else "risk"
-        elif isinstance(pass_rate, (int, float)):
+        elif isinstance(pass_rate, int | float):
             status = "pass" if float(pass_rate) >= 0.7 else "risk"
         scorecard.append(
             {

@@ -117,18 +117,18 @@ class PatternDetector:
         results: dict[str, list[PatternEvidence]] = {}
 
         for metric in target_metrics:
-            playbook = self._playbook.get_metric_playbook(metric)
-            if not playbook:
+            metric_playbook = self._playbook.metrics.get(metric)
+            if not metric_playbook:
                 logger.debug(f"No playbook found for metric: {metric}")
                 continue
 
             metric_patterns = []
-            for pattern_def in playbook.patterns:
+            for pattern_def in metric_playbook.patterns:
                 evidence = self._detect_single_pattern(
                     pattern_def=pattern_def,
                     feature_vectors=feature_vectors,
                     target_metric=metric,
-                    threshold=run.thresholds.get(metric, playbook.default_threshold),
+                    threshold=run.thresholds.get(metric, metric_playbook.default_threshold),
                 )
                 if evidence:
                     metric_patterns.append(evidence)
@@ -475,17 +475,15 @@ class PatternDetector:
 
         # 상관계수 계산
         try:
-            corr_result = stats.pearsonr(values1, values2)
+            result = stats.pearsonr(values1, values2)
+            corr_raw = getattr(result, "statistic", None)
+            p_value_raw = getattr(result, "pvalue", None)
+            if corr_raw is None or p_value_raw is None:
+                corr_raw, p_value_raw = result
+            corr = float(corr_raw)
+            p_value = float(p_value_raw)
         except Exception:
             return {"matched": False, "matched_vectors": [], "correlation": None}
-
-        if isinstance(corr_result, tuple):
-            corr_value, p_value_value = cast(tuple[float, float], corr_result)
-            corr = float(corr_value)
-            p_value = float(p_value_value)
-        else:
-            corr = float(corr_result.statistic)
-            p_value = float(corr_result.pvalue)
 
         # 방향 및 강도 확인
         matched = False

@@ -1,0 +1,12 @@
+{
+  "node_id": "trend_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "trends": [],
+    "summary": {
+      "note": "Insufficient history"
+    }
+  }
+}

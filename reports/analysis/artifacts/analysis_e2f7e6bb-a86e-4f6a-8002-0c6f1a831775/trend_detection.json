@@ -1,0 +1,23 @@
+{
+  "node_id": "trend_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "trends": [
+      {
+        "metric": "pass_rate",
+        "direction": "flat",
+        "delta": 0.0
+      }
+    ],
+    "summary": {
+      "start": 0.2,
+      "end": 0.2,
+      "delta": 0.0
+    },
+    "recommendations": [
+      "Performance is stable across recent runs."
+    ]
+  }
+}

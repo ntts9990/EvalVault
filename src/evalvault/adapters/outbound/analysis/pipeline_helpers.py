@@ -107,7 +107,7 @@ def to_serializable(value: Any) -> Any:
         return value.value
     if isinstance(value, dict):
         return {key: to_serializable(val) for key, val in value.items()}
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         return [to_serializable(item) for item in value]
     return value
 

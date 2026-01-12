@@ -1,0 +1,22 @@
+{
+  "node_id": "pattern_detection",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "patterns": [
+      {
+        "label": "Question type",
+        "detail": "factual (0.6%)"
+      },
+      {
+        "label": "Question type",
+        "detail": "reasoning (0.4%)"
+      }
+    ],
+    "summary": {
+      "keyword_count": 0,
+      "question_type_count": 2
+    }
+  }
+}

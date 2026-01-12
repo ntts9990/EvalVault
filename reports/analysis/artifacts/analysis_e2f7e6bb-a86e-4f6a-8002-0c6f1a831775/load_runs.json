@@ -1,0 +1,484 @@
+{
+  "node_id": "load_runs",
+  "status": "completed",
+  "duration_ms": 1,
+  "error": null,
+  "output": {
+    "runs": [
+      {
+        "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+        "dataset_name": "insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gemma3:1b",
+        "started_at": "2026-01-11T19:24:33.411290",
+        "finished_at": "2026-01-11T19:25:37.475751",
+        "results": [
+          {
+            "test_case_id": "kr-001",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.7068932894305174,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4113,
+            "latency_ms": 12794,
+            "cost_usd": 0.0125025,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:24:33.411455",
+            "finished_at": "2026-01-11T19:24:46.205735",
+            "question": "이 보험의 사망보험금은 얼마인가요?",
+            "answer": "해당 보험의 사망보험금은 1억원입니다.",
+            "contexts": [
+              "본 보험계약의 사망보험금은 1억원이며, 피보험자가 보험기간 중 사망한 경우 지급됩니다.",
+              "보험금 청구 시 사망진단서와 수익자 신분증이 필요합니다."
+            ],
+            "ground_truth": "1억원"
+          },
+          {
+            "test_case_id": "kr-002",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4030,
+            "latency_ms": 11424,
+            "cost_usd": 0.011785,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:24:46.205779",
+            "finished_at": "2026-01-11T19:24:57.630712",
+            "question": "보험료 납입 기간은 어떻게 되나요?",
+            "answer": "보험료 납입 기간은 20년입니다.",
+            "contexts": [
+              "보험료 납입기간은 20년이며, 월납 기준 보험료는 50,000원입니다.",
+              "납입 기간 중 보험료 납입이 어려운 경우 납입유예 신청이 가능합니다."
+            ],
+            "ground_truth": "20년"
+          },
+          {
+            "test_case_id": "kr-003",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4229,
+            "latency_ms": 12794,
+            "cost_usd": 0.013152500000000001,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:24:57.630741",
+            "finished_at": "2026-01-11T19:25:10.424789",
+            "question": "암 진단비는 얼마를 받을 수 있나요?",
+            "answer": "암 진단 시 3,000만원의 진단비를 받으실 수 있습니다.",
+            "contexts": [
+              "암 진단비는 일반암 기준 3,000만원이 지급됩니다.",
+              "다만, 갑상선암, 기타피부암 등 소액암의 경우 300만원이 지급됩니다.",
+              "암 진단비는 최초 1회에 한하여 지급됩니다."
+            ],
+            "ground_truth": "3,000만원"
+          },
+          {
+            "test_case_id": "kr-004",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.39428823969179067,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4302,
+            "latency_ms": 14451,
+            "cost_usd": 0.0138075,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:25:10.424816",
+            "finished_at": "2026-01-11T19:25:24.876245",
+            "question": "보험 해지 시 환급금은 얼마인가요?",
+            "answer": "5년 납입 후 해지 시 납입보험료의 약 70%가 환급됩니다.",
+            "contexts": [
+              "해지환급금은 납입기간에 따라 다르며, 5년 납입 시 약 70%, 10년 납입 시 약 85%가 환급됩니다.",
+              "조기 해지 시 원금 손실이 발생할 수 있습니다."
+            ],
+            "ground_truth": "납입보험료의 약 70%"
+          },
+          {
+            "test_case_id": "kr-005",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4168,
+            "latency_ms": 12599,
+            "cost_usd": 0.012805,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:25:24.876271",
+            "finished_at": "2026-01-11T19:25:37.475686",
+            "question": "입원비 보장은 어떻게 되나요?",
+            "answer": "질병 입원 시 1일당 5만원의 입원비가 지급됩니다.",
+            "contexts": [
+              "질병으로 인한 입원 시 1일당 5만원(최대 180일)이 지급됩니다.",
+              "상해로 인한 입원은 별도의 상해입원비 특약 가입이 필요합니다."
+            ],
+            "ground_truth": "1일당 5만원"
+          }
+        ],
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "total_tokens": 20842,
+        "total_cost_usd": 0.0640525,
+        "langfuse_trace_id": null,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:0.6b",
+            "temperature": null
+          },
+          "run_mode": "simple",
+          "phoenix": {
+            "trace_id": "7ce7bfd8-b188-417f-9034-15fa5bce2027",
+            "endpoint": "http://localhost:6006/v1/traces",
+            "trace_url": "http://localhost:6006/#/traces/7ce7bfd8-b188-417f-9034-15fa5bce2027",
+            "schema_version": 2
+          }
+        },
+        "retrieval_metadata": {}
+      },
+      {
+        "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+        "dataset_name": "insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gemma3:1b",
+        "started_at": "2026-01-11T19:22:58.954675",
+        "finished_at": "2026-01-11T19:24:03.649391",
+        "results": [
+          {
+            "test_case_id": "kr-001",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.7068932894305174,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4113,
+            "latency_ms": 13304,
+            "cost_usd": 0.0125025,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:22:58.954833",
+            "finished_at": "2026-01-11T19:23:12.259547",
+            "question": "이 보험의 사망보험금은 얼마인가요?",
+            "answer": "해당 보험의 사망보험금은 1억원입니다.",
+            "contexts": [
+              "본 보험계약의 사망보험금은 1억원이며, 피보험자가 보험기간 중 사망한 경우 지급됩니다.",
+              "보험금 청구 시 사망진단서와 수익자 신분증이 필요합니다."
+            ],
+            "ground_truth": "1억원"
+          },
+          {
+            "test_case_id": "kr-002",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4030,
+            "latency_ms": 11484,
+            "cost_usd": 0.011785,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:23:12.259583",
+            "finished_at": "2026-01-11T19:23:23.744201",
+            "question": "보험료 납입 기간은 어떻게 되나요?",
+            "answer": "보험료 납입 기간은 20년입니다.",
+            "contexts": [
+              "보험료 납입기간은 20년이며, 월납 기준 보험료는 50,000원입니다.",
+              "납입 기간 중 보험료 납입이 어려운 경우 납입유예 신청이 가능합니다."
+            ],
+            "ground_truth": "20년"
+          },
+          {
+            "test_case_id": "kr-003",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4229,
+            "latency_ms": 12790,
+            "cost_usd": 0.013152500000000001,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:23:23.744247",
+            "finished_at": "2026-01-11T19:23:36.534646",
+            "question": "암 진단비는 얼마를 받을 수 있나요?",
+            "answer": "암 진단 시 3,000만원의 진단비를 받으실 수 있습니다.",
+            "contexts": [
+              "암 진단비는 일반암 기준 3,000만원이 지급됩니다.",
+              "다만, 갑상선암, 기타피부암 등 소액암의 경우 300만원이 지급됩니다.",
+              "암 진단비는 최초 1회에 한하여 지급됩니다."
+            ],
+            "ground_truth": "3,000만원"
+          },
+          {
+            "test_case_id": "kr-004",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.39428823969179067,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4302,
+            "latency_ms": 14563,
+            "cost_usd": 0.0138075,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:23:36.534671",
+            "finished_at": "2026-01-11T19:23:51.097796",
+            "question": "보험 해지 시 환급금은 얼마인가요?",
+            "answer": "5년 납입 후 해지 시 납입보험료의 약 70%가 환급됩니다.",
+            "contexts": [
+              "해지환급금은 납입기간에 따라 다르며, 5년 납입 시 약 70%, 10년 납입 시 약 85%가 환급됩니다.",
+              "조기 해지 시 원금 손실이 발생할 수 있습니다."
+            ],
+            "ground_truth": "납입보험료의 약 70%"
+          },
+          {
+            "test_case_id": "kr-005",
+            "metrics": [
+              {
+                "name": "faithfulness",
+                "score": 1.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              },
+              {
+                "name": "answer_relevancy",
+                "score": 0.0,
+                "threshold": 0.7,
+                "reason": null,
+                "claim_details": null
+              }
+            ],
+            "tokens_used": 4168,
+            "latency_ms": 12551,
+            "cost_usd": 0.012805,
+            "trace_id": null,
+            "started_at": "2026-01-11T19:23:51.097822",
+            "finished_at": "2026-01-11T19:24:03.649320",
+            "question": "입원비 보장은 어떻게 되나요?",
+            "answer": "질병 입원 시 1일당 5만원의 입원비가 지급됩니다.",
+            "contexts": [
+              "질병으로 인한 입원 시 1일당 5만원(최대 180일)이 지급됩니다.",
+              "상해로 인한 입원은 별도의 상해입원비 특약 가입이 필요합니다."
+            ],
+            "ground_truth": "1일당 5만원"
+          }
+        ],
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "total_tokens": 20842,
+        "total_cost_usd": 0.0640525,
+        "langfuse_trace_id": null,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:0.6b",
+            "temperature": null
+          },
+          "run_mode": "simple",
+          "phoenix": {
+            "trace_id": "d5ea27dc-f1e7-46d8-a2e5-31df0cc1ba36",
+            "endpoint": "http://localhost:6006/v1/traces",
+            "trace_url": "http://localhost:6006/#/traces/d5ea27dc-f1e7-46d8-a2e5-31df0cc1ba36",
+            "schema_version": 2
+          }
+        },
+        "retrieval_metadata": {}
+      }
+    ],
+    "summaries": [
+      {
+        "run_id": "e2f7e6bb-a86e-4f6a-8002-0c6f1a831775",
+        "dataset_name": "insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gemma3:1b",
+        "started_at": "2026-01-11T19:24:33.411290",
+        "finished_at": "2026-01-11T19:25:37.475751",
+        "total_test_cases": 5,
+        "passed_test_cases": 1,
+        "pass_rate": 0.2,
+        "total_tokens": 20842,
+        "total_cost_usd": 0.0640525,
+        "duration_seconds": 64.064461,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:0.6b",
+            "temperature": null
+          },
+          "run_mode": "simple",
+          "phoenix": {
+            "trace_id": "7ce7bfd8-b188-417f-9034-15fa5bce2027",
+            "endpoint": "http://localhost:6006/v1/traces",
+            "trace_url": "http://localhost:6006/#/traces/7ce7bfd8-b188-417f-9034-15fa5bce2027",
+            "schema_version": 2
+          }
+        },
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "phoenix_trace_url": "http://localhost:6006/#/traces/7ce7bfd8-b188-417f-9034-15fa5bce2027",
+        "run_mode": "simple",
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "avg_faithfulness": 1.0,
+        "avg_answer_relevancy": 0.22023630582446163
+      },
+      {
+        "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+        "dataset_name": "insurance-qa-korean",
+        "dataset_version": "1.0.0",
+        "model_name": "ollama/gemma3:1b",
+        "started_at": "2026-01-11T19:22:58.954675",
+        "finished_at": "2026-01-11T19:24:03.649391",
+        "total_test_cases": 5,
+        "passed_test_cases": 1,
+        "pass_rate": 0.2,
+        "total_tokens": 20842,
+        "total_cost_usd": 0.0640525,
+        "duration_seconds": 64.694716,
+        "tracker_metadata": {
+          "ragas_config": {
+            "embedding_model": "qwen3-embedding:0.6b",
+            "temperature": null
+          },
+          "run_mode": "simple",
+          "phoenix": {
+            "trace_id": "d5ea27dc-f1e7-46d8-a2e5-31df0cc1ba36",
+            "endpoint": "http://localhost:6006/v1/traces",
+            "trace_url": "http://localhost:6006/#/traces/d5ea27dc-f1e7-46d8-a2e5-31df0cc1ba36",
+            "schema_version": 2
+          }
+        },
+        "metrics_evaluated": [
+          "faithfulness",
+          "answer_relevancy"
+        ],
+        "phoenix_trace_url": "http://localhost:6006/#/traces/d5ea27dc-f1e7-46d8-a2e5-31df0cc1ba36",
+        "run_mode": "simple",
+        "thresholds": {
+          "faithfulness": 0.7,
+          "answer_relevancy": 0.7
+        },
+        "avg_faithfulness": 1.0,
+        "avg_answer_relevancy": 0.22023630582446163
+      }
+    ],
+    "count": 2,
+    "missing_run_ids": []
+  }
+}

@@ -12,15 +12,18 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.analysis import (
     CausalAnalysisAdapter,
+    HypothesisGeneratorModule,
+    NetworkAnalyzerModule,
     NLPAnalysisAdapter,
     StatisticalAnalysisAdapter,
+    TimeSeriesAdvancedModule,
 )
 from evalvault.adapters.outbound.analysis.pipeline_factory import (
     build_analysis_pipeline_service,
 )
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
-from evalvault.adapters.outbound.report import MarkdownReportAdapter
+from evalvault.adapters.outbound.report import DashboardGenerator, MarkdownReportAdapter
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.phoenix_support import get_phoenix_trace_url
 from evalvault.config.settings import Settings, apply_profile
@@ -64,6 +67,37 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             "-L",
             help="플레이북 분석에서 LLM 인사이트 생성",
         ),
+        dashboard: bool = typer.Option(False, "--dashboard", help="시각화 대시보드 생성"),
+        dashboard_format: str = typer.Option(
+            "png", "--dashboard-format", help="대시보드 출력 형식 (png, svg, pdf)"
+        ),
+        anomaly_detect: bool = typer.Option(
+            False, "--anomaly-detect", "-A", help="이상치 탐지 실행 (Phase 2)"
+        ),
+        window_size: int = typer.Option(
+            200, "--window-size", "-w", help="이상치 탐지 윈도 크기", min=50, max=500
+        ),
+        forecast: bool = typer.Option(False, "--forecast", "-F", help="성능 예측 실행 (Phase 2)"),
+        forecast_horizon: int = typer.Option(
+            3, "--forecast-horizon", help="예측 범위(런 개수)", min=1, max=10
+        ),
+        network: bool = typer.Option(
+            False, "--network", help="메트릭 상관관계 네트워크 생성 (Phase 3)"
+        ),
+        min_correlation: float = typer.Option(
+            0.5, "--min-correlation", help="네트워크 최소 상관계수", min=0, max=1
+        ),
+        generate_hypothesis: bool = typer.Option(
+            False, "--generate-hypothesis", "-H", help="가설 자동 생성 (Phase 4)"
+        ),
+        hypothesis_method: str = typer.Option(
+            "heuristic",
+            "--hypothesis-method",
+            help="가설 생성 방식 (heuristic, hyporefine, union)",
+        ),
+        num_hypotheses: int = typer.Option(
+            5, "--num-hypotheses", help="생성할 가설 수", min=1, max=20
+        ),
         output: Path | None = typer.Option(None, "--output", "-o", help="JSON 출력 파일"),
         report: Path | None = typer.Option(
             None, "--report", "-r", help="리포트 출력 파일 (*.md 또는 *.html)"
@@ -77,6 +111,9 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         """평가 실행 결과를 분석하고 통계 인사이트를 표시합니다."""
 
         resolved_db_path = db_path or Settings().evalvault_db_path
+        if resolved_db_path is None:
+            _console.print("[red]오류: DB 경로가 설정되지 않았습니다.[/red]")
+            raise typer.Exit(1)
         storage = SQLiteStorageAdapter(db_path=resolved_db_path)
 
         try:
@@ -161,6 +198,97 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             storage.save_analysis(analysis)
             _console.print(f"\n[green]분석 결과 DB 저장: {resolved_db_path}[/green]")
 
+        if dashboard:
+            dashboard_gen = DashboardGenerator()
+            _console.print("\n[bold cyan]Generating visualization dashboard...[/bold cyan]")
+
+            fig = dashboard_gen.generate_evaluation_dashboard(run_id)
+
+            output_dir = Path("reports/dashboard")
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            output_path = output_dir / f"dashboard_{run_id[:8]}.{dashboard_format}"
+            fig.savefig(output_path, dpi=300, bbox_inches="tight")
+            _console.print(f"\n[green]Dashboard saved to: {output_path}[/green]")
+
+        if anomaly_detect or forecast:
+            ts_analyzer = TimeSeriesAdvancedModule(window_size=window_size)
+            run_history = storage.list_runs(limit=50)
+
+            if not run_history or len(run_history) < 5:
+                _console.print("[yellow]Need at least 5 runs for time series analysis.[/yellow]")
+            else:
+                if anomaly_detect:
+                    _console.print("\n[bold cyan]Running anomaly detection...[/bold cyan]")
+                    history_data = [
+                        {
+                            "run_id": r.run_id,
+                            "pass_rate": r.pass_rate,
+                            "timestamp": r.started_at,
+                        }
+                        for r in run_history
+                    ]
+                    anomaly_result = ts_analyzer.detect_anomalies(history_data)
+                    _display_anomaly_detection(anomaly_result)
+
+                if forecast:
+                    _console.print("\n[bold cyan]Running performance forecasting...[/bold cyan]")
+                    history_data = [
+                        {"run_id": r.run_id, "pass_rate": r.pass_rate} for r in run_history
+                    ]
+                    forecast_result = ts_analyzer.forecast_performance(
+                        history_data, horizon=forecast_horizon
+                    )
+                    _display_forecast_result(forecast_result)
+
+        if network:
+            _console.print("\n[bold cyan]Building metric correlation network...[/bold cyan]")
+            net_analyzer = NetworkAnalyzerModule()
+
+            if not bundle.statistical or not bundle.statistical.significant_correlations:
+                _console.print("[yellow]No significant correlations for network analysis.[/yellow]")
+            else:
+                correlations_data = [
+                    {
+                        "variable1": corr.variable1,
+                        "variable2": corr.variable2,
+                        "correlation": corr.correlation,
+                        "p_value": corr.p_value,
+                        "is_significant": corr.is_significant,
+                    }
+                    for corr in bundle.statistical.significant_correlations
+                ]
+                graph = net_analyzer.build_correlation_network(
+                    correlations_data, min_correlation=min_correlation
+                )
+                net_result = net_analyzer.analyze_metric_network(graph)
+                _display_network_analysis(net_result)
+
+        if generate_hypothesis:
+            _console.print(
+                f"\n[bold cyan]Generating hypotheses ({hypothesis_method})...[/bold cyan]"
+            )
+            hyp_gen = HypothesisGeneratorModule(
+                method=hypothesis_method, num_hypotheses=num_hypotheses
+            )
+
+            metric_scores = {}
+            for metric_name, stats in analysis.metrics_summary.items():
+                metric_scores[metric_name] = stats.mean
+
+            low_performers_data = [
+                {
+                    "question": lp.test_case_id,
+                    "metric_name": lp.metric_name,
+                }
+                for lp in (analysis.low_performers or [])
+            ]
+
+            hypotheses = hyp_gen.generate_simple_hypotheses(
+                run_id, metric_scores, low_performers_data
+            )
+            _display_hypothesis_generation(hypotheses, hypothesis_method)
+
         if output:
             _export_analysis_json(analysis, output, bundle.nlp if nlp else None, improvement_report)
             _console.print(f"\n[green]분석 결과 내보냄: {output}[/green]")
@@ -192,6 +320,9 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         """두 실행을 통계적으로 비교합니다."""
 
         resolved_db_path = db_path or Settings().evalvault_db_path
+        if resolved_db_path is None:
+            _console.print("[red]오류: DB 경로가 설정되지 않았습니다.[/red]")
+            raise typer.Exit(1)
         storage = SQLiteStorageAdapter(db_path=resolved_db_path)
 
         try:
@@ -220,7 +351,15 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             _console.print(f"    Phoenix 트레이스: {trace_b}")
         _console.print(f"  검정: {test}\n")
 
-        comparisons = service.compare_runs(run_a, run_b, metrics=metric_list, test_type=test)
+        if test == "t-test":
+            test_type = "t-test"
+        elif test == "mann-whitney":
+            test_type = "mann-whitney"
+        else:
+            _console.print(f"[red]Error: Unsupported test type: {test}[/red]")
+            raise typer.Exit(1)
+
+        comparisons = service.compare_runs(run_a, run_b, metrics=metric_list, test_type=test_type)
 
         if not comparisons:
             _console.print("[yellow]비교할 공통 메트릭이 없습니다.[/yellow]")
@@ -940,6 +1079,123 @@ def _generate_report(
 
     with open(output_path, "w", encoding="utf-8") as file:
         file.write(content)
+
+
+def _display_anomaly_detection(anomaly_result) -> None:
+    _console.print("\n[bold]Anomaly Detection Results[/bold]")
+    _console.print(f"Detection method: {anomaly_result.detection_method}")
+    _console.print(f"Threshold: {anomaly_result.threshold:.2f}")
+    _console.print(f"Total runs: {anomaly_result.total_runs}")
+
+    if anomaly_result.anomalies:
+        detected = [a for a in anomaly_result.anomalies if a.is_anomaly]
+        if detected:
+            _console.print(f"\n[red]Detected {len(detected)} anomalies:[/red]")
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("Run ID")
+            table.add_column("Score", justify="right")
+            table.add_column("Pass Rate", justify="right")
+            table.add_column("Severity")
+
+            for anomaly in detected[:10]:
+                severity_color = (
+                    "red"
+                    if anomaly.severity == "high"
+                    else "yellow"
+                    if anomaly.severity == "medium"
+                    else "green"
+                )
+                table.add_row(
+                    anomaly.run_id[:12] + "...",
+                    f"{anomaly.anomaly_score:.2f}",
+                    f"{anomaly.pass_rate:.1%}",
+                    f"[{severity_color}]{anomaly.severity}[/{severity_color}]",
+                )
+            _console.print(table)
+        else:
+            _console.print("[green]No anomalies detected.[/green]")
+
+    if anomaly_result.insights:
+        _console.print("\n[bold]Insights:[/bold]")
+        for insight in anomaly_result.insights:
+            _console.print(f"  • {insight}")
+
+
+def _display_forecast_result(forecast_result) -> None:
+    _console.print("\n[bold]Forecast Results[/bold]")
+    _console.print(f"Method: {forecast_result.method}")
+    _console.print(f"Horizon: {forecast_result.horizon} runs")
+
+    if forecast_result.predicted_values:
+        _console.print("\n[bold]Predicted Pass Rates:[/bold]")
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Run")
+        table.add_column("Predicted", justify="right")
+
+        for i, value in enumerate(forecast_result.predicted_values, 1):
+            table.add_row(f"+{i}", f"{value:.1%}")
+        _console.print(table)
+
+        avg_forecast = sum(forecast_result.predicted_values) / len(forecast_result.predicted_values)
+        _console.print(f"\nAverage forecast: {avg_forecast:.1%}")
+
+
+def _display_network_analysis(net_result) -> None:
+    _console.print("\n[bold]Network Analysis Results[/bold]")
+    _console.print(f"Nodes (metrics): {net_result.node_count}")
+    _console.print(f"Edges (correlations): {net_result.edge_count}")
+    _console.print(f"Density: {net_result.density:.3f}")
+    _console.print(f"Avg clustering: {net_result.avg_clustering:.3f}")
+
+    if net_result.communities:
+        _console.print(f"\n[bold]Communities ({len(net_result.communities)}):[/bold]")
+        for i, community in enumerate(net_result.communities):
+            if len(community) > 1:
+                _console.print(f"  Community {i + 1}: {', '.join(community)}")
+
+    if net_result.hub_metrics:
+        _console.print("\n[bold]Hub Metrics:[/bold]")
+        for metric in net_result.hub_metrics:
+            _console.print(f"  • {metric}")
+
+    if net_result.insights:
+        _console.print("\n[bold]Insights:[/bold]")
+        for insight in net_result.insights:
+            _console.print(f"  • {insight}")
+
+
+def _display_hypothesis_generation(hypotheses, method: str) -> None:
+    _console.print("\n[bold]Hypothesis Generation Results[/bold]")
+    _console.print(f"Method: {method}")
+    _console.print(f"Total hypotheses: {len(hypotheses)}")
+
+    if hypotheses:
+        _console.print("\n[bold]Generated Hypotheses:[/bold]")
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("#")
+        table.add_column("Hypothesis")
+        table.add_column("Metric")
+        table.add_column("Confidence", justify="right")
+        table.add_column("Evidence")
+
+        for i, hyp in enumerate(hypotheses[:10], 1):
+            confidence_color = (
+                "green" if hyp.confidence >= 0.8 else "yellow" if hyp.confidence >= 0.6 else "red"
+            )
+            table.add_row(
+                str(i),
+                hyp.text[:60] + "..." if len(hyp.text) > 60 else hyp.text,
+                hyp.metric_name or "-",
+                f"[{confidence_color}]{hyp.confidence:.2f}[/{confidence_color}]",
+                hyp.evidence[:30] + "..." if len(hyp.evidence) > 30 else hyp.evidence,
+            )
+        _console.print(table)
+
+        high_conf = [h for h in hypotheses if h.confidence >= 0.8]
+        if high_conf:
+            _console.print(
+                f"\n[green]High confidence hypotheses: {len(high_conf)}/{len(hypotheses)}[/green]"
+            )
 
 
 __all__ = [

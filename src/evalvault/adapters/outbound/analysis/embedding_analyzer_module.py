@@ -8,7 +8,6 @@ import numpy as np
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
 from evalvault.adapters.outbound.analysis.pipeline_helpers import get_upstream_output
-from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
 from evalvault.config.settings import Settings
 from evalvault.domain.entities import EvaluationRun
@@ -140,6 +139,8 @@ class EmbeddingAnalyzerModule(BaseAnalysisModule):
 
         if backend_hint == "ollama" or embedding_profile in {"dev", "prod"}:
             try:
+                from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+
                 adapter = OllamaAdapter(settings)
                 retriever = KoreanDenseRetriever(
                     model_name=model_name or settings.ollama_embedding_model,

@@ -59,6 +59,9 @@ def build_analysis_pipeline_service(
     service.register_module(analysis_modules.RootCauseAnalyzerModule())
     service.register_module(analysis_modules.PatternDetectorModule())
     service.register_module(analysis_modules.TimeSeriesAnalyzerModule())
+    service.register_module(analysis_modules.TimeSeriesAdvancedModule())
     service.register_module(analysis_modules.TrendDetectorModule())
+    service.register_module(analysis_modules.NetworkAnalyzerModule())
+    service.register_module(analysis_modules.HypothesisGeneratorModule())
 
     return service

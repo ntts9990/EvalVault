@@ -1,0 +1,18 @@
+{
+  "node_id": "root_cause",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "causes": [
+      {
+        "metric": "answer_relevancy",
+        "reason": "answer_relevancy 점수가 기준치 미달입니다 (0.22 < 0.70)."
+      }
+    ],
+    "recommendations": [
+      "질문 의도 파악과 프롬프트 정렬을 점검하세요."
+    ],
+    "low_performer_count": 0
+  }
+}

@@ -183,7 +183,7 @@ class PrioritySummaryModule(BaseAnalysisModule):
             return None
 
         avg_score = per_case.get("avg_score")
-        if not isinstance(avg_score, (int, float)):
+        if not isinstance(avg_score, int | float):
             avg_score = safe_mean(metrics.values())
 
         gap_by_metric: dict[str, float] = {}

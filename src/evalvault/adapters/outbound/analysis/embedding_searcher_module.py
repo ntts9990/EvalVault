@@ -12,7 +12,6 @@ from evalvault.adapters.outbound.analysis.pipeline_helpers import (
     recall_at_k,
     safe_mean,
 )
-from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
 from evalvault.config.settings import Settings
 from evalvault.domain.entities import EvaluationRun
@@ -66,6 +65,8 @@ class EmbeddingSearcherModule(BaseAnalysisModule):
 
         if embedding_profile in {"dev", "prod"}:
             try:
+                from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+
                 adapter = OllamaAdapter(settings)
                 retriever = KoreanDenseRetriever(
                     model_name=settings.ollama_embedding_model,

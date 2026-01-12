@@ -333,34 +333,34 @@ class LLMReportModule(BaseAnalysisModule):
             threshold = self._resolve_threshold(run, metric)
             pass_rate = pass_rates.get(metric) if isinstance(pass_rates, dict) else None
             status = "unknown"
-            if isinstance(mean, (int, float)):
+            if isinstance(mean, int | float):
                 status = "pass" if float(mean) >= threshold else "risk"
-            elif isinstance(pass_rate, (int, float)):
+            elif isinstance(pass_rate, int | float):
                 status = "pass" if float(pass_rate) >= 0.7 else "risk"
 
             scorecard.append(
                 {
                     "metric": metric,
-                    "mean": round(float(mean), 4) if isinstance(mean, (int, float)) else None,
+                    "mean": round(float(mean), 4) if isinstance(mean, int | float) else None,
                     "std": round(float(stats.get("std")), 4)
-                    if isinstance(stats.get("std"), (int, float))
+                    if isinstance(stats.get("std"), int | float)
                     else None,
                     "min": round(float(stats.get("min")), 4)
-                    if isinstance(stats.get("min"), (int, float))
+                    if isinstance(stats.get("min"), int | float)
                     else None,
                     "max": round(float(stats.get("max")), 4)
-                    if isinstance(stats.get("max"), (int, float))
+                    if isinstance(stats.get("max"), int | float)
                     else None,
                     "median": round(float(stats.get("median")), 4)
-                    if isinstance(stats.get("median"), (int, float))
+                    if isinstance(stats.get("median"), int | float)
                     else None,
                     "count": stats.get("count") if isinstance(stats.get("count"), int) else None,
                     "pass_rate": (
-                        round(float(pass_rate), 4) if isinstance(pass_rate, (int, float)) else None
+                        round(float(pass_rate), 4) if isinstance(pass_rate, int | float) else None
                     ),
                     "threshold": threshold,
                     "gap": round(threshold - float(mean), 4)
-                    if isinstance(mean, (int, float))
+                    if isinstance(mean, int | float)
                     else None,
                     "status": status,
                 }

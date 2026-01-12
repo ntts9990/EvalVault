@@ -1,0 +1,22 @@
+{
+  "node_id": "time_series",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "series": [
+      {
+        "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+        "timestamp": "2026-01-11T19:22:58.954675",
+        "pass_rate": 0.2,
+        "model_name": "ollama/gemma3:1b"
+      }
+    ],
+    "summary": {
+      "run_count": 1,
+      "avg_pass_rate": 0.2,
+      "start": "2026-01-11T19:22:58.954675",
+      "end": "2026-01-11T19:22:58.954675"
+    }
+  }
+}

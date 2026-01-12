@@ -1,0 +1,143 @@
+{
+  "node_id": "nlp_analysis",
+  "status": "completed",
+  "duration_ms": 0,
+  "error": null,
+  "output": {
+    "analysis": {
+      "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+      "question_stats": {
+        "char_count": 97,
+        "word_count": 24,
+        "sentence_count": 5,
+        "avg_word_length": 2.875,
+        "unique_word_ratio": 0.875
+      },
+      "answer_stats": {
+        "char_count": 136,
+        "word_count": 32,
+        "sentence_count": 5,
+        "avg_word_length": 2.6875,
+        "unique_word_ratio": 0.875
+      },
+      "context_stats": {
+        "char_count": 413,
+        "word_count": 94,
+        "sentence_count": 11,
+        "avg_word_length": 2.872340425531915,
+        "unique_word_ratio": 0.7659574468085106
+      },
+      "question_types": [
+        {
+          "question_type": "factual",
+          "count": 3,
+          "percentage": 0.6,
+          "avg_scores": {
+            "answer_relevancy": 0.36706050970743603,
+            "faithfulness": 1.0
+          }
+        },
+        {
+          "question_type": "reasoning",
+          "count": 2,
+          "percentage": 0.4,
+          "avg_scores": {
+            "answer_relevancy": 0.0,
+            "faithfulness": 1.0
+          }
+        }
+      ],
+      "top_keywords": [],
+      "topic_clusters": [],
+      "insights": [
+        "High vocabulary diversity in questions",
+        "Questions are short and concise",
+        "Dominant question type: factual (60%)"
+      ]
+    },
+    "summary": {
+      "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+      "has_text_stats": true,
+      "has_question_type_analysis": true,
+      "has_keyword_analysis": false,
+      "question_stats_preview": 4.8,
+      "answer_stats_preview": 6.4,
+      "context_count": 11,
+      "dominant_question_type": "factual"
+    },
+    "statistics": {
+      "text_stats": {
+        "questions": {
+          "char_count": 97,
+          "word_count": 24,
+          "sentence_count": 5,
+          "avg_word_length": 2.875,
+          "unique_word_ratio": 0.875
+        },
+        "answers": {
+          "char_count": 136,
+          "word_count": 32,
+          "sentence_count": 5,
+          "avg_word_length": 2.6875,
+          "unique_word_ratio": 0.875
+        },
+        "contexts": {
+          "char_count": 413,
+          "word_count": 94,
+          "sentence_count": 11,
+          "avg_word_length": 2.872340425531915,
+          "unique_word_ratio": 0.7659574468085106
+        }
+      },
+      "question_type_distribution": [
+        {
+          "question_type": "factual",
+          "count": 3,
+          "percentage": 0.6,
+          "avg_scores": {
+            "answer_relevancy": 0.36706050970743603,
+            "faithfulness": 1.0
+          }
+        },
+        {
+          "question_type": "reasoning",
+          "count": 2,
+          "percentage": 0.4,
+          "avg_scores": {
+            "answer_relevancy": 0.0,
+            "faithfulness": 1.0
+          }
+        }
+      ]
+    },
+    "insights": [
+      "High vocabulary diversity in questions",
+      "Questions are short and concise",
+      "Dominant question type: factual (60%)"
+    ],
+    "analysis_id": null,
+    "run_id": "4792d785-a8ea-4fd3-8a0c-dcbf1889f5fb",
+    "question_types": [
+      {
+        "question_type": "factual",
+        "count": 3,
+        "percentage": 0.6,
+        "avg_scores": {
+          "answer_relevancy": 0.36706050970743603,
+          "faithfulness": 1.0
+        }
+      },
+      {
+        "question_type": "reasoning",
+        "count": 2,
+        "percentage": 0.4,
+        "avg_scores": {
+          "answer_relevancy": 0.0,
+          "faithfulness": 1.0
+        }
+      }
+    ],
+    "top_keywords": [],
+    "topic_clusters": []
+  }
+}
