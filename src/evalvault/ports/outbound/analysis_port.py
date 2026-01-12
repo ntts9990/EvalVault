@@ -1,6 +1,6 @@
 """분석 서비스 인터페이스."""
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from evalvault.domain.entities import EvaluationRun
 from evalvault.domain.entities.analysis import (
@@ -44,7 +44,7 @@ class AnalysisPort(Protocol):
         run_a: EvaluationRun,
         run_b: EvaluationRun,
         metrics: list[str] | None = None,
-        test_type: str = "t-test",
+        test_type: Literal["t-test", "mann-whitney"] = "t-test",
     ) -> list[ComparisonResult]:
         """두 실행을 통계적으로 비교합니다.
 

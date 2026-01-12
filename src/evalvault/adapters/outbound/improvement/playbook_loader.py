@@ -6,11 +6,19 @@ YAML 플레이북 파일을 로드하고 파싱하여 패턴 탐지 규칙을 �
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from evalvault.ports.outbound.improvement_port import (
+    ActionDefinitionProtocol,
+    MetricPlaybookProtocol,
+    PatternDefinitionProtocol,
+    PlaybookPort,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +52,7 @@ class DetectionRule:
 
 
 @dataclass
-class ActionDefinition:
+class ActionDefinition(ActionDefinitionProtocol):
     """개선 액션 정의."""
 
     title: str
@@ -72,16 +80,16 @@ class ActionDefinition:
 
 
 @dataclass
-class PatternDefinition:
+class PatternDefinition(PatternDefinitionProtocol):
     """패턴 정의."""
 
     pattern_id: str
     pattern_type: str
     description: str
-    detection_rules: list[DetectionRule]
+    detection_rules: Sequence[Any]
     component: str
     priority: str
-    actions: list[ActionDefinition]
+    actions: Sequence[ActionDefinitionProtocol]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PatternDefinition:
@@ -98,13 +106,13 @@ class PatternDefinition:
 
 
 @dataclass
-class MetricPlaybook:
+class MetricPlaybook(MetricPlaybookProtocol):
     """메트릭별 플레이북."""
 
     metric_name: str
     description: str
     default_threshold: float
-    patterns: list[PatternDefinition]
+    patterns: Sequence[PatternDefinitionProtocol]
 
     @classmethod
     def from_dict(cls, metric_name: str, data: dict[str, Any]) -> MetricPlaybook:
@@ -118,7 +126,7 @@ class MetricPlaybook:
 
 
 @dataclass
-class Playbook:
+class Playbook(PlaybookPort):
     """전체 플레이북."""
 
     version: str
@@ -130,14 +138,14 @@ class Playbook:
         """특정 메트릭의 플레이북 조회."""
         return self.metrics.get(metric)
 
-    def get_patterns_for_metric(self, metric: str) -> list[PatternDefinition]:
+    def get_patterns_for_metric(self, metric: str) -> Sequence[PatternDefinitionProtocol]:
         """특정 메트릭의 패턴 목록."""
         playbook = self.get_metric_playbook(metric)
         return playbook.patterns if playbook else []
 
-    def get_all_patterns(self) -> list[tuple[str, PatternDefinition]]:
+    def get_all_patterns(self) -> list[tuple[str, PatternDefinitionProtocol]]:
         """모든 메트릭의 패턴 목록 (metric_name, pattern) 튜플."""
-        result = []
+        result: list[tuple[str, PatternDefinitionProtocol]] = []
         for metric_name, playbook in self.metrics.items():
             for pattern in playbook.patterns:
                 result.append((metric_name, pattern))

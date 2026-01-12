@@ -13,12 +13,13 @@ from evalvault.adapters.outbound.kg.networkx_adapter import NetworkXKnowledgeGra
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.domain.entities.kg import EntityModel, RelationModel
 from evalvault.domain.services.entity_extractor import EntityExtractor
+from evalvault.ports.outbound.korean_nlp_port import RetrieverResultProtocol
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class GraphRAGResult:
+class GraphRAGResult(RetrieverResultProtocol):
     """Unified GraphRAG retrieval result."""
 
     doc_id: str

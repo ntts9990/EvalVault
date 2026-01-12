@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,7 @@ from evalvault.domain.entities.improvement import (
     FailureSample,
     PatternType,
 )
+from evalvault.ports.outbound.improvement_port import ClaimImprovementProtocol
 
 if TYPE_CHECKING:
     from evalvault.ports.outbound import LLMPort
@@ -151,14 +153,14 @@ class LLMInsight:
 
 
 @dataclass
-class BatchPatternInsight:
+class BatchPatternInsight(ClaimImprovementProtocol):
     """배치 패턴 분석 결과."""
 
     common_patterns: list[dict[str, Any]] = field(default_factory=list)
     root_causes: list[dict[str, str]] = field(default_factory=list)
-    prioritized_improvements: list[dict[str, Any]] = field(default_factory=list)
-    overall_assessment: str = ""
-    confidence: float = 0.0
+    prioritized_improvements: Sequence[Mapping[str, Any]] = field(default_factory=list)
+    overall_assessment: str | None = None
+    confidence: float | None = None
     raw_response: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -236,8 +238,11 @@ class InsightGenerator:
         )
 
         try:
+            llm_adapter = self._llm_adapter
+            if llm_adapter is None:
+                raise RuntimeError("LLM adapter is not configured")
             # LLM adapter의 generate_text 사용 (JSON 모드)
-            response = self._llm_adapter.generate_text(prompt, json_mode=True)
+            response = llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_single_response(response)
         except Exception as e:
             logger.warning(f"LLM analysis failed: {e}")
@@ -245,7 +250,7 @@ class InsightGenerator:
 
     def analyze_batch_failures(
         self,
-        failures: list[FailureSample],
+        failures: Sequence[FailureSample],
         metric_name: str,
         avg_score: float,
         threshold: float,
@@ -287,8 +292,11 @@ class InsightGenerator:
         )
 
         try:
+            llm_adapter = self._llm_adapter
+            if llm_adapter is None:
+                raise RuntimeError("LLM adapter is not configured")
             # LLM adapter의 generate_text 사용 (JSON 모드)
-            response = self._llm_adapter.generate_text(prompt, json_mode=True)
+            response = llm_adapter.generate_text(prompt, json_mode=True)
             return self._parse_batch_response(response)
         except Exception as e:
             logger.warning(f"LLM batch analysis failed: {e}")
@@ -433,7 +441,7 @@ class InsightGenerator:
 
     def _fallback_batch_analysis(
         self,
-        failures: list[FailureSample],
+        failures: Sequence[FailureSample],
         metric_name: str,
     ) -> BatchPatternInsight:
         """LLM 없이 기본 배치 분석 수행."""

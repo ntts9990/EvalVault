@@ -129,7 +129,7 @@ def evaluation_progress(
     console: Console,
     total: int,
     description: str = "Evaluating",
-) -> Iterator[Callable[[int], None]]:
+) -> Iterator[Callable[[int, str | None], None]]:
     """Show evaluation progress bar with ETA.
 
     Args:
@@ -222,7 +222,7 @@ def batch_progress(
 def streaming_progress(
     console: Console,
     description: str = "Streaming",
-) -> Iterator[Callable[[int, int | None], None]]:
+) -> Iterator[Callable[[int, int | None, str | None], None]]:
     """Show progress for streaming evaluation where total may change.
 
     Args:

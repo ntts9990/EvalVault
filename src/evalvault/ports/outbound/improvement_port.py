@@ -28,6 +28,7 @@ class PatternDefinitionProtocol(Protocol):
     pattern_type: str
     component: str
     priority: str
+    detection_rules: Sequence[Any]
     actions: Sequence[ActionDefinitionProtocol]
 
 
@@ -55,6 +56,7 @@ class PatternDetectorPort(Protocol):
         metrics: Sequence[str] | None = None,
     ) -> Mapping[str, list[PatternEvidence]]:
         """Detect problematic patterns for the evaluation run."""
+        ...
 
 
 @runtime_checkable
@@ -71,6 +73,7 @@ class InsightGeneratorPort(Protocol):
 
     def enrich_failure_sample(self, failure: FailureSample) -> FailureSample:
         """Enrich a single failure sample using LLM analysis."""
+        ...
 
     def analyze_batch_failures(
         self,
@@ -80,3 +83,4 @@ class InsightGeneratorPort(Protocol):
         threshold: float,
     ) -> ClaimImprovementProtocol:
         """Produce aggregated insights for multiple failures."""
+        ...

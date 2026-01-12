@@ -9,16 +9,15 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from scipy import stats
 
 from evalvault.adapters.outbound.improvement.playbook_loader import (
     DetectionRule,
-    PatternDefinition,
     Playbook,
     get_default_playbook,
 )
@@ -28,6 +27,7 @@ from evalvault.domain.entities.improvement import (
     PatternEvidence,
     PatternType,
 )
+from evalvault.ports.outbound.improvement_port import PatternDefinitionProtocol
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun, TestCaseResult
@@ -90,7 +90,7 @@ class PatternDetector:
     def detect_patterns(
         self,
         run: EvaluationRun,
-        metrics: list[str] | None = None,
+        metrics: Sequence[str] | None = None,
     ) -> dict[str, list[PatternEvidence]]:
         """패턴 탐지 수행.
 
@@ -249,7 +249,7 @@ class PatternDetector:
 
     def _detect_single_pattern(
         self,
-        pattern_def: PatternDefinition,
+        pattern_def: PatternDefinitionProtocol,
         feature_vectors: list[FeatureVector],
         target_metric: str,
         threshold: float,
@@ -475,9 +475,17 @@ class PatternDetector:
 
         # 상관계수 계산
         try:
-            corr, p_value = stats.pearsonr(values1, values2)
+            corr_result = stats.pearsonr(values1, values2)
         except Exception:
             return {"matched": False, "matched_vectors": [], "correlation": None}
+
+        if isinstance(corr_result, tuple):
+            corr_value, p_value_value = cast(tuple[float, float], corr_result)
+            corr = float(corr_value)
+            p_value = float(p_value_value)
+        else:
+            corr = float(corr_result.statistic)
+            p_value = float(corr_result.pvalue)
 
         # 방향 및 강도 확인
         matched = False

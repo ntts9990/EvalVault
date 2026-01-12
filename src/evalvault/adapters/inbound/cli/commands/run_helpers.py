@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+import click
 import typer
 from click.core import ParameterSource
 from rich.console import Console
@@ -872,8 +873,19 @@ def _merge_evaluation_runs(
     return merged
 
 
-async def _evaluate_streaming_run(
+def _build_streaming_progress_callback(
+    on_progress: Callable[[int, int | None, str], None],
     *,
+    offset: int,
+    total_estimate: int | None,
+) -> Callable[[int, int, str], None]:
+    def progress_callback(current: int, _total: int, message: str) -> None:
+        on_progress(offset + current, total_estimate, message)
+
+    return progress_callback
+
+
+async def _evaluate_streaming_run(
     dataset_path: Path,
     dataset_template: Dataset,
     metrics: list[str],
@@ -895,6 +907,7 @@ async def _evaluate_streaming_run(
     threshold_template = dict(dataset_template.thresholds or {})
     source_file = dataset_template.source_file or str(dataset_path)
     processed_total = 0
+    progress_callback_wrapper: Callable[[int, int, str], None] | None = None
 
     iterator = loader.stream(dataset_path)
     estimated_total = iterator.stats.estimated_total_rows
@@ -915,20 +928,13 @@ async def _evaluate_streaming_run(
         )
         if iterator.stats.estimated_total_rows is not None:
             estimated_total = iterator.stats.estimated_total_rows
-        progress_callback = None
+        progress_callback_wrapper = None
         if on_progress:
-            offset = chunk_offset
-            total_estimate = estimated_total
-
-            def progress_callback(
-                current: int,
-                _total: int,
-                message: str,
-                *,
-                _offset: int = offset,
-                _total_estimate: int | None = total_estimate,
-            ) -> None:
-                on_progress(_offset + current, _total_estimate, message)
+            progress_callback_wrapper = _build_streaming_progress_callback(
+                on_progress,
+                offset=chunk_offset,
+                total_estimate=estimated_total,
+            )
 
         chunk_run = await evaluator.evaluate(
             dataset=chunk_dataset,
@@ -938,7 +944,7 @@ async def _evaluate_streaming_run(
             parallel=parallel,
             batch_size=batch_size,
             prompt_overrides=prompt_overrides,
-            on_progress=progress_callback,
+            on_progress=progress_callback_wrapper,
         )
         merged_run = _merge_evaluation_runs(
             merged_run,
@@ -963,20 +969,13 @@ async def _evaluate_streaming_run(
         )
         if iterator.stats.estimated_total_rows is not None:
             estimated_total = iterator.stats.estimated_total_rows
-        progress_callback = None
+        progress_callback_wrapper = None
         if on_progress:
-            offset = chunk_offset
-            total_estimate = estimated_total
-
-            def progress_callback(
-                current: int,
-                _total: int,
-                message: str,
-                *,
-                _offset: int = offset,
-                _total_estimate: int | None = total_estimate,
-            ) -> None:
-                on_progress(_offset + current, _total_estimate, message)
+            progress_callback_wrapper = _build_streaming_progress_callback(
+                on_progress,
+                offset=chunk_offset,
+                total_estimate=estimated_total,
+            )
 
         chunk_run = await evaluator.evaluate(
             dataset=chunk_dataset,
@@ -986,7 +985,7 @@ async def _evaluate_streaming_run(
             parallel=parallel,
             batch_size=batch_size,
             prompt_overrides=prompt_overrides,
-            on_progress=progress_callback,
+            on_progress=progress_callback_wrapper,
         )
         merged_run = _merge_evaluation_runs(
             merged_run,
@@ -1095,7 +1094,7 @@ def _build_content_preview(content: str, *, max_chars: int = 4000) -> str:
     return normalized[:max_chars].rstrip() + f"\n... (+{remaining} chars)"
 
 
-def _option_was_provided(ctx: typer.Context, param_name: str) -> bool:
+def _option_was_provided(ctx: typer.Context | click.Context | None, param_name: str) -> bool:
     """Check whether a CLI option was explicitly provided."""
 
     if ctx is None:
