@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+import importlib
+import sys
 from datetime import datetime
+from pathlib import Path
 
-from evalvault.adapters.inbound.mcp import tools as mcp_tools
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+
+def _load_mcp_tools():
+    repo_root = Path(__file__).resolve().parents[5]
+    src_path = repo_root / "src"
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    tools_path = src_path / "evalvault" / "adapters" / "inbound" / "mcp" / "tools.py"
+    module_parts = tools_path.relative_to(src_path).with_suffix("").parts
+    module_path = ".".join(module_parts)
+    return importlib.import_module(module_path)
+
+
+mcp_tools = _load_mcp_tools()
 
 
 def _seed_run(storage: SQLiteStorageAdapter, run_id: str) -> EvaluationRun:

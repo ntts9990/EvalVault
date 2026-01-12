@@ -1,6 +1,10 @@
 """MCP inbound adapter package."""
 
 from .schemas import (
+    AnalyzeCompareRequest,
+    AnalyzeCompareResponse,
+    ComparisonArtifactsPayload,
+    EvaluationArtifactsPayload,
     GetArtifactsRequest,
     GetArtifactsResponse,
     GetRunSummaryRequest,
@@ -8,11 +12,25 @@ from .schemas import (
     ListRunsRequest,
     ListRunsResponse,
     McpError,
+    MetricsDeltaPayload,
+    RunEvaluationRequest,
+    RunEvaluationResponse,
     RunSummaryPayload,
 )
-from .tools import get_artifacts, get_run_summary, get_tool_specs, list_runs
+from .tools import (
+    analyze_compare,
+    get_artifacts,
+    get_run_summary,
+    get_tool_specs,
+    list_runs,
+    run_evaluation,
+)
 
 __all__ = [
+    "AnalyzeCompareRequest",
+    "AnalyzeCompareResponse",
+    "ComparisonArtifactsPayload",
+    "EvaluationArtifactsPayload",
     "GetArtifactsRequest",
     "GetArtifactsResponse",
     "GetRunSummaryRequest",
@@ -20,9 +38,14 @@ __all__ = [
     "ListRunsRequest",
     "ListRunsResponse",
     "McpError",
+    "MetricsDeltaPayload",
+    "RunEvaluationRequest",
+    "RunEvaluationResponse",
     "RunSummaryPayload",
+    "analyze_compare",
     "get_artifacts",
     "get_run_summary",
     "get_tool_specs",
     "list_runs",
+    "run_evaluation",
 ]
