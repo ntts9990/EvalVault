@@ -166,37 +166,30 @@ class OllamaAdapter(BaseLLMAdapter):
         """
         model = model or self._embedding_model_name
         is_single = isinstance(texts, str)
-        text_list = [texts] if is_single else texts
+        text_list = [texts] if is_single else list(texts)
 
-        embeddings = []
+        embeddings: list[list[float]] = []
+        batch_size = 64
         async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout, connect=30.0)) as client:
-            for text in text_list:
-                payload: dict[str, Any] = {
-                    "model": model,
-                    "prompt": text,
-                }
-
-                # Matryoshka dimension support for Qwen3-Embedding
-                if dimension is not None:
-                    payload["options"] = {"num_ctx": 8192}
-                    # Truncate embedding to specified dimension after generation
-                    # Ollama doesn't support dimension parameter directly,
-                    # so we truncate the output embedding
-                    payload["_truncate_dim"] = dimension
-
+            for start in range(0, len(text_list), batch_size):
+                batch = text_list[start : start + batch_size]
                 response = await client.post(
-                    f"{self._base_url}/api/embeddings",
-                    json={k: v for k, v in payload.items() if not k.startswith("_")},
+                    f"{self._base_url}/v1/embeddings",
+                    json={"model": model, "input": batch},
+                    headers={"Authorization": "Bearer ollama"},
                 )
                 response.raise_for_status()
-                result = response.json()
-                embedding = result["embedding"]
-
-                # Apply Matryoshka truncation if specified
-                if dimension is not None and len(embedding) > dimension:
-                    embedding = embedding[:dimension]
-
-                embeddings.append(embedding)
+                payload = response.json()
+                items = payload.get("data", []) if isinstance(payload, dict) else []
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    embedding = item.get("embedding")
+                    if not isinstance(embedding, list):
+                        raise ValueError("Invalid embedding response from Ollama")
+                    if dimension is not None and len(embedding) > dimension:
+                        embedding = embedding[:dimension]
+                    embeddings.append(embedding)
 
         return embeddings[0] if is_single else embeddings
 
