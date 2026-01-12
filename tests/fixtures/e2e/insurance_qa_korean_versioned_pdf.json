@@ -1,0 +1,45 @@
+{
+  "name": "e2e-insurance-qa-korean-versioned-pdf",
+  "version": "1.0.0",
+  "description": "Korean insurance QA dataset for versioned PDF retriever smoke runs",
+  "metadata": {
+    "domain": "insurance",
+    "notes": "contexts are intentionally empty to be filled by --retriever-docs (directory)"
+  },
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "kr-vpdf-001",
+      "question": "이 보험의 사망보험금은 얼마인가요?",
+      "answer": "해당 보험의 사망보험금은 1억원입니다.",
+      "contexts": [],
+      "ground_truth": "1억원",
+      "metadata": {
+        "contract_date": "2024-06-01"
+      }
+    },
+    {
+      "id": "kr-vpdf-002",
+      "question": "보험료 납입 기간은 어떻게 되나요?",
+      "answer": "보험료 납입 기간은 20년입니다.",
+      "contexts": [],
+      "ground_truth": "20년",
+      "metadata": {
+        "contract_date": "2025-07-01"
+      }
+    },
+    {
+      "id": "kr-vpdf-003",
+      "question": "보험 해지 시 환급금은 얼마인가요?",
+      "answer": "5년 납입 후 해지 시 납입보험료의 약 70%가 환급됩니다.",
+      "contexts": [],
+      "ground_truth": "납입보험료의 약 70%",
+      "metadata": {
+        "contract_date": "2025.01.01"
+      }
+    }
+  ]
+}

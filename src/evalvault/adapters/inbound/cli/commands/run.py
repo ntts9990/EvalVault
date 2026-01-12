@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
-from datetime import datetime
+from collections.abc import Callable, Sequence
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import click
 import typer
@@ -15,6 +15,9 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis_pipeline_service
 from evalvault.adapters.outbound.dataset import get_loader
+from evalvault.adapters.outbound.documents.versioned_loader import (
+    load_versioned_chunks_from_pdf_dir,
+)
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.phoenix.sync_service import (
@@ -28,6 +31,7 @@ from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTra
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+from evalvault.domain.services.document_versioning import parse_contract_date
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
@@ -40,6 +44,7 @@ from evalvault.domain.services.ragas_prompt_overrides import (
     PromptOverrideError,
     load_ragas_prompt_overrides,
 )
+from evalvault.domain.services.retriever_context import apply_versioned_retriever_to_dataset
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 
@@ -118,9 +123,15 @@ def _build_dense_retriever(
             dense_retriever.index(documents)
             return dense_retriever
 
-    dense_retriever = KoreanDenseRetriever()
-    dense_retriever.index(documents)
-    return dense_retriever
+    try:
+        dense_retriever = KoreanDenseRetriever()
+        dense_retriever.index(documents)
+        return dense_retriever
+    except Exception as exc:
+        raise RuntimeError(
+            "Dense retriever initialization failed. "
+            "Use --profile dev/prod (Ollama embedding), or install/prepare a local embedding model."
+        ) from exc
 
 
 def _log_timestamp(console: Console, verbose: bool, message: str) -> None:
@@ -231,7 +242,7 @@ def register_run_commands(
         retriever_docs: Path | None = typer.Option(
             None,
             "--retriever-docs",
-            help="Documents file for retriever (.json/.jsonl/.txt).",
+            help="Documents for retriever: .json/.jsonl/.txt file or a PDF directory.",
             rich_help_panel="Full mode options",
         ),
         kg: Path | None = typer.Option(
@@ -245,6 +256,63 @@ def register_run_commands(
             5,
             "--retriever-top-k",
             help="Top-K documents to retrieve (default: 5).",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr: bool = typer.Option(
+            False,
+            "--pdf-ocr/--no-pdf-ocr",
+            help="When --retriever-docs is a PDF directory, run OCR fallback if needed.",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr_backend: str = typer.Option(
+            "paddleocr",
+            "--pdf-ocr-backend",
+            help="OCR backend for PDFs (paddleocr).",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr_mode: str = typer.Option(
+            "text",
+            "--pdf-ocr-mode",
+            help="OCR extraction mode (text|structure).",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr_lang: str = typer.Option(
+            "korean",
+            "--pdf-ocr-lang",
+            help="OCR language code for PaddleOCR (default: korean).",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr_device: str = typer.Option(
+            "auto",
+            "--pdf-ocr-device",
+            help="OCR device selection (auto|cpu|gpu).",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_ocr_min_chars: int = typer.Option(
+            200,
+            "--pdf-ocr-min-chars",
+            help="If extracted text is shorter than this, OCR fallback runs.",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_chunk_size: int = typer.Option(
+            1200,
+            "--pdf-chunk-size",
+            min=200,
+            help="Chunk size for PDF directory ingestion.",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_chunk_overlap: int = typer.Option(
+            120,
+            "--pdf-chunk-overlap",
+            min=0,
+            help="Chunk overlap for PDF directory ingestion.",
+            rich_help_panel="Full mode options",
+        ),
+        pdf_max_chunks: int | None = typer.Option(
+            None,
+            "--pdf-max-chunks",
+            min=1,
+            help="Optional cap on total chunks built from PDFs (speed guardrail).",
             rich_help_panel="Full mode options",
         ),
         stage_events: Path | None = typer.Option(
@@ -376,7 +444,7 @@ def register_run_commands(
             help="Language code for Domain Memory lookups (default: ko).",
             rich_help_panel="Domain Memory (full mode)",
         ),
-        memory_db: Path = memory_db_option(
+        memory_db: Path | None = memory_db_option(
             help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
@@ -759,6 +827,93 @@ def register_run_commands(
             )
             raise typer.Exit(1)
 
+        provider = str(getattr(settings, "llm_provider", "")).strip().lower()
+        if provider == "ollama":
+            try:
+                import httpx
+
+                resp = httpx.get(
+                    f"{settings.ollama_base_url.rstrip('/')}/api/tags",
+                    timeout=httpx.Timeout(5.0, connect=2.0),
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+                raw_models = payload.get("models", []) if isinstance(payload, dict) else []
+                models = {
+                    str(item.get("name"))
+                    for item in raw_models
+                    if isinstance(item, dict) and item.get("name")
+                }
+
+                required_models = {settings.ollama_model, settings.ollama_embedding_model}
+                if "faithfulness" in set(metric_list):
+                    fallback_provider = (
+                        settings.faithfulness_fallback_provider.strip().lower()
+                        if settings.faithfulness_fallback_provider
+                        else "ollama"
+                    )
+                    fallback_model = settings.faithfulness_fallback_model
+                    if fallback_provider == "ollama" and not fallback_model:
+                        fallback_model = "gpt-oss-safeguard:20b"
+                    if fallback_provider == "ollama" and fallback_model:
+                        required_models.add(fallback_model)
+
+                missing = sorted({m for m in required_models if m and m not in models})
+                if missing:
+                    print_cli_error(
+                        console,
+                        "Ollama 모델이 준비되지 않았습니다.",
+                        details="missing: " + ", ".join(missing),
+                        fixes=[
+                            "필요 모델을 받아두세요: "
+                            + " ".join(f"`ollama pull {m}`" for m in missing)
+                        ],
+                    )
+                    raise typer.Exit(1)
+            except typer.Exit:
+                raise
+            except Exception as exc:
+                print_cli_error(
+                    console,
+                    "Ollama 서버에 연결할 수 없습니다.",
+                    details=str(exc),
+                    fixes=[
+                        "Ollama가 실행 중인지 확인하세요: `ollama serve` (또는 데스크톱 앱 실행).",
+                        "필요 모델을 받아두세요: `ollama pull gemma3:1b`, `ollama pull qwen3-embedding:0.6b`.",
+                        "서버 URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
+                    ],
+                )
+                raise typer.Exit(1) from exc
+
+        if provider == "vllm":
+            try:
+                import httpx
+
+                base_url = settings.vllm_base_url.rstrip("/")
+                resp = httpx.get(
+                    f"{base_url}/models",
+                    timeout=httpx.Timeout(5.0, connect=2.0),
+                    headers={
+                        **(
+                            {"Authorization": f"Bearer {settings.vllm_api_key}"}
+                            if settings.vllm_api_key
+                            else {}
+                        )
+                    },
+                )
+                resp.raise_for_status()
+            except Exception as exc:
+                print_cli_error(
+                    console,
+                    "vLLM 서버에 연결할 수 없습니다.",
+                    details=str(exc),
+                    fixes=[
+                        "vLLM(OpenAI-compatible) 서버가 실행 중인지 확인하세요.",
+                        "`.env`의 `VLLM_BASE_URL`/`VLLM_MODEL` 설정을 확인하세요.",
+                    ],
+                )
+                raise typer.Exit(1) from exc
+
         if settings.llm_provider == "ollama":
             display_model = f"ollama/{settings.ollama_model}"
         elif settings.llm_provider == "vllm":
@@ -831,6 +986,9 @@ def register_run_commands(
 
         retriever_instance: RetrieverPort | None = None
         retriever_doc_ids: list[str] | None = None
+        prefilled_retriever_metadata: dict[str, dict[str, Any]] = {}
+        used_versioned_prefill = False
+        versioned_prefill_stats: dict[str, Any] | None = None
         if retriever:
             _log_timestamp(console, verbose, f"Retriever 준비 시작 (mode={retriever})")
             validate_choice(
@@ -858,151 +1016,351 @@ def register_run_commands(
                     tips=["--kg <knowledge_graph.json> 옵션을 함께 지정하세요."],
                 )
             else:
-                retriever_docs_started_at = datetime.now()
-                try:
-                    documents, doc_ids = load_retriever_documents(retriever_docs)
-                    retriever_doc_ids = doc_ids
-                    _log_duration(
-                        console,
-                        verbose,
-                        f"Retriever 문서 로드 완료 (count={len(documents)})",
-                        retriever_docs_started_at,
-                    )
-                except Exception as exc:
-                    _log_duration(
-                        console,
-                        verbose,
-                        "Retriever 문서 로드 실패",
-                        retriever_docs_started_at,
-                    )
-                    print_cli_error(
-                        console,
-                        "Retriever 문서를 불러오지 못했습니다.",
-                        details=str(exc),
-                        fixes=["JSON/JSONL/TXT 형식을 확인하세요."],
-                    )
-                    raise typer.Exit(1) from exc
+                if retriever_docs.is_dir():
+                    phoenix_trace_metadata["retriever.mode"] = retriever
+                    phoenix_trace_metadata["retriever.docs"] = str(retriever_docs)
 
-                retriever_init_started_at = datetime.now()
-                try:
-                    if retriever == "graphrag":
-                        from evalvault.adapters.outbound.kg.graph_rag_retriever import (
-                            GraphRAGRetriever,
+                    if retriever not in {"bm25", "dense", "hybrid"}:
+                        print_cli_warning(
+                            console,
+                            "버전 PDF 문서는 bm25/dense/hybrid에서만 지원됩니다.",
+                            tips=["GraphRAG는 버전 문서 적용을 아직 지원하지 않습니다."],
+                        )
+                    else:
+                        pdf_count = len(list(retriever_docs.glob("*.pdf")))
+
+                        pdf_ocr_backend_value = str(pdf_ocr_backend).strip().lower()
+                        pdf_ocr_mode_value = str(pdf_ocr_mode).strip().lower()
+                        pdf_ocr_device_value = str(pdf_ocr_device).strip().lower()
+                        validate_choice(
+                            pdf_ocr_backend_value,
+                            ("paddleocr",),
+                            console,
+                            value_label="pdf_ocr_backend",
+                        )
+                        validate_choice(
+                            pdf_ocr_mode_value,
+                            ("text", "structure"),
+                            console,
+                            value_label="pdf_ocr_mode",
+                        )
+                        validate_choice(
+                            pdf_ocr_device_value,
+                            ("auto", "cpu", "gpu"),
+                            console,
+                            value_label="pdf_ocr_device",
                         )
 
+                        contract_dates: list[date | None] = []
+                        for test_case in ds.test_cases:
+                            if any(ctx.strip() for ctx in test_case.contexts):
+                                continue
+                            contract = None
+                            if isinstance(test_case.metadata, dict):
+                                contract = parse_contract_date(
+                                    test_case.metadata.get("contract_date")
+                                )
+                            contract_dates.append(contract)
+
+                        retriever_docs_started_at = datetime.now()
                         try:
-                            kg_graph = load_knowledge_graph(kg)
+                            versioned_chunks = load_versioned_chunks_from_pdf_dir(
+                                retriever_docs,
+                                chunk_size=pdf_chunk_size,
+                                overlap=pdf_chunk_overlap,
+                                enable_ocr=pdf_ocr,
+                                ocr_backend=pdf_ocr_backend_value,
+                                ocr_lang=pdf_ocr_lang,
+                                ocr_device=pdf_ocr_device_value,
+                                ocr_mode=pdf_ocr_mode_value,
+                                ocr_min_chars=pdf_ocr_min_chars,
+                                contract_dates=contract_dates,
+                                max_chunks=pdf_max_chunks,
+                            )
+                            _log_duration(
+                                console,
+                                verbose,
+                                f"버전 PDF 문서 로드 완료 (chunks={len(versioned_chunks)})",
+                                retriever_docs_started_at,
+                            )
                         except Exception as exc:
+                            _log_duration(
+                                console,
+                                verbose,
+                                "버전 PDF 문서 로드 실패",
+                                retriever_docs_started_at,
+                            )
                             print_cli_error(
                                 console,
-                                "Knowledge Graph 파일을 불러오지 못했습니다.",
+                                "버전 PDF 문서를 불러오지 못했습니다.",
                                 details=str(exc),
-                                fixes=["KG JSON 스키마와 경로를 확인하세요."],
+                                fixes=[
+                                    "스캔 PDF(텍스트 레이어 없음)라면 --pdf-ocr를 켜세요.",
+                                    "OCR 사용 시: `uv sync --extra ocr_paddle`로 의존성을 설치하고 paddlepaddle wheel이 필요합니다.",
+                                    "OCR 없이 진행하려면 --no-pdf-ocr로 실행하세요.",
+                                    "PDF 파일명에 적용일(YYYYMMDD/YYMMDD 등)이 포함되어야 합니다.",
+                                ],
                             )
                             raise typer.Exit(1) from exc
 
-                        bm25_retriever = None
+                        apply_started_at = datetime.now()
                         try:
-                            from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+                            if retriever in {"bm25", "hybrid"}:
+                                from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
 
-                            toolkit = KoreanNLPToolkit()
-                            bm25_retriever = toolkit.build_retriever(
-                                documents,
-                                use_hybrid=False,
-                                verbose=verbose,
+                                toolkit = KoreanNLPToolkit()
+
+                                def build_versioned_retriever(docs: Sequence[str]) -> RetrieverPort:
+                                    instance = toolkit.build_retriever(
+                                        list(docs),
+                                        use_hybrid=retriever == "hybrid",
+                                        verbose=verbose,
+                                    )
+                                    if instance is None:
+                                        raise RuntimeError("Retriever initialization failed")
+                                    return instance
+
+                            else:
+
+                                def build_versioned_retriever(docs: Sequence[str]) -> RetrieverPort:
+                                    return _build_dense_retriever(
+                                        documents=list(docs),
+                                        settings=settings,
+                                        profile_name=profile_name,
+                                    )
+
+                            prefilled_retriever_metadata = apply_versioned_retriever_to_dataset(
+                                dataset=ds,
+                                versioned_chunks=versioned_chunks,
+                                build_retriever=build_versioned_retriever,
+                                top_k=retriever_top_k,
                             )
-                        except Exception as exc:  # pragma: no cover - optional dependency
-                            print_cli_warning(
+                            used_versioned_prefill = True
+
+                            filled_case_ids = set(prefilled_retriever_metadata)
+                            parsed_contract_dates = set()
+                            unknown_contract_dates = 0
+                            for test_case in ds.test_cases:
+                                if test_case.id not in filled_case_ids:
+                                    continue
+                                contract = None
+                                if isinstance(test_case.metadata, dict):
+                                    contract = parse_contract_date(
+                                        test_case.metadata.get("contract_date")
+                                    )
+                                if contract is None:
+                                    unknown_contract_dates += 1
+                                else:
+                                    parsed_contract_dates.add(contract)
+
+                            versioned_prefill_stats = {
+                                "pdf_files": pdf_count,
+                                "chunks": len(versioned_chunks),
+                                "filled_test_cases": len(filled_case_ids),
+                                "contract_dates": len(parsed_contract_dates),
+                                "unknown_contract_dates": unknown_contract_dates,
+                            }
+                            phoenix_trace_metadata["retriever.versioned_docs"] = True
+                            phoenix_trace_metadata["retriever.versioned.pdf_files"] = pdf_count
+                            phoenix_trace_metadata["retriever.versioned.chunks"] = len(
+                                versioned_chunks
+                            )
+                            phoenix_trace_metadata["retriever.versioned.contract_dates"] = len(
+                                parsed_contract_dates
+                            )
+
+                            message = (
+                                "Versioned PDF prefill: "
+                                f"pdfs={pdf_count}, chunks={len(versioned_chunks)}, "
+                                f"filled={len(filled_case_ids)}, contract_dates={len(parsed_contract_dates)}"
+                            )
+                            if pdf_ocr:
+                                message += f", ocr={pdf_ocr_backend_value}/{pdf_ocr_mode_value}/{pdf_ocr_device_value}"
+                            if verbose and unknown_contract_dates:
+                                message += f", unknown_contract_dates={unknown_contract_dates}"
+                            console.print(f"[dim]{message}[/dim]")
+
+                            _log_duration(
                                 console,
-                                "GraphRAG용 BM25 retriever 초기화에 실패했습니다.",
-                                tips=[str(exc)],
+                                verbose,
+                                "버전 PDF retriever 적용 완료",
+                                apply_started_at,
+                            )
+                        except Exception as exc:
+                            _log_duration(
+                                console,
+                                verbose,
+                                "버전 PDF retriever 적용 실패",
+                                apply_started_at,
+                            )
+                            print_cli_error(
+                                console,
+                                "버전 PDF retriever 적용에 실패했습니다.",
+                                details=str(exc),
+                                fixes=[
+                                    "--verbose로 원인을 확인하세요.",
+                                    "dense/hybrid는 임베딩 모델이 필요합니다. 기본은 `--profile dev`(Ollama + qwen3-embedding)입니다.",
+                                    "Ollama 사용 시 `ollama pull qwen3-embedding:0.6b` 후 다시 실행하세요.",
+                                ],
+                            )
+                            raise typer.Exit(1) from exc
+                else:
+                    documents: list[str] = []
+                    doc_ids: list[str] = []
+                    retriever_docs_started_at = datetime.now()
+                    try:
+                        documents, doc_ids = load_retriever_documents(retriever_docs)
+                        retriever_doc_ids = doc_ids
+                        _log_duration(
+                            console,
+                            verbose,
+                            f"Retriever 문서 로드 완료 (count={len(documents)})",
+                            retriever_docs_started_at,
+                        )
+                    except Exception as exc:
+                        _log_duration(
+                            console,
+                            verbose,
+                            "Retriever 문서 로드 실패",
+                            retriever_docs_started_at,
+                        )
+                        print_cli_error(
+                            console,
+                            "Retriever 문서를 불러오지 못했습니다.",
+                            details=str(exc),
+                            fixes=["JSON/JSONL/TXT 형식을 확인하세요."],
+                        )
+                        raise typer.Exit(1) from exc
+
+                    retriever_init_started_at = datetime.now()
+                    try:
+                        if retriever == "graphrag":
+                            from evalvault.adapters.outbound.kg.graph_rag_retriever import (
+                                GraphRAGRetriever,
                             )
 
-                        dense_retriever = None
-                        try:
-                            dense_retriever = _build_dense_retriever(
+                            if kg is None:
+                                print_cli_error(
+                                    console,
+                                    "GraphRAG retriever를 사용하려면 KG 파일이 필요합니다.",
+                                    fixes=["--kg <knowledge_graph.json> 옵션을 함께 지정하세요."],
+                                )
+                                raise typer.Exit(1)
+                            kg_path = kg
+
+                            try:
+                                kg_graph = load_knowledge_graph(kg_path)
+                            except Exception as exc:
+                                print_cli_error(
+                                    console,
+                                    "Knowledge Graph 파일을 불러오지 못했습니다.",
+                                    details=str(exc),
+                                    fixes=["KG JSON 스키마와 경로를 확인하세요."],
+                                )
+                                raise typer.Exit(1) from exc
+
+                            bm25_retriever = None
+                            try:
+                                from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+                                toolkit = KoreanNLPToolkit()
+                                bm25_retriever = toolkit.build_retriever(
+                                    documents,
+                                    use_hybrid=False,
+                                    verbose=verbose,
+                                )
+                            except Exception as exc:  # pragma: no cover - optional dependency
+                                print_cli_warning(
+                                    console,
+                                    "GraphRAG용 BM25 retriever 초기화에 실패했습니다.",
+                                    tips=[str(exc)],
+                                )
+
+                            dense_retriever = None
+                            try:
+                                dense_retriever = _build_dense_retriever(
+                                    documents=documents,
+                                    settings=settings,
+                                    profile_name=profile_name,
+                                )
+                            except Exception as exc:  # pragma: no cover - optional dependency
+                                print_cli_warning(
+                                    console,
+                                    "GraphRAG용 Dense retriever 초기화에 실패했습니다.",
+                                    tips=[str(exc)],
+                                )
+
+                            kg_doc_ids = {
+                                str(entity.source_document_id)
+                                for entity in kg_graph.get_all_entities()
+                                if entity.source_document_id
+                            }
+                            if kg_doc_ids and not (kg_doc_ids & set(doc_ids)):
+                                preview = ", ".join(sorted(kg_doc_ids)[:3])
+                                print_cli_warning(
+                                    console,
+                                    "KG의 doc_id가 문서 doc_id와 매칭되지 않습니다.",
+                                    tips=[
+                                        "문서 파일의 doc_id를 KG source_document_id와 동일하게 지정하세요.",
+                                        f"예시 KG doc_id: {preview}",
+                                    ],
+                                )
+
+                            retriever_instance = GraphRAGRetriever(
+                                kg_graph,
+                                bm25_retriever=bm25_retriever,
+                                dense_retriever=dense_retriever,
+                                documents=documents,
+                                document_ids=doc_ids,
+                            )
+                        elif retriever == "dense":
+                            retriever_instance = _build_dense_retriever(
                                 documents=documents,
                                 settings=settings,
                                 profile_name=profile_name,
                             )
-                        except Exception as exc:  # pragma: no cover - optional dependency
-                            print_cli_warning(
-                                console,
-                                "GraphRAG용 Dense retriever 초기화에 실패했습니다.",
-                                tips=[str(exc)],
+                        else:
+                            from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
+
+                            toolkit = KoreanNLPToolkit()
+                            retriever_instance = toolkit.build_retriever(
+                                documents,
+                                use_hybrid=retriever == "hybrid",
+                                verbose=verbose,
                             )
-
-                        kg_doc_ids = {
-                            str(entity.source_document_id)
-                            for entity in kg_graph.get_all_entities()
-                            if entity.source_document_id
-                        }
-                        if kg_doc_ids and not (kg_doc_ids & set(doc_ids)):
-                            preview = ", ".join(sorted(kg_doc_ids)[:3])
-                            print_cli_warning(
+                        if retriever_instance:
+                            _log_duration(
                                 console,
-                                "KG의 doc_id가 문서 doc_id와 매칭되지 않습니다.",
-                                tips=[
-                                    "문서 파일의 doc_id를 KG source_document_id와 동일하게 지정하세요.",
-                                    f"예시 KG doc_id: {preview}",
-                                ],
+                                verbose,
+                                "Retriever 초기화 완료",
+                                retriever_init_started_at,
                             )
-
-                        retriever_instance = GraphRAGRetriever(
-                            kg_graph,
-                            bm25_retriever=bm25_retriever,
-                            dense_retriever=dense_retriever,
-                            documents=documents,
-                            document_ids=doc_ids,
-                        )
-                    elif retriever == "dense":
-                        retriever_instance = _build_dense_retriever(
-                            documents=documents,
-                            settings=settings,
-                            profile_name=profile_name,
-                        )
-                    else:
-                        from evalvault.adapters.outbound.nlp.korean import KoreanNLPToolkit
-
-                        toolkit = KoreanNLPToolkit()
-                        retriever_instance = toolkit.build_retriever(
-                            documents,
-                            use_hybrid=retriever == "hybrid",
-                            verbose=verbose,
-                        )
-                    if retriever_instance:
-                        _log_duration(
-                            console,
-                            verbose,
-                            "Retriever 초기화 완료",
-                            retriever_init_started_at,
-                        )
-                    else:
+                        else:
+                            _log_duration(
+                                console,
+                                verbose,
+                                "Retriever 초기화 실패",
+                                retriever_init_started_at,
+                            )
+                    except Exception as exc:  # pragma: no cover - dependency/IO issues
                         _log_duration(
                             console,
                             verbose,
                             "Retriever 초기화 실패",
                             retriever_init_started_at,
                         )
-                except Exception as exc:  # pragma: no cover - dependency/IO issues
-                    _log_duration(
-                        console,
-                        verbose,
-                        "Retriever 초기화 실패",
-                        retriever_init_started_at,
-                    )
-                    print_cli_warning(
-                        console,
-                        "Retriever 초기화에 실패했습니다.",
-                        tips=[str(exc)],
-                    )
-                    retriever_instance = None
+                        print_cli_warning(
+                            console,
+                            "Retriever 초기화에 실패했습니다.",
+                            tips=[str(exc)],
+                        )
+                        retriever_instance = None
 
-                if retriever_instance:
-                    phoenix_trace_metadata["retriever.mode"] = retriever
-                    phoenix_trace_metadata["retriever.docs"] = str(retriever_docs)
-                    if retriever == "graphrag" and kg:
-                        phoenix_trace_metadata["retriever.kg"] = str(kg)
+                    if retriever_instance:
+                        phoenix_trace_metadata["retriever.mode"] = retriever
+                        phoenix_trace_metadata["retriever.docs"] = str(retriever_docs)
+                        if retriever == "graphrag" and kg:
+                            phoenix_trace_metadata["retriever.kg"] = str(kg)
 
         try:
             resolved_thresholds = _resolve_thresholds(
@@ -1063,7 +1421,37 @@ def register_run_commands(
             ensure_phoenix_instrumentation(settings, console=console, force=True)
 
         evaluator = RagasEvaluator()
-        llm_adapter = get_llm_adapter(settings)
+        try:
+            llm_adapter = get_llm_adapter(settings)
+        except Exception as exc:
+            provider = str(getattr(settings, "llm_provider", "")).strip().lower()
+            fixes: list[str] = []
+            if provider == "ollama":
+                fixes = [
+                    "Ollama 서버가 실행 중인지 확인하세요 (기본: http://localhost:11434).",
+                    "필요 모델을 받아두세요: `ollama pull gemma3:1b` 및 `ollama pull qwen3-embedding:0.6b`.",
+                    "URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
+                ]
+            elif provider == "openai":
+                fixes = [
+                    "`.env`에 `OPENAI_API_KEY`를 설정하세요.",
+                    "프록시/네트워크가 필요한 환경이면 연결 가능 여부를 확인하세요.",
+                ]
+            elif provider == "vllm":
+                fixes = [
+                    "`.env`의 `VLLM_BASE_URL`/`VLLM_MODEL` 설정을 확인하세요.",
+                    "vLLM 서버가 OpenAI 호환 API로 실행 중인지 확인하세요.",
+                ]
+            else:
+                fixes = ["--profile 또는 환경변수 설정을 확인하세요."]
+
+            print_cli_error(
+                console,
+                "LLM/임베딩 어댑터를 초기화하지 못했습니다.",
+                details=str(exc),
+                fixes=fixes,
+            )
+            raise typer.Exit(1) from exc
 
         memory_adapter: SQLiteDomainMemoryAdapter | None = None
         memory_evaluator: MemoryAwareEvaluator | None = None
@@ -1087,7 +1475,8 @@ def register_run_commands(
                 f"Domain Memory 초기화 시작 (domain={memory_domain_name}, lang={memory_language})",
             )
             try:
-                memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
+                memory_db_path = memory_db or settings.evalvault_memory_db_path
+                memory_adapter = SQLiteDomainMemoryAdapter(memory_db_path)
                 memory_evaluator = MemoryAwareEvaluator(
                     evaluator=evaluator,
                     memory_port=memory_adapter,
@@ -1189,14 +1578,10 @@ def register_run_commands(
                 "평가 시작 "
                 f"(mode={eval_mode_label}, cases={len(ds)}, metrics={', '.join(metric_list)})",
             )
-        progress_context = (
-            streaming_progress(console, description=status_msg)
-            if stream
-            else evaluation_progress(console, len(ds), description=status_msg)
-        )
-        with progress_context as update_progress:
-            try:
-                if stream:
+        if stream:
+            with streaming_progress(console, description=status_msg) as update_progress:
+                stream_update = cast(Callable[[int, int | None, str | None], None], update_progress)
+                try:
                     result = asyncio.run(
                         _evaluate_streaming_run(
                             dataset_path=dataset,
@@ -1209,61 +1594,83 @@ def register_run_commands(
                             parallel=final_parallel,
                             batch_size=final_batch_size,
                             prompt_overrides=ragas_prompt_overrides or None,
-                            on_progress=lambda c, t, msg: update_progress(c, t, msg),
+                            on_progress=lambda c, t, msg: stream_update(c, t, msg),
                         )
                     )
-                elif memory_evaluator and use_domain_memory:
-                    update_progress(0, "🔁 Domain Memory와 병렬로 실행 중...")
-                    result = asyncio.run(
-                        memory_evaluator.evaluate_with_memory(
-                            dataset=ds,
-                            metrics=metric_list,
-                            llm=llm_adapter,
-                            thresholds=resolved_thresholds,
-                            parallel=final_parallel,
-                            batch_size=final_batch_size,
-                            domain=memory_domain_name,
-                            language=memory_language,
-                            retriever=retriever_instance,
-                            retriever_top_k=retriever_top_k,
-                            retriever_doc_ids=retriever_doc_ids,
-                            prompt_overrides=ragas_prompt_overrides or None,
-                            on_progress=lambda c, _t, msg: update_progress(c, msg),
-                            claim_level=claim_level,
-                        )
+                    _log_duration(console, verbose, "평가 완료", evaluation_started_at)
+                except Exception as exc:  # pragma: no cover - surfaced to CLI
+                    _log_duration(console, verbose, "평가 실패", evaluation_started_at)
+                    print_cli_error(
+                        console,
+                        "평가 실행 중 오류가 발생했습니다.",
+                        details=str(exc),
+                        fixes=[
+                            "LLM API 키/쿼터 상태와 dataset 스키마를 확인하세요.",
+                            "추가 로그는 --verbose 옵션으로 확인할 수 있습니다.",
+                        ],
                     )
-                else:
-                    result = asyncio.run(
-                        evaluator.evaluate(
-                            dataset=ds,
-                            metrics=metric_list,
-                            llm=llm_adapter,
-                            thresholds=resolved_thresholds,
-                            parallel=final_parallel,
-                            batch_size=final_batch_size,
-                            retriever=retriever_instance,
-                            retriever_top_k=retriever_top_k,
-                            retriever_doc_ids=retriever_doc_ids,
-                            prompt_overrides=ragas_prompt_overrides or None,
-                            on_progress=lambda c, _t, msg: update_progress(c, msg),
-                            claim_level=claim_level,
+                    raise typer.Exit(1) from exc
+        else:
+            with evaluation_progress(console, len(ds), description=status_msg) as update_progress:
+                eval_update = cast(Callable[[int, str | None], None], update_progress)
+                try:
+                    if memory_evaluator and use_domain_memory:
+                        eval_update(0, "🔁 Domain Memory와 병렬로 실행 중...")
+                        result = asyncio.run(
+                            memory_evaluator.evaluate_with_memory(
+                                dataset=ds,
+                                metrics=metric_list,
+                                llm=llm_adapter,
+                                thresholds=resolved_thresholds,
+                                parallel=final_parallel,
+                                batch_size=final_batch_size,
+                                domain=memory_domain_name,
+                                language=memory_language,
+                                retriever=retriever_instance,
+                                retriever_top_k=retriever_top_k,
+                                retriever_doc_ids=retriever_doc_ids,
+                                prompt_overrides=ragas_prompt_overrides or None,
+                                on_progress=lambda c, _t, msg: eval_update(c, msg),
+                                claim_level=claim_level,
+                            )
                         )
+                    else:
+                        result = asyncio.run(
+                            evaluator.evaluate(
+                                dataset=ds,
+                                metrics=metric_list,
+                                llm=llm_adapter,
+                                thresholds=resolved_thresholds,
+                                parallel=final_parallel,
+                                batch_size=final_batch_size,
+                                retriever=retriever_instance,
+                                retriever_top_k=retriever_top_k,
+                                retriever_doc_ids=retriever_doc_ids,
+                                prompt_overrides=ragas_prompt_overrides or None,
+                                on_progress=lambda c, _t, msg: eval_update(c, msg),
+                                claim_level=claim_level,
+                            )
+                        )
+                    _log_duration(console, verbose, "평가 완료", evaluation_started_at)
+                except Exception as exc:  # pragma: no cover - surfaced to CLI
+                    _log_duration(console, verbose, "평가 실패", evaluation_started_at)
+                    print_cli_error(
+                        console,
+                        "평가 실행 중 오류가 발생했습니다.",
+                        details=str(exc),
+                        fixes=[
+                            "LLM API 키/쿼터 상태와 dataset 스키마를 확인하세요.",
+                            "추가 로그는 --verbose 옵션으로 확인할 수 있습니다.",
+                        ],
                     )
-                _log_duration(console, verbose, "평가 완료", evaluation_started_at)
-            except Exception as exc:  # pragma: no cover - surfaced to CLI
-                _log_duration(console, verbose, "평가 실패", evaluation_started_at)
-                print_cli_error(
-                    console,
-                    "평가 실행 중 오류가 발생했습니다.",
-                    details=str(exc),
-                    fixes=[
-                        "LLM API 키/쿼터 상태와 dataset 스키마를 확인하세요.",
-                        "추가 로그는 --verbose 옵션으로 확인할 수 있습니다.",
-                    ],
-                )
-                raise typer.Exit(1) from exc
+                    raise typer.Exit(1) from exc
 
         phoenix_trace_metadata["dataset.test_cases"] = result.total_test_cases
+
+        if prefilled_retriever_metadata:
+            merged_retriever_metadata = dict(result.retrieval_metadata or {})
+            merged_retriever_metadata.update(prefilled_retriever_metadata)
+            result.retrieval_metadata = merged_retriever_metadata
 
         result.tracker_metadata.setdefault("run_mode", preset.name)
         if prompt_inputs:
@@ -1282,12 +1689,16 @@ def register_run_commands(
             if prompt_bundle:
                 result.tracker_metadata["prompt_set"] = build_prompt_summary(prompt_bundle)
 
-        if retriever_instance:
-            result.tracker_metadata["retriever"] = {
+        if retriever_instance or used_versioned_prefill:
+            retriever_tracker_meta: dict[str, Any] = {
                 "mode": retriever,
                 "docs_path": str(retriever_docs) if retriever_docs else None,
                 "top_k": retriever_top_k,
+                "versioned_docs": used_versioned_prefill,
             }
+            if versioned_prefill_stats:
+                retriever_tracker_meta["versioned_docs_stats"] = versioned_prefill_stats
+            result.tracker_metadata["retriever"] = retriever_tracker_meta
         if memory_required:
             result.tracker_metadata["domain_memory"] = {
                 "enabled": memory_required,
@@ -1303,7 +1714,7 @@ def register_run_commands(
             console.print(f"[dim]{preprocess_summary}[/dim]")
 
         retriever_metadata: dict[str, dict[str, Any]] | None = result.retrieval_metadata or None
-        if retriever_instance and retriever_metadata:
+        if (retriever_instance or used_versioned_prefill) and retriever_metadata:
             console.print(
                 f"[dim]Applied {retriever} retriever to "
                 f"{len(retriever_metadata)} test case(s).[/dim]"
@@ -1722,7 +2133,7 @@ def register_run_commands(
             "--memory-language",
             help="Language code for Domain Memory lookups (default: ko).",
         ),
-        memory_db: Path = memory_db_option(
+        memory_db: Path | None = memory_db_option(
             help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(
@@ -2006,7 +2417,7 @@ def register_run_commands(
             "--memory-language",
             help="Language code for Domain Memory lookups (default: ko).",
         ),
-        memory_db: Path = memory_db_option(
+        memory_db: Path | None = memory_db_option(
             help_text="Path to Domain Memory database (default: data/db/evalvault_memory.db).",
         ),
         memory_augment_context: bool = typer.Option(

@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from datetime import date
 from typing import Any
 
-from evalvault.domain.entities import Dataset
+from evalvault.domain.entities import Dataset, TestCase
+from evalvault.domain.services.document_versioning import (
+    VersionedChunk,
+    parse_contract_date,
+    select_chunks_for_contract_date,
+)
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort, RetrieverResultProtocol
 
 
@@ -156,3 +162,51 @@ def _compact_values(values: set[str]) -> str | list[str]:
     if len(values) == 1:
         return next(iter(values))
     return sorted(values)
+
+
+def apply_versioned_retriever_to_dataset(
+    *,
+    dataset: Dataset,
+    versioned_chunks: Sequence[VersionedChunk],
+    build_retriever: Callable[[Sequence[str]], RetrieverPort],
+    top_k: int,
+) -> dict[str, dict[str, Any]]:
+    cases_by_contract: dict[date | None, list[TestCase]] = {}
+    for test_case in dataset.test_cases:
+        if _has_contexts(test_case.contexts):
+            continue
+        contract = None
+        if isinstance(test_case.metadata, dict):
+            contract = parse_contract_date(test_case.metadata.get("contract_date"))
+        cases_by_contract.setdefault(contract, []).append(test_case)
+
+    if not cases_by_contract:
+        return {}
+
+    retrieval_metadata: dict[str, dict[str, Any]] = {}
+    chunk_list = list(versioned_chunks)
+
+    for contract, cases in cases_by_contract.items():
+        selected = select_chunks_for_contract_date(chunk_list, contract)
+        documents = [chunk.content for chunk in selected]
+        doc_ids = [chunk.doc_id for chunk in selected]
+
+        retriever = build_retriever(documents)
+        subset = Dataset(
+            name=dataset.name,
+            version=dataset.version,
+            test_cases=cases,
+            metadata=dict(dataset.metadata or {}),
+            source_file=dataset.source_file,
+            thresholds=dict(dataset.thresholds or {}),
+        )
+        retrieval_metadata.update(
+            apply_retriever_to_dataset(
+                dataset=subset,
+                retriever=retriever,
+                top_k=top_k,
+                doc_ids=doc_ids,
+            )
+        )
+
+    return retrieval_metadata
