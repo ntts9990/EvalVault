@@ -243,6 +243,62 @@ export interface RunComparisonResponse {
     total_cases_delta: number;
 }
 
+export interface QualityGateResultResponse {
+    metric: string;
+    score: number;
+    threshold: number;
+    passed: boolean;
+    gap: number;
+}
+
+export interface QualityGateReportResponse {
+    run_id: string;
+    overall_passed: boolean;
+    results: QualityGateResultResponse[];
+    regression_detected: boolean;
+    regression_amount?: number | null;
+}
+
+export interface DebugReport {
+    run_summary: Record<string, unknown>;
+    stage_summary: {
+        run_id: string;
+        total_events: number;
+        stage_type_counts: Record<string, number>;
+        stage_type_avg_durations: Record<string, number>;
+        missing_required_stage_types: string[];
+    } | null;
+    stage_metrics: StageMetric[];
+    bottlenecks: Record<string, unknown>[];
+    recommendations: string[];
+    phoenix_trace_url?: string | null;
+    langfuse_trace_url?: string | null;
+}
+
+export interface PromptDiffSummaryItem {
+    role: string;
+    base_checksum?: string | null;
+    target_checksum?: string | null;
+    status: "same" | "diff" | "missing";
+    base_name?: string | null;
+    target_name?: string | null;
+    base_kind?: string | null;
+    target_kind?: string | null;
+}
+
+export interface PromptDiffEntry {
+    role: string;
+    lines: string[];
+    truncated: boolean;
+}
+
+export interface PromptDiffResponse {
+    base_run_id: string;
+    target_run_id: string;
+    summary: PromptDiffSummaryItem[];
+    diffs: PromptDiffEntry[];
+}
+
 export interface DatasetItem {
     name: string;
     path: string;
@@ -637,6 +693,49 @@ export async function fetchRunComparison(
     const response = await fetch(`${API_BASE_URL}/runs/compare?${params.toString()}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run comparison: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchQualityGateReport(runId: string): Promise<QualityGateReportResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/quality-gate`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch quality gate: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchDebugReport(runId: string): Promise<DebugReport> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/debug-report`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch debug report: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchDebugReportMarkdown(runId: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/debug-report?format=markdown`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch debug report: ${response.statusText}`);
+    }
+    return response.blob();
+}
+
+export async function fetchPromptDiff(
+    baseRunId: string,
+    targetRunId: string,
+    maxLines: number = 40,
+    includeDiff: boolean = true
+): Promise<PromptDiffResponse> {
+    const params = new URLSearchParams({
+        base_run_id: baseRunId,
+        target_run_id: targetRunId,
+        max_lines: String(maxLines),
+        include_diff: includeDiff ? "true" : "false",
+    });
+    const response = await fetch(`${API_BASE_URL}/runs/prompt-diff?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch prompt diff: ${response.statusText}`);
     }
     return response.json();
 }

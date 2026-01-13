@@ -4,9 +4,11 @@ import {
     fetchConfig,
     fetchConfigProfiles,
     fetchModels,
+    fetchMetricSpecs,
     updateConfig,
     type ConfigProfile,
     type ConfigUpdateRequest,
+    type MetricSpec,
     type ModelItem,
     type SystemConfig,
 } from "../services/api";
@@ -19,6 +21,7 @@ import {
     Database,
     Sliders,
     ExternalLink,
+    BookOpen,
 } from "lucide-react";
 import { getPhoenixUiUrl } from "../utils/phoenix";
 
@@ -441,6 +444,9 @@ export function Settings() {
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
     const [saveError, setSaveError] = useState<string | null>(null);
     const [openaiConsent, setOpenaiConsent] = useState(false);
+    const [metricSpecs, setMetricSpecs] = useState<MetricSpec[]>([]);
+    const [metricsLoading, setMetricsLoading] = useState(false);
+    const [metricsError, setMetricsError] = useState<string | null>(null);
 
     const profileOptions = useMemo<FieldOption[]>(() => {
         const baseOptions = [{ label: "사용 안 함", value: "" }];
@@ -599,6 +605,23 @@ export function Settings() {
         PROVIDERS.forEach((provider) => {
             loadModelOptions(provider);
         });
+    }, []);
+
+    useEffect(() => {
+        async function loadMetrics() {
+            setMetricsLoading(true);
+            setMetricsError(null);
+            try {
+                const specs = await fetchMetricSpecs();
+                setMetricSpecs(specs);
+            } catch {
+                setMetricsError("메트릭 정보를 불러오지 못했습니다.");
+            } finally {
+                setMetricsLoading(false);
+            }
+        }
+
+        loadMetrics();
     }, []);
 
     const updateDraftValue = (key: keyof ConfigUpdateRequest, value: DraftValue) => {
@@ -860,6 +883,89 @@ export function Settings() {
                         </section>
                     ))}
                 </div>
+
+                <section className="surface-panel p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <BookOpen className="w-5 h-5 text-primary" />
+                        <div>
+                            <h2 className="text-lg font-semibold">메트릭 카탈로그</h2>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                시스템에서 사용 가능한 평가 지표 명세입니다.
+                            </p>
+                        </div>
+                    </div>
+
+                    {metricsLoading && (
+                        <div className="text-sm text-muted-foreground py-8 text-center flex flex-col items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                            <span>메트릭 정보를 불러오는 중...</span>
+                        </div>
+                    )}
+
+                    {metricsError && (
+                        <div className="text-sm text-rose-600 py-4 text-center bg-rose-50/50 rounded-lg border border-rose-100">
+                            {metricsError}
+                        </div>
+                    )}
+
+                    {!metricsLoading && !metricsError && (
+                        <div className="overflow-hidden rounded-lg border border-border">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-muted/30 text-xs text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="py-2.5 px-4 font-semibold w-[25%]">이름 / 그룹</th>
+                                        <th className="py-2.5 px-4 font-semibold w-[55%]">설명</th>
+                                        <th className="py-2.5 px-4 font-semibold w-[20%] text-right">요구 데이터</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border bg-background">
+                                    {metricSpecs.map((spec) => (
+                                        <tr key={spec.name} className="hover:bg-muted/30 transition-colors">
+                                            <td className="py-3 px-4 align-top">
+                                                <div className="font-medium text-foreground">{spec.name}</div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground font-mono">
+                                                        {spec.signal_group}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 rounded">
+                                                        {spec.source}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4 align-top text-muted-foreground leading-relaxed">
+                                                {spec.description}
+                                            </td>
+                                            <td className="py-3 px-4 align-top text-right">
+                                                <div className="flex flex-wrap justify-end gap-1.5">
+                                                    {spec.requires_ground_truth && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                                            정답셋(GT)
+                                                        </span>
+                                                    )}
+                                                    {spec.requires_embeddings && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                                            임베딩
+                                                        </span>
+                                                    )}
+                                                    {!spec.requires_ground_truth && !spec.requires_embeddings && (
+                                                        <span className="text-xs text-muted-foreground">-</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {metricSpecs.length === 0 && (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                                                등록된 메트릭이 없습니다.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
             </div>
         </Layout>
     );

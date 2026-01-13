@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
-import { fetchRuns, type RunSummary } from "../services/api";
+import {
+    fetchAnalysisHistory,
+    fetchPromptDiff,
+    fetchRuns,
+    type AnalysisHistoryItem,
+    type PromptDiffResponse,
+    type RunSummary,
+} from "../services/api";
 import {
     Area,
     AreaChart,
@@ -39,6 +47,12 @@ import {
     FileText,
     Printer,
     Share2,
+    GitCompare,
+    Download,
+    Info,
+    CheckCircle2,
+    XCircle,
+    AlertTriangle,
 } from "lucide-react";
 
 type MetricTrendRow = Record<string, number | string | null>;
@@ -63,6 +77,11 @@ export function CustomerReport() {
     const [customEnd, setCustomEnd] = useState(() => toDateInputValue(new Date()));
     const [selectedProjects, setSelectedProjects] = useState<string[]>([PROJECT_ALL]);
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
+    const [analysisHistory, setAnalysisHistory] = useState<AnalysisHistoryItem[]>([]);
+    const [analysisHistoryError, setAnalysisHistoryError] = useState<string | null>(null);
+    const [promptDiff, setPromptDiff] = useState<PromptDiffResponse | null>(null);
+    const [diffLoading, setDiffLoading] = useState(false);
+    const [diffError, setDiffError] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadRuns() {
@@ -76,6 +95,16 @@ export function CustomerReport() {
             }
         }
         loadRuns();
+    }, []);
+
+    useEffect(() => {
+        fetchAnalysisHistory(50)
+            .then(setAnalysisHistory)
+            .catch((err) => {
+                setAnalysisHistoryError(
+                    err instanceof Error ? err.message : "분석 이력을 불러오지 못했습니다."
+                );
+            });
     }, []);
 
     const projectOptions = useMemo(() => collectProjectNames(runs), [runs]);
@@ -138,6 +167,80 @@ export function CustomerReport() {
             return row;
         });
     }, [trendSeries, selectedMetrics]);
+
+    const analysisCompareLink = useMemo(() => {
+        if (filteredRuns.length < 2) return null;
+        const targetRunId = filteredRuns[0].run_id;
+        const baseRunId = filteredRuns[1].run_id;
+        const targetResult = analysisHistory.find(
+            (item) => item.run_id === targetRunId && item.is_complete
+        );
+        const baseResult = analysisHistory.find(
+            (item) => item.run_id === baseRunId && item.is_complete
+        );
+        if (!targetResult || !baseResult) return null;
+        return `/analysis/compare?left=${encodeURIComponent(baseResult.result_id)}&right=${encodeURIComponent(
+            targetResult.result_id
+        )}`;
+    }, [analysisHistory, filteredRuns]);
+
+    useEffect(() => {
+        if (filteredRuns.length < 2) {
+            setPromptDiff(null);
+            setDiffError(null);
+            return;
+        }
+
+        const targetRun = filteredRuns[0];
+        const baseRun = filteredRuns[1];
+
+        if (
+            promptDiff?.base_run_id === baseRun.run_id &&
+            promptDiff?.target_run_id === targetRun.run_id
+        ) {
+            return;
+        }
+
+        async function loadDiff() {
+            setDiffLoading(true);
+            try {
+                const data = await fetchPromptDiff(baseRun.run_id, targetRun.run_id);
+                setPromptDiff(data);
+                setDiffError(null);
+            } catch (err) {
+                console.error(err);
+                setDiffError("프롬프트 변경 내역을 불러오지 못했습니다.");
+            } finally {
+                setDiffLoading(false);
+            }
+        }
+
+        loadDiff();
+    }, [filteredRuns, promptDiff?.base_run_id, promptDiff?.target_run_id]);
+
+    const diffCounts = useMemo(() => {
+        if (!promptDiff) return { same: 0, diff: 0, missing: 0 };
+        return promptDiff.summary.reduce(
+            (acc, item) => {
+                acc[item.status] = (acc[item.status] || 0) + 1;
+                return acc;
+            },
+            { same: 0, diff: 0, missing: 0 } as Record<string, number>
+        );
+    }, [promptDiff]);
+
+    const handleDownloadDiff = () => {
+        if (!promptDiff) return;
+        const blob = new Blob([JSON.stringify(promptDiff, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `prompt-diff-${promptDiff.base_run_id}-${promptDiff.target_run_id}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
     const toggleProjectSelection = (value: string) => {
         setSelectedProjects((prev) => {
@@ -348,6 +451,94 @@ export function CustomerReport() {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className="surface-card p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <GitCompare className="w-5 h-5 text-primary" />
+                            <h2 className="text-lg font-semibold">최근 Run 2건 프롬프트 변경 요약</h2>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {filteredRuns.length >= 2 && (
+                                <Link
+                                    to={`/compare?base=${encodeURIComponent(filteredRuns[1].run_id)}&target=${encodeURIComponent(filteredRuns[0].run_id)}`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-background hover:bg-secondary/50 transition-colors"
+                                >
+                                    비교 상세 보기
+                                </Link>
+                            )}
+                            {analysisCompareLink && (
+                                <Link
+                                    to={analysisCompareLink}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-background hover:bg-secondary/50 transition-colors"
+                                >
+                                    <Activity className="w-3.5 h-3.5" />
+                                    분석 결과 비교
+                                </Link>
+                            )}
+                            {promptDiff && !diffLoading && (
+                                <button
+                                    onClick={handleDownloadDiff}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-background hover:bg-secondary/50 transition-colors"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    상세 JSON 다운로드
+                                </button>
+                            )}
+                            {analysisHistoryError && (
+                                <div className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground opacity-70" title={analysisHistoryError}>
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span className="truncate max-w-[120px]">{analysisHistoryError}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {filteredRuns.length < 2 ? (
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm p-2 bg-secondary/20 rounded-lg">
+                            <Info className="w-4 h-4" />
+                            <span>비교할 Run이 부족합니다. (현재 필터 기준 최소 2건 필요)</span>
+                        </div>
+                    ) : diffLoading ? (
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground animate-pulse">
+                            <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                            <span>프롬프트 변경 내역 분석 중...</span>
+                        </div>
+                    ) : diffError ? (
+                        <div className="flex items-center gap-2 text-destructive text-sm p-2 bg-destructive/10 rounded-lg border border-destructive/20">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span>{diffError}</span>
+                        </div>
+                    ) : promptDiff ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                <span className="text-xs text-muted-foreground font-medium uppercase mb-1 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> 동일
+                                </span>
+                                <span className="text-2xl font-bold text-foreground">{diffCounts.same}</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                <span className="text-xs text-muted-foreground font-medium uppercase mb-1 flex items-center gap-1">
+                                    <GitCompare className="w-3 h-3" /> 변경
+                                </span>
+                                <span className="text-2xl font-bold text-foreground">{diffCounts.diff}</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                                <span className="text-xs text-muted-foreground font-medium uppercase mb-1 flex items-center gap-1">
+                                    <XCircle className="w-3 h-3" /> 누락
+                                </span>
+                                <span className="text-2xl font-bold text-foreground">{diffCounts.missing}</span>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {promptDiff && filteredRuns.length >= 2 && (
+                        <div className="mt-3 text-xs text-muted-foreground text-right">
+                            비교 대상: <span className="font-mono">{filteredRuns[1].run_id.slice(0, 8)}</span> (Base)
+                            vs <span className="font-mono">{filteredRuns[0].run_id.slice(0, 8)}</span> (Target)
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">

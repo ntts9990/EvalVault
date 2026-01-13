@@ -36,6 +36,7 @@ import {
     Circle,
     Copy,
     ExternalLink,
+    FileDiff,
     Link2,
     Play,
     Save,
@@ -576,6 +577,17 @@ export function AnalysisLab() {
         const [left, right] = compareSelection;
         return `/analysis/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`;
     }, [compareSelection]);
+
+    const promptDiffLink = useMemo(() => {
+        if (compareSelection.length !== 2) return null;
+        const [leftId, rightId] = compareSelection;
+        const leftItem = history.find(item => item.result_id === leftId);
+        const rightItem = history.find(item => item.result_id === rightId);
+
+        if (!leftItem?.run_id || !rightItem?.run_id) return null;
+
+        return `/compare?base=${encodeURIComponent(leftItem.run_id)}&target=${encodeURIComponent(rightItem.run_id)}`;
+    }, [compareSelection, history]);
 
     const savedInCompare = useMemo(() => {
         if (!savedResultId) return false;
@@ -1357,6 +1369,33 @@ export function AnalysisLab() {
                                         >
                                             비교 보기
                                         </button>
+                                    )}
+                                    {promptDiffLink && (
+                                        <Link
+                                            to={promptDiffLink}
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-border hover:border-primary/40"
+                                        >
+                                            <FileDiff className="w-3 h-3" />
+                                            프롬프트 비교
+                                        </Link>
+                                    )}
+                                    {compareSelection.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={clearCompareSelection}
+                                            className="text-[11px] text-muted-foreground hover:text-foreground"
+                                        >
+                                            선택 해제
+                                        </button>
+                                    )}
+                                    {promptDiffLink && (
+                                        <Link
+                                            to={promptDiffLink}
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-border hover:border-primary/40"
+                                        >
+                                            <FileDiff className="w-3 h-3" />
+                                            프롬프트 비교
+                                        </Link>
                                     )}
                                     {compareSelection.length > 0 && (
                                         <button

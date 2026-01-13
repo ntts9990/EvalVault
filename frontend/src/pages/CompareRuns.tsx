@@ -3,6 +3,8 @@ import { useSearchParams, Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import {
     fetchRunComparison,
+    fetchPromptDiff,
+    type PromptDiffResponse,
     type RunComparisonCounts,
     type RunDetailsResponse,
 } from "../services/api";
@@ -16,6 +18,10 @@ import {
     TrendingDown,
     PlusCircle,
     MinusCircle,
+    Download,
+    Eye,
+    EyeOff,
+    FileDiff,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
 
@@ -29,6 +35,11 @@ export function CompareRuns() {
     const [caseCounts, setCaseCounts] = useState<RunComparisonCounts | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [promptDiff, setPromptDiff] = useState<PromptDiffResponse | null>(null);
+    const [diffLoading, setDiffLoading] = useState(false);
+    const [diffError, setDiffError] = useState<string | null>(null);
+    const [showDiff, setShowDiff] = useState(false);
 
     // View state
     const [filterMode, setFilterMode] = useState<"all" | "changes" | "regressions">("all");
@@ -53,6 +64,18 @@ export function CompareRuns() {
             }
         }
         loadData();
+    }, [baseId, targetId]);
+
+    useEffect(() => {
+        if (!baseId || !targetId) return;
+        setDiffLoading(true);
+        setDiffError(null);
+        fetchPromptDiff(baseId, targetId)
+            .then(setPromptDiff)
+            .catch((err) => {
+                setDiffError(err instanceof Error ? err.message : "프롬프트 비교를 불러오지 못했습니다.");
+            })
+            .finally(() => setDiffLoading(false));
     }, [baseId, targetId]);
 
     if (loading) return (
@@ -184,6 +207,17 @@ export function CompareRuns() {
 
     const passRateDelta = targetRun.summary.pass_rate - baseRun.summary.pass_rate;
 
+    const downloadPromptDiff = () => {
+        if (!promptDiff || !baseId || !targetId) return;
+        const blob = new Blob([JSON.stringify(promptDiff, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `prompt_diff_${baseId}_${targetId}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <Layout>
             <div className="pb-20 max-w-7xl mx-auto">
@@ -258,7 +292,130 @@ export function CompareRuns() {
                     </span>
                 </div>
 
-                {/* Metric Delta Chart */}
+                <div className="surface-panel p-6 mb-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                            <FileDiff className="w-5 h-5 text-primary" />
+                            <h3 className="font-semibold">프롬프트 변경 사항</h3>
+                            {diffLoading && (
+                                <span className="text-xs text-muted-foreground animate-pulse ml-2">로딩 중...</span>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            {promptDiff && (
+                                <button
+                                    onClick={downloadPromptDiff}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-secondary transition-colors"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    다운로드
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowDiff((prev) => !prev)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                            >
+                                {showDiff ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                {showDiff ? "상세 숨기기" : "비교 상세 보기"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {diffError ? (
+                        <div className="text-center py-8 text-sm text-rose-600 border border-dashed border-border rounded-lg">
+                            {diffError}
+                        </div>
+                    ) : !promptDiff && !diffLoading ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground border border-dashed border-border rounded-lg">
+                            프롬프트 비교 정보를 불러올 수 없습니다.
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="overflow-hidden rounded-lg border border-border">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-secondary/30 text-muted-foreground font-medium border-b border-border">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">역할 (Role)</th>
+                                            <th className="px-4 py-2 text-left">상태</th>
+                                            <th className="px-4 py-2 text-left">Base</th>
+                                            <th className="px-4 py-2 text-left">Target</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/50 bg-card">
+                                        {promptDiff?.summary.map((item, idx) => (
+                                            <tr key={`${item.role}-${idx}`} className="hover:bg-secondary/10 transition-colors">
+                                                <td className="px-4 py-2 font-medium text-foreground">{item.role}</td>
+                                                <td className="px-4 py-2">
+                                                    <span
+                                                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
+                                                            item.status === "same"
+                                                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                                                : item.status === "diff"
+                                                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                                                                : "bg-secondary text-muted-foreground border border-border"
+                                                        }`}
+                                                    >
+                                                        {item.status === "same"
+                                                            ? "동일함"
+                                                            : item.status === "diff"
+                                                            ? "변경됨"
+                                                            : "없음"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground truncate max-w-[150px]" title={item.base_name || ""}>
+                                                    {item.base_name || "-"}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground truncate max-w-[150px]" title={item.target_name || ""}>
+                                                    {item.target_name || "-"}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {showDiff && promptDiff?.diffs.length ? (
+                                <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4 pt-2">
+                                    {promptDiff.diffs.map((diff, idx) => (
+                                        <div key={`diff-${idx}`} className="border border-border rounded-lg overflow-hidden shadow-sm">
+                                            <div className="bg-secondary/30 px-4 py-2 border-b border-border flex justify-between items-center">
+                                                <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                                                    {diff.role} Diff
+                                                </span>
+                                            </div>
+                                            <div className="bg-background overflow-x-auto">
+                                                <pre className="text-[11px] leading-relaxed font-mono p-4 min-w-full">
+                                                    {diff.lines.map((line, index) => (
+                                                        <div
+                                                            key={`${diff.role}-${index}`}
+                                                            className={`px-2 -mx-2 py-0.5 w-full ${
+                                                                line.startsWith("+")
+                                                                    ? "bg-emerald-500/5 text-emerald-600"
+                                                                    : line.startsWith("-")
+                                                                    ? "bg-rose-500/5 text-rose-600"
+                                                                    : line.startsWith("?")
+                                                                    ? "bg-amber-500/5 text-amber-600"
+                                                                    : "text-muted-foreground"
+                                                            }`}
+                                                        >
+                                                            {line}
+                                                        </div>
+                                                    ))}
+                                                    {diff.truncated && (
+                                                        <div className="px-2 py-2 text-muted-foreground italic border-t border-border/50 mt-2">
+                                                            ... 결과가 너무 길어 생략되었습니다 (전체 내용은 다운로드하여 확인하세요)
+                                                        </div>
+                                                    )}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
+                </div>
+
                 <div className="surface-panel p-6 mb-8">
                     <h3 className="font-semibold mb-6">Metric Performance Delta</h3>
                     <div className="h-64 w-full">

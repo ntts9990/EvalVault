@@ -7,12 +7,14 @@ import {
     fetchAnalysisIntents,
     fetchAnalysisMetricSpecs,
     fetchAnalysisResult,
+    fetchPromptDiff,
     type AnalysisIntentInfo,
     type AnalysisMetricSpec,
     type SavedAnalysisResult,
+    type PromptDiffResponse,
 } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
-import { Activity, AlertCircle, ArrowLeft, GitCompare } from "lucide-react";
+import { Activity, AlertCircle, ArrowLeft, GitCompare, Download, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
 const METRIC_EPSILON = 0.0001;
 
@@ -339,6 +341,11 @@ export function AnalysisCompareView() {
     const [analysisMetricSpecError, setAnalysisMetricSpecError] = useState<string | null>(null);
     const [showAnalysisMetrics, setShowAnalysisMetrics] = useState(false);
 
+    const [promptDiff, setPromptDiff] = useState<PromptDiffResponse | null>(null);
+    const [promptDiffLoading, setPromptDiffLoading] = useState(false);
+    const [promptDiffError, setPromptDiffError] = useState<string | null>(null);
+    const [showPromptDiffDetail, setShowPromptDiffDetail] = useState(false);
+
     useEffect(() => {
         async function loadResults() {
             if (!idA || !idB) {
@@ -362,6 +369,29 @@ export function AnalysisCompareView() {
         }
         loadResults();
     }, [idA, idB]);
+
+    useEffect(() => {
+        async function loadPromptDiff() {
+            if (!resultA?.run_id || !resultB?.run_id) {
+                setPromptDiff(null);
+                return;
+            }
+            setPromptDiffLoading(true);
+            setPromptDiffError(null);
+            try {
+                const data = await fetchPromptDiff(resultA.run_id, resultB.run_id);
+                setPromptDiff(data);
+            } catch (err) {
+                console.error("Failed to load prompt diff", err);
+                setPromptDiffError("프롬프트 비교 정보를 불러오지 못했습니다.");
+            } finally {
+                setPromptDiffLoading(false);
+            }
+        }
+        if (resultA && resultB) {
+            loadPromptDiff();
+        }
+    }, [resultA, resultB]);
 
     useEffect(() => {
         let cancelled = false;
@@ -825,6 +855,158 @@ export function AnalysisCompareView() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <ResultCard result={resultA} variant="A" failureCount={failureCountA} />
                             <ResultCard result={resultB} variant="B" failureCount={failureCountB} />
+                        </div>
+
+                        <div className="surface-panel p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold">프롬프트 변화</h3>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Run ID 기반 프롬프트 스냅샷을 비교합니다.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {promptDiff && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const blob = new Blob([JSON.stringify(promptDiff, null, 2)], {
+                                                    type: "application/json",
+                                                });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement("a");
+                                                a.href = url;
+                                                a.download = `prompt_diff_${resultA?.run_id}_${resultB?.run_id}.json`;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                                URL.revokeObjectURL(url);
+                                            }}
+                                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+                                            title="JSON 다운로드"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPromptDiffDetail((prev) => !prev)}
+                                        className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                    >
+                                        {showPromptDiffDetail ? (
+                                            <>
+                                                <ChevronUp className="w-3 h-3" /> 접기
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronDown className="w-3 h-3" /> 상세 보기
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {promptDiffLoading && (
+                                <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+                                    <Activity className="w-3 h-3 animate-spin" /> 비교 분석 중...
+                                </div>
+                            )}
+
+                            {promptDiffError && (
+                                <p className="text-xs text-rose-500 py-2">{promptDiffError}</p>
+                            )}
+
+                            {!promptDiffLoading && !promptDiff && resultA && resultB && (
+                                <p className="text-xs text-muted-foreground py-2">
+                                    {!resultA.run_id || !resultB.run_id
+                                        ? "Run ID가 없는 결과는 프롬프트를 비교할 수 없습니다."
+                                        : "비교할 프롬프트 데이터가 없습니다."}
+                                </p>
+                            )}
+
+                                {!promptDiffLoading && promptDiff && (
+                                <div className="space-y-4">
+                                    <div className="overflow-hidden border border-border rounded-lg">
+                                        <table className="w-full text-xs">
+                                            <thead className="bg-secondary/50 text-muted-foreground">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left font-medium">Role</th>
+                                                    <th className="px-3 py-2 text-left font-medium">Status</th>
+                                                    <th className="px-3 py-2 text-left font-medium">Base (A)</th>
+                                                    <th className="px-3 py-2 text-left font-medium">Target (B)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {promptDiff.summary.map((item, idx) => (
+                                                    <tr key={`${item.role}-${idx}`} className="hover:bg-secondary/20">
+                                                        <td className="px-3 py-2 font-medium">{item.role}</td>
+                                                        <td className="px-3 py-2">
+                                                            <span
+                                                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                                    item.status === "diff"
+                                                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                                                        : item.status === "missing"
+                                                                            ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                                                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                                                }`}
+                                                            >
+                                                                {item.status.toUpperCase()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-muted-foreground">
+                                                            {item.base_name || "-"}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-muted-foreground">
+                                                            {item.target_name || "-"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {showPromptDiffDetail && (
+                                        <div className="space-y-3">
+                                            {promptDiff.diffs.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    변경사항이 없거나 텍스트 차이가 없습니다.
+                                                </p>
+                                            ) : (
+                                                promptDiff.diffs.map((diff, idx) => (
+                                                    <div key={`diff-${idx}`} className="border border-border rounded-lg overflow-hidden">
+                                                        <div className="px-3 py-2 bg-secondary/30 border-b border-border flex items-center justify-between">
+                                                            <span className="text-xs font-semibold flex items-center gap-2">
+                                                                <FileText className="w-3 h-3" />
+                                                                {diff.role}
+                                                            </span>
+                                                            {diff.truncated && (
+                                                                <span className="text-[10px] text-amber-600">
+                                                                    (일부 생략됨)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="bg-slate-50 dark:bg-slate-950 p-3 overflow-x-auto">
+                                                            <pre className="text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
+                                                                {diff.lines.map((line, lIdx) => {
+                                                                    let colorClass = "text-foreground";
+                                                                    if (line.startsWith("+")) colorClass = "text-emerald-600 dark:text-emerald-400";
+                                                                    if (line.startsWith("-")) colorClass = "text-rose-600 dark:text-rose-400";
+                                                                    if (line.startsWith("@")) colorClass = "text-blue-500";
+                                                                    return (
+                                                                        <div key={lIdx} className={colorClass}>
+                                                                            {line}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </pre>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="surface-panel p-4">

@@ -5,8 +5,21 @@ import {
     fetchRunFeedback,
     saveRunFeedback,
     fetchRunFeedbackSummary,
+    fetchStageEvents,
+    fetchStageMetrics,
+    fetchQualityGateReport,
+    fetchDebugReport,
+    fetchDebugReportMarkdown,
+    fetchRuns,
+    fetchPromptDiff,
     type RunDetailsResponse,
-    type FeedbackResponse
+    type FeedbackResponse,
+    type StageEvent,
+    type StageMetric,
+    type QualityGateReportResponse,
+    type DebugReport,
+    type RunSummary,
+    type PromptDiffResponse,
 } from "../services/api";
 import { Layout } from "../components/Layout";
 import { InsightSpacePanel } from "../components/InsightSpacePanel";
@@ -26,9 +39,16 @@ import {
     ThumbsDown,
     Star,
     Save,
+    Layers,
+    Terminal,
+    ShieldCheck,
+    Bug,
+    Download,
+    GitCompare,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
+
 
 function FeedbackItem({
     result,
@@ -201,10 +221,33 @@ export function RunDetails() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     // Tabs
-    const [activeTab, setActiveTab] = useState<"overview" | "performance" | "feedback">("overview");
+    const [activeTab, setActiveTab] = useState<
+        "overview" | "performance" | "feedback" | "stages" | "prompts" | "gate" | "debug"
+    >("overview");
     const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
     const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackResponse>>({});
     const [loadingFeedback, setLoadingFeedback] = useState(false);
+    const [stageEvents, setStageEvents] = useState<StageEvent[]>([]);
+    const [stageMetrics, setStageMetrics] = useState<StageMetric[]>([]);
+    const [stagesLoaded, setStagesLoaded] = useState(false);
+    const [loadingStages, setLoadingStages] = useState(false);
+    const [stageError, setStageError] = useState<string | null>(null);
+    const [gateReport, setGateReport] = useState<QualityGateReportResponse | null>(null);
+    const [gateLoaded, setGateLoaded] = useState(false);
+    const [loadingGate, setLoadingGate] = useState(false);
+    const [gateError, setGateError] = useState<string | null>(null);
+    const [debugReport, setDebugReport] = useState<DebugReport | null>(null);
+    const [debugLoaded, setDebugLoaded] = useState(false);
+    const [loadingDebug, setLoadingDebug] = useState(false);
+    const [debugError, setDebugError] = useState<string | null>(null);
+
+    const [diffTargetRunId, setDiffTargetRunId] = useState<string>("");
+    const [diffData, setDiffData] = useState<PromptDiffResponse | null>(null);
+    const [loadingDiff, setLoadingDiff] = useState(false);
+    const [diffError, setDiffError] = useState<string | null>(null);
+    const [runList, setRunList] = useState<RunSummary[]>([]);
+    const [runListLoaded, setRunListLoaded] = useState(false);
+    const [runListError, setRunListError] = useState<string | null>(null);
 
     const summaryMetricSet = new Set<string>(SUMMARY_METRICS);
 
@@ -213,6 +256,27 @@ export function RunDetails() {
         const lines = content.split("\n");
         const snippet = lines.slice(0, 4).join("\n");
         return lines.length > 4 ? `${snippet}\n...` : snippet;
+    };
+
+    const downloadJson = (filename: string, payload: unknown) => {
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+            type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const downloadBlob = (filename: string, blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
     };
 
     useEffect(() => {
@@ -231,6 +295,22 @@ export function RunDetails() {
     }, [id]);
 
     useEffect(() => {
+        setStageEvents([]);
+        setStageMetrics([]);
+        setStagesLoaded(false);
+        setStageError(null);
+        setGateReport(null);
+        setGateLoaded(false);
+        setGateError(null);
+        setDebugReport(null);
+        setDebugLoaded(false);
+        setDebugError(null);
+        setDiffTargetRunId("");
+        setDiffData(null);
+        setDiffError(null);
+    }, [id]);
+
+    useEffect(() => {
         if (activeTab === "feedback" && id) {
             setLoadingFeedback(true);
             fetchRunFeedback(id)
@@ -243,6 +323,62 @@ export function RunDetails() {
                 .finally(() => setLoadingFeedback(false));
         }
     }, [activeTab, id]);
+
+    useEffect(() => {
+        if (!id) return;
+
+        if (activeTab === "stages" && !stagesLoaded && !loadingStages) {
+            setLoadingStages(true);
+            setStageError(null);
+            Promise.all([fetchStageEvents(id), fetchStageMetrics(id)])
+                .then(([events, metrics]) => {
+                    setStageEvents(events);
+                    setStageMetrics(metrics);
+                    setStagesLoaded(true);
+                })
+                .catch((err) => {
+                    setStageError(err instanceof Error ? err.message : "Failed to load stage data");
+                })
+                .finally(() => setLoadingStages(false));
+        }
+
+        if (activeTab === "gate" && !gateLoaded && !loadingGate) {
+            setLoadingGate(true);
+            setGateError(null);
+            fetchQualityGateReport(id)
+                .then((report) => {
+                    setGateReport(report);
+                    setGateLoaded(true);
+                })
+                .catch((err) => {
+                    setGateError(err instanceof Error ? err.message : "Failed to load quality gate");
+                })
+                .finally(() => setLoadingGate(false));
+        }
+
+        if (activeTab === "debug" && !debugLoaded && !loadingDebug) {
+            setLoadingDebug(true);
+            setDebugError(null);
+            fetchDebugReport(id)
+                .then((report) => {
+                    setDebugReport(report);
+                    setDebugLoaded(true);
+                })
+                .catch((err) => {
+                    setDebugError(err instanceof Error ? err.message : "Failed to load debug report");
+                })
+                .finally(() => setLoadingDebug(false));
+        }
+    }, [
+        activeTab,
+        debugLoaded,
+        gateLoaded,
+        id,
+        loadingDebug,
+        loadingGate,
+        loadingStages,
+        stagesLoaded,
+    ]);
 
     useEffect(() => {
         if (!data || !location.hash) return;
@@ -263,37 +399,30 @@ export function RunDetails() {
         });
     }, [data, location.hash]);
 
-    /*
     useEffect(() => {
-        async function loadAnalysis() {
-            if (!id || activeTab === "overview") return;
+        if (activeTab !== "prompts" || runListLoaded) return;
+        setRunListError(null);
+        fetchRuns()
+            .then((runs) => {
+                setRunList(runs);
+                setRunListLoaded(true);
+            })
+            .catch((err) => {
+                setRunListError(err instanceof Error ? err.message : "런 목록을 불러오지 못했습니다.");
+                setRunListLoaded(true);
+            });
+    }, [activeTab, runListLoaded]);
 
-            // Only load if not already loaded
-            if (activeTab === "improvement" && !improvementData) {
-                setLoadingAnalysis(true);
-                try {
-                    const data = await fetchImprovementGuide(id);
-                    setImprovementData(data);
-                } catch (e) {
-                    console.error(e);
-                } finally {
-                    setLoadingAnalysis(false);
-                }
-            } else if (activeTab === "report" && !reportData) {
-                setLoadingAnalysis(true);
-                try {
-                    const data = await fetchLLMReport(id);
-                    setReportData(data);
-                } catch (e) {
-                    console.error(e);
-                } finally {
-                    setLoadingAnalysis(false);
-                }
-            }
-        }
-        loadAnalysis();
-    }, [id, activeTab, improvementData, reportData]);
-    */
+    useEffect(() => {
+        if (!id || !diffTargetRunId) return;
+        setLoadingDiff(true);
+        setDiffError(null);
+        setDiffData(null);
+        fetchPromptDiff(id, diffTargetRunId)
+            .then(setDiffData)
+            .catch((err) => setDiffError(err instanceof Error ? err.message : "Failed to load diff"))
+            .finally(() => setLoadingDiff(false));
+    }, [id, diffTargetRunId]);
 
     const toggleExpand = (testCaseId: string) => {
         const newSet = new Set(expandedCases);
@@ -436,7 +565,7 @@ export function RunDetails() {
                             시각화 열기
                         </Link>
                         {/* Tab Navigation */}
-                        <div className="tab-shell">
+                        <div className="tab-shell flex flex-wrap">
                             <button
                                 onClick={() => setActiveTab("overview")}
                                 className={`tab-pill ${activeTab === "overview" ? "tab-pill-active" : "tab-pill-inactive"}`}
@@ -454,6 +583,34 @@ export function RunDetails() {
                                 className={`tab-pill ${activeTab === "feedback" ? "tab-pill-active" : "tab-pill-inactive"}`}
                             >
                                 Feedback
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("stages")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "stages" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <Layers className="w-3.5 h-3.5" />
+                                Stages
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("prompts")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "prompts" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <Terminal className="w-3.5 h-3.5" />
+                                Prompts
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("gate")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "gate" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                Gate
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("debug")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "debug" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <Bug className="w-3.5 h-3.5" />
+                                Debug
                             </button>
                         </div>
 
@@ -740,7 +897,513 @@ export function RunDetails() {
                     </div>
                 )}
 
-                {activeTab !== "feedback" && (
+                {activeTab === "stages" && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <div className="surface-panel p-6">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-primary" />
+                                    Stage Events
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => downloadJson(`stage_events_${summary.run_id}.json`, stageEvents)}
+                                    disabled={stageEvents.length === 0}
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground disabled:opacity-50"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    이벤트 다운로드
+                                </button>
+                            </div>
+                            {loadingStages ? (
+                                <div className="text-center py-8 text-muted-foreground">Stage 이벤트를 불러오는 중...</div>
+                            ) : stageError ? (
+                                <div className="text-center py-8 text-destructive">{stageError}</div>
+                            ) : stageEvents.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">Stage 이벤트가 없습니다.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {stageEvents.map((event) => (
+                                        <div
+                                            key={`${event.stage_id}-${event.attempt}`}
+                                            className="border border-border rounded-lg p-4 bg-background/40"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold text-foreground">{event.stage_name || event.stage_type}</span>
+                                                    <span className="text-xs text-muted-foreground font-mono">
+                                                        {event.stage_type}
+                                                    </span>
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-secondary text-muted-foreground">
+                                                        {event.status}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground font-mono">
+                                                    {event.duration_ms != null ? `${event.duration_ms.toFixed(1)}ms` : "-"}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                                <span className="font-mono">stage_id: {event.stage_id}</span>
+                                                {event.parent_stage_id && (
+                                                    <span className="font-mono">parent: {event.parent_stage_id}</span>
+                                                )}
+                                                {event.started_at && (
+                                                    <span>start: {new Date(event.started_at).toLocaleString()}</span>
+                                                )}
+                                                {event.finished_at && (
+                                                    <span>end: {new Date(event.finished_at).toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="surface-panel p-6">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-primary" />
+                                    Stage Metrics
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => downloadJson(`stage_metrics_${summary.run_id}.json`, stageMetrics)}
+                                    disabled={stageMetrics.length === 0}
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground disabled:opacity-50"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    메트릭 다운로드
+                                </button>
+                            </div>
+                            {loadingStages ? (
+                                <div className="text-center py-8 text-muted-foreground">Stage 메트릭을 불러오는 중...</div>
+                            ) : stageMetrics.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">Stage 메트릭이 없습니다.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="text-xs text-muted-foreground border-b border-border">
+                                            <tr>
+                                                <th className="py-2 text-left">Stage</th>
+                                                <th className="py-2 text-left">Metric</th>
+                                                <th className="py-2 text-right">Score</th>
+                                                <th className="py-2 text-right">Threshold</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/50">
+                                            {stageMetrics.map((metric) => (
+                                                <tr key={`${metric.stage_id}-${metric.metric_name}`}>
+                                                    <td className="py-2 pr-2 font-mono text-xs text-muted-foreground">
+                                                        {metric.stage_id}
+                                                    </td>
+                                                    <td className="py-2 pr-2 font-medium text-foreground">
+                                                        {metric.metric_name}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono text-sm">
+                                                        {metric.score.toFixed(3)}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono text-sm text-muted-foreground">
+                                                        {metric.threshold != null ? metric.threshold.toFixed(3) : "-"}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "prompts" && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        {!promptSet ? (
+                            <div className="surface-panel p-8 text-center text-muted-foreground">
+                                <Terminal className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                                프롬프트 스냅샷이 없습니다.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="surface-panel p-6">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <h3 className="font-semibold flex items-center gap-2">
+                                                <FileText className="w-4 h-4 text-primary" />
+                                                Prompt Snapshot
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground">
+                                                {promptSet.name || "Unnamed prompt set"}
+                                                {promptSet.description ? ` • ${promptSet.description}` : ""}
+                                            </p>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground font-mono">
+                                            {promptSet.prompt_set_id.slice(0, 8)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {promptSet.items.map((item) => (
+                                        <div
+                                            key={item.prompt.prompt_id}
+                                            className="border border-border rounded-lg p-4 bg-background/40"
+                                        >
+                                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                <span className="font-semibold text-foreground">{item.role}</span>
+                                                <span className="px-2 py-0.5 rounded-full border border-border bg-secondary">
+                                                    {item.prompt.kind}
+                                                </span>
+                                                <span className="font-mono">{item.prompt.checksum.slice(0, 12)}</span>
+                                                {item.prompt.source && (
+                                                    <span className="truncate max-w-[200px]">{item.prompt.source}</span>
+                                                )}
+                                            </div>
+                                            {item.prompt.content && (
+                                                <pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                                    {previewPrompt(item.prompt.content)}
+                                                </pre>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        <div className="surface-panel p-6 mt-8 border-t border-border">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <GitCompare className="w-4 h-4 text-primary" />
+                                    Prompt Diff
+                                </h3>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={diffTargetRunId || ""}
+                                            onChange={(e) => setDiffTargetRunId(e.target.value)}
+                                        >
+                                            <option value="" disabled>비교할 Run 선택...</option>
+                                            {runList
+                                                .filter((r) => r.run_id !== id)
+                                                .map((r) => (
+                                                    <option key={r.run_id} value={r.run_id}>
+                                                        {r.run_id.slice(0, 8)} - {r.dataset_name} ({new Date(r.started_at).toLocaleDateString()})
+                                                    </option>
+                                                ))}
+                                        </select>
+                                        {diffData && (
+                                            <button
+                                                onClick={() => downloadJson(`prompt_diff_${id}_vs_${diffTargetRunId}.json`, diffData)}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary"
+                                            >
+                                                <Download className="w-3.5 h-3.5" />
+                                                JSON
+                                            </button>
+                                        )}
+                                    </div>
+                                    {runListError && (
+                                        <span className="text-xs text-rose-600">{runListError}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {loadingDiff ? (
+                                <div className="text-center py-8 text-muted-foreground">Loading diff...</div>
+                            ) : diffError ? (
+                                <div className="text-center py-8 text-destructive">{diffError}</div>
+                            ) : diffData ? (
+                                <div className="space-y-6">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="text-xs text-muted-foreground border-b border-border">
+                                                <tr>
+                                                    <th className="py-2 text-left">Role</th>
+                                                    <th className="py-2 text-left">Status</th>
+                                                    <th className="py-2 text-left">Base (Current)</th>
+                                                    <th className="py-2 text-left">Target</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border/50">
+                                                {diffData.summary.map((item, idx) => (
+                                                    <tr key={idx}>
+                                                        <td className="py-2 font-medium">{item.role}</td>
+                                                        <td className="py-2">
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded text-xs font-mono ${
+                                                                    item.status === "diff"
+                                                                        ? "bg-amber-500/10 text-amber-500"
+                                                                        : item.status === "missing"
+                                                                        ? "bg-rose-500/10 text-rose-500"
+                                                                        : "bg-secondary text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                {item.status.toUpperCase()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2 text-xs font-mono text-muted-foreground">
+                                                            {item.base_checksum?.slice(0, 8) || "-"}
+                                                        </td>
+                                                        <td className="py-2 text-xs font-mono text-muted-foreground">
+                                                            {item.target_checksum?.slice(0, 8) || "-"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {diffData.diffs.map((diff, idx) => (
+                                            <div key={idx} className="border border-border rounded-lg overflow-hidden">
+                                                <div className="bg-secondary/30 px-4 py-2 text-xs font-semibold border-b border-border flex justify-between">
+                                                    <span>{diff.role}</span>
+                                                    {diff.truncated && <span className="text-amber-500">Truncated</span>}
+                                                </div>
+                                                <div className="p-4 bg-background overflow-x-auto">
+                                                    <pre className="text-xs font-mono leading-relaxed">
+                                                        {diff.lines.map((line, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className={`${
+                                                                    line.startsWith("+")
+                                                                        ? "bg-emerald-500/10 text-emerald-600"
+                                                                        : line.startsWith("-")
+                                                                        ? "bg-rose-500/10 text-rose-600"
+                                                                        : line.startsWith("?")
+                                                                        ? "bg-amber-500/10 text-amber-600"
+                                                                        : "text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                {line}
+                                                            </div>
+                                                        ))}
+                                                    </pre>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground text-sm">
+                                    비교할 Run을 선택하면 프롬프트 변경사항을 확인할 수 있습니다.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === "gate" && (
+                    <div className="surface-panel p-6 animate-in fade-in duration-300">
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <h3 className="font-semibold flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-primary" />
+                                Quality Gate
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => gateReport && downloadJson(`quality_gate_${summary.run_id}.json`, gateReport)}
+                                disabled={!gateReport}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground disabled:opacity-50"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                게이트 다운로드
+                            </button>
+                        </div>
+                        {loadingGate ? (
+                            <div className="text-center py-8 text-muted-foreground">게이트 결과를 불러오는 중...</div>
+                        ) : gateError ? (
+                            <div className="text-center py-8 text-destructive">{gateError}</div>
+                        ) : !gateReport ? (
+                            <div className="text-center py-8 text-muted-foreground">게이트 결과가 없습니다.</div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span
+                                        className={`px-2 py-1 rounded-full text-xs font-semibold border ${gateReport.overall_passed
+                                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                            : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                                            }`}
+                                    >
+                                        {gateReport.overall_passed ? "PASS" : "FAIL"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Threshold Profile: {thresholdProfileLabel}
+                                    </span>
+                                    {gateReport.regression_detected && (
+                                        <span className="text-xs text-rose-600">
+                                            Regression {gateReport.regression_amount != null
+                                                ? gateReport.regression_amount.toFixed(3)
+                                                : "detected"}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="text-xs text-muted-foreground border-b border-border">
+                                            <tr>
+                                                <th className="py-2 text-left">Metric</th>
+                                                <th className="py-2 text-right">Score</th>
+                                                <th className="py-2 text-right">Threshold</th>
+                                                <th className="py-2 text-right">Gap</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/50">
+                                            {gateReport.results.map((item) => (
+                                                <tr key={item.metric}>
+                                                    <td className="py-2 font-medium text-foreground">{item.metric}</td>
+                                                    <td
+                                                        className={`py-2 text-right font-mono ${item.passed
+                                                            ? "text-emerald-600"
+                                                            : "text-rose-600"
+                                                            }`}
+                                                    >
+                                                        {item.score.toFixed(3)}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono text-muted-foreground">
+                                                        {item.threshold.toFixed(3)}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono text-muted-foreground">
+                                                        {item.gap.toFixed(3)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === "debug" && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <div className="surface-panel p-6">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                    <Bug className="w-4 h-4 text-primary" />
+                                    Debug Report
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => debugReport && downloadJson(`debug_report_${summary.run_id}.json`, debugReport)}
+                                        disabled={!debugReport}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground disabled:opacity-50"
+                                    >
+                                        <Download className="w-3.5 h-3.5" />
+                                        JSON
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!id) return;
+                                            fetchDebugReportMarkdown(id)
+                                                .then((blob) => downloadBlob(`debug_report_${summary.run_id}.md`, blob))
+                                                .catch((err) => setDebugError(err instanceof Error ? err.message : "다운로드 실패"));
+                                        }}
+                                        disabled={!id}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground disabled:opacity-50"
+                                    >
+                                        <Download className="w-3.5 h-3.5" />
+                                        Markdown
+                                    </button>
+                                </div>
+                            </div>
+                            {loadingDebug ? (
+                                <div className="text-center py-8 text-muted-foreground">Debug 리포트를 생성 중...</div>
+                            ) : debugError ? (
+                                <div className="text-center py-8 text-destructive">{debugError}</div>
+                            ) : !debugReport ? (
+                                <div className="text-center py-8 text-muted-foreground">Debug 리포트가 없습니다.</div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-card border border-border rounded-xl p-4">
+                                            <p className="text-xs text-muted-foreground mb-1">Total Events</p>
+                                            <p className="text-2xl font-bold">
+                                                {debugReport.stage_summary?.total_events ?? 0}
+                                            </p>
+                                        </div>
+                                        <div className="bg-card border border-border rounded-xl p-4">
+                                            <p className="text-xs text-muted-foreground mb-1">Bottlenecks</p>
+                                            <p className="text-2xl font-bold">
+                                                {debugReport.bottlenecks.length}
+                                            </p>
+                                        </div>
+                                        <div className="bg-card border border-border rounded-xl p-4">
+                                            <p className="text-xs text-muted-foreground mb-1">Recommendations</p>
+                                            <p className="text-2xl font-bold">
+                                                {debugReport.recommendations.length}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {debugReport.stage_summary?.missing_required_stage_types?.length ? (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+                                            누락된 Stage: {debugReport.stage_summary.missing_required_stage_types.join(", ")}
+                                        </div>
+                                    ) : null}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="surface-panel p-4">
+                                            <h4 className="text-sm font-semibold mb-2">Bottlenecks</h4>
+                                            {debugReport.bottlenecks.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">없음</p>
+                                            ) : (
+                                                <ul className="space-y-1 text-xs text-muted-foreground">
+                                                    {debugReport.bottlenecks.map((item, index) => (
+                                                        <li key={`${item.type ?? "b"}-${index}`}>
+                                                            {JSON.stringify(item)}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div className="surface-panel p-4">
+                                            <h4 className="text-sm font-semibold mb-2">Recommendations</h4>
+                                            {debugReport.recommendations.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">없음</p>
+                                            ) : (
+                                                <ul className="space-y-1 text-xs text-muted-foreground">
+                                                    {debugReport.recommendations.map((item, index) => (
+                                                        <li key={`${item}-${index}`}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {(debugReport.phoenix_trace_url || debugReport.langfuse_trace_url) && (
+                                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                                            {debugReport.phoenix_trace_url && (
+                                                <a
+                                                    href={debugReport.phoenix_trace_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    Phoenix Trace
+                                                </a>
+                                            )}
+                                            {debugReport.langfuse_trace_url && (
+                                                <a
+                                                    href={debugReport.langfuse_trace_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    Langfuse Trace
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {(activeTab === "overview" || activeTab === "performance") && (
                     <>
                         {/* Test Case Explorer */}
                         <h3 className="font-semibold text-xl mb-4">Test Case Explorer</h3>
