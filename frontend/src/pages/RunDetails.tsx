@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import {
     fetchRunDetails,
@@ -29,7 +28,7 @@ import {
     Save,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
+import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
 
 function FeedbackItem({
     result,
@@ -59,10 +58,17 @@ function FeedbackItem({
     const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
-        setScore(feedback?.satisfaction_score ?? null);
-        setThumb(resolveThumb(feedback?.thumb_feedback));
-        setComment(feedback?.comment ?? "");
-        setIsDirty(false);
+        let canceled = false;
+        Promise.resolve().then(() => {
+            if (canceled) return;
+            setScore(feedback?.satisfaction_score ?? null);
+            setThumb(resolveThumb(feedback?.thumb_feedback));
+            setComment(feedback?.comment ?? "");
+            setIsDirty(false);
+        });
+        return () => {
+            canceled = true;
+        };
     }, [feedback]);
 
     const handleSave = () => {
@@ -200,7 +206,7 @@ export function RunDetails() {
     const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackResponse>>({});
     const [loadingFeedback, setLoadingFeedback] = useState(false);
 
-    const summaryMetricSet = new Set(SUMMARY_METRICS);
+    const summaryMetricSet = new Set<string>(SUMMARY_METRICS);
 
     const previewPrompt = (content?: string) => {
         if (!content) return "";
@@ -371,7 +377,7 @@ export function RunDetails() {
     const promptSet = data.prompt_set;
     const summaryThresholds = summary.thresholds || {};
     const summaryMetrics = summary.metrics_evaluated.filter((metric) =>
-        summaryMetricSet.has(metric)
+        summaryMetricSet.has(metric as SummaryMetric)
     );
     const thresholdProfileLabel = summary.threshold_profile
         ? summary.threshold_profile.toUpperCase()
@@ -847,7 +853,7 @@ export function RunDetails() {
                                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Metric Details</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                                 {result.metrics.map((metric) => {
-                                                    const isSummaryMetric = summaryMetricSet.has(metric.name);
+                                                    const isSummaryMetric = summaryMetricSet.has(metric.name as SummaryMetric);
                                                     return (
                                                         <div
                                                             key={metric.name}

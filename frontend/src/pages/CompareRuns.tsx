@@ -46,7 +46,7 @@ export function CompareRuns() {
                 setBaseRun(comparison.base);
                 setTargetRun(comparison.target);
                 setCaseCounts(comparison.case_counts);
-            } catch (err) {
+            } catch {
                 setError("Failed to load runs for comparison");
             } finally {
                 setLoading(false);
@@ -156,7 +156,13 @@ export function CompareRuns() {
     // Filter
     const computedCounts = combinedResults.reduce<RunComparisonCounts>(
         (acc, row) => {
-            acc[row.status] += 1;
+            const statusKey: keyof RunComparisonCounts =
+                row.status === "regression"
+                    ? "regressions"
+                    : row.status === "improvement"
+                        ? "improvements"
+                        : row.status;
+            acc[statusKey] += 1;
             return acc;
         },
         {

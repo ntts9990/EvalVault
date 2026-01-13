@@ -159,9 +159,8 @@ function CaseCard({
 }
 
 export function PrioritySummaryPanel({ summary }: { summary: PrioritySummary }) {
-    const bottomCases = summary.bottom_cases || [];
-    const impactCases = summary.impact_cases || [];
-    if (!bottomCases.length && !impactCases.length) return null;
+    const bottomCases = useMemo(() => summary.bottom_cases ?? [], [summary.bottom_cases]);
+    const impactCases = useMemo(() => summary.impact_cases ?? [], [summary.impact_cases]);
 
     const combinedCases = useMemo(() => {
         const merged = [...bottomCases, ...impactCases];
@@ -213,6 +212,8 @@ export function PrioritySummaryPanel({ summary }: { summary: PrioritySummary }) 
             .sort((a, b) => b[1] - a[1])
             .slice(0, 3);
     }, [combinedCases]);
+
+    if (!bottomCases.length && !impactCases.length) return null;
 
     const bottomPercentile = summary.bottom_percentile ?? 10;
     const bottomCount = summary.bottom_count ?? bottomCases.length;

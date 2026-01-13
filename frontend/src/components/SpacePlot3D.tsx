@@ -146,9 +146,11 @@ export function SpacePlot3D({ points }: { points: VisualSpacePoint[] }) {
     }, [ready, plotPoints]);
 
     useEffect(() => {
+        const plotly = plotlyRef.current;
+        const container = containerRef.current;
         return () => {
-            if (plotlyRef.current && containerRef.current) {
-                plotlyRef.current.purge(containerRef.current);
+            if (plotly && container) {
+                plotly.purge(container);
             }
         };
     }, []);

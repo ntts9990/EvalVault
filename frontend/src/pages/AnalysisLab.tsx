@@ -352,18 +352,7 @@ export function AnalysisLab() {
     }, []);
 
     useEffect(() => {
-        let active = true;
-        const run = async () => {
-            try {
-                await refreshApiStatus();
-            } finally {
-                if (!active) return;
-            }
-        };
-        run();
-        return () => {
-            active = false;
-        };
+        refreshApiStatus();
     }, [refreshApiStatus]);
 
     useEffect(() => {
@@ -491,7 +480,14 @@ export function AnalysisLab() {
         return `/analysis/compare?left=${encodeURIComponent(left.result_id)}&right=${encodeURIComponent(right.result_id)}`;
     }, [recentHistory]);
 
-    const reportMeta = useMemo(() => {
+    type ReportMeta = {
+        hasReport: boolean;
+        llmUsed: boolean | null;
+        llmModel: string | null;
+        llmError: string | null;
+    };
+
+    const reportMeta = useMemo<ReportMeta | null>(() => {
         if (!result?.final_output || !isPlainRecord(result.final_output)) return null;
         let hasReport = false;
         let llmUsed: boolean | null = null;
@@ -671,7 +667,7 @@ export function AnalysisLab() {
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!result || saving) return;
         setSaving(true);
         setSaveError(null);
@@ -714,7 +710,16 @@ export function AnalysisLab() {
         } finally {
             setSaving(false);
         }
-    };
+    }, [
+        analysisRunId,
+        lastQuery,
+        result,
+        saveMetadataText,
+        saveProfile,
+        saveTags,
+        saving,
+        selectedIntent?.sample_query,
+    ]);
 
     const handleLoadImprovement = async () => {
         if (!analysisRunId || improvementLoading) return;
@@ -730,7 +735,7 @@ export function AnalysisLab() {
         }
     };
 
-    const toggleCompareSelection = (resultId: string) => {
+    const toggleCompareSelection = useCallback((resultId: string) => {
         setCompareSelection(prev => {
             if (prev.includes(resultId)) {
                 return prev.filter(id => id !== resultId);
@@ -740,7 +745,7 @@ export function AnalysisLab() {
             }
             return [...prev, resultId];
         });
-    };
+    }, []);
 
     const clearCompareSelection = () => {
         setCompareSelection([]);
@@ -787,9 +792,9 @@ export function AnalysisLab() {
 
     const reportText = useMemo(() => {
         if (!result?.final_output || !isPlainRecord(result.final_output)) return null;
-        const reportEntry = (result.final_output as Record<string, any>).report;
-        if (reportEntry && typeof reportEntry === "object" && typeof reportEntry.report === "string") {
-            return reportEntry.report as string;
+        const reportEntry = (result.final_output as Record<string, unknown>).report;
+        if (isRecord(reportEntry) && typeof reportEntry.report === "string") {
+            return reportEntry.report;
         }
         const entries = Object.values(result.final_output);
         for (const entry of entries) {
@@ -867,8 +872,6 @@ export function AnalysisLab() {
         || "분석";
 
     const intentDefinition = selectedIntent || catalog.find(item => item.intent === result?.intent) || null;
-    const activeIntentValue = intentDefinition?.intent || result?.intent || null;
-    const isBenchmarkIntent = activeIntentValue === "benchmark_retrieval";
     const requiresRunData = useMemo(() => {
         const nodes = intentDefinition?.nodes || selectedIntent?.nodes || [];
         return nodes.some(node => RUN_REQUIRED_MODULES.has(node.module));

@@ -17,7 +17,7 @@ const STATUS_META: Record<StatusKey, { label: string; className: string }> = {
     incomplete: { label: "미완료", className: "text-amber-700 bg-amber-50 border-amber-200" },
 };
 
-export function getStatusMeta(status?: string | null) {
+function getStatusMeta(status?: string | null) {
     if (!status) return STATUS_META.pending;
     return STATUS_META[status as StatusKey] ?? STATUS_META.pending;
 }

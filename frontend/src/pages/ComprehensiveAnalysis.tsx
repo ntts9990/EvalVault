@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Layout } from "../components/Layout";
 import { MarkdownContent } from "../components/MarkdownContent";
 
-import { fetchRuns, fetchAnalysisIntents, runAnalysis } from "../services/api";
+import { fetchRuns, runAnalysis } from "../services/api";
 
-import { AnalysisResult, type RunSummary } from "../services/api";
+import type { AnalysisResult, RunSummary } from "../services/api";
 
 export type AnalysisCategory =
   | "statistical"
@@ -25,12 +24,14 @@ export interface MenuItem {
   parameters: ParameterConfig[];
 }
 
+export type ParameterValue = string | number | boolean | null;
+
 export interface ParameterConfig {
   name: string;
   type: "text" | "number" | "select" | "boolean" | "run-select";
   label: string;
   description?: string;
-  default?: any;
+  default?: ParameterValue;
   min?: number;
   max?: number;
   step?: number;
@@ -244,9 +245,8 @@ const CATEGORY_LABELS: Record<AnalysisCategory, { label: string; icon: string }>
 
 export default function ComprehensiveAnalysis() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
-  const [intents, setIntents] = useState<any[]>([]);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
-  const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
+  const [parameterValues, setParameterValues] = useState<Record<string, ParameterValue>>({});
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -258,12 +258,8 @@ export default function ComprehensiveAnalysis() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [runsData, intentsData] = await Promise.all([
-          fetchRuns(),
-          fetchAnalysisIntents().catch(() => []),
-        ]);
+        const runsData = await fetchRuns();
         setRuns(runsData);
-        setIntents(intentsData);
       } catch (err) {
         console.error("데이터 로드 실패:", err);
       }
@@ -276,7 +272,7 @@ export default function ComprehensiveAnalysis() {
     setAnalysisResult(null);
     setError(null);
 
-    const defaultValues: Record<string, any> = {};
+    const defaultValues: Record<string, ParameterValue> = {};
     for (const param of item.parameters) {
       defaultValues[param.name] = param.default ?? "";
     }
@@ -296,7 +292,7 @@ export default function ComprehensiveAnalysis() {
     });
   }, []);
 
-  const handleParameterChange = useCallback((name: string, value: any) => {
+  const handleParameterChange = useCallback((name: string, value: ParameterValue) => {
     setParameterValues((prev) => ({
       ...prev,
       [name]: value,
@@ -317,12 +313,11 @@ export default function ComprehensiveAnalysis() {
     setError(null);
 
     try {
-      const result = await runAnalysis(
-        parameterValues.query || "",
-        parameterValues.run_id || selectedRunId,
-        selectedMenuItem.intent,
-        parameterValues
-      );
+      const queryValue = parameterValues.query;
+      const runValue = parameterValues.run_id;
+      const queryText = typeof queryValue === "string" ? queryValue : "";
+      const runId = typeof runValue === "string" && runValue ? runValue : selectedRunId;
+      const result = await runAnalysis(queryText, runId, selectedMenuItem.intent, parameterValues);
       setAnalysisResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실패");
@@ -526,9 +521,9 @@ export default function ComprehensiveAnalysis() {
 
 interface ParameterInputProps {
   config: ParameterConfig;
-  value: any;
+  value: ParameterValue;
   runs: RunSummary[];
-  onValueChange: (value: any) => void;
+  onValueChange: (value: ParameterValue) => void;
 }
 
 function ParameterInput({ config, value, runs, onValueChange }: ParameterInputProps) {
@@ -540,7 +535,7 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
             className={`w-full p-2 border rounded-md bg-white ${
               config.required && !value ? "border-red-300" : "border-gray-300"
             }`}
-            value={value}
+            value={typeof value === "string" ? value : ""}
             onChange={(e) => onValueChange(e.target.value)}
             required={config.required}
           >
@@ -558,7 +553,7 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
         return (
           <select
             className="w-full p-2 border border-gray-300 rounded-md bg-white"
-            value={value}
+            value={typeof value === "string" ? value : ""}
             onChange={(e) => onValueChange(e.target.value)}
           >
             {config.options?.map((opt) => (
@@ -575,7 +570,7 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
             <input
               type="checkbox"
               className="w-4 h-4"
-              checked={value}
+              checked={Boolean(value)}
               onChange={(e) => onValueChange(e.target.checked)}
             />
             <span className="text-sm text-gray-700">활성화</span>
@@ -587,7 +582,7 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
           <input
             type="number"
             className="w-full p-2 border border-gray-300 rounded-md bg-white"
-            value={value}
+            value={typeof value === "number" ? value : ""}
             onChange={(e) => onValueChange(Number(e.target.value))}
             min={config.min}
             max={config.max}
@@ -601,7 +596,7 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
           <input
             type="text"
             className="w-full p-2 border border-gray-300 rounded-md bg-white"
-            value={value}
+            value={typeof value === "string" ? value : ""}
             onChange={(e) => onValueChange(e.target.value)}
           />
         );
@@ -629,6 +624,7 @@ interface AnalysisResultDisplayProps {
 function AnalysisResultDisplay({ result }: AnalysisResultDisplayProps) {
   const finalOutput = result.final_output || {};
   const nodeResults = result.node_results || {};
+  const markdown = typeof finalOutput.markdown === "string" ? finalOutput.markdown : null;
 
   return (
     <div className="space-y-6">
@@ -682,11 +678,11 @@ function AnalysisResultDisplay({ result }: AnalysisResultDisplayProps) {
         </div>
       )}
 
-      {result.final_output?.markdown && (
+      {markdown && (
         <div>
           <h4 className="text-md font-bold mb-3">보고서</h4>
           <div className="border border-gray-200 rounded-lg p-4">
-            <MarkdownContent content={result.final_output.markdown as string} />
+            <MarkdownContent text={markdown} />
           </div>
         </div>
       )}

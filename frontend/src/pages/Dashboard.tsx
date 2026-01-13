@@ -546,7 +546,9 @@ export function Dashboard() {
                                         tickFormatter={(value) => `${value}%`}
                                     />
                                     <Tooltip
-                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                        formatter={(value: number | undefined) =>
+                                            value == null ? "-" : `${value.toFixed(1)}%`
+                                        }
                                         labelFormatter={(label) => `Date: ${label}`}
                                         contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
                                     />
@@ -620,7 +622,9 @@ export function Dashboard() {
                                         tickFormatter={(value) => `${value}%`}
                                     />
                                     <Tooltip
-                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                        formatter={(value: number | undefined) =>
+                                            value == null ? "-" : `${value.toFixed(1)}%`
+                                        }
                                         labelFormatter={(label) => `Date: ${label}`}
                                         contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
                                     />

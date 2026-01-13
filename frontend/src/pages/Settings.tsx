@@ -652,14 +652,15 @@ export function Settings() {
         }
 
         if (field.type === "toggle") {
+            const isEnabled = Boolean(rawValue);
             return (
                 <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <input
                         type="checkbox"
-                        checked={Boolean(rawValue)}
+                        checked={isEnabled}
                         onChange={(event) => updateDraftValue(field.key, event.target.checked)}
                     />
-                    {Boolean(rawValue) ? "Enabled" : "Disabled"}
+                    {isEnabled ? "Enabled" : "Disabled"}
                 </label>
             );
         }

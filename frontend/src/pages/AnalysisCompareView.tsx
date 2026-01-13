@@ -183,8 +183,8 @@ function formatSignedDelta(value: number | null, digits: number = 4) {
     return `${sign}${value.toFixed(digits)}`;
 }
 
-function isPrioritySummary(value: any): value is PrioritySummary {
-    if (!value || typeof value !== "object") return false;
+function isPrioritySummary(value: unknown): value is PrioritySummary {
+    if (!isRecord(value)) return false;
     return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
 }
 
@@ -194,7 +194,11 @@ function extractPrioritySummary(result: SavedAnalysisResult | null): PrioritySum
     for (const entry of Object.values(finalOutput)) {
         if (isPrioritySummary(entry)) return entry;
     }
-    const nodeOutput = result.node_results?.priority_summary?.output;
+    const nodeResults = isRecord(result.node_results) ? result.node_results : null;
+    const priorityNode = nodeResults && isRecord(nodeResults.priority_summary)
+        ? nodeResults.priority_summary
+        : null;
+    const nodeOutput = priorityNode ? priorityNode.output : null;
     if (isPrioritySummary(nodeOutput)) return nodeOutput;
     return null;
 }

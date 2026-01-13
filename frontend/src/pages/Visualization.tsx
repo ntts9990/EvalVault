@@ -261,6 +261,20 @@ function buildAxisValue(
     return safeAverage(scores.map(normalizeScore));
 }
 
+type PlotlyInstance = {
+    newPlot: (
+        element: HTMLElement,
+        data: unknown[],
+        layout: Record<string, unknown>,
+        config: Record<string, unknown>
+    ) => Promise<void> | void;
+    purge: (element: HTMLElement) => void;
+};
+
+type PlotlyClickEvent = {
+    points?: Array<{ pointIndex?: number; pointNumber?: number }>;
+};
+
 function VisualizationPlot({
     points,
     axisSpecs,
@@ -275,18 +289,20 @@ function VisualizationPlot({
     onSelect: (point: ScatterPoint) => void;
 }) {
     const plotRef = useRef<HTMLDivElement | null>(null);
-    const plotlyRef = useRef<any>(null);
+    const plotlyRef = useRef<PlotlyInstance | null>(null);
 
     useEffect(() => {
         let cancelled = false;
 
+        const plotElement = plotRef.current;
         const render = async () => {
-            if (!plotRef.current || points.length === 0) {
+            if (!plotElement || points.length === 0) {
                 return;
             }
             const module = await import("plotly.js-dist-min");
-            const Plotly = (module as any).default ?? module;
-            if (cancelled || !plotRef.current) {
+            const PlotlyModule = module as unknown as PlotlyInstance & { default?: PlotlyInstance };
+            const Plotly = PlotlyModule.default ?? PlotlyModule;
+            if (cancelled || !plotElement) {
                 return;
             }
             plotlyRef.current = Plotly;
@@ -359,9 +375,11 @@ function VisualizationPlot({
                 responsive: true,
             };
 
-            await Plotly.newPlot(plotRef.current, data, layout, config);
-            const node = plotRef.current as any;
-            node.on?.("plotly_click", (event: any) => {
+            await Plotly.newPlot(plotElement, data, layout, config);
+            const node = plotElement as unknown as {
+                on?: (eventName: string, handler: (event: PlotlyClickEvent) => void) => void;
+            };
+            node.on?.("plotly_click", (event) => {
                 const hit = event?.points?.[0];
                 const pointIndex = hit?.pointIndex ?? hit?.pointNumber;
                 if (typeof pointIndex === "number" && points[pointIndex]) {
@@ -374,8 +392,9 @@ function VisualizationPlot({
 
         return () => {
             cancelled = true;
-            if (plotRef.current && plotlyRef.current) {
-                plotlyRef.current.purge(plotRef.current);
+            const plotly = plotlyRef.current;
+            if (plotElement && plotly) {
+                plotly.purge(plotElement);
             }
         };
     }, [points, axisSpecs, colorMode, clusterPalette, onSelect]);

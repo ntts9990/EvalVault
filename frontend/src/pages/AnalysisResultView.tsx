@@ -177,9 +177,9 @@ export function AnalysisResultView() {
 
     const reportText = useMemo(() => {
         if (!result?.final_output) return null;
-        const reportEntry = (result.final_output as Record<string, any>).report;
-        if (reportEntry && typeof reportEntry === "object" && typeof reportEntry.report === "string") {
-            return reportEntry.report as string;
+        const reportEntry = (result.final_output as Record<string, unknown>).report;
+        if (isRecord(reportEntry) && typeof reportEntry.report === "string") {
+            return reportEntry.report;
         }
         const entries = Object.values(result.final_output);
         for (const entry of entries) {

@@ -30,7 +30,7 @@ import {
     ExternalLink
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
+import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
 import { getPhoenixUiUrl } from "../utils/phoenix";
 
 const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
@@ -279,7 +279,7 @@ export function EvaluationStudio() {
         }
     };
 
-    const summaryMetricSet = new Set(SUMMARY_METRICS);
+    const summaryMetricSet = new Set<string>(SUMMARY_METRICS);
     const summaryThresholdLabel = SUMMARY_METRICS.map((metric) => {
         const threshold = SUMMARY_METRIC_THRESHOLDS[metric];
         return `${metric} >= ${threshold.toFixed(2)}`;
@@ -616,7 +616,7 @@ export function EvaluationStudio() {
                         <div className="flex flex-wrap gap-3">
                             {availableMetrics.map((metric) => {
                                 const isSelected = selectedMetrics.has(metric);
-                                const isSummaryMetric = summaryMetricSet.has(metric);
+                                const isSummaryMetric = summaryMetricSet.has(metric as SummaryMetric);
                                 const isDisabled = summaryMode;
                                 const spec = metricSpecMap.get(metric);
                                 return (

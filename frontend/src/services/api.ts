@@ -386,10 +386,10 @@ export interface ImprovementGuide {
     target_metrics: string[];
     priority: string;
     actions: ImprovementAction[];
-    evidence?: Record<string, any> | null;
+    evidence?: Record<string, unknown> | null;
     affected_test_case_ids?: string[];
     verification_command?: string;
-    metadata?: Record<string, any> | null;
+    metadata?: Record<string, unknown> | null;
 }
 
 export interface ImprovementReport {
@@ -405,7 +405,7 @@ export interface ImprovementReport {
     guides: ImprovementGuide[];
     total_expected_improvement: Record<string, number>;
     analysis_methods_used: string[];
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
 }
 
 export interface StageEvent {

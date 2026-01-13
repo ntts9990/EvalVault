@@ -7,6 +7,7 @@ import {
     Tooltip,
     ReferenceLine,
 } from "recharts";
+import type { ReactElement } from "react";
 import type { VisualSpacePoint } from "../services/api";
 
 type PlotPoint = {
@@ -20,6 +21,20 @@ type PlotPoint = {
     quadrant?: string | null;
     hint?: string | null;
 };
+
+type ScatterShapeProps = {
+    cx?: number;
+    cy?: number;
+    payload?: PlotPoint;
+};
+
+const hasCoordinates = (
+    point: VisualSpacePoint
+): point is VisualSpacePoint & { coords: { x: number; y: number } } =>
+    typeof point.coords.x === "number"
+    && Number.isFinite(point.coords.x)
+    && typeof point.coords.y === "number"
+    && Number.isFinite(point.coords.y);
 
 const COLOR_MAP: Record<string, string> = {
     "risk.ok": "#10b981",
@@ -136,6 +151,7 @@ const renderShape = (
 
 export function SpacePlot2D({ points }: { points: VisualSpacePoint[] }) {
     const plotPoints: PlotPoint[] = points
+        .filter(hasCoordinates)
         .map((point) => ({
             id: point.id,
             x: point.coords.x,
@@ -146,14 +162,16 @@ export function SpacePlot2D({ points }: { points: VisualSpacePoint[] }) {
             opacity: point.encoding?.opacity,
             quadrant: point.labels?.quadrant,
             hint: point.labels?.guide_hint,
-        }))
-        .filter(
-            (point): point is PlotPoint =>
-                typeof point.x === "number" &&
-                Number.isFinite(point.x) &&
-                typeof point.y === "number" &&
-                Number.isFinite(point.y)
-        );
+        }));
+
+    const renderScatterShape = (props: unknown): ReactElement => {
+        const { cx, cy, payload } = props as ScatterShapeProps;
+        if (cx == null || cy == null || !payload) return <g />;
+        const color = COLOR_MAP[payload.color || "risk.unknown"] || COLOR_MAP["risk.unknown"];
+        const radius = 4 + Math.max(0, Math.min(1, payload.size ?? 0.6)) * 6;
+        const opacity = payload.opacity ?? 0.85;
+        return renderShape(payload.shape, cx, cy, radius, color, opacity);
+    };
 
     return (
         <div className="h-[360px] w-full">
@@ -214,19 +232,7 @@ export function SpacePlot2D({ points }: { points: VisualSpacePoint[] }) {
                             );
                         }}
                     />
-                    <Scatter
-                        data={plotPoints}
-                        shape={({ cx, cy, payload }) => {
-                            if (cx == null || cy == null) return null;
-                            const point = payload as PlotPoint;
-                            const color =
-                                COLOR_MAP[point.color || "risk.unknown"] ||
-                                COLOR_MAP["risk.unknown"];
-                            const radius = 4 + Math.max(0, Math.min(1, point.size ?? 0.6)) * 6;
-                            const opacity = point.opacity ?? 0.85;
-                            return renderShape(point.shape, cx, cy, radius, color, opacity);
-                        }}
-                    />
+                    <Scatter data={plotPoints} shape={renderScatterShape} />
                 </ScatterChart>
             </ResponsiveContainer>
         </div>

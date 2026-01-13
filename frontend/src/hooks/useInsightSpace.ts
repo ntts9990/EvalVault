@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchVisualSpace,
     type VisualSpaceQuery,
@@ -19,11 +19,6 @@ export function useInsightSpace(query: VisualSpaceQuery | null) {
     });
     const [reloadToken, setReloadToken] = useState(0);
 
-    const queryKey = useMemo(() => {
-        if (!query) return "";
-        return JSON.stringify(query);
-    }, [query]);
-
     const reload = useCallback(() => {
         setReloadToken((prev) => prev + 1);
     }, []);
@@ -32,7 +27,10 @@ export function useInsightSpace(query: VisualSpaceQuery | null) {
         if (!query) return;
         let canceled = false;
 
-        setState((prev) => ({ ...prev, loading: true, error: null }));
+        Promise.resolve().then(() => {
+            if (canceled) return;
+            setState((prev) => ({ ...prev, loading: true, error: null }));
+        });
 
         fetchVisualSpace(query.runId, {
             granularity: query.granularity,
@@ -59,7 +57,7 @@ export function useInsightSpace(query: VisualSpaceQuery | null) {
         return () => {
             canceled = true;
         };
-    }, [queryKey, reloadToken]);
+    }, [query, reloadToken]);
 
     return { ...state, reload };
 }

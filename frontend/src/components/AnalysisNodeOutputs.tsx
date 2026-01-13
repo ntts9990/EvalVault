@@ -153,7 +153,7 @@ function formatMetrics(metrics: Record<string, unknown> | null | undefined) {
 }
 
 function normalizeDetailItems(
-    items: any[],
+    items: unknown[],
     options: {
         titleKeys: string[];
         detailKeys: string[];
@@ -162,7 +162,7 @@ function normalizeDetailItems(
 ) {
     const { titleKeys, detailKeys, scoreKey } = options;
     return items.map((item, index) => {
-        if (!item || typeof item !== "object") {
+        if (!isRecord(item)) {
             return {
                 title: `Item ${index + 1}`,
                 detail: String(item),
@@ -170,9 +170,14 @@ function normalizeDetailItems(
             };
         }
         const title =
-            titleKeys.map((key) => item[key]).find((value) => value) || `Item ${index + 1}`;
+            titleKeys
+                .map((key) => item[key])
+                .find((value) => value)
+            || `Item ${index + 1}`;
         const detail =
-            detailKeys.map((key) => item[key]).find((value) => value)
+            detailKeys
+                .map((key) => item[key])
+                .find((value) => value)
             || (item.detail ?? item.message ?? JSON.stringify(item));
         const scoreValue = scoreKey ? item[scoreKey] : null;
         const score =
@@ -187,10 +192,10 @@ function normalizeDetailItems(
     });
 }
 
-function normalizeStringList(items: any[]) {
+function normalizeStringList(items: unknown[]) {
     return items.map((item) => {
         if (typeof item === "string") return item;
-        if (item && typeof item === "object") {
+        if (isRecord(item)) {
             const text = item.intervention || item.recommendation || item.detail || item.message;
             if (text) return String(text);
         }
@@ -229,33 +234,34 @@ export function AnalysisNodeOutputs({
                     const statusKey = node.result?.status || "pending";
                     const meta = STATUS_META[statusKey] || STATUS_META.pending;
                     const output = node.result?.output;
+                    const outputRecord = isRecord(output) ? output : null;
                     const reportText =
-                        isRecord(output) && typeof output.report === "string"
-                            ? output.report
+                        outputRecord && typeof outputRecord.report === "string"
+                            ? outputRecord.report
                             : null;
                     const summary =
-                        isRecord(output) && isRecord(output.summary)
-                            ? output.summary
+                        outputRecord && isRecord(outputRecord.summary)
+                            ? outputRecord.summary
                             : null;
                     const insights =
-                        isRecord(output) && Array.isArray(output.insights)
-                            ? output.insights.filter((item): item is string => typeof item === "string")
+                        outputRecord && Array.isArray(outputRecord.insights)
+                            ? outputRecord.insights.filter((item): item is string => typeof item === "string")
                             : null;
                     const recommendations =
-                        output && typeof output === "object" && Array.isArray(output.recommendations)
-                            ? output.recommendations
+                        outputRecord && Array.isArray(outputRecord.recommendations)
+                            ? outputRecord.recommendations
                             : null;
                     const diagnostics =
-                        output && typeof output === "object" && Array.isArray(output.diagnostics)
-                            ? output.diagnostics
+                        outputRecord && Array.isArray(outputRecord.diagnostics)
+                            ? outputRecord.diagnostics
                             : null;
                     const causes =
-                        output && typeof output === "object" && Array.isArray(output.causes)
-                            ? output.causes
+                        outputRecord && Array.isArray(outputRecord.causes)
+                            ? outputRecord.causes
                             : null;
                     const interventions =
-                        output && typeof output === "object" && Array.isArray(output.interventions)
-                            ? output.interventions
+                        outputRecord && Array.isArray(outputRecord.interventions)
+                            ? outputRecord.interventions
                             : null;
                     const evidence = extractEvidence(output);
                     const rawText = (() => {
