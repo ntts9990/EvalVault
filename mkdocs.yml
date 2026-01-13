@@ -104,8 +104,8 @@ nav:
       - Dev Guide: guides/DEV_GUIDE.md
       - CLI MCP Plan: guides/CLI_MCP_PLAN.md
       - Release Checklist: guides/RELEASE_CHECKLIST.md
-      - Open RAG Trace Samples: guides/open-rag-trace-samples.md
-      - Open RAG Trace Internal Adapter: guides/open-rag-trace-internal-adapter.md
+      - Open RAG Trace Samples: guides/OPEN_RAG_TRACE_SAMPLES.md
+      - Open RAG Trace Internal Adapter: guides/OPEN_RAG_TRACE_INTERNAL_ADAPTER.md
   - Open RAG Trace:
       - Spec: architecture/open-rag-trace-spec.md
       - Collector: architecture/open-rag-trace-collector.md

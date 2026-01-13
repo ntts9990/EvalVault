@@ -178,7 +178,7 @@ RAG 서비스 (OTel SDK) ── OTLP ──> OTel Collector ──> Phoenix / �
 
 ## 관련 문서
 - [open-rag-trace-collector.md](open-rag-trace-collector.md): Collector 구성 예시
-- [../guides/open-rag-trace-samples.md](../guides/open-rag-trace-samples.md): 최소 계측 샘플
+- [../guides/OPEN_RAG_TRACE_SAMPLES.md](../guides/OPEN_RAG_TRACE_SAMPLES.md): 최소 계측 샘플
 
 ---
 

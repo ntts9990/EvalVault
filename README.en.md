@@ -150,8 +150,8 @@ The core contract is **module-level spans (`rag.module`) + log events + shared a
 **Docs**
 - `docs/architecture/open-rag-trace-spec.md`
 - `docs/architecture/open-rag-trace-collector.md`
-- `docs/guides/open-rag-trace-internal-adapter.md`
-- `docs/guides/open-rag-trace-samples.md`
+- `docs/guides/OPEN_RAG_TRACE_INTERNAL_ADAPTER.md`
+- `docs/guides/OPEN_RAG_TRACE_SAMPLES.md`
 
 ---
 

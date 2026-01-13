@@ -178,7 +178,7 @@ EvalVault는 OpenTelemetry + OpenInference 기반의 **Open RAG Trace** 스키�
 
 - 스펙: `docs/architecture/open-rag-trace-spec.md`
 - Collector: `docs/architecture/open-rag-trace-collector.md`
-- 샘플/내부 래퍼: `docs/guides/open-rag-trace-samples.md`, `docs/guides/open-rag-trace-internal-adapter.md`
+- 샘플/내부 래퍼: `docs/guides/OPEN_RAG_TRACE_SAMPLES.md`, `docs/guides/OPEN_RAG_TRACE_INTERNAL_ADAPTER.md`
 - 관련 문서: `docs/INDEX.md`, `docs/architecture/open-rag-trace-collector.md`
 
 ---

@@ -819,8 +819,8 @@ OpenTelemetry + OpenInference 기반의 **Open RAG Trace 표준**을 따르세�
 **관련 문서**
 - `docs/architecture/open-rag-trace-spec.md`
 - `docs/architecture/open-rag-trace-collector.md`
-- `docs/guides/open-rag-trace-internal-adapter.md`
-- `docs/guides/open-rag-trace-samples.md`
+- `docs/guides/OPEN_RAG_TRACE_INTERNAL_ADAPTER.md`
+- `docs/guides/OPEN_RAG_TRACE_SAMPLES.md`
 
 ### 임베딩 분석 & 내보내기
 
@@ -1201,7 +1201,7 @@ Langfuse에는 테스트 케이스별 스팬과 메트릭 점수가 기록되며
 - [new_whitepaper/INDEX.md](../new_whitepaper/INDEX.md) - 개발 백서(설계/운영/품질 기준)
 - [open-rag-trace-spec.md](../architecture/open-rag-trace-spec.md) - Open RAG Trace 표준
 - [open-rag-trace-collector.md](../architecture/open-rag-trace-collector.md) - Collector 구성 가이드
-- [open-rag-trace-internal-adapter.md](open-rag-trace-internal-adapter.md) - 내부 시스템 계측
+- [OPEN_RAG_TRACE_INTERNAL_ADAPTER.md](OPEN_RAG_TRACE_INTERNAL_ADAPTER.md) - 내부 시스템 계측
 - [CHANGELOG.md](https://github.com/ntts9990/EvalVault/blob/main/CHANGELOG.md) - 변경 이력
 
 ### 외부 리소스
