@@ -7,7 +7,13 @@ from datetime import datetime
 from hashlib import sha256
 from typing import Any
 
-from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
+from evalvault.domain.entities.prompt import (
+    Prompt,
+    PromptKind,
+    PromptSet,
+    PromptSetBundle,
+    PromptSetItem,
+)
 
 
 @dataclass(frozen=True)
@@ -16,7 +22,7 @@ class PromptInput:
 
     content: str
     name: str
-    kind: str
+    kind: PromptKind
     role: str
     source: str | None = None
     notes: str | None = None
@@ -99,3 +105,35 @@ def build_prompt_summary(bundle: PromptSetBundle) -> dict[str, Any]:
     if ragas_checksums:
         summary["ragas_prompt_checksums"] = ragas_checksums
     return summary
+
+
+def build_prompt_inputs_from_snapshots(
+    snapshots: dict[str, dict[str, Any]] | None,
+) -> list[PromptInput]:
+    if not snapshots:
+        return []
+    prompt_inputs: list[PromptInput] = []
+    for metric_name, entry in snapshots.items():
+        prompt_text = entry.get("prompt") if isinstance(entry, dict) else None
+        if not isinstance(prompt_text, str):
+            continue
+        prompt_text = prompt_text.strip()
+        if not prompt_text:
+            continue
+        source = entry.get("source") if isinstance(entry, dict) else None
+        metadata = {
+            key: value
+            for key, value in entry.items()
+            if key != "prompt" and isinstance(entry, dict)
+        }
+        prompt_inputs.append(
+            PromptInput(
+                content=prompt_text,
+                name=f"ragas.{metric_name}",
+                kind="ragas",
+                role=str(metric_name),
+                source=source if isinstance(source, str) and source else "ragas",
+                metadata=metadata or None,
+            )
+        )
+    return prompt_inputs

@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 from evalvault.domain.entities import (
     EvaluationRun,
@@ -585,3 +586,479 @@ class BaseSQLStorageAdapter(ABC):
             return row[key]
         except (KeyError, TypeError, IndexError):
             return None
+
+    def _row_to_mapping(self, row: Any) -> dict[str, Any]:
+        if row is None:
+            return {}
+        if isinstance(row, dict):
+            return dict(row)
+        if hasattr(row, "keys"):
+            return {key: row[key] for key in row}
+        try:
+            return dict(row)
+        except Exception:
+            return {}
+
+    def _coerce_excel_value(self, value: Any, *, force_json: bool = False) -> Any:
+        if force_json:
+            payload = self._deserialize_json(value)
+            if payload is None:
+                return None
+            return json.dumps(payload, ensure_ascii=False)
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, ensure_ascii=False)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return value
+
+    def _normalize_rows(
+        self,
+        rows: Sequence[Any],
+        *,
+        json_columns: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        json_columns = json_columns or set()
+        normalized: list[dict[str, Any]] = []
+        for row in rows:
+            payload = self._row_to_mapping(row)
+            for key, value in payload.items():
+                payload[key] = self._coerce_excel_value(
+                    value,
+                    force_json=key in json_columns,
+                )
+            normalized.append(payload)
+        return normalized
+
+    def export_run_to_excel(self, run_id: str, output_path) -> Path:
+        from openpyxl import Workbook
+
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        placeholder = self.queries.placeholder
+
+        with self._get_connection() as conn:
+            run_row = self._execute(conn, self.queries.select_run(), (run_id,)).fetchone()
+            if not run_row:
+                raise KeyError(f"Run not found: {run_id}")
+
+            run_rows = self._normalize_rows(
+                [run_row],
+                json_columns={"metrics_evaluated", "thresholds", "metadata", "retrieval_metadata"},
+            )
+
+            test_case_rows = self._execute(
+                conn,
+                (
+                    "SELECT id, run_id, test_case_id, tokens_used, latency_ms, cost_usd, trace_id, "
+                    "started_at, finished_at, question, answer, contexts, ground_truth "
+                    f"FROM test_case_results WHERE run_id = {placeholder} ORDER BY id"
+                ),
+                (run_id,),
+            ).fetchall()
+            test_case_payloads = self._normalize_rows(
+                test_case_rows,
+                json_columns={"contexts"},
+            )
+
+            metric_rows = self._execute(
+                conn,
+                (
+                    "SELECT m.result_id, t.test_case_id, m."
+                    f"{self.queries.metric_name_column} AS metric_name, m.score, m.threshold, m.reason "
+                    "FROM metric_scores m JOIN test_case_results t ON m.result_id = t.id "
+                    f"WHERE t.run_id = {placeholder} ORDER BY m.id"
+                ),
+                (run_id,),
+            ).fetchall()
+            metric_payloads = self._normalize_rows(metric_rows)
+
+            run_prompt_rows = self._execute(
+                conn,
+                (
+                    "SELECT run_id, prompt_set_id, created_at FROM run_prompt_sets "
+                    f"WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            run_prompt_payloads = self._normalize_rows(run_prompt_rows)
+            prompt_set_ids = [row.get("prompt_set_id") for row in run_prompt_payloads if row]
+
+            prompt_sets_payloads: list[dict[str, Any]] = []
+            prompt_set_item_payloads: list[dict[str, Any]] = []
+            prompt_payloads: list[dict[str, Any]] = []
+
+            if prompt_set_ids:
+                placeholders = ", ".join([placeholder] * len(prompt_set_ids))
+                prompt_set_rows = self._execute(
+                    conn,
+                    (
+                        "SELECT prompt_set_id, name, description, metadata, created_at "
+                        f"FROM prompt_sets WHERE prompt_set_id IN ({placeholders})"
+                    ),
+                    prompt_set_ids,
+                ).fetchall()
+                prompt_sets_payloads = self._normalize_rows(
+                    prompt_set_rows,
+                    json_columns={"metadata"},
+                )
+
+                item_rows = self._execute(
+                    conn,
+                    (
+                        "SELECT id, prompt_set_id, prompt_id, role, item_order, metadata "
+                        f"FROM prompt_set_items WHERE prompt_set_id IN ({placeholders})"
+                    ),
+                    prompt_set_ids,
+                ).fetchall()
+                prompt_set_item_payloads = self._normalize_rows(
+                    item_rows,
+                    json_columns={"metadata"},
+                )
+
+                prompt_ids = [row.get("prompt_id") for row in prompt_set_item_payloads if row]
+                if prompt_ids:
+                    prompt_placeholders = ", ".join([placeholder] * len(prompt_ids))
+                    prompt_rows = self._execute(
+                        conn,
+                        (
+                            "SELECT prompt_id, name, kind, content, checksum, source, notes, metadata, created_at "
+                            f"FROM prompts WHERE prompt_id IN ({prompt_placeholders})"
+                        ),
+                        prompt_ids,
+                    ).fetchall()
+                    prompt_payloads = self._normalize_rows(
+                        prompt_rows,
+                        json_columns={"metadata"},
+                    )
+
+            feedback_rows = self._execute(
+                conn,
+                (
+                    "SELECT id, run_id, test_case_id, satisfaction_score, thumb_feedback, comment, rater_id, created_at "
+                    f"FROM satisfaction_feedback WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            feedback_payloads = self._normalize_rows(feedback_rows)
+
+            cluster_rows = self._execute(
+                conn,
+                (
+                    "SELECT run_id, map_id, test_case_id, cluster_id, source, metadata, created_at "
+                    f"FROM run_cluster_maps WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            cluster_payloads = self._normalize_rows(cluster_rows, json_columns={"metadata"})
+
+            stage_event_rows = self._execute(
+                conn,
+                (
+                    "SELECT id, run_id, stage_id, parent_stage_id, stage_type, stage_name, status, "
+                    "attempt, started_at, finished_at, duration_ms, input_ref, output_ref, attributes, "
+                    "metadata, trace_id, span_id FROM stage_events "
+                    f"WHERE run_id = {placeholder} ORDER BY id"
+                ),
+                (run_id,),
+            ).fetchall()
+            stage_event_payloads = self._normalize_rows(
+                stage_event_rows,
+                json_columns={"attributes", "metadata"},
+            )
+
+            stage_metric_rows = self._execute(
+                conn,
+                (
+                    "SELECT id, run_id, stage_id, metric_name, score, threshold, evidence "
+                    f"FROM stage_metrics WHERE run_id = {placeholder} ORDER BY id"
+                ),
+                (run_id,),
+            ).fetchall()
+            stage_metric_payloads = self._normalize_rows(
+                stage_metric_rows, json_columns={"evidence"}
+            )
+
+            report_rows = self._execute(
+                conn,
+                (
+                    "SELECT report_id, run_id, experiment_id, report_type, format, content, metadata, created_at "
+                    f"FROM analysis_reports WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            report_payloads = self._normalize_rows(report_rows, json_columns={"metadata"})
+
+            pipeline_rows = self._execute(
+                conn,
+                (
+                    "SELECT result_id, intent, query, run_id, pipeline_id, profile, tags, metadata, "
+                    "is_complete, duration_ms, final_output, node_results, started_at, finished_at, created_at "
+                    f"FROM pipeline_results WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            pipeline_payloads = self._normalize_rows(
+                pipeline_rows,
+                json_columns={"tags", "metadata", "final_output", "node_results"},
+            )
+
+        summary_rows: list[dict[str, Any]] = []
+        run_payload = run_rows[0] if run_rows else {}
+        prompt_set_id = None
+        prompt_set_name = None
+        if run_prompt_payloads:
+            prompt_set_id = run_prompt_payloads[0].get("prompt_set_id")
+        if prompt_sets_payloads:
+            prompt_set_name = prompt_sets_payloads[0].get("name")
+        summary_rows.append(
+            {
+                "run_id": run_payload.get("run_id"),
+                "dataset_name": run_payload.get("dataset_name"),
+                "model_name": run_payload.get("model_name"),
+                "started_at": run_payload.get("started_at"),
+                "finished_at": run_payload.get("finished_at"),
+                "total_test_cases": len(test_case_payloads),
+                "total_tokens": run_payload.get("total_tokens"),
+                "total_cost_usd": run_payload.get("total_cost_usd"),
+                "pass_rate": run_payload.get("pass_rate"),
+                "metrics_evaluated": run_payload.get("metrics_evaluated"),
+                "prompt_set_id": prompt_set_id,
+                "prompt_set_name": prompt_set_name,
+            }
+        )
+
+        metric_summary_rows: list[dict[str, Any]] = []
+        metrics_index: dict[str, dict[str, Any]] = {}
+        for row in metric_payloads:
+            metric_name = row.get("metric_name")
+            if not metric_name:
+                continue
+            entry = metrics_index.setdefault(
+                metric_name,
+                {"metric_name": metric_name, "count": 0, "score_sum": 0.0, "pass_count": 0},
+            )
+            score = row.get("score")
+            threshold = row.get("threshold")
+            if isinstance(score, (int, float)):
+                entry["count"] += 1
+                entry["score_sum"] += float(score)
+                if isinstance(threshold, (int, float)) and score >= threshold:
+                    entry["pass_count"] += 1
+
+        for entry in metrics_index.values():
+            count = entry["count"] or 0
+            metric_summary_rows.append(
+                {
+                    "metric_name": entry["metric_name"],
+                    "avg_score": (entry["score_sum"] / count) if count else None,
+                    "pass_rate": (entry["pass_count"] / count) if count else None,
+                    "samples": count,
+                }
+            )
+
+        sheet_order: list[tuple[str, list[dict[str, Any]], list[str]]] = [
+            (
+                "Summary",
+                summary_rows,
+                [
+                    "run_id",
+                    "dataset_name",
+                    "model_name",
+                    "started_at",
+                    "finished_at",
+                    "total_test_cases",
+                    "total_tokens",
+                    "total_cost_usd",
+                    "pass_rate",
+                    "metrics_evaluated",
+                    "prompt_set_id",
+                    "prompt_set_name",
+                ],
+            ),
+            (
+                "Run",
+                run_rows,
+                [
+                    "run_id",
+                    "dataset_name",
+                    "dataset_version",
+                    "model_name",
+                    "started_at",
+                    "finished_at",
+                    "total_tokens",
+                    "total_cost_usd",
+                    "pass_rate",
+                    "metrics_evaluated",
+                    "thresholds",
+                    "langfuse_trace_id",
+                    "metadata",
+                    "retrieval_metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "TestCases",
+                test_case_payloads,
+                [
+                    "id",
+                    "run_id",
+                    "test_case_id",
+                    "tokens_used",
+                    "latency_ms",
+                    "cost_usd",
+                    "trace_id",
+                    "started_at",
+                    "finished_at",
+                    "question",
+                    "answer",
+                    "contexts",
+                    "ground_truth",
+                ],
+            ),
+            (
+                "MetricScores",
+                metric_payloads,
+                ["result_id", "test_case_id", "metric_name", "score", "threshold", "reason"],
+            ),
+            (
+                "MetricsSummary",
+                metric_summary_rows,
+                ["metric_name", "avg_score", "pass_rate", "samples"],
+            ),
+            (
+                "RunPromptSets",
+                run_prompt_payloads,
+                ["run_id", "prompt_set_id", "created_at"],
+            ),
+            (
+                "PromptSets",
+                prompt_sets_payloads,
+                ["prompt_set_id", "name", "description", "metadata", "created_at"],
+            ),
+            (
+                "PromptSetItems",
+                prompt_set_item_payloads,
+                ["id", "prompt_set_id", "prompt_id", "role", "item_order", "metadata"],
+            ),
+            (
+                "Prompts",
+                prompt_payloads,
+                [
+                    "prompt_id",
+                    "name",
+                    "kind",
+                    "content",
+                    "checksum",
+                    "source",
+                    "notes",
+                    "metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "Feedback",
+                feedback_payloads,
+                [
+                    "id",
+                    "run_id",
+                    "test_case_id",
+                    "satisfaction_score",
+                    "thumb_feedback",
+                    "comment",
+                    "rater_id",
+                    "created_at",
+                ],
+            ),
+            (
+                "ClusterMaps",
+                cluster_payloads,
+                [
+                    "run_id",
+                    "map_id",
+                    "test_case_id",
+                    "cluster_id",
+                    "source",
+                    "metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "StageEvents",
+                stage_event_payloads,
+                [
+                    "id",
+                    "run_id",
+                    "stage_id",
+                    "parent_stage_id",
+                    "stage_type",
+                    "stage_name",
+                    "status",
+                    "attempt",
+                    "started_at",
+                    "finished_at",
+                    "duration_ms",
+                    "input_ref",
+                    "output_ref",
+                    "attributes",
+                    "metadata",
+                    "trace_id",
+                    "span_id",
+                ],
+            ),
+            (
+                "StageMetrics",
+                stage_metric_payloads,
+                ["id", "run_id", "stage_id", "metric_name", "score", "threshold", "evidence"],
+            ),
+            (
+                "AnalysisReports",
+                report_payloads,
+                [
+                    "report_id",
+                    "run_id",
+                    "experiment_id",
+                    "report_type",
+                    "format",
+                    "content",
+                    "metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "PipelineResults",
+                pipeline_payloads,
+                [
+                    "result_id",
+                    "intent",
+                    "query",
+                    "run_id",
+                    "pipeline_id",
+                    "profile",
+                    "tags",
+                    "metadata",
+                    "is_complete",
+                    "duration_ms",
+                    "final_output",
+                    "node_results",
+                    "started_at",
+                    "finished_at",
+                    "created_at",
+                ],
+            ),
+        ]
+
+        workbook = Workbook()
+        default_sheet = workbook.active
+        if default_sheet is not None:
+            workbook.remove(default_sheet)
+        for sheet_name, rows, columns in sheet_order:
+            worksheet = cast(Any, workbook.create_sheet(title=sheet_name))
+            worksheet.append(columns)
+            for row in rows:
+                worksheet.append([row.get(column) for column in columns])
+
+        workbook.save(output)
+        return output

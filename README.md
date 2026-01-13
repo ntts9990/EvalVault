@@ -56,8 +56,82 @@ uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
   --auto-analyze
 ```
 
-- 결과는 `--db`에 저장되어 `history`, Web UI, 비교 분석에서 재사용됩니다.
+- 결과는 기본 DB(`data/db/evalvault.db`)에 저장되어 `history`, Web UI, 비교 분석에서 재사용됩니다.
+- `--db`를 생략해도 기본 경로로 저장되며, 모든 데이터가 자동으로 엑셀로 내보내집니다.
 - `--auto-analyze`는 요약 리포트 + 모듈별 아티팩트를 함께 생성합니다.
+
+---
+
+## 프롬프트 오버라이드 (RAGAS / 시스템)
+
+**에디터 관점**: 기본 동작은 유지하고 필요한 항목만 YAML/파일로 덮어씁니다.
+**개발자 관점**: CLI 옵션 또는 Web API 필드로 주입합니다.
+
+### CLI
+- RAGAS 메트릭별 오버라이드: `--ragas-prompts`
+- 시스템 프롬프트 적용: `--system-prompt` 또는 `--system-prompt-file`
+
+```bash
+uv run evalvault run --mode full tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness,answer_relevancy \
+  --ragas-prompts config/ragas_prompts.yaml
+
+uv run evalvault run --mode full tests/fixtures/e2e/insurance_qa_korean.json \
+  --system-prompt-file prompts/system.txt
+```
+
+`config/ragas_prompts.yaml` 예시:
+```yaml
+faithfulness: |
+  # custom prompt...
+answer_relevancy: |
+  # custom prompt...
+```
+
+### Web UI / API
+- `EvalRequest` 필드:
+  - `system_prompt`, `system_prompt_name`
+  - `ragas_prompt_overrides` (메트릭명 → 프롬프트 문자열)
+  - `prompt_set_name`, `prompt_set_description`
+
+---
+
+## 엑셀 내보내기 (자동)
+
+**에디터 관점**: DB 저장과 동시에 Excel이 자동 생성됩니다.
+**개발자 관점**: 저장 로직에서 `export_run_to_excel`이 자동 호출됩니다.
+
+- 기본 DB 경로: `data/db/evalvault.db`
+- 엑셀 경로: `data/db/evalvault_run_<RUN_ID>.xlsx`
+
+**시트 구성(요약 → 상세)**
+- `Summary`, `Run`, `TestCases`, `MetricScores`, `MetricsSummary`
+- `RunPromptSets`, `PromptSets`, `PromptSetItems`, `Prompts`
+- `Feedback`, `ClusterMaps`, `StageEvents`, `StageMetrics`
+- `AnalysisReports`, `PipelineResults`
+
+---
+
+## 외부 시스템 로그 연동 (의도분석/리트리브/리랭킹 등)
+
+**에디터 관점**: 표준 포맷(JSON/JSONL)으로 붙일 수 있어야 합니다.
+**개발자 관점**: OpenTelemetry 또는 Stage Events로 연결합니다.
+
+1) **Open RAG Trace (권장)**
+- OpenTelemetry + OpenInference 기반 표준 스키마
+- 문서: `docs/architecture/open-rag-trace-spec.md`
+- 샘플: `docs/guides/OPEN_RAG_TRACE_SAMPLES.md`
+
+2) **Stage Events / Metrics 적재**
+- 외부 파이프라인 로그를 JSON/JSONL로 저장 → DB ingest
+
+```bash
+uv run evalvault stage ingest path/to/stage_events.jsonl --db data/db/evalvault.db
+uv run evalvault stage summary <RUN_ID> --db data/db/evalvault.db
+```
+
+- Stage Event에는 **의도분석/리트리브/리랭킹**의 입력/출력/파라미터/결과를 넣습니다.
+- `--stage-store` 사용 시 EvalVault 내부 실행 로그도 자동 저장됩니다.
 
 ---
 
@@ -142,8 +216,6 @@ npm run dev
 - **외부 근거(비영어권 이슈)**:
   - https://github.com/explodinggradients/ragas/issues/1829
   - https://github.com/explodinggradients/ragas/issues/402
-- **공식 문서(언어 이슈 직접 언급)**:
-  - https://docs.ragas.io/en/stable/howtos/customizations/metrics/_metrics_language_adaptation/
 
 **이유**: 질문 생성/판정 프롬프트가 영어에 고정될 경우, 비영어 입력에서 언어 불일치로 점수 왜곡이 발생할 수 있으므로 이를 최소화합니다.
 

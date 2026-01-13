@@ -359,7 +359,11 @@ class RagasEvaluator:
         eval_results_by_test_case = {}
         if ragas_metrics:
             run.tracker_metadata["ragas_config"] = self._build_ragas_config(llm)
-            eval_results_by_test_case, override_status = await self._evaluate_with_ragas(
+            (
+                eval_results_by_test_case,
+                override_status,
+                prompt_snapshots,
+            ) = await self._evaluate_with_ragas(
                 dataset=dataset,
                 metrics=ragas_metrics,
                 llm=llm,
@@ -370,6 +374,8 @@ class RagasEvaluator:
             )
             if override_status:
                 run.tracker_metadata["ragas_prompt_overrides"] = override_status
+            if prompt_snapshots:
+                run.tracker_metadata["ragas_prompt_snapshots"] = prompt_snapshots
         elif prompt_overrides:
             logger.warning("Ragas prompt overrides provided but no Ragas metrics requested.")
 
@@ -485,7 +491,7 @@ class RagasEvaluator:
         batch_size: int = 5,
         on_progress: Callable[[int, int, str], None] | None = None,
         prompt_overrides: dict[str, str] | None = None,
-    ) -> tuple[dict[str, TestCaseEvalResult], dict[str, str]]:
+    ) -> tuple[dict[str, TestCaseEvalResult], dict[str, str], dict[str, dict[str, Any]]]:
         """Ragas로 실제 평가 수행.
 
         Args:
@@ -496,7 +502,7 @@ class RagasEvaluator:
             batch_size: 병렬 처리 시 배치 크기
 
         Returns:
-            (테스트 케이스 ID별 평가 결과, 프롬프트 오버라이드 적용 상태)
+            (테스트 케이스 ID별 평가 결과, 프롬프트 오버라이드 적용 상태, 프롬프트 스냅샷)
             예: {"tc-001": TestCaseEvalResult(...)}
         """
 
@@ -554,6 +560,12 @@ class RagasEvaluator:
         if prompt_overrides:
             override_status = self._apply_prompt_overrides(ragas_metrics, prompt_overrides)
 
+        prompt_snapshots = self._collect_ragas_prompt_snapshots(
+            ragas_metrics,
+            prompt_overrides,
+            override_status,
+        )
+
         # 병렬 처리 vs 순차 처리
         if parallel and len(ragas_samples) > 1:
             return (
@@ -566,6 +578,7 @@ class RagasEvaluator:
                     on_progress=on_progress,
                 ),
                 override_status,
+                prompt_snapshots,
             )
         return (
             await self._evaluate_sequential(
@@ -576,6 +589,7 @@ class RagasEvaluator:
                 on_progress=on_progress,
             ),
             override_status,
+            prompt_snapshots,
         )
 
     def _apply_answer_relevancy_prompt_defaults(
@@ -828,6 +842,68 @@ class RagasEvaluator:
                 return True
 
         return False
+
+    @staticmethod
+    def _extract_prompt_text(value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        for attr in ("template", "instruction", "prompt", "text"):
+            try:
+                candidate = getattr(value, attr)
+            except Exception:
+                continue
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+        return None
+
+    def _collect_metric_prompt_text(self, metric: Any) -> str | None:
+        for attr in ("prompt", "question_generation"):
+            if hasattr(metric, attr):
+                try:
+                    value = getattr(metric, attr)
+                except Exception:
+                    continue
+                text = self._extract_prompt_text(value)
+                if text:
+                    return text
+        for attr in dir(metric):
+            if not attr.endswith("_prompt") or attr == "prompt":
+                continue
+            try:
+                value = getattr(metric, attr)
+            except Exception:
+                continue
+            text = self._extract_prompt_text(value)
+            if text:
+                return text
+        return None
+
+    def _collect_ragas_prompt_snapshots(
+        self,
+        ragas_metrics: list[Any],
+        prompt_overrides: dict[str, str] | None,
+        override_status: dict[str, str],
+    ) -> dict[str, dict[str, Any]]:
+        snapshots: dict[str, dict[str, Any]] = {}
+        for metric in ragas_metrics:
+            metric_name = getattr(metric, "name", None)
+            if not metric_name:
+                continue
+            prompt_text = self._collect_metric_prompt_text(metric)
+            if not prompt_text:
+                continue
+            requested = bool(prompt_overrides and metric_name in prompt_overrides)
+            status = override_status.get(metric_name)
+            source = "override" if status == "applied" else "default"
+            snapshots[str(metric_name)] = {
+                "prompt": prompt_text,
+                "source": source,
+                "override_requested": requested,
+                "override_status": status,
+            }
+        return snapshots
 
     async def _evaluate_sequential(
         self,

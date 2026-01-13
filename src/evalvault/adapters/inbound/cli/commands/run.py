@@ -39,6 +39,7 @@ from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
+    build_prompt_inputs_from_snapshots,
     build_prompt_summary,
 )
 from evalvault.domain.services.ragas_prompt_overrides import (
@@ -807,6 +808,9 @@ def register_run_commands(
         profile_name = profile or settings.evalvault_profile
         if profile_name:
             settings = apply_profile(settings, profile_name)
+
+        if db_path is None:
+            db_path = Path(settings.evalvault_db_path)
 
         # Override model if specified
         if model:
@@ -1707,6 +1711,40 @@ def register_run_commands(
             result.retrieval_metadata = merged_retriever_metadata
 
         result.tracker_metadata.setdefault("run_mode", preset.name)
+        tracker_meta = result.tracker_metadata or {}
+        result.tracker_metadata = tracker_meta
+        ragas_snapshots = tracker_meta.get("ragas_prompt_snapshots")
+        ragas_snapshot_inputs = build_prompt_inputs_from_snapshots(
+            ragas_snapshots if isinstance(ragas_snapshots, dict) else None,
+        )
+        override_status: dict[str, str] = {}
+        raw_override = tracker_meta.get("ragas_prompt_overrides")
+        if isinstance(raw_override, dict):
+            override_status = cast(dict[str, str], raw_override)
+        if override_status:
+            prompt_inputs = [
+                entry
+                for entry in prompt_inputs
+                if not (
+                    entry.kind == "ragas"
+                    and override_status.get(entry.role) is not None
+                    and override_status.get(entry.role) != "applied"
+                )
+            ]
+
+        if ragas_snapshot_inputs:
+            existing_roles = {entry.role for entry in prompt_inputs if entry.kind == "ragas"}
+            for entry in ragas_snapshot_inputs:
+                if entry.role in existing_roles and override_status.get(entry.role) == "applied":
+                    continue
+                prompt_inputs.append(entry)
+        if prompt_inputs and not db_path:
+            print_cli_warning(
+                console,
+                "Prompt snapshot은 --db 저장 시에만 DB에 기록됩니다.",
+                tips=["--db data/db/evalvault.db 옵션을 추가하세요."],
+            )
+
         if prompt_inputs:
             prompt_bundle = build_prompt_bundle(
                 run_id=result.run_id,

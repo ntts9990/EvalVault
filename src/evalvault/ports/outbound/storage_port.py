@@ -1,5 +1,6 @@
 """결과 저장 인터페이스."""
 
+from pathlib import Path
 from typing import Any, Protocol
 
 from evalvault.domain.entities import (
@@ -33,6 +34,8 @@ class StoragePort(Protocol):
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:
         """Persist prompt set and prompt items."""
         ...
+
+    def export_run_to_excel(self, run_id: str, output_path: str | Path) -> Path: ...
 
     def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
         """Attach a prompt set to an evaluation run."""

@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 from urllib.request import urlopen
 
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
@@ -31,6 +31,7 @@ from evalvault.domain.services.cluster_map_builder import build_cluster_map
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
+    build_prompt_inputs_from_snapshots,
     build_prompt_summary,
 )
 from evalvault.domain.services.prompt_status import extract_prompt_entries
@@ -105,12 +106,21 @@ class WebUIAdapter:
             llm_adapter: LLM 어댑터 (선택적)
             data_loader: 데이터 로더 (선택적)
         """
+        resolved_settings = settings
+        if storage is None:
+            resolved_settings = settings or Settings()
+            db_path = getattr(resolved_settings, "evalvault_db_path", None)
+            if db_path:
+                from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+
+                storage = SQLiteStorageAdapter(db_path=db_path)
+
         self._storage = storage
         self._evaluator = evaluator
         self._report_generator = report_generator
         self._llm_adapter = llm_adapter
         self._data_loader = data_loader
-        self._settings = settings
+        self._settings = resolved_settings
         self._phoenix_resolver: PhoenixExperimentResolver | None = None
         self._phoenix_resolver_checked = False
 
@@ -573,6 +583,34 @@ class WebUIAdapter:
                 on_progress(EvalProgress(0, 0, "", 0.0, "failed", str(e)))
             raise e
 
+        tracker_meta = result.tracker_metadata or {}
+        result.tracker_metadata = tracker_meta
+        ragas_snapshots = tracker_meta.get("ragas_prompt_snapshots")
+        ragas_snapshot_inputs = build_prompt_inputs_from_snapshots(
+            ragas_snapshots if isinstance(ragas_snapshots, dict) else None,
+        )
+        override_status: dict[str, str] = {}
+        raw_override = tracker_meta.get("ragas_prompt_overrides")
+        if isinstance(raw_override, dict):
+            override_status = cast(dict[str, str], raw_override)
+        if override_status:
+            prompt_inputs = [
+                entry
+                for entry in prompt_inputs
+                if not (
+                    entry.kind == "ragas"
+                    and override_status.get(entry.role) is not None
+                    and override_status.get(entry.role) != "applied"
+                )
+            ]
+
+        if ragas_snapshot_inputs:
+            existing_roles = {entry.role for entry in prompt_inputs if entry.kind == "ragas"}
+            for entry in ragas_snapshot_inputs:
+                if entry.role in existing_roles and override_status.get(entry.role) == "applied":
+                    continue
+                prompt_inputs.append(entry)
+
         prompt_bundle = None
         if prompt_inputs:
             prompt_bundle = build_prompt_bundle(
@@ -683,6 +721,14 @@ class WebUIAdapter:
                     result.run_id,
                     prompt_bundle.prompt_set.prompt_set_id,
                 )
+            try:
+                export_settings = self._settings or Settings()
+                export_base = Path(export_settings.evalvault_db_path)
+                excel_path = export_base.parent / f"evalvault_run_{result.run_id}.xlsx"
+                if hasattr(self._storage, "export_run_to_excel"):
+                    self._storage.export_run_to_excel(result.run_id, excel_path)
+            except Exception as exc:
+                logger.warning("Excel export failed for run %s: %s", result.run_id, exc)
             try:
                 self._auto_generate_cluster_map(result, llm_adapter)
             except Exception as exc:
