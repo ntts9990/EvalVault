@@ -16,6 +16,9 @@ export interface RunSummary {
     threshold_profile?: string | null;
     thresholds?: Record<string, number> | null;
     avg_metric_scores?: Record<string, number> | null;
+    avg_satisfaction_score?: number | null;
+    thumb_up_rate?: number | null;
+    imputed_ratio?: number | null;
     total_cost_usd: number | null;
     phoenix_precision: number | null;
     phoenix_drift: number | null;
@@ -35,12 +38,40 @@ export interface TestCase {
         passed: boolean;
         reason: string | null;
     }[];
+    calibrated_satisfaction?: number | null;
+    imputed?: boolean;
+    imputation_source?: string | null;
 }
 
 export interface RunDetailsResponse {
     summary: RunSummary;
     results: TestCase[];
     prompt_set?: PromptSetDetail;
+}
+
+export interface FeedbackSaveRequest {
+    test_case_id: string;
+    satisfaction_score?: number | null;
+    thumb_feedback?: "up" | "down" | "none" | null;
+    comment?: string | null;
+    rater_id?: string | null;
+}
+
+export interface FeedbackResponse {
+    feedback_id: string;
+    run_id: string;
+    test_case_id: string;
+    satisfaction_score?: number | null;
+    thumb_feedback?: string | null;
+    comment?: string | null;
+    rater_id?: string | null;
+    created_at?: string | null;
+}
+
+export interface FeedbackSummaryResponse {
+    avg_satisfaction_score?: number | null;
+    thumb_up_rate?: number | null;
+    total_feedback: number;
 }
 
 export interface ClusterMapItem {
@@ -422,6 +453,39 @@ export async function fetchRunDetails(runId: string): Promise<RunDetailsResponse
     const response = await fetch(`${API_BASE_URL}/runs/${runId}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunFeedback(runId: string): Promise<FeedbackResponse[]> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/feedback`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch feedback: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function saveRunFeedback(
+    runId: string,
+    payload: FeedbackSaveRequest
+): Promise<FeedbackResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to save feedback: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchRunFeedbackSummary(
+    runId: string
+): Promise<FeedbackSummaryResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/feedback/summary`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch feedback summary: ${response.statusText}`);
     }
     return response.json();
 }

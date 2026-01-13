@@ -14,6 +14,13 @@ from evalvault.domain.entities.analysis import (
 )
 from evalvault.domain.entities.dataset import Dataset, TestCase
 from evalvault.domain.entities.experiment import Experiment, ExperimentGroup
+from evalvault.domain.entities.feedback import (
+    CalibrationCaseResult,
+    CalibrationResult,
+    CalibrationSummary,
+    FeedbackSummary,
+    SatisfactionFeedback,
+)
 from evalvault.domain.entities.improvement import (
     EffortLevel,
     EvidenceSource,
@@ -74,6 +81,11 @@ __all__ = [
     # Experiment
     "Experiment",
     "ExperimentGroup",
+    "CalibrationCaseResult",
+    "CalibrationResult",
+    "CalibrationSummary",
+    "FeedbackSummary",
+    "SatisfactionFeedback",
     # Improvement
     "EffortLevel",
     "EvidenceSource",

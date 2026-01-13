@@ -610,3 +610,31 @@ class TestSQLiteStorageNLPAnalysis:
         assert retrieved.answer_stats is None
         assert len(retrieved.question_types) == 0
         assert len(retrieved.top_keywords) == 0
+
+    def test_feedback_roundtrip(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        from evalvault.domain.entities import SatisfactionFeedback
+
+        feedback = SatisfactionFeedback(
+            feedback_id="",
+            run_id=sample_run.run_id,
+            test_case_id="tc-001",
+            satisfaction_score=4.0,
+            thumb_feedback="up",
+            comment="좋아요",
+            rater_id="user-1",
+        )
+
+        feedback_id = storage_adapter.save_feedback(feedback)
+        feedbacks = storage_adapter.list_feedback(sample_run.run_id)
+
+        assert feedbacks
+        assert feedbacks[0].feedback_id == str(feedback_id)
+        assert feedbacks[0].satisfaction_score == 4.0
+        assert feedbacks[0].thumb_feedback == "up"
+
+        summary = storage_adapter.get_feedback_summary(sample_run.run_id)
+        assert summary.total_feedback == 1
+        assert summary.avg_satisfaction_score == 4.0
+        assert summary.thumb_up_rate == 1.0

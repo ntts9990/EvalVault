@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS run_cluster_maps (
 CREATE INDEX IF NOT EXISTS idx_cluster_maps_run_id ON run_cluster_maps(run_id);
 CREATE INDEX IF NOT EXISTS idx_cluster_maps_map_id ON run_cluster_maps(map_id);
 
+CREATE TABLE IF NOT EXISTS satisfaction_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    test_case_id TEXT NOT NULL,
+    satisfaction_score REAL,
+    thumb_feedback TEXT,
+    comment TEXT,
+    rater_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_run_id ON satisfaction_feedback(run_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_test_case_id ON satisfaction_feedback(test_case_id);
+
 -- Metric scores table
 CREATE TABLE IF NOT EXISTS metric_scores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

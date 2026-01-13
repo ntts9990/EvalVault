@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
-import { fetchRunDetails, type RunDetailsResponse } from "../services/api";
+import {
+    fetchRunDetails,
+    fetchRunFeedback,
+    saveRunFeedback,
+    fetchRunFeedbackSummary,
+    type RunDetailsResponse,
+    type FeedbackResponse
+} from "../services/api";
 import { Layout } from "../components/Layout";
 import { InsightSpacePanel } from "../components/InsightSpacePanel";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
@@ -15,9 +23,170 @@ import {
     MessageSquare,
     BookOpen,
     ExternalLink,
+    ThumbsUp,
+    ThumbsDown,
+    Star,
+    Save,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS } from "../utils/summaryMetrics";
+
+function FeedbackItem({
+    result,
+    feedback,
+    onSave,
+}: {
+    result: RunDetailsResponse["results"][number];
+    feedback?: FeedbackResponse;
+    onSave: (
+        id: string,
+        score: number | null,
+        thumb: "up" | "down" | "none" | null,
+        comment: string | null
+    ) => void;
+}) {
+    const [score, setScore] = useState<number | null>(feedback?.satisfaction_score ?? null);
+    const resolveThumb = (value: string | null | undefined): "up" | "down" | "none" => {
+        if (value === "up" || value === "down") {
+            return value;
+        }
+        return "none";
+    };
+    const [thumb, setThumb] = useState<"up" | "down" | "none" | null>(
+        resolveThumb(feedback?.thumb_feedback)
+    );
+    const [comment, setComment] = useState<string>(feedback?.comment ?? "");
+    const [isDirty, setIsDirty] = useState(false);
+
+    useEffect(() => {
+        setScore(feedback?.satisfaction_score ?? null);
+        setThumb(resolveThumb(feedback?.thumb_feedback));
+        setComment(feedback?.comment ?? "");
+        setIsDirty(false);
+    }, [feedback]);
+
+    const handleSave = () => {
+        onSave(result.test_case_id, score, thumb, comment || null);
+        setIsDirty(false);
+    };
+
+    return (
+        <div className="bg-card border border-border rounded-xl p-4 transition-all hover:border-primary/50">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                    <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                            Question
+                        </h4>
+                        <p className="text-sm font-medium text-foreground line-clamp-2">
+                            {result.question}
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                            Answer
+                        </h4>
+                        <p className="text-sm text-muted-foreground line-clamp-3">
+                            {result.answer}
+                        </p>
+                    </div>
+                    {result.calibrated_satisfaction !== null && result.calibrated_satisfaction !== undefined && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">
+                                Calibrated: {result.calibrated_satisfaction.toFixed(2)}
+                            </span>
+                            {result.imputed && (
+                                <span className="text-[10px] text-amber-500 border border-amber-500/30 px-1.5 rounded">
+                                    Imputed
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="space-y-4 border-l border-border/50 pl-0 lg:pl-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => {
+                                            setScore(s);
+                                            setIsDirty(true);
+                                        }}
+                                        className={`p-1 transition-colors ${
+                                            (score ?? 0) >= s
+                                                ? "text-yellow-400"
+                                                : "text-muted-foreground/30 hover:text-yellow-400/50"
+                                        }`}
+                                    >
+                                        <Star
+                                            className="w-5 h-5"
+                                            fill={(score ?? 0) >= s ? "currentColor" : "none"}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-2 border-l border-border pl-4">
+                                <button
+                                    onClick={() => {
+                                        setThumb(thumb === "up" ? "none" : "up");
+                                        setIsDirty(true);
+                                    }}
+                                    className={`p-2 rounded-full transition-colors ${
+                                        thumb === "up"
+                                            ? "bg-emerald-500/10 text-emerald-500"
+                                            : "hover:bg-secondary text-muted-foreground"
+                                    }`}
+                                >
+                                    <ThumbsUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setThumb(thumb === "down" ? "none" : "down");
+                                        setIsDirty(true);
+                                    }}
+                                    className={`p-2 rounded-full transition-colors ${
+                                        thumb === "down"
+                                            ? "bg-rose-500/10 text-rose-500"
+                                            : "hover:bg-secondary text-muted-foreground"
+                                    }`}
+                                >
+                                    <ThumbsDown className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleSave}
+                            disabled={!isDirty}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                isDirty
+                                    ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                                    : "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
+                            }`}
+                        >
+                            <Save className="w-3.5 h-3.5" />
+                            Save
+                        </button>
+                    </div>
+
+                    <textarea
+                        value={comment}
+                        onChange={(e) => {
+                            setComment(e.target.value);
+                            setIsDirty(true);
+                        }}
+                        placeholder="Add a comment about this result..."
+                        className="w-full h-20 p-3 bg-secondary/20 border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export function RunDetails() {
     const { id } = useParams<{ id: string }>();
@@ -26,8 +195,11 @@ export function RunDetails() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     // Tabs
-    const [activeTab, setActiveTab] = useState<"overview" | "performance">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "performance" | "feedback">("overview");
     const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
+    const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackResponse>>({});
+    const [loadingFeedback, setLoadingFeedback] = useState(false);
+
     const summaryMetricSet = new Set(SUMMARY_METRICS);
 
     const previewPrompt = (content?: string) => {
@@ -51,6 +223,20 @@ export function RunDetails() {
         }
         loadDetails();
     }, [id]);
+
+    useEffect(() => {
+        if (activeTab === "feedback" && id) {
+            setLoadingFeedback(true);
+            fetchRunFeedback(id)
+                .then((feedbacks) => {
+                    const map: Record<string, FeedbackResponse> = {};
+                    feedbacks.forEach((f) => (map[f.test_case_id] = f));
+                    setFeedbackMap(map);
+                })
+                .catch((err) => console.error("Failed to load feedback", err))
+                .finally(() => setLoadingFeedback(false));
+        }
+    }, [activeTab, id]);
 
     useEffect(() => {
         if (!data || !location.hash) return;
@@ -111,6 +297,44 @@ export function RunDetails() {
             newSet.add(testCaseId);
         }
         setExpandedCases(newSet);
+    };
+
+    const handleSaveFeedback = async (
+        caseId: string,
+        score: number | null,
+        thumb: "up" | "down" | "none" | null,
+        comment: string | null
+    ) => {
+        if (!id) return;
+        try {
+            const result = await saveRunFeedback(id, {
+                test_case_id: caseId,
+                satisfaction_score: score,
+                thumb_feedback: thumb,
+                comment: comment,
+            });
+            setFeedbackMap((prev) => ({ ...prev, [caseId]: result }));
+
+            try {
+                const summaryData = await fetchRunFeedbackSummary(id);
+                setData((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        summary: {
+                            ...prev.summary,
+                            avg_satisfaction_score: summaryData.avg_satisfaction_score,
+                            thumb_up_rate: summaryData.thumb_up_rate,
+                        },
+                    };
+                });
+            } catch (summaryErr) {
+                console.error("Failed to update feedback summary", summaryErr);
+            }
+        } catch (e) {
+            console.error("Failed to save feedback", e);
+            alert("Failed to save feedback");
+        }
     };
 
     // Prepare chart data
@@ -219,6 +443,12 @@ export function RunDetails() {
                             >
                                 Performance
                             </button>
+                            <button
+                                onClick={() => setActiveTab("feedback")}
+                                className={`tab-pill ${activeTab === "feedback" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                Feedback
+                            </button>
                         </div>
 
                         {summary.phoenix_drift != null && (
@@ -306,7 +536,7 @@ export function RunDetails() {
                     </div>
                 )}
 
-                {activeTab === "overview" ? (
+                {activeTab === "overview" && (
                     <>
                         {/* Charts & Summary Grid (Overview) */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -402,8 +632,9 @@ export function RunDetails() {
                             </div>
                         )}
                     </>
-                ) : (
-                    /* Performance Tab Content */
+                )}
+
+                {activeTab === "performance" && (
                     /* Performance Tab Content */
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-in fade-in duration-300">
                         {/* Latency Analysis */}
@@ -457,11 +688,59 @@ export function RunDetails() {
                     </div>
                 )}
 
-                {/* Test Case Explorer */}
-                <h3 className="font-semibold text-xl mb-4">Test Case Explorer</h3>
-                <div className="space-y-4">
-                    {(results || []).map((result) => {
-                        const isExpanded = expandedCases.has(result.test_case_id);
+                {activeTab === "feedback" && (
+                    <div className="animate-in fade-in duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="surface-panel p-6">
+                                <h3 className="font-semibold text-muted-foreground text-sm mb-2">Avg. Satisfaction</h3>
+                                <p className="text-3xl font-bold text-foreground">
+                                    {summary.avg_satisfaction_score ? summary.avg_satisfaction_score.toFixed(2) : "N/A"}
+                                    <span className="text-sm font-normal text-muted-foreground ml-2">/ 5.0</span>
+                                </p>
+                            </div>
+                            <div className="surface-panel p-6">
+                                <h3 className="font-semibold text-muted-foreground text-sm mb-2">Thumb Up Rate</h3>
+                                <p className="text-3xl font-bold text-emerald-500">
+                                    {summary.thumb_up_rate !== null && summary.thumb_up_rate !== undefined
+                                        ? `${(summary.thumb_up_rate * 100).toFixed(1)}%`
+                                        : "N/A"}
+                                </p>
+                            </div>
+                            <div className="surface-panel p-6">
+                                <h3 className="font-semibold text-muted-foreground text-sm mb-2">Imputed Ratio</h3>
+                                <p className="text-3xl font-bold text-amber-500">
+                                    {summary.imputed_ratio !== null && summary.imputed_ratio !== undefined
+                                        ? `${(summary.imputed_ratio * 100).toFixed(1)}%`
+                                        : "0.0%"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">Cases with auto-calibrated feedback</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {loadingFeedback ? (
+                                <div className="text-center py-10 text-muted-foreground">Loading feedback...</div>
+                            ) : (
+                                results.map((result) => (
+                                    <FeedbackItem
+                                        key={result.test_case_id}
+                                        result={result}
+                                        feedback={feedbackMap[result.test_case_id]}
+                                        onSave={handleSaveFeedback}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab !== "feedback" && (
+                    <>
+                        {/* Test Case Explorer */}
+                        <h3 className="font-semibold text-xl mb-4">Test Case Explorer</h3>
+                        <div className="space-y-4">
+                            {(results || []).map((result) => {
+                                const isExpanded = expandedCases.has(result.test_case_id);
                         const allPassed = result.metrics.every(m => m.passed);
 
                         return (
@@ -485,7 +764,14 @@ export function RunDetails() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-foreground line-clamp-1">{result.question}</p>
-                                        <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{result.answer}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <p className="text-sm text-muted-foreground line-clamp-1">{result.answer}</p>
+                                            {result.calibrated_satisfaction !== null && result.calibrated_satisfaction !== undefined && (
+                                                <span className="shrink-0 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono text-muted-foreground border border-border">
+                                                    Satisf: {result.calibrated_satisfaction.toFixed(1)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
@@ -595,10 +881,12 @@ export function RunDetails() {
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        );
-                    })}
-                </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
         </Layout>
     );

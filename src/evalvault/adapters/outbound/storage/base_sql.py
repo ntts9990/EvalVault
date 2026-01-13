@@ -11,9 +11,11 @@ from typing import Any
 
 from evalvault.domain.entities import (
     EvaluationRun,
+    FeedbackSummary,
     MetricScore,
     RunClusterMap,
     RunClusterMapInfo,
+    SatisfactionFeedback,
     TestCaseResult,
 )
 
@@ -27,10 +29,12 @@ class SQLQueries:
         placeholder: str = "?",
         metric_name_column: str = "metric_name",
         test_case_returning_clause: str = "",
+        feedback_returning_clause: str = "",
     ) -> None:
         self.placeholder = placeholder
         self.metric_name_column = metric_name_column
         self._test_case_returning = test_case_returning_clause
+        self._feedback_returning = feedback_returning_clause
 
     def _values(self, count: int) -> str:
         return ", ".join([self.placeholder] * count)
@@ -73,6 +77,25 @@ class SQLQueries:
         INSERT INTO run_cluster_maps (
             run_id, map_id, test_case_id, cluster_id, source, metadata, created_at
         ) VALUES ({values})
+        """
+
+    def insert_feedback(self) -> str:
+        values = self._values(7)
+        query = f"""
+        INSERT INTO satisfaction_feedback (
+            run_id, test_case_id, satisfaction_score, thumb_feedback, comment, rater_id, created_at
+        ) VALUES ({values})
+        """
+        if self._feedback_returning:
+            query = f"{query.strip()} {self._feedback_returning}"
+        return query
+
+    def select_feedback_by_run(self) -> str:
+        return f"""
+        SELECT id, run_id, test_case_id, satisfaction_score, thumb_feedback, comment, rater_id, created_at
+        FROM satisfaction_feedback
+        WHERE run_id = {self.placeholder}
+        ORDER BY created_at DESC
         """
 
     def select_run(self) -> str:
@@ -127,6 +150,13 @@ class SQLQueries:
         WHERE run_id = {self.placeholder}
         GROUP BY map_id, source, created_at
         ORDER BY created_at DESC
+        """
+
+    def update_run_metadata(self) -> str:
+        return f"""
+        UPDATE evaluation_runs
+        SET metadata = {self.placeholder}
+        WHERE run_id = {self.placeholder}
         """
 
     def delete_run(self) -> str:
@@ -259,6 +289,12 @@ class BaseSQLStorageAdapter(ABC):
             conn.commit()
             return deleted
 
+    def update_run_metadata(self, run_id: str, metadata: dict[str, Any]) -> None:
+        payload = self._serialize_json(metadata)
+        with self._get_connection() as conn:
+            self._execute(conn, self.queries.update_run_metadata(), (payload, run_id))
+            conn.commit()
+
     def save_run_cluster_map(
         self,
         run_id: str,
@@ -365,6 +401,45 @@ class BaseSQLStorageAdapter(ABC):
             conn.commit()
             return deleted
 
+    def save_feedback(self, feedback: SatisfactionFeedback) -> str:
+        created_at = feedback.created_at or datetime.now()
+        with self._get_connection() as conn:
+            cursor = self._execute(
+                conn,
+                self.queries.insert_feedback(),
+                (
+                    feedback.run_id,
+                    feedback.test_case_id,
+                    feedback.satisfaction_score,
+                    feedback.thumb_feedback,
+                    feedback.comment,
+                    feedback.rater_id,
+                    self._serialize_datetime(created_at),
+                ),
+            )
+            feedback_id = self._fetch_lastrowid(cursor)
+            conn.commit()
+            return str(feedback_id)
+
+    def list_feedback(self, run_id: str) -> list[SatisfactionFeedback]:
+        with self._get_connection() as conn:
+            rows = self._execute(conn, self.queries.select_feedback_by_run(), (run_id,)).fetchall()
+            return [self._row_to_feedback(row) for row in rows]
+
+    def get_feedback_summary(self, run_id: str) -> FeedbackSummary:
+        feedbacks = self.list_feedback(run_id)
+        scores = [f.satisfaction_score for f in feedbacks if f.satisfaction_score is not None]
+        thumbs = [f.thumb_feedback for f in feedbacks if f.thumb_feedback in {"up", "down"}]
+        avg_score = sum(scores) / len(scores) if scores else None
+        thumb_up_rate = None
+        if thumbs:
+            thumb_up_rate = thumbs.count("up") / len(thumbs)
+        return FeedbackSummary(
+            avg_satisfaction_score=avg_score,
+            thumb_up_rate=thumb_up_rate,
+            total_feedback=len(feedbacks),
+        )
+
     # Serialization helpers --------------------------------------------
 
     def _run_params(self, run: EvaluationRun) -> Sequence[Any]:
@@ -426,6 +501,22 @@ class BaseSQLStorageAdapter(ABC):
             answer=row["answer"],
             contexts=self._deserialize_contexts(row["contexts"]),
             ground_truth=row["ground_truth"],
+        )
+
+    def _row_to_feedback(self, row) -> SatisfactionFeedback:
+        feedback_id = self._row_value(row, "id")
+        run_id = self._row_value(row, "run_id")
+        test_case_id = self._row_value(row, "test_case_id")
+        created_at = self._deserialize_datetime(self._row_value(row, "created_at"))
+        return SatisfactionFeedback(
+            feedback_id=str(feedback_id or ""),
+            run_id=str(run_id or ""),
+            test_case_id=str(test_case_id or ""),
+            satisfaction_score=self._maybe_float(self._row_value(row, "satisfaction_score")),
+            thumb_feedback=self._row_value(row, "thumb_feedback"),
+            comment=self._row_value(row, "comment"),
+            rater_id=self._row_value(row, "rater_id"),
+            created_at=created_at,
         )
 
     def _fetch_metric_scores(self, conn, result_id: int) -> list[MetricScore]:

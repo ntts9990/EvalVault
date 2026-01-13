@@ -13,6 +13,7 @@ from .agent import register_agent_commands
 from .analyze import register_analyze_commands
 from .api import register_api_command
 from .benchmark import create_benchmark_app
+from .calibrate import register_calibrate_commands
 from .config import register_config_commands
 from .debug import create_debug_app
 from .domain import create_domain_app
@@ -61,6 +62,7 @@ COMMAND_MODULES: tuple[CommandModule, ...] = (
     CommandModule(register_pipeline_commands),
     CommandModule(register_history_commands),
     CommandModule(register_analyze_commands),
+    CommandModule(register_calibrate_commands),
     CommandModule(register_generate_commands),
     CommandModule(register_gate_commands),
     CommandModule(register_agent_commands),

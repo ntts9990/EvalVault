@@ -4,9 +4,11 @@ from typing import Any, Protocol
 
 from evalvault.domain.entities import (
     EvaluationRun,
+    FeedbackSummary,
     PromptSetBundle,
     RunClusterMap,
     RunClusterMapInfo,
+    SatisfactionFeedback,
 )
 from evalvault.domain.entities.experiment import Experiment
 
@@ -76,6 +78,8 @@ class StoragePort(Protocol):
         """
         ...
 
+    def update_run_metadata(self, run_id: str, metadata: dict[str, Any]) -> None: ...
+
     def save_run_cluster_map(
         self,
         run_id: str,
@@ -98,6 +102,12 @@ class StoragePort(Protocol):
     def delete_run_cluster_map(self, run_id: str, map_id: str) -> int:
         """런별 클러스터 맵을 삭제합니다."""
         ...
+
+    def save_feedback(self, feedback: SatisfactionFeedback) -> str: ...
+
+    def list_feedback(self, run_id: str) -> list[SatisfactionFeedback]: ...
+
+    def get_feedback_summary(self, run_id: str) -> FeedbackSummary: ...
 
     # Experiment 관련 메서드
 

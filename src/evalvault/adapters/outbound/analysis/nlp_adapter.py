@@ -727,8 +727,52 @@ class NLPAnalysisAdapter(BaseAnalysisAdapter):
                     if values:
                         avg_scores[metric_name] = sum(values) / len(values)
 
-                # 대표 질문 선택 (처음 3개)
-                representative_questions = cluster_qs[:3]
+                representative_questions: list[str] = []
+                try:
+                    cluster_idx_list = cluster_indices[cluster_id]
+                    cluster_vectors = embedding_array[cluster_idx_list]
+                    centroid = cluster_vectors.mean(axis=0)
+                    distances = np.linalg.norm(cluster_vectors - centroid, axis=1)
+                    sorted_pairs = sorted(
+                        zip(cluster_idx_list, distances, strict=True), key=lambda x: x[1]
+                    )
+
+                    center_indices = [idx for idx, _dist in sorted_pairs[:2]]
+                    edge_far = sorted_pairs[-1][0] if sorted_pairs else None
+
+                    worst_idx = None
+                    worst_score = None
+                    for idx in cluster_idx_list:
+                        q = questions[idx]
+                        result = question_to_result.get(q)
+                        if not result or not result.metrics:
+                            continue
+                        avg_score = sum(m.score for m in result.metrics) / len(result.metrics)
+                        if worst_score is None or avg_score < worst_score:
+                            worst_score = avg_score
+                            worst_idx = idx
+
+                    edge_needed = worst_idx
+                    if edge_needed is None and len(sorted_pairs) > 1:
+                        edge_needed = sorted_pairs[-2][0]
+
+                    candidate_indices: list[int] = []
+                    candidate_indices.extend(center_indices)
+                    if edge_far is not None:
+                        candidate_indices.append(edge_far)
+                    if edge_needed is not None:
+                        candidate_indices.append(edge_needed)
+
+                    seen: set[int] = set()
+                    for idx in candidate_indices:
+                        if idx in seen:
+                            continue
+                        seen.add(idx)
+                        representative_questions.append(questions[idx])
+                        if len(representative_questions) >= 4:
+                            break
+                except Exception:
+                    representative_questions = cluster_qs[:4]
 
                 clusters.append(
                     TopicCluster(

@@ -14,6 +14,11 @@ from urllib.request import urlopen
 
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
+from evalvault.domain.entities import (
+    CalibrationResult,
+    FeedbackSummary,
+    SatisfactionFeedback,
+)
 from evalvault.domain.entities.prompt import PromptSetBundle
 from evalvault.domain.metrics.registry import (
     get_metric_descriptions as registry_metric_descriptions,
@@ -29,6 +34,9 @@ from evalvault.domain.services.prompt_registry import (
     build_prompt_summary,
 )
 from evalvault.domain.services.prompt_status import extract_prompt_entries
+from evalvault.domain.services.satisfaction_calibration_service import (
+    SatisfactionCalibrationService,
+)
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
 from evalvault.domain.services.stage_metric_service import StageMetricService
 from evalvault.domain.services.threshold_profiles import apply_threshold_profile
@@ -892,6 +900,27 @@ class WebUIAdapter:
         if self._storage is None or not hasattr(self._storage, "delete_run_cluster_map"):
             raise RuntimeError("Storage not configured")
         return self._storage.delete_run_cluster_map(run_id, map_id)
+
+    def save_feedback(self, feedback: SatisfactionFeedback) -> str:
+        if self._storage is None or not hasattr(self._storage, "save_feedback"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.save_feedback(feedback)
+
+    def list_feedback(self, run_id: str) -> list[SatisfactionFeedback]:
+        if self._storage is None or not hasattr(self._storage, "list_feedback"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.list_feedback(run_id)
+
+    def get_feedback_summary(self, run_id: str) -> FeedbackSummary:
+        if self._storage is None or not hasattr(self._storage, "get_feedback_summary"):
+            raise RuntimeError("Storage not configured")
+        return self._storage.get_feedback_summary(run_id)
+
+    def build_calibration(self, run_id: str, *, model: str = "both") -> CalibrationResult:
+        run = self.get_run_details(run_id)
+        feedbacks = self.list_feedback(run_id)
+        service = SatisfactionCalibrationService()
+        return service.build_calibration(run, feedbacks, model=model)
 
     def list_stage_events(self, run_id: str, *, stage_type: str | None = None) -> list[StageEvent]:
         """Stage 이벤트 목록 조회."""

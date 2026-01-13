@@ -60,6 +60,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
                 placeholder="%s",
                 metric_name_column="name",
                 test_case_returning_clause="RETURNING id",
+                feedback_returning_clause="RETURNING id",
             )
         )
         if connection_string:
@@ -197,6 +198,27 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
                         )
         elif cluster_columns and "metadata" not in cluster_columns:
             conn.execute("ALTER TABLE run_cluster_maps ADD COLUMN metadata JSONB")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS satisfaction_feedback (
+                id SERIAL PRIMARY KEY,
+                run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+                test_case_id VARCHAR(255) NOT NULL,
+                satisfaction_score DECIMAL(4, 2),
+                thumb_feedback VARCHAR(10),
+                comment TEXT,
+                rater_id VARCHAR(255),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_feedback_run_id ON satisfaction_feedback(run_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_feedback_test_case_id ON satisfaction_feedback(test_case_id)"
+        )
 
     # Prompt set methods
 

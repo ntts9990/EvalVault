@@ -21,7 +21,11 @@ from evalvault.adapters.outbound.dataset.templates import (
 )
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.config.settings import get_settings
-from evalvault.domain.entities import EvaluationRun
+from evalvault.domain.entities import (
+    CalibrationResult,
+    EvaluationRun,
+    SatisfactionFeedback,
+)
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.domain.services.ragas_prompt_overrides import (
     PromptOverrideError,
@@ -178,6 +182,31 @@ class ClusterMapDeleteResponse(BaseModel):
     deleted_count: int
 
 
+class FeedbackSaveRequest(BaseModel):
+    test_case_id: str
+    satisfaction_score: float | None = None
+    thumb_feedback: Literal["up", "down", "none"] | None = None
+    comment: str | None = None
+    rater_id: str | None = None
+
+
+class FeedbackResponse(BaseModel):
+    feedback_id: str
+    run_id: str
+    test_case_id: str
+    satisfaction_score: float | None = None
+    thumb_feedback: str | None = None
+    comment: str | None = None
+    rater_id: str | None = None
+    created_at: str | None = None
+
+
+class FeedbackSummaryResponse(BaseModel):
+    avg_satisfaction_score: float | None = None
+    thumb_up_rate: float | None = None
+    total_feedback: int
+
+
 class VisualSpaceRequest(BaseModel):
     granularity: Literal["run", "case", "cluster"] = "case"
     base_run_id: str | None = None
@@ -188,9 +217,22 @@ class VisualSpaceRequest(BaseModel):
     cluster_map: dict[str, str] | None = None
 
 
-def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
+def _serialize_run_details(
+    run: EvaluationRun,
+    *,
+    calibration: CalibrationResult | None = None,
+) -> dict[str, Any]:
+    summary = run.to_summary_dict()
+    if calibration is not None:
+        summary.update(
+            {
+                "avg_satisfaction_score": calibration.summary.avg_satisfaction_score,
+                "thumb_up_rate": calibration.summary.thumb_up_rate,
+                "imputed_ratio": calibration.summary.imputed_ratio,
+            }
+        )
     payload = {
-        "summary": run.to_summary_dict(),
+        "summary": summary,
         "results": [
             {
                 "test_case_id": result.test_case_id,
@@ -207,6 +249,21 @@ def _serialize_run_details(run: EvaluationRun) -> dict[str, Any]:
                     }
                     for metric in result.metrics
                 ],
+                "calibrated_satisfaction": (
+                    calibration.cases[result.test_case_id].calibrated_satisfaction
+                    if calibration and result.test_case_id in calibration.cases
+                    else None
+                ),
+                "imputed": (
+                    calibration.cases[result.test_case_id].imputed
+                    if calibration and result.test_case_id in calibration.cases
+                    else False
+                ),
+                "imputation_source": (
+                    calibration.cases[result.test_case_id].imputation_source
+                    if calibration and result.test_case_id in calibration.cases
+                    else None
+                ),
             }
             for result in run.results
         ],
@@ -719,9 +776,12 @@ def compare_runs(
             }
         )
 
+    base_calibration = adapter.build_calibration(base_id)
+    target_calibration = adapter.build_calibration(target_id)
+
     return {
-        "base": _serialize_run_details(base_run),
-        "target": _serialize_run_details(target_run),
+        "base": _serialize_run_details(base_run, calibration=base_calibration),
+        "target": _serialize_run_details(target_run, calibration=target_calibration),
         "metric_deltas": metric_deltas,
         "case_counts": _build_case_counts(base_run, target_run),
         "pass_rate_delta": target_run.pass_rate - base_run.pass_rate,
@@ -898,7 +958,70 @@ def get_run_details(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
     """Get detailed information for a specific run."""
     try:
         run: EvaluationRun = adapter.get_run_details(run_id)
-        return _serialize_run_details(run)
+        calibration = adapter.build_calibration(run_id)
+        return _serialize_run_details(run, calibration=calibration)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{run_id}/feedback", response_model=FeedbackResponse)
+def save_feedback(
+    run_id: str,
+    request: FeedbackSaveRequest,
+    adapter: AdapterDep,
+) -> dict[str, Any]:
+    try:
+        adapter.get_run_details(run_id)
+        thumb_feedback = request.thumb_feedback
+        if thumb_feedback == "none":
+            thumb_feedback = None
+        satisfaction_score = request.satisfaction_score
+        if satisfaction_score is not None:
+            satisfaction_score = max(1.0, min(5.0, satisfaction_score))
+        feedback = SatisfactionFeedback(
+            feedback_id="",
+            run_id=run_id,
+            test_case_id=request.test_case_id,
+            satisfaction_score=satisfaction_score,
+            thumb_feedback=thumb_feedback,
+            comment=request.comment,
+            rater_id=request.rater_id,
+            created_at=datetime.now(),
+        )
+        feedback_id = adapter.save_feedback(feedback)
+        saved = feedback.to_dict()
+        saved["feedback_id"] = feedback_id
+        return saved
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/feedback", response_model=list[FeedbackResponse])
+def list_feedback(run_id: str, adapter: AdapterDep) -> list[dict[str, Any]]:
+    try:
+        adapter.get_run_details(run_id)
+        feedbacks = adapter.list_feedback(run_id)
+        return [feedback.to_dict() for feedback in feedbacks]
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/feedback/summary", response_model=FeedbackSummaryResponse)
+def get_feedback_summary(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
+    try:
+        adapter.get_run_details(run_id)
+        summary = adapter.get_feedback_summary(run_id)
+        return {
+            "avg_satisfaction_score": summary.avg_satisfaction_score,
+            "thumb_up_rate": summary.thumb_up_rate,
+            "total_feedback": summary.total_feedback,
+        }
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as e:

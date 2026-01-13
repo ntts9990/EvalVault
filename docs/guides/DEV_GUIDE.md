@@ -62,6 +62,15 @@ npm run dev
 
 ---
 
+## 타입체크 (Pyright 비활성화)
+
+EvalVault는 Ruff만 사용합니다. Pyright/Pylance 경고가 보이면 에디터 설정을 끄세요.
+
+- VS Code: 확장(“Pylance”, “Pyright”) 비활성화 또는 제거
+- VS Code 설정 예시: `"python.analysis.typeCheckingMode": "off"`
+
+---
+
 ## 문서 작업 규칙 (Docs)
 
 - `docs/`는 **현재 프로젝트에 필요한 문서만** 유지합니다. (중복/과거 정보는 삭제)

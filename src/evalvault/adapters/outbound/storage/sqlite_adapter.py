@@ -140,6 +140,31 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         elif cluster_columns and "metadata" not in cluster_columns:
             conn.execute("ALTER TABLE run_cluster_maps ADD COLUMN metadata TEXT")
 
+        feedback_cursor = conn.execute("PRAGMA table_info(satisfaction_feedback)")
+        feedback_columns = {row[1] for row in feedback_cursor.fetchall()}
+        if not feedback_columns:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS satisfaction_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    test_case_id TEXT NOT NULL,
+                    satisfaction_score REAL,
+                    thumb_feedback TEXT,
+                    comment TEXT,
+                    rater_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_run_id ON satisfaction_feedback(run_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_test_case_id ON satisfaction_feedback(test_case_id)"
+            )
+
         pipeline_cursor = conn.execute("PRAGMA table_info(pipeline_results)")
         pipeline_columns = {row[1] for row in pipeline_cursor.fetchall()}
         if pipeline_columns:

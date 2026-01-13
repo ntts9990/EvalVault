@@ -216,7 +216,7 @@ class NLPAnalyzerModule(BaseAnalysisModule):
                     "keywords": list(cluster.keywords),
                     "document_count": cluster.document_count,
                     "avg_scores": cluster.avg_scores,
-                    "representative_questions": cluster.representative_questions[:3],
+                    "representative_questions": cluster.representative_questions[:4],
                 }
             )
         return serialized
