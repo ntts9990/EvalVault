@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
 import time
@@ -19,6 +20,7 @@ from evalvault.domain.entities import (
     FeedbackSummary,
     SatisfactionFeedback,
 )
+from evalvault.domain.entities.debug import DebugReport
 from evalvault.domain.entities.prompt import PromptSetBundle
 from evalvault.domain.metrics.registry import (
     get_metric_descriptions as registry_metric_descriptions,
@@ -28,6 +30,7 @@ from evalvault.domain.metrics.registry import (
     list_metric_specs,
 )
 from evalvault.domain.services.cluster_map_builder import build_cluster_map
+from evalvault.domain.services.debug_report_service import DebugReportService
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
@@ -48,12 +51,16 @@ from evalvault.ports.inbound.web_port import (
     RunFilters,
     RunSummary,
 )
+from evalvault.ports.outbound.stage_storage_port import StageStoragePort
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun, RunClusterMap, RunClusterMapInfo
     from evalvault.domain.entities.improvement import ImprovementReport
     from evalvault.domain.entities.stage import StageEvent, StageMetric
+    from evalvault.domain.services.evaluator import RagasEvaluator
+    from evalvault.ports.outbound.dataset_port import DatasetPort
     from evalvault.ports.outbound.llm_port import LLMPort
+    from evalvault.ports.outbound.report_port import ReportPort
     from evalvault.ports.outbound.storage_port import StoragePort
 
 logger = logging.getLogger(__name__)
@@ -91,10 +98,10 @@ class WebUIAdapter:
     def __init__(
         self,
         storage: StoragePort | None = None,
-        evaluator: object | None = None,
-        report_generator: object | None = None,
+        evaluator: RagasEvaluator | None = None,
+        report_generator: ReportPort | None = None,
         llm_adapter: LLMPort | None = None,
-        data_loader: object | None = None,
+        data_loader: DatasetPort | None = None,
         settings: Settings | None = None,
     ):
         """어댑터 초기화.
@@ -372,13 +379,14 @@ class WebUIAdapter:
         """
         if self._evaluator is None:
             raise RuntimeError("Evaluator not configured")
+        evaluator = self._evaluator
 
         # LLM Adapter Resolution
-        llm_adapter = self._get_llm_for_model(request.model_name)
-        if llm_adapter is None:
+        resolved_llm = self._get_llm_for_model(request.model_name)
+        if resolved_llm is None:
             if self._llm_adapter is None:
                 raise RuntimeError("LLM adapter not configured")
-            llm_adapter = self._llm_adapter
+            resolved_llm = self._llm_adapter
             logger.warning(f"Using default LLM adapter instead of requested {request.model_name}")
 
         # 1. 데이터셋 로드 (비동기 처리)
@@ -550,7 +558,7 @@ class WebUIAdapter:
                 result = await memory_evaluator.evaluate_with_memory(
                     dataset=dataset,
                     metrics=request.metrics,
-                    llm=llm_adapter,
+                    llm=resolved_llm,
                     thresholds=resolved_thresholds,
                     parallel=request.parallel,
                     batch_size=request.batch_size,
@@ -563,10 +571,10 @@ class WebUIAdapter:
                     on_progress=adaptor_progress,
                 )
             else:
-                result = await self._evaluator.evaluate(
+                result = await evaluator.evaluate(
                     dataset=dataset,
                     metrics=request.metrics,
-                    llm=llm_adapter,
+                    llm=resolved_llm,
                     thresholds=resolved_thresholds,
                     parallel=request.parallel,
                     batch_size=request.batch_size,
@@ -730,7 +738,7 @@ class WebUIAdapter:
             except Exception as exc:
                 logger.warning("Excel export failed for run %s: %s", result.run_id, exc)
             try:
-                self._auto_generate_cluster_map(result, llm_adapter)
+                self._auto_generate_cluster_map(result, resolved_llm)
             except Exception as exc:
                 logger.warning("Cluster map auto-generation failed: %s", exc)
 
@@ -1003,6 +1011,116 @@ class WebUIAdapter:
             ]
         return metrics
 
+    def compare_prompt_sets(
+        self,
+        base_run_id: str,
+        target_run_id: str,
+        *,
+        max_lines: int = 40,
+        include_diff: bool = True,
+    ) -> dict[str, Any]:
+        if self._storage is None or not hasattr(self._storage, "get_prompt_set_for_run"):
+            raise RuntimeError("Storage not configured")
+
+        base_bundle = self._storage.get_prompt_set_for_run(base_run_id)
+        target_bundle = self._storage.get_prompt_set_for_run(target_run_id)
+        if not base_bundle or not target_bundle:
+            raise KeyError("Prompt set not found")
+
+        base_roles = self._prompt_bundle_role_map(base_bundle)
+        target_roles = self._prompt_bundle_role_map(target_bundle)
+        all_roles = sorted(set(base_roles) | set(target_roles))
+
+        summary: list[dict[str, Any]] = []
+        diffs: list[dict[str, Any]] = []
+
+        for role in all_roles:
+            base = base_roles.get(role)
+            target = target_roles.get(role)
+            if not base or not target:
+                summary.append(
+                    {
+                        "role": role,
+                        "base_checksum": base["checksum"] if base else None,
+                        "target_checksum": target["checksum"] if target else None,
+                        "status": "missing",
+                        "base_name": base["name"] if base else None,
+                        "target_name": target["name"] if target else None,
+                        "base_kind": base["kind"] if base else None,
+                        "target_kind": target["kind"] if target else None,
+                    }
+                )
+                continue
+
+            status = "same" if base["checksum"] == target["checksum"] else "diff"
+            summary.append(
+                {
+                    "role": role,
+                    "base_checksum": base["checksum"],
+                    "target_checksum": target["checksum"],
+                    "status": status,
+                    "base_name": base["name"],
+                    "target_name": target["name"],
+                    "base_kind": base["kind"],
+                    "target_kind": target["kind"],
+                }
+            )
+
+            if include_diff and status == "diff":
+                diff_lines = list(
+                    difflib.unified_diff(
+                        base["content"].splitlines(),
+                        target["content"].splitlines(),
+                        fromfile=f"{base_run_id[:8]}:{role}",
+                        tofile=f"{target_run_id[:8]}:{role}",
+                        lineterm="",
+                    )
+                )
+                truncated = len(diff_lines) > max_lines
+                diffs.append(
+                    {
+                        "role": role,
+                        "lines": diff_lines[:max_lines],
+                        "truncated": truncated,
+                    }
+                )
+
+        return {
+            "base_run_id": base_run_id,
+            "target_run_id": target_run_id,
+            "summary": summary,
+            "diffs": diffs,
+        }
+
+    def _prompt_bundle_role_map(self, bundle: PromptSetBundle) -> dict[str, dict[str, str]]:
+        prompt_map = {prompt.prompt_id: prompt for prompt in bundle.prompts}
+        roles: dict[str, dict[str, str]] = {}
+        for item in bundle.items:
+            prompt = prompt_map.get(item.prompt_id)
+            if not prompt:
+                continue
+            roles[item.role] = {
+                "checksum": prompt.checksum,
+                "content": prompt.content,
+                "name": prompt.name,
+                "kind": prompt.kind,
+            }
+        return roles
+
+    def build_debug_report(self, run_id: str) -> DebugReport:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        if not hasattr(self._storage, "list_stage_events"):
+            raise RuntimeError("Stage storage not configured")
+
+        service = DebugReportService()
+        stage_storage = cast(StageStoragePort, self._storage)
+        return service.build_report(
+            run_id,
+            storage=self._storage,
+            stage_storage=stage_storage,
+        )
+
     def delete_run(self, run_id: str) -> bool:
         """평가 삭제.
 
@@ -1184,6 +1302,8 @@ class WebUIAdapter:
             raise RuntimeError("Evaluator not configured")
         if self._llm_adapter is None:
             raise RuntimeError("LLM adapter not configured. .env에 OPENAI_API_KEY를 설정하세요.")
+        evaluator = self._evaluator
+        llm_adapter = self._llm_adapter
 
         # 진행률 초기화
         if on_progress:
@@ -1202,10 +1322,10 @@ class WebUIAdapter:
         logger.info(f"Starting evaluation ({mode}) with metrics: {metrics}")
 
         async def run_async_evaluation():
-            return await self._evaluator.evaluate(
+            return await evaluator.evaluate(
                 dataset=dataset,
                 metrics=metrics,
-                llm=self._llm_adapter,
+                llm=llm_adapter,
                 thresholds=thresholds or {},
                 parallel=parallel,
                 batch_size=batch_size,
@@ -1402,6 +1522,7 @@ class WebUIAdapter:
         metrics_to_analyze: list[str] | None = None,
         thresholds: dict[str, float] | None = None,
         model_id: str | None = None,
+        language: str | None = None,
     ):
         """LLM 기반 지능형 보고서 생성.
 
@@ -1441,6 +1562,7 @@ class WebUIAdapter:
             llm_adapter=llm_adapter,
             include_research_insights=True,
             include_action_items=True,
+            language=language or "ko",
         )
 
         # 동기 방식으로 보고서 생성
@@ -1508,7 +1630,7 @@ class WebUIAdapter:
 
         return str(file_path.absolute())
 
-    def list_models(self, provider: str | None = None) -> list[dict[str, str]]:
+    def list_models(self, provider: str | None = None) -> list[dict[str, str | bool]]:
         """사용 가능한 모델 목록 조회."""
         settings = self._settings or Settings()
         provider_key = provider.lower() if provider else None
@@ -1522,7 +1644,7 @@ class WebUIAdapter:
         if provider_key:
             return self._list_other_models(provider_key)
 
-        models: list[dict[str, str]] = []
+        models: list[dict[str, str | bool]] = []
         models.extend(self._list_ollama_models(settings))
         models.extend(self._list_openai_models())
         models.extend(self._list_vllm_models(settings))
@@ -1617,7 +1739,7 @@ class WebUIAdapter:
         lowered = model_name.lower()
         return any(lowered == entry or lowered.startswith(f"{entry}:") for entry in allowlist)
 
-    def _list_other_models(self, provider: str | None = None) -> list[dict[str, str]]:
+    def _list_other_models(self, provider: str | None = None) -> list[dict[str, str | bool]]:
         if provider and provider not in {"anthropic", "azure"}:
             return []
         return [
@@ -1658,7 +1780,8 @@ def create_adapter() -> WebUIAdapter:
 
     설정에 따라 적절한 저장소와 서비스를 주입합니다.
     """
-    from evalvault.adapters.outbound.llm import get_llm_adapter
+    from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
+    from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
     from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
     from evalvault.config.settings import get_settings
     from evalvault.domain.services.evaluator import RagasEvaluator
@@ -1679,7 +1802,9 @@ def create_adapter() -> WebUIAdapter:
         logger.warning(f"LLM adapter initialization failed: {e}")
 
     # Evaluator 생성
-    evaluator = RagasEvaluator()
+    llm_factory = SettingsLLMFactory(settings)
+    korean_toolkit = try_create_korean_toolkit()
+    evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
 
     return WebUIAdapter(
         storage=storage,

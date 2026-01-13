@@ -148,3 +148,4 @@ dmypy.json
 .AppleDouble
 .LSOverride
 scratch/
+.sisyphus/

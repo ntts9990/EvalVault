@@ -20,7 +20,10 @@ class DomainLearningHookPort(Protocol):
     평가 완료 후 호출되어 도메인 메모리를 형성합니다.
 
     사용 예시:
-        evaluator = RagasEvaluator()
+        settings = Settings()
+        llm_factory = SettingsLLMFactory(settings)
+        korean_toolkit = try_create_korean_toolkit()
+        evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
         hook = InsuranceDomainLearningHook(memory_adapter)
 
         # 평가 실행

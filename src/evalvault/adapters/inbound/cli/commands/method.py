@@ -15,8 +15,9 @@ from rich.console import Console
 from rich.table import Table
 
 from evalvault.adapters.outbound.dataset.method_input_loader import MethodInputDatasetLoader
-from evalvault.adapters.outbound.llm import get_llm_adapter
+from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
 from evalvault.adapters.outbound.methods import ExternalCommandMethod, MethodRegistry
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities import Dataset
 from evalvault.domain.entities.method import MethodOutput
@@ -376,7 +377,9 @@ def create_method_app(console: Console) -> typer.Typer:
             raise typer.Exit(1)
 
         llm_adapter = get_llm_adapter(settings)
-        evaluator = RagasEvaluator()
+        llm_factory = SettingsLLMFactory(settings)
+        korean_toolkit = try_create_korean_toolkit()
+        evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
         resolved_thresholds = _resolve_thresholds(metric_list, method_result.dataset)
 
         with progress_spinner(console, "🤖 Evaluation in progress") as update_progress:

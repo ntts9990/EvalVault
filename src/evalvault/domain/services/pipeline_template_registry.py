@@ -81,6 +81,9 @@ class PipelineTemplateRegistry:
         """의도에 대응하는 파이프라인 템플릿 조회."""
         return self._templates.get(intent)
 
+    def list_all(self) -> list[tuple[AnalysisIntent, AnalysisPipeline]]:
+        return list(self._templates.items())
+
     # =========================================================================
     # Verification Templates
     # =========================================================================

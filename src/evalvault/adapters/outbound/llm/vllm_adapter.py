@@ -12,6 +12,7 @@ from evalvault.adapters.outbound.llm.instructor_factory import create_instructor
 from evalvault.adapters.outbound.llm.token_aware_chat import TokenTrackingAsyncOpenAI
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
+from evalvault.ports.outbound.llm_port import GenerationOptions
 
 
 class VLLMAdapter(BaseLLMAdapter):
@@ -63,25 +64,46 @@ class VLLMAdapter(BaseLLMAdapter):
         """Get the embedding model name being used."""
         return self._embedding_model_name
 
-    async def agenerate_text(self, prompt: str) -> str:
+    async def agenerate_text(
+        self,
+        prompt: str,
+        *,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (async)."""
         attrs = {
             "llm.provider": "vllm",
             "llm.model": self._model_name,
             "llm.mode": "async",
         }
+        max_tokens = options.max_tokens if options and options.max_tokens is not None else 8192
+        api_kwargs = {
+            "model": self._model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_completion_tokens": max_tokens,
+        }
+        if options and options.temperature is not None:
+            api_kwargs["temperature"] = options.temperature
+        if options and options.top_p is not None:
+            api_kwargs["top_p"] = options.top_p
+        if options and options.n is not None:
+            api_kwargs["n"] = options.n
+        if options and options.seed is not None:
+            api_kwargs["seed"] = options.seed
         with instrumentation_span("llm.generate_text", attrs) as span:
-            response = await self._client.chat.completions.create(
-                model=self._model_name,
-                messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=8192,
-            )
+            response = await self._client.chat.completions.create(**api_kwargs)
             content = response.choices[0].message.content or ""
             if span:
                 set_span_attributes(span, {"llm.response.length": len(content)})
         return content
 
-    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (sync)."""
         sync_client = OpenAI(
             base_url=self._settings.vllm_base_url,
@@ -89,11 +111,20 @@ class VLLMAdapter(BaseLLMAdapter):
             timeout=self._settings.vllm_timeout,
         )
 
+        max_tokens = options.max_tokens if options and options.max_tokens is not None else 8192
         api_kwargs: dict = {
             "model": self._model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "max_completion_tokens": 8192,
+            "max_completion_tokens": max_tokens,
         }
+        if options and options.temperature is not None:
+            api_kwargs["temperature"] = options.temperature
+        if options and options.top_p is not None:
+            api_kwargs["top_p"] = options.top_p
+        if options and options.n is not None:
+            api_kwargs["n"] = options.n
+        if options and options.seed is not None:
+            api_kwargs["seed"] = options.seed
         if json_mode:
             api_kwargs["response_format"] = {"type": "json_object"}
 

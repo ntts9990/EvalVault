@@ -149,7 +149,16 @@ class TokenTrackingAsyncOpenAI(AsyncOpenAI):
 
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
-                    response = await inner_self._completions.create(**kwargs)
+                    try:
+                        response = await inner_self._completions.create(**kwargs)
+                    except TypeError as exc:
+                        if "max_completion_tokens" in str(exc):
+                            fallback_kwargs = dict(kwargs)
+                            fallback_kwargs.pop("max_completion_tokens", None)
+                            fallback_kwargs.pop("max_tokens", None)
+                            response = await inner_self._completions.create(**fallback_kwargs)
+                        else:
+                            raise
                     if provider_name == "ollama":
                         _normalize_tool_calls(response, kwargs.get("tools"))
                     # Extract usage from response
@@ -198,6 +207,7 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
 
             async def create(inner_self, **kwargs: Any) -> Any:  # noqa: N805
                 # Ensure 충분한 출력 토큰 확보 (Ollama는 max_tokens를 사용)
+                min_tokens = None
                 if provider_name == "ollama":
                     if "max_tokens" not in kwargs or kwargs["max_tokens"] < 4096:
                         kwargs["max_tokens"] = 16384
@@ -222,7 +232,16 @@ class ThinkingTokenTrackingAsyncOpenAI(TokenTrackingAsyncOpenAI):
 
                 span_attrs = _build_llm_span_attrs(provider_name, kwargs)
                 with instrumentation_span("llm.chat_completion", span_attrs) as span:
-                    response = await inner_self._completions.create(**kwargs)
+                    try:
+                        response = await inner_self._completions.create(**kwargs)
+                    except TypeError as exc:
+                        if "max_completion_tokens" in str(exc):
+                            fallback_kwargs = dict(kwargs)
+                            fallback_kwargs.pop("max_completion_tokens", None)
+                            fallback_kwargs.pop("max_tokens", None)
+                            response = await inner_self._completions.create(**fallback_kwargs)
+                        else:
+                            raise
                     if provider_name == "ollama":
                         _normalize_tool_calls(response, kwargs.get("tools"))
 

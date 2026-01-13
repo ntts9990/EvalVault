@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import math
@@ -10,35 +11,9 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, cast, overload
 
 from ragas import SingleTurnSample
-
-try:  # Ragas >=0.2.0
-    from ragas.metrics.collections import (
-        AnswerRelevancy,
-        ContextPrecision,
-        ContextRecall,
-        FactualCorrectness,
-        Faithfulness,
-        SemanticSimilarity,
-    )
-except ImportError:  # pragma: no cover - fallback for older Ragas versions
-    from ragas.metrics import (
-        AnswerRelevancy,
-        ContextPrecision,
-        ContextRecall,
-        FactualCorrectness,
-        Faithfulness,
-        SemanticSimilarity,
-    )
-try:  # SummaryScore lives in different modules depending on Ragas version
-    from ragas.metrics.collections import SummaryScore as RagasSummaryScore
-except ImportError:  # pragma: no cover - fallback for older Ragas versions
-    try:
-        from ragas.metrics import SummarizationScore as RagasSummaryScore
-    except ImportError:  # pragma: no cover - no summary support available
-        RagasSummaryScore = None
 
 from evalvault.domain.entities import (
     ClaimLevelResult,
@@ -59,8 +34,54 @@ from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
-from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
+from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort, RetrieverPort
+from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
+
+_SUMMARY_FAITHFULNESS_PROMPT_KO = (
+    "당신은 요약 충실도 판정자입니다.\n"
+    "컨텍스트와 요약을 보고 요약의 모든 주장이 컨텍스트에 의해 뒷받침되는지 판단하세요.\n"
+    "숫자, 조건, 면책, 기간, 자격 등이 누락되거나 추가되거나 모순되면 verdict는 unsupported입니다.\n"
+    'JSON만 반환: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
+    "컨텍스트:\n{context}\n\n요약:\n{summary}\n"
+)
+_SUMMARY_FAITHFULNESS_PROMPT_EN = (
+    "You are a strict summarization faithfulness judge.\n"
+    "Given the CONTEXT and SUMMARY, determine whether every claim in SUMMARY is supported by CONTEXT.\n"
+    "If any numbers, conditions, exclusions, durations, or eligibility are missing, added, or "
+    "contradicted, verdict is unsupported.\n"
+    'Return JSON only: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
+    "CONTEXT:\n{context}\n\nSUMMARY:\n{summary}\n"
+)
+
+
+def _import_metric(name: str) -> type[Any]:
+    for module_name in ("ragas.metrics.collections", "ragas.metrics"):
+        try:
+            module = importlib.import_module(module_name)
+        except Exception:
+            continue
+        if hasattr(module, name):
+            return cast(type[Any], getattr(module, name))
+    raise ImportError(f"Missing ragas metric: {name}")
+
+
+def _import_optional_metric(names: list[str]) -> type[Any] | None:
+    for name in names:
+        try:
+            return _import_metric(name)
+        except Exception:
+            continue
+    return None
+
+
+AnswerRelevancy = _import_metric("AnswerRelevancy")
+ContextPrecision = _import_metric("ContextPrecision")
+ContextRecall = _import_metric("ContextRecall")
+FactualCorrectness = _import_metric("FactualCorrectness")
+Faithfulness = _import_metric("Faithfulness")
+SemanticSimilarity = _import_metric("SemanticSimilarity")
+RagasSummaryScore = _import_optional_metric(["SummaryScore", "SummarizationScore"])
 
 logger = logging.getLogger(__name__)
 
@@ -247,9 +268,16 @@ class RagasEvaluator:
         "openai/gpt-5-nano": (5.00, 15.00),
     }
 
-    def __init__(self, *, preprocessor: DatasetPreprocessor | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        preprocessor: DatasetPreprocessor | None = None,
+        korean_toolkit: KoreanNLPToolkitPort | None = None,
+        llm_factory: LLMFactoryPort | None = None,
+    ) -> None:
         self._preprocessor = preprocessor or DatasetPreprocessor()
-        self._korean_toolkit = None
+        self._korean_toolkit = korean_toolkit
+        self._llm_factory = llm_factory
         self._faithfulness_ragas_failed = False
         self._faithfulness_fallback_llm = None
         self._faithfulness_fallback_metric = None
@@ -258,6 +286,7 @@ class RagasEvaluator:
         self._active_llm_provider = None
         self._active_llm_model = None
         self._active_llm = None
+        self._prompt_language = None
 
     async def evaluate(
         self,
@@ -273,6 +302,7 @@ class RagasEvaluator:
         on_progress: Callable[[int, int, str], None] | None = None,
         prompt_overrides: dict[str, str] | None = None,
         claim_level: bool = False,
+        language: str | None = None,
     ) -> EvaluationRun:
         """데이터셋을 Ragas로 평가.
 
@@ -299,6 +329,7 @@ class RagasEvaluator:
         self._active_llm_provider = getattr(llm, "provider_name", None)
         self._active_llm_model = llm.get_model_name()
         self._active_llm = llm
+        self._prompt_language = self._normalize_language_hint(language) if language else None
         # Resolve thresholds: CLI > dataset > default(0.7)
         resolved_thresholds = {}
         for metric in metrics:
@@ -633,6 +664,8 @@ class RagasEvaluator:
             self._apply_korean_factual_correctness_prompts(metric)
 
     def _resolve_dataset_language(self, dataset: Dataset) -> str | None:
+        if self._prompt_language:
+            return self._prompt_language
         metadata = dataset.metadata if isinstance(dataset.metadata, dict) else {}
         for key in ("language", "lang", "locale"):
             normalized = self._normalize_language_hint(metadata.get(key))
@@ -798,10 +831,10 @@ class RagasEvaluator:
             if isinstance(target, str):
                 metric.prompt = prompt_text
                 return True
-            if hasattr(target, "template"):
+            if target is not None and hasattr(target, "template"):
                 target.template = prompt_text
                 return True
-            if hasattr(target, "instruction"):
+            if target is not None and hasattr(target, "instruction"):
                 target.instruction = prompt_text
                 return True
 
@@ -810,10 +843,10 @@ class RagasEvaluator:
             if isinstance(target, str):
                 metric.question_generation = prompt_text
                 return True
-            if hasattr(target, "template"):
+            if target is not None and hasattr(target, "template"):
                 target.template = prompt_text
                 return True
-            if hasattr(target, "instruction"):
+            if target is not None and hasattr(target, "instruction"):
                 target.instruction = prompt_text
                 return True
 
@@ -1249,6 +1282,22 @@ class RagasEvaluator:
     def default_threshold_for(cls, metric_name: str) -> float:
         return cls.DEFAULT_METRIC_THRESHOLDS.get(metric_name, cls.DEFAULT_THRESHOLD_FALLBACK)
 
+    @overload
+    def _fallback_korean_faithfulness(
+        self,
+        sample: SingleTurnSample,
+        *,
+        return_details: Literal[True],
+    ) -> ClaimLevelResult | None: ...
+
+    @overload
+    def _fallback_korean_faithfulness(
+        self,
+        sample: SingleTurnSample,
+        *,
+        return_details: Literal[False] = False,
+    ) -> float | None: ...
+
     def _fallback_korean_faithfulness(
         self, sample: SingleTurnSample, *, return_details: bool = False
     ) -> float | ClaimLevelResult | None:
@@ -1270,11 +1319,7 @@ class RagasEvaluator:
             return None
 
         if self._korean_toolkit is None:
-            try:
-                from evalvault.adapters.outbound.nlp.korean.toolkit import KoreanNLPToolkit
-            except Exception:  # pragma: no cover - optional dependency
-                return None
-            self._korean_toolkit = KoreanNLPToolkit()
+            return None
 
         try:
             result = self._korean_toolkit.check_faithfulness(
@@ -1288,6 +1333,8 @@ class RagasEvaluator:
             return self._convert_to_claim_level_result(result, test_case_id="")
 
         score = getattr(result, "score", None)
+        if score is None:
+            return None
         try:
             return float(score)
         except (TypeError, ValueError):
@@ -1367,14 +1414,11 @@ class RagasEvaluator:
             return None
 
         context = "\n\n".join(sample.retrieved_contexts)
-        prompt = (
-            "You are a strict summarization faithfulness judge.\n"
-            "Given the CONTEXT and SUMMARY, determine whether every claim in SUMMARY is supported by CONTEXT.\n"
-            "If any numbers, conditions, exclusions, durations, or eligibility are missing, added, or "
-            "contradicted, verdict is unsupported.\n"
-            'Return JSON only: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
-            f"CONTEXT:\n{context}\n\nSUMMARY:\n{sample.response}\n"
+        language = self._prompt_language or "ko"
+        template = (
+            _SUMMARY_FAITHFULNESS_PROMPT_EN if language == "en" else _SUMMARY_FAITHFULNESS_PROMPT_KO
         )
+        prompt = template.format(context=context, summary=sample.response)
 
         try:
             response_text = await asyncio.to_thread(llm.generate_text, prompt, json_mode=True)
@@ -1416,7 +1460,7 @@ class RagasEvaluator:
     ) -> float | None:
         metric = self._get_faithfulness_fallback_metric()
         if metric is None:
-            return self._fallback_korean_faithfulness(sample)
+            return self._fallback_korean_faithfulness(sample, return_details=False)
 
         try:
             if hasattr(metric, "ascore"):
@@ -1444,6 +1488,8 @@ class RagasEvaluator:
             else:
                 score_value = result
 
+            if score_value is None:
+                raise ValueError("Metric returned None")
             score_value = float(score_value)
             if math.isnan(score_value):
                 raise ValueError("Metric returned NaN")
@@ -1455,7 +1501,7 @@ class RagasEvaluator:
                     self._summarize_ragas_error(exc),
                 )
                 self._faithfulness_fallback_failed = True
-            return self._fallback_korean_faithfulness(sample)
+            return self._fallback_korean_faithfulness(sample, return_details=False)
 
     def _get_faithfulness_fallback_metric(self):
         if self._faithfulness_fallback_failed:
@@ -1487,29 +1533,14 @@ class RagasEvaluator:
             return None
         if self._faithfulness_fallback_llm is not None:
             return self._faithfulness_fallback_llm
-
-        try:
-            from evalvault.adapters.outbound.llm import create_llm_adapter_for_model
-            from evalvault.config.settings import Settings
-        except Exception:
-            return None
-
-        settings = Settings()
-        provider, model = self._resolve_faithfulness_fallback_config(settings)
-        if not provider or not model:
+        if self._llm_factory is None:
             return None
 
         try:
-            llm = create_llm_adapter_for_model(provider, model, settings)
-            self._faithfulness_fallback_llm = llm
-            if not self._faithfulness_fallback_logged:
-                logger.warning(
-                    "Faithfulness fallback LLM enabled: %s/%s",
-                    provider,
-                    model,
-                )
-                self._faithfulness_fallback_logged = True
-            return llm
+            llm = self._llm_factory.create_faithfulness_fallback(
+                self._active_llm_provider,
+                self._active_llm_model,
+            )
         except Exception as exc:
             if not self._faithfulness_fallback_failed:
                 logger.warning(
@@ -1519,39 +1550,20 @@ class RagasEvaluator:
                 self._faithfulness_fallback_failed = True
             return None
 
-    def _resolve_faithfulness_fallback_config(self, settings) -> tuple[str | None, str | None]:
-        provider = (
-            settings.faithfulness_fallback_provider.strip().lower()
-            if settings.faithfulness_fallback_provider
-            else None
-        )
-        model = settings.faithfulness_fallback_model
-        active_provider = (
-            self._active_llm_provider.strip().lower()
-            if isinstance(self._active_llm_provider, str) and self._active_llm_provider.strip()
-            else None
-        )
-        default_provider = active_provider or settings.llm_provider.lower()
+        if llm is None:
+            return None
 
-        if not provider and model:
-            provider = default_provider
-        if provider and not model:
-            model = self._default_faithfulness_fallback_model(provider)
-        if not provider and not model:
-            provider = default_provider
-            model = self._default_faithfulness_fallback_model(default_provider)
-
-        if not provider or not model:
-            return None, None
-        return provider, model
-
-    @staticmethod
-    def _default_faithfulness_fallback_model(provider: str) -> str | None:
-        if provider == "ollama":
-            return "gpt-oss-safeguard:20b"
-        if provider == "vllm":
-            return "gpt-oss-120b"
-        return None
+        self._faithfulness_fallback_llm = llm
+        if not self._faithfulness_fallback_logged:
+            provider = getattr(llm, "provider_name", None)
+            model = llm.get_model_name()
+            logger.warning(
+                "Faithfulness fallback LLM enabled: %s/%s",
+                provider,
+                model,
+            )
+            self._faithfulness_fallback_logged = True
+        return llm
 
     @staticmethod
     def _contains_korean(text: str) -> bool:

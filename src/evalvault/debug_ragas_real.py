@@ -1,7 +1,9 @@
 import asyncio
 import logging
 
+from evalvault.adapters.outbound.llm import SettingsLLMFactory
 from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities.dataset import Dataset, TestCase
 from evalvault.domain.services.evaluator import RagasEvaluator
@@ -25,7 +27,9 @@ async def debug_ragas_real():
     print(f"Using Model: {settings.openai_model}")
 
     llm = OpenAIAdapter(settings)
-    evaluator = RagasEvaluator()
+    llm_factory = SettingsLLMFactory(settings)
+    korean_toolkit = try_create_korean_toolkit()
+    evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
 
     # Manual Dataset
     test_case = TestCase(

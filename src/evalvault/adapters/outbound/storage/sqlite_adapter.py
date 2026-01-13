@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
+from contextlib import AbstractContextManager, closing
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from evalvault.adapters.outbound.storage.base_sql import BaseSQLStorageAdapter, SQLQueries
 from evalvault.domain.entities.analysis import (
@@ -61,15 +63,20 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         conn.commit()
         conn.close()
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> Any:
         """Create a DB-API connection with the expected options."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-    def _apply_migrations(self, conn: sqlite3.Connection) -> None:
+    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]:
+        conn = self._connect()
+        return closing(cast(sqlite3.Connection, conn))
+
+    def _apply_migrations(self, conn: Any) -> None:
         """Apply schema migrations for legacy databases."""
+        conn = cast(Any, conn)
         cursor = conn.execute("PRAGMA table_info(evaluation_runs)")
         columns = {row[1] for row in cursor.fetchall()}
         if "metadata" not in columns:
@@ -180,6 +187,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:
         """Save prompt set, prompts, and join items."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -241,6 +249,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
         """Attach a prompt set to a run."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             conn.execute(
                 """
                 INSERT OR REPLACE INTO run_prompt_sets (
@@ -258,6 +267,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     def get_prompt_set(self, prompt_set_id: str) -> PromptSetBundle:
         """Load a prompt set bundle by ID."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(
                 """
                 SELECT prompt_set_id, name, description, metadata, created_at
@@ -270,12 +280,17 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             if not row:
                 raise KeyError(f"Prompt set not found: {prompt_set_id}")
 
+            created_at = self._deserialize_datetime(row["created_at"])
+            if created_at is None:
+                created_at = datetime.now()
+            assert created_at is not None
+
             prompt_set = PromptSet(
                 prompt_set_id=row["prompt_set_id"],
                 name=row["name"],
                 description=row["description"] or "",
                 metadata=json.loads(row["metadata"]) if row["metadata"] else {},
-                created_at=self._deserialize_datetime(row["created_at"]),
+                created_at=created_at,
             )
 
             item_rows = conn.execute(
@@ -313,6 +328,11 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                     tuple(prompt_ids),
                 ).fetchall()
                 for prompt_row in prompt_rows:
+                    created_at = self._deserialize_datetime(prompt_row["created_at"])
+                    if created_at is None:
+                        created_at = datetime.now()
+                    assert created_at is not None
+
                     prompts.append(
                         Prompt(
                             prompt_id=prompt_row["prompt_id"],
@@ -325,7 +345,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                             metadata=json.loads(prompt_row["metadata"])
                             if prompt_row["metadata"]
                             else {},
-                            created_at=self._deserialize_datetime(prompt_row["created_at"]),
+                            created_at=created_at,
                         )
                     )
 
@@ -334,6 +354,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     def get_prompt_set_for_run(self, run_id: str) -> PromptSetBundle | None:
         """Load the prompt set linked to a run."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             row = conn.execute(
                 """
                 SELECT prompt_set_id
@@ -360,6 +381,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             저장된 experiment의 ID
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             # Insert or replace experiment
             cursor.execute(
@@ -425,6 +447,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             KeyError: 실험을 찾을 수 없는 경우
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             # Fetch experiment
             cursor.execute(
@@ -503,6 +526,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             Experiment 객체 리스트
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             query = "SELECT experiment_id FROM experiments WHERE 1=1"
             params = []
@@ -539,6 +563,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             저장된 analysis의 ID
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             # Serialize analysis to JSON
             result_data = self._serialize_analysis(analysis)
@@ -574,6 +599,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             KeyError: 분석을 찾을 수 없는 경우
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -612,6 +638,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             StatisticalAnalysis 리스트
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             query = """
                 SELECT analysis_id, run_id, analysis_type, result_data, created_at
@@ -650,6 +677,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             삭제 성공 여부
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM analysis_results WHERE analysis_id = ?",
@@ -726,6 +754,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         import uuid
 
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             analysis_id = f"nlp-{analysis.run_id}-{uuid.uuid4().hex[:8]}"
             result_data = self._serialize_nlp_analysis(analysis)
@@ -761,6 +790,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             KeyError: 분석을 찾을 수 없는 경우
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -788,6 +818,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             NLPAnalysis 또는 None (분석 결과가 없는 경우)
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -891,6 +922,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         is_complete = 1 if record.get("is_complete", False) else 0
 
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             conn.execute(
                 """
                 INSERT OR REPLACE INTO pipeline_results (
@@ -920,6 +952,44 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             )
             conn.commit()
 
+    def save_analysis_report(
+        self,
+        *,
+        report_id: str | None,
+        run_id: str | None,
+        experiment_id: str | None,
+        report_type: str,
+        format: str,
+        content: str | None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> str:
+        report_id = report_id or str(uuid.uuid4())
+        created_at = created_at or datetime.now().isoformat()
+
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO analysis_reports (
+                    report_id, run_id, experiment_id, report_type, format, content, metadata, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report_id,
+                    run_id,
+                    experiment_id,
+                    report_type,
+                    format,
+                    content,
+                    self._serialize_json(metadata),
+                    created_at,
+                ),
+            )
+            conn.commit()
+
+        return report_id
+
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """
@@ -931,12 +1001,14 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             LIMIT ?
         """
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             rows = conn.execute(query, (limit,)).fetchall()
         return [self._deserialize_pipeline_result(row, include_payload=False) for row in rows]
 
     def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
         """저장된 파이프라인 분석 결과를 조회합니다."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             row = conn.execute(
                 """
             SELECT result_id, intent, query, run_id, pipeline_id,
@@ -983,6 +1055,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     def save_stage_event(self, event: StageEvent) -> str:
         """단계 이벤트를 저장합니다."""
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             conn.execute(
                 """
                 INSERT OR REPLACE INTO stage_events (
@@ -1001,6 +1074,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         if not events:
             return 0
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO stage_events (
@@ -1034,6 +1108,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             params.append(stage_type)
         query += " ORDER BY id"
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
         return [self._deserialize_stage_event(row) for row in rows]
@@ -1043,6 +1118,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         if not metrics:
             return 0
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             conn.executemany(
                 """
                 INSERT INTO stage_metrics (
@@ -1076,6 +1152,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             params.append(metric_name)
         query += " ORDER BY id"
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
         return [self._deserialize_stage_metric(row) for row in rows]
@@ -1155,6 +1232,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
 
     def save_benchmark_run(self, run: BenchmarkRun) -> str:
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             task_scores_json = json.dumps(
                 [
                     {
@@ -1208,6 +1286,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         )
 
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(
                 """
                 SELECT run_id, benchmark_type, model_name, backend, tasks,
@@ -1288,6 +1367,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         params.append(limit)
 
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(query, params)
             run_ids = [row["run_id"] for row in cursor.fetchall()]
 
@@ -1295,6 +1375,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
 
     def delete_benchmark_run(self, run_id: str) -> bool:
         with self._get_connection() as conn:
+            conn = cast(Any, conn)
             cursor = conn.execute(
                 "DELETE FROM benchmark_runs WHERE run_id = ?",
                 (run_id,),

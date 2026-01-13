@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from evalvault.adapters.inbound.api.main import AdapterDep
@@ -19,6 +19,7 @@ from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_json,
     render_dataset_template_xlsx,
 )
+from evalvault.adapters.outbound.debug.report_renderer import render_markdown
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities import (
@@ -79,6 +80,30 @@ class QualityGateReportResponse(BaseModel):
     results: list[QualityGateResultResponse]
     regression_detected: bool
     regression_amount: float | None = None
+
+
+class PromptDiffSummaryItem(BaseModel):
+    role: str
+    base_checksum: str | None = None
+    target_checksum: str | None = None
+    status: Literal["same", "diff", "missing"]
+    base_name: str | None = None
+    target_name: str | None = None
+    base_kind: str | None = None
+    target_kind: str | None = None
+
+
+class PromptDiffEntry(BaseModel):
+    role: str
+    lines: list[str]
+    truncated: bool
+
+
+class PromptDiffResponse(BaseModel):
+    base_run_id: str
+    target_run_id: str
+    summary: list[PromptDiffSummaryItem]
+    diffs: list[PromptDiffEntry]
 
 
 class StartEvaluationRequest(BaseModel):
@@ -1067,12 +1092,50 @@ def list_stage_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/prompt-diff", response_model=PromptDiffResponse)
+def prompt_diff(
+    adapter: AdapterDep,
+    base_run_id: str = Query(..., description="Base run id"),
+    target_run_id: str = Query(..., description="Target run id"),
+    max_lines: int = Query(40, ge=1, le=200),
+    include_diff: bool = Query(True),
+):
+    try:
+        return adapter.compare_prompt_sets(
+            base_run_id,
+            target_run_id,
+            max_lines=max_lines,
+            include_diff=include_diff,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Prompt set not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{run_id}/quality-gate", response_model=QualityGateReportResponse)
 def check_quality_gate(run_id: str, adapter: AdapterDep):
     """Check quality gate status for a run."""
     try:
         report = adapter.check_quality_gate(run_id)
         return report
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/debug-report", response_model=None)
+def get_debug_report(
+    run_id: str,
+    adapter: AdapterDep,
+    format: Literal["json", "markdown"] = Query("json", description="Report format"),
+):
+    try:
+        report = adapter.build_debug_report(run_id)
+        if format == "markdown":
+            return PlainTextResponse(render_markdown(report))
+        return report.to_dict()
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as e:
@@ -1101,10 +1164,11 @@ def generate_llm_report(
     run_id: str,
     adapter: AdapterDep,
     model_id: str | None = None,
+    language: str | None = Query(None, description="Report language (ko/en)"),
 ):
     """Generate LLM-based detailed report."""
     try:
-        report = adapter.generate_llm_report(run_id, model_id=model_id)
+        report = adapter.generate_llm_report(run_id, model_id=model_id, language=language)
         return report
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")

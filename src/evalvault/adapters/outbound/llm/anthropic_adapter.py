@@ -14,7 +14,7 @@ from evalvault.adapters.outbound.llm.base import (
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.config.phoenix_support import instrumentation_span, set_span_attributes
 from evalvault.config.settings import Settings
-from evalvault.ports.outbound.llm_port import ThinkingConfig
+from evalvault.ports.outbound.llm_port import GenerationOptions, ThinkingConfig
 
 try:  # Optional dependency
     from anthropic import AsyncAnthropic
@@ -147,7 +147,12 @@ class AnthropicAdapter(BaseLLMAdapter):
         """Get the extended thinking token budget."""
         return self._thinking_budget
 
-    async def agenerate_text(self, prompt: str) -> str:
+    async def agenerate_text(
+        self,
+        prompt: str,
+        *,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (async).
 
         Uses the Anthropic messages API for simple text generation.
@@ -158,10 +163,17 @@ class AnthropicAdapter(BaseLLMAdapter):
         Returns:
             Generated text string
         """
+        max_tokens = options.max_tokens if options and options.max_tokens is not None else 8192
+        api_kwargs: dict[str, Any] = {}
+        if options and options.temperature is not None:
+            api_kwargs["temperature"] = options.temperature
+        if options and options.top_p is not None:
+            api_kwargs["top_p"] = options.top_p
         response = await self._anthropic_client.messages.create(
             model=self._model_name,
-            max_tokens=8192,
+            max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
+            **api_kwargs,
         )
         # Extract text from response content blocks
         text_parts = []
@@ -170,7 +182,13 @@ class AnthropicAdapter(BaseLLMAdapter):
                 text_parts.append(block.text)
         return "".join(text_parts)
 
-    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (sync).
 
         Args:
@@ -192,12 +210,14 @@ class AnthropicAdapter(BaseLLMAdapter):
                 import nest_asyncio
 
                 nest_asyncio.apply()
-                return loop.run_until_complete(self.agenerate_text(prompt))
+                return loop.run_until_complete(self.agenerate_text(prompt, options=options))
             except ImportError:
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, self.agenerate_text(prompt))
+                    future = executor.submit(
+                        asyncio.run, self.agenerate_text(prompt, options=options)
+                    )
                     return future.result()
         else:
-            return asyncio.run(self.agenerate_text(prompt))
+            return asyncio.run(self.agenerate_text(prompt, options=options))

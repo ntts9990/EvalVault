@@ -18,6 +18,7 @@ For tests requiring API keys:
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -234,7 +235,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=1),
                     latency_ms=1000,
                 )
-            mock_eval.return_value = (mock_results, {})
+            mock_eval.return_value = (mock_results, {}, {})
 
             run = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -268,7 +269,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=2),
                     latency_ms=2000,
                 )
-            mock_eval.return_value = (mock_results, {})
+            mock_eval.return_value = (mock_results, {}, {})
 
             run = await evaluator.evaluate(
                 dataset=sample_dataset,
@@ -296,7 +297,7 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
                     finished_at=datetime.now() + timedelta(seconds=1),
                     latency_ms=1000,
                 )
-            mock_eval.return_value = (mock_results, {})
+            mock_eval.return_value = (mock_results, {}, {})
 
             before = datetime.now()
             run = await evaluator.evaluate(
@@ -306,9 +307,15 @@ class TestEvaluationPipelineE2E(TestE2EFixturePaths):
             )
             after = datetime.now()
 
-        assert run.started_at >= before
-        assert run.finished_at <= after
-        assert run.duration_seconds >= 0
+        assert run.started_at is not None
+        assert run.finished_at is not None
+        started_at = cast(datetime, run.started_at)
+        finished_at = cast(datetime, run.finished_at)
+        assert started_at >= before
+        assert finished_at <= after
+        duration = run.duration_seconds
+        assert duration is not None
+        assert duration >= 0
 
 
 class TestStorageIntegrationE2E(TestE2EFixturePaths):

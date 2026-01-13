@@ -11,6 +11,7 @@ import json
 import logging
 import random
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -130,8 +131,8 @@ class SyntheticQAGenerator:
     - 한국어/영어 지원
 
     Example:
-        >>> from evalvault.adapters.outbound.llm import OpenAIAdapter
-        >>> llm = OpenAIAdapter()
+        >>> from evalvault.ports.outbound.llm_port import LLMPort
+        >>> llm: LLMPort = ...
         >>> generator = SyntheticQAGenerator(llm)
         >>> dataset = generator.generate(documents, config)
     """
@@ -298,7 +299,7 @@ class SyntheticQAGenerator:
         self,
         documents: list[str],
         config: SyntheticQAConfig,
-        progress_callback: callable = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> Dataset:
         """Generate synthetic Q&A dataset from documents.
 

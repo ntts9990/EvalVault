@@ -34,6 +34,15 @@ class ThinkingConfig:
         return {"think_level": self.think_level}
 
 
+@dataclass
+class GenerationOptions:
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
+    n: int | None = None
+    seed: int | None = None
+
+
 class LLMPort(ABC):
     """LLM adapter interface for Ragas metrics evaluation.
 
@@ -62,6 +71,18 @@ class LLMPort(ABC):
         """
         pass
 
+    def as_ragas_embeddings(self) -> Any:
+        raise NotImplementedError("as_ragas_embeddings not implemented")
+
+    def get_token_usage(self) -> tuple[int, int, int]:
+        raise NotImplementedError("get_token_usage not implemented")
+
+    def get_and_reset_token_usage(self) -> tuple[int, int, int]:
+        raise NotImplementedError("get_and_reset_token_usage not implemented")
+
+    def reset_token_usage(self) -> None:
+        raise NotImplementedError("reset_token_usage not implemented")
+
     def get_thinking_config(self) -> ThinkingConfig:
         """Get thinking/reasoning configuration for this adapter.
 
@@ -81,7 +102,12 @@ class LLMPort(ABC):
         """
         return self.get_thinking_config().enabled
 
-    async def agenerate_text(self, prompt: str) -> str:
+    async def agenerate_text(
+        self,
+        prompt: str,
+        *,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (async).
 
         Simple text generation for use cases like report generation,
@@ -98,7 +124,13 @@ class LLMPort(ABC):
         """
         raise NotImplementedError("agenerate_text not implemented")
 
-    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (sync).
 
         Simple text generation for use cases like report generation,

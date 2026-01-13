@@ -366,6 +366,24 @@ DEFAULT_METRIC_PROMPT = """당신은 RAG 시스템 평가 전문가입니다.
 
 마크다운 형식으로 작성해주세요."""
 
+DEFAULT_METRIC_PROMPT_EN = """You are a RAG evaluation expert.
+
+## Target
+- Metric: {metric_name}
+- Score: {score:.3f} / 1.0
+- Threshold: {threshold:.2f}
+- Status: {status}
+
+## Request
+Provide a Markdown analysis covering:
+
+1. **Current assessment**: what this score implies
+2. **Likely causes**: plausible root causes
+3. **Actionable improvements**: practical steps the team can take
+4. **Expected impact**: anticipated gains per action
+
+Respond in Markdown."""
+
 
 EXECUTIVE_SUMMARY_PROMPT = """당신은 RAG 시스템 성능 개선 전문가입니다. 평가 결과를 분석하고 구체적인 개선 방안을 제시해주세요.
 
@@ -422,6 +440,60 @@ EXECUTIVE_SUMMARY_PROMPT = """당신은 RAG 시스템 성능 개선 전문가입
 **주의**: 추상적 조언(예: "품질을 높이세요")은 금지. 모든 제안은 **구체적이고 실행 가능**해야 합니다.
 
 마크다운 형식으로 작성해주세요."""
+
+EXECUTIVE_SUMMARY_PROMPT_EN = """You are a RAG performance improvement expert. Analyze the evaluation results and propose concrete actions.
+
+Evaluation Results:
+- Dataset: {dataset_name}
+- Model: {model_name}
+- Pass rate: {pass_rate:.1%}
+- Test cases: {total_test_cases}
+
+Metric Scores:
+{metrics_summary}
+
+Analysis Request:
+
+Provide a RAG performance improvement-focused analysis using the structure below:
+
+1) Current Summary (3 sentences)
+- Overall quality level and the most urgent issue
+- Clearly distinguish strong areas vs weak areas
+
+2) Problem Definition
+
+| Problem | Metric | Current | Target | Severity |
+|------|--------|--------|--------|--------|
+| (Specific issue) | (Related metric) | (Score) | (Target) | Critical/High/Medium |
+
+3) Root Cause Analysis
+
+For each problem:
+- Direct cause: immediate cause (e.g., "relevant context is not retrieved")
+- Root cause: structural cause (e.g., "chunk size is too large and dilutes relevance")
+- Verification: how to validate (e.g., "re-run with top_k=10")
+
+4) Solutions
+
+P0 - Immediate (1-3 days)
+For each action:
+- Action: one-line description
+- Implementation: concrete steps (including code/config changes)
+- Expected impact: quantified estimate (e.g., "faithfulness +0.15")
+
+P1 - Short term (1-2 weeks)
+Provide 2-3 actions in the same format
+
+P2 - Mid term (1 month)
+Provide 1-2 actions in the same format
+
+5) Verification Plan
+- How to measure improvement for each action
+- Monitoring indicators to prevent regressions
+
+Note: Do not give abstract advice. All suggestions must be concrete and actionable.
+
+Respond in Markdown."""
 
 SUMMARY_RECOMMENDED_THRESHOLDS = {
     "summary_faithfulness": 0.90,
@@ -643,11 +715,15 @@ class LLMReportGenerator:
         threshold: float,
     ) -> LLMReportSection:
         """개별 메트릭 분석."""
-        # 프롬프트 선택
-        prompt_template = METRIC_ANALYSIS_PROMPTS.get(metric_name, DEFAULT_METRIC_PROMPT)
+        prompt_template = (
+            DEFAULT_METRIC_PROMPT_EN
+            if self._language == "en"
+            else METRIC_ANALYSIS_PROMPTS.get(metric_name, DEFAULT_METRIC_PROMPT)
+        )
 
-        # 상태 계산
-        status = "통과" if score >= threshold else "미달"
+        status = "pass" if score >= threshold else "fail"
+        if self._language != "en":
+            status = "통과" if score >= threshold else "미달"
 
         prompt = prompt_template.format(
             metric_name=metric_name,
@@ -683,11 +759,19 @@ class LLMReportGenerator:
         for metric, score in metrics_scores.items():
             threshold = thresholds.get(metric, 0.7)
             status = "✅" if score >= threshold else "❌"
-            metrics_lines.append(f"- {metric}: {score:.3f} (임계값: {threshold:.2f}) {status}")
+            if self._language == "en":
+                metrics_lines.append(
+                    f"- {metric}: {score:.3f} (threshold: {threshold:.2f}) {status}"
+                )
+            else:
+                metrics_lines.append(f"- {metric}: {score:.3f} (임계값: {threshold:.2f}) {status}")
 
         metrics_summary = "\n".join(metrics_lines)
 
-        prompt = EXECUTIVE_SUMMARY_PROMPT.format(
+        prompt_template = (
+            EXECUTIVE_SUMMARY_PROMPT_EN if self._language == "en" else EXECUTIVE_SUMMARY_PROMPT
+        )
+        prompt = prompt_template.format(
             dataset_name=run.dataset_name,
             model_name=run.model_name,
             pass_rate=run.pass_rate,

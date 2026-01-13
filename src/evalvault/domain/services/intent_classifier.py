@@ -157,6 +157,79 @@ class IntentKeywordRegistry:
             "추이",
             "history",
         }
+        self._keywords[AnalysisIntent.ANALYZE_STATISTICAL] = {
+            "통계",
+            "statistical",
+            "statistics",
+            "평균",
+            "mean",
+            "median",
+            "분산",
+            "variance",
+            "표준편차",
+            "std",
+        }
+        self._keywords[AnalysisIntent.ANALYZE_NLP] = {
+            "nlp",
+            "언어",
+            "텍스트",
+            "text",
+            "문장",
+            "sentence",
+            "키워드",
+            "keyword",
+            "토픽",
+            "topic",
+        }
+        self._keywords[AnalysisIntent.ANALYZE_CAUSAL] = {
+            "인과",
+            "causal",
+            "cause",
+            "effect",
+            "원인",
+            "영향",
+            "intervention",
+        }
+        self._keywords[AnalysisIntent.ANALYZE_NETWORK] = {
+            "네트워크",
+            "network",
+            "graph",
+            "그래프",
+            "연결",
+            "centrality",
+        }
+        self._keywords[AnalysisIntent.ANALYZE_PLAYBOOK] = {
+            "playbook",
+            "플레이북",
+            "규칙",
+            "rule",
+            "추천",
+            "recommendation",
+        }
+        self._keywords[AnalysisIntent.DETECT_ANOMALIES] = {
+            "이상",
+            "anomaly",
+            "anomalies",
+            "outlier",
+            "이상치",
+            "detect",
+        }
+        self._keywords[AnalysisIntent.FORECAST_PERFORMANCE] = {
+            "예측",
+            "forecast",
+            "predict",
+            "projection",
+            "미래",
+            "future",
+        }
+        self._keywords[AnalysisIntent.GENERATE_HYPOTHESES] = {
+            "가설",
+            "hypothesis",
+            "hypotheses",
+            "실험",
+            "experiment",
+            "검증",
+        }
         self._keywords[AnalysisIntent.BENCHMARK_RETRIEVAL] = {
             "벤치마크",
             "benchmark",

@@ -8,6 +8,10 @@ from evalvault.adapters.outbound.llm.base import (
     LLMConfigurationError,
     create_openai_embeddings_with_legacy,
 )
+from evalvault.adapters.outbound.llm.factory import (
+    SettingsLLMFactory,
+    create_llm_adapter_for_model,
+)
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
 from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
@@ -70,49 +74,6 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
     )
 
 
-def create_llm_adapter_for_model(
-    provider: str,
-    model_name: str,
-    base_settings: Settings,
-) -> LLMPort:
-    provider = provider.lower()
-
-    if provider == "openai":
-        base_settings.llm_provider = "openai"
-        base_settings.openai_model = model_name
-        from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
-
-        return OpenAIAdapter(base_settings)
-    if provider == "ollama":
-        base_settings.llm_provider = "ollama"
-        base_settings.ollama_model = model_name
-        from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
-
-        return OllamaAdapter(base_settings)
-    if provider == "vllm":
-        base_settings.llm_provider = "vllm"
-        base_settings.vllm_model = model_name
-        from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
-
-        return VLLMAdapter(base_settings)
-    if provider == "azure":
-        base_settings.llm_provider = "azure"
-        base_settings.azure_deployment = model_name
-        from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter
-
-        return AzureOpenAIAdapter(base_settings)
-    if provider == "anthropic":
-        base_settings.llm_provider = "anthropic"
-        base_settings.anthropic_model = model_name
-        from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
-
-        return AnthropicAdapter(base_settings)
-
-    raise ValueError(
-        f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
-    )
-
-
 __all__ = [
     "BaseLLMAdapter",
     "LLMConfigurationError",
@@ -123,6 +84,7 @@ __all__ = [
     "LLMRelationAugmenter",
     "OllamaAdapter",
     "VLLMAdapter",
+    "SettingsLLMFactory",
     "get_llm_adapter",
     "create_llm_adapter_for_model",
 ]

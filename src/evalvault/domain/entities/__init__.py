@@ -37,6 +37,12 @@ from evalvault.domain.entities.improvement import (
 from evalvault.domain.entities.kg import EntityModel, RelationModel
 from evalvault.domain.entities.method import MethodInput, MethodInputDataset, MethodOutput
 from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
+from evalvault.domain.entities.prompt_suggestion import (
+    PromptCandidate,
+    PromptCandidateSampleScore,
+    PromptCandidateScore,
+    PromptSuggestionResult,
+)
 from evalvault.domain.entities.rag_trace import (
     GenerationData,
     RAGTraceData,
@@ -110,6 +116,10 @@ __all__ = [
     "PromptSet",
     "PromptSetBundle",
     "PromptSetItem",
+    "PromptCandidate",
+    "PromptCandidateSampleScore",
+    "PromptCandidateScore",
+    "PromptSuggestionResult",
     # RAG Trace
     "GenerationData",
     "RAGTraceData",

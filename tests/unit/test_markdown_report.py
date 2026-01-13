@@ -180,25 +180,25 @@ class TestMarkdownReportAdapter:
         result = adapter.generate_markdown(analysis_bundle)
 
         # Check header
-        assert "# EvalVault Analysis Report" in result
+        assert "# EvalVault 분석 리포트" in result
         assert "run-123" in result
 
         # Check summary
-        assert "## Executive Summary" in result
+        assert "## 요약" in result
         assert "75.0%" in result  # pass rate
 
         # Check statistical section
-        assert "## Statistical Analysis" in result
+        assert "## 통계 분석" in result
         assert "faithfulness" in result
         assert "answer_relevancy" in result
 
         # Check NLP section
-        assert "## NLP Analysis" in result
+        assert "## NLP 분석" in result
         assert "500" in result  # word count
         assert "insurance" in result  # keyword
 
         # Check recommendations
-        assert "## Recommendations" in result
+        assert "## 권장사항" in result
 
     def test_generate_markdown_without_nlp(self, bundle_without_nlp: AnalysisBundle) -> None:
         """Test generating markdown report without NLP section."""
@@ -206,8 +206,8 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(bundle_without_nlp)
 
-        assert "## Statistical Analysis" in result
-        assert "## NLP Analysis" not in result
+        assert "## 통계 분석" in result
+        assert "## NLP 분석" not in result
 
     def test_generate_markdown_exclude_nlp(self, analysis_bundle: AnalysisBundle) -> None:
         """Test excluding NLP section via parameter."""
@@ -215,8 +215,8 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle, include_nlp=False)
 
-        assert "## Statistical Analysis" in result
-        assert "## NLP Analysis" not in result
+        assert "## 통계 분석" in result
+        assert "## NLP 분석" not in result
 
     def test_generate_markdown_exclude_recommendations(
         self, analysis_bundle: AnalysisBundle
@@ -226,8 +226,8 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle, include_recommendations=False)
 
-        assert "## Statistical Analysis" in result
-        assert "## Recommendations" not in result
+        assert "## 통계 분석" in result
+        assert "## 권장사항" not in result
 
     def test_generate_markdown_metric_pass_rates_table(
         self, analysis_bundle: AnalysisBundle
@@ -237,7 +237,7 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "| Metric | Pass Rate |" in result
+        assert "| 메트릭 | 통과율 |" in result
         assert "| faithfulness | 80.0% |" in result
         assert "| answer_relevancy | 70.0% |" in result
 
@@ -247,7 +247,7 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "### Significant Correlations" in result
+        assert "### 유의미한 상관관계" in result
         assert "faithfulness" in result
         assert "answer_relevancy" in result
         assert "0.65" in result
@@ -258,7 +258,7 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "### Low Performing Cases" in result
+        assert "### 낮은 성능 케이스" in result
         assert "tc-001" in result
         assert "tc-002" in result
 
@@ -268,7 +268,7 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "### Question Type Distribution" in result
+        assert "### 질문 유형 분포" in result
         assert "Factual" in result
         assert "Reasoning" in result
 
@@ -278,7 +278,7 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "### Top Keywords" in result
+        assert "### 상위 키워드" in result
         assert "insurance" in result
         assert "coverage" in result
 
@@ -288,9 +288,9 @@ class TestMarkdownReportAdapter:
 
         result = adapter.generate_markdown(analysis_bundle)
 
-        assert "### Topic Clusters" in result
-        assert "Cluster 0" in result
-        assert "Cluster 1" in result
+        assert "### 토픽 클러스터" in result
+        assert "클러스터 0" in result
+        assert "클러스터 1" in result
 
 
 class TestMarkdownReportAdapterHTML:
@@ -314,7 +314,7 @@ class TestMarkdownReportAdapterHTML:
 
         result = adapter.generate_html(analysis_bundle)
 
-        assert "<title>EvalVault Analysis Report - run-123</title>" in result
+        assert "<title>EvalVault 분석 리포트 - run-123</title>" in result
 
     def test_generate_html_styles(self, analysis_bundle: AnalysisBundle) -> None:
         """Test HTML report includes CSS styles."""
@@ -333,8 +333,8 @@ class TestMarkdownReportAdapterHTML:
 
         result = adapter.generate_html(analysis_bundle)
 
-        assert "<h1>EvalVault Analysis Report</h1>" in result
-        assert "<h2>Executive Summary</h2>" in result
+        assert "<h1>EvalVault 분석 리포트</h1>" in result
+        assert "<h2>요약</h2>" in result
 
     def test_generate_html_tables_converted(self, analysis_bundle: AnalysisBundle) -> None:
         """Test markdown tables converted to HTML."""
@@ -381,8 +381,8 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "**Critical:**" in result
-        assert "below 50%" in result
+        assert "**중요:**" in result
+        assert "50% 미만" in result
 
     def test_warning_recommendation_medium_pass_rate(self) -> None:
         """Test warning recommendation for medium pass rate."""
@@ -399,8 +399,8 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "**Warning:**" in result
-        assert "below 70%" in result
+        assert "**경고:**" in result
+        assert "70% 미만" in result
 
     def test_metric_improvement_recommendation(self) -> None:
         """Test recommendation for low-performing metric."""
@@ -420,7 +420,7 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "**Improve answer_relevancy:**" in result
+        assert "**answer_relevancy 개선:**" in result
         assert "50.0%" in result
 
     def test_low_performers_recommendation(self) -> None:
@@ -449,8 +449,8 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "**Review low performers:**" in result
-        assert "10 cases" in result
+        assert "**저성능 케이스 점검:**" in result
+        assert "10건" in result
 
     def test_no_issues_recommendation(self) -> None:
         """Test default recommendation when no issues."""
@@ -467,7 +467,7 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "No critical issues found" in result
+        assert "중요 이슈가 없습니다" in result
 
     def test_vocabulary_diversity_recommendation(self) -> None:
         """Test recommendation for low vocabulary diversity."""
@@ -493,4 +493,4 @@ class TestMarkdownReportAdapterRecommendations:
 
         result = adapter.generate_markdown(bundle)
 
-        assert "**Vocabulary diversity is low:**" in result
+        assert "**어휘 다양성이 낮음:**" in result

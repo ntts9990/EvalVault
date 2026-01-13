@@ -20,7 +20,8 @@ from evalvault.adapters.outbound.documents.versioned_loader import (
     load_versioned_chunks_from_pdf_dir,
 )
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
-from evalvault.adapters.outbound.llm import get_llm_adapter
+from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.adapters.outbound.phoenix.sync_service import (
     PhoenixDatasetInfo,
     PhoenixSyncError,
@@ -1440,7 +1441,9 @@ def register_run_commands(
         if should_enable_phoenix:
             ensure_phoenix_instrumentation(settings, console=console, force=True)
 
-        evaluator = RagasEvaluator()
+        llm_factory = SettingsLLMFactory(settings)
+        korean_toolkit = try_create_korean_toolkit()
+        evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
         llm_adapter = None
         try:
             llm_adapter = get_llm_adapter(settings)

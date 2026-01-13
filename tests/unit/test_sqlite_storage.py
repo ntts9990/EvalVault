@@ -3,7 +3,7 @@
 import json
 import sqlite3
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -638,3 +638,38 @@ class TestSQLiteStorageNLPAnalysis:
         assert summary.total_feedback == 1
         assert summary.avg_satisfaction_score == 4.0
         assert summary.thumb_up_rate == 1.0
+
+    def test_feedback_summary_uses_latest(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        from evalvault.domain.entities import SatisfactionFeedback
+
+        base_time = datetime.now()
+        feedback = SatisfactionFeedback(
+            feedback_id="",
+            run_id=sample_run.run_id,
+            test_case_id="tc-001",
+            satisfaction_score=None,
+            thumb_feedback="up",
+            comment=None,
+            rater_id="user-1",
+            created_at=base_time,
+        )
+        storage_adapter.save_feedback(feedback)
+
+        cancel = SatisfactionFeedback(
+            feedback_id="",
+            run_id=sample_run.run_id,
+            test_case_id="tc-001",
+            satisfaction_score=None,
+            thumb_feedback=None,
+            comment=None,
+            rater_id="user-1",
+            created_at=base_time + timedelta(seconds=1),
+        )
+        storage_adapter.save_feedback(cancel)
+
+        summary = storage_adapter.get_feedback_summary(sample_run.run_id)
+        assert summary.total_feedback == 0
+        assert summary.avg_satisfaction_score is None
+        assert summary.thumb_up_rate is None

@@ -1,0 +1,222 @@
+{
+  "name": "ragas_ko90_en10",
+  "version": "1.1.0",
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7,
+    "context_precision": 0.6,
+    "context_recall": 0.6
+  },
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "question": "서울의 수도는 어디인가요?",
+      "answer": "대한민국의 수도는 서울입니다.",
+      "contexts": ["대한민국의 수도는 서울이며 정치, 경제, 문화의 중심지입니다."],
+      "ground_truth": "대한민국의 수도는 서울입니다."
+    },
+    {
+      "id": "tc-002",
+      "question": "지구는 태양을 한 바퀴 도는 데 얼마나 걸리나요?",
+      "answer": "지구는 태양을 한 바퀴 도는 데 약 1년이 걸립니다.",
+      "contexts": ["지구의 공전 주기는 약 365일이며 이를 1년이라고 부릅니다."],
+      "ground_truth": "지구의 공전 주기는 약 365일입니다."
+    },
+    {
+      "id": "tc-003",
+      "question": "한글을 만든 사람은 누구인가요?",
+      "answer": "한글은 세종대왕이 만들었습니다.",
+      "contexts": ["훈민정음은 세종대왕이 창제하여 1446년에 반포되었습니다."],
+      "ground_truth": "한글은 세종대왕이 창제했습니다."
+    },
+    {
+      "id": "tc-004",
+      "question": "물의 화학식은 무엇인가요?",
+      "answer": "물의 화학식은 H2O입니다.",
+      "contexts": ["물 분자는 수소 2개와 산소 1개로 구성되어 H2O로 표시됩니다."],
+      "ground_truth": "물의 화학식은 H2O입니다."
+    },
+    {
+      "id": "tc-005",
+      "question": "대한민국의 국화는 무엇인가요?",
+      "answer": "대한민국의 국화는 무궁화입니다.",
+      "contexts": ["무궁화는 대한민국을 상징하는 꽃으로 국화로 지정되어 있습니다."],
+      "ground_truth": "대한민국의 국화는 무궁화입니다."
+    },
+    {
+      "id": "tc-006",
+      "question": "삼각형의 내각의 합은 몇 도인가요?",
+      "answer": "삼각형의 내각의 합은 180도입니다.",
+      "contexts": ["유클리드 기하학에서 삼각형의 내각의 합은 180도입니다."],
+      "ground_truth": "삼각형의 내각의 합은 180도입니다."
+    },
+    {
+      "id": "tc-007",
+      "question": "빛의 속도는 진공에서 약 얼마인가요?",
+      "answer": "빛의 속도는 진공에서 약 299,792km/s입니다.",
+      "contexts": ["빛의 속도는 진공에서 약 299,792킬로미터 매초입니다."],
+      "ground_truth": "빛의 속도는 진공에서 약 299,792km/s입니다."
+    },
+    {
+      "id": "tc-008",
+      "question": "대한민국의 화폐 단위는 무엇인가요?",
+      "answer": "대한민국의 화폐 단위는 원입니다.",
+      "contexts": ["대한민국의 공식 화폐 단위는 원(KRW)입니다."],
+      "ground_truth": "대한민국의 화폐 단위는 원입니다."
+    },
+    {
+      "id": "tc-009",
+      "question": "인공지능은 무엇을 의미하나요?",
+      "answer": "인공지능은 인간의 지능을 모방해 학습·추론·문제 해결을 수행하는 기술을 의미합니다.",
+      "contexts": ["인공지능(AI)은 데이터로부터 학습하고 추론하여 문제를 해결하는 컴퓨터 기술입니다."],
+      "ground_truth": "인공지능은 학습과 추론을 통해 문제를 해결하는 기술입니다."
+    },
+    {
+      "id": "tc-010",
+      "question": "What is the capital of France?",
+      "answer": "The capital of France is Paris.",
+      "contexts": ["Paris is the capital and most populous city of France."],
+      "ground_truth": "Paris is the capital of France."
+    },
+    {
+      "id": "tc-011",
+      "question": "대한민국의 수도권에는 어떤 도시가 포함되나요?",
+      "answer": "수도권에는 서울, 인천, 경기도 주요 도시가 포함됩니다.",
+      "contexts": ["대한민국 수도권은 서울특별시, 인천광역시, 경기도 지역을 포함합니다."],
+      "ground_truth": "수도권에는 서울, 인천, 경기도가 포함됩니다."
+    },
+    {
+      "id": "tc-012",
+      "question": "태양계에서 가장 큰 행성은 무엇인가요?",
+      "answer": "태양계에서 가장 큰 행성은 목성입니다.",
+      "contexts": ["목성은 태양계에서 가장 큰 행성으로 질량과 부피가 가장 큽니다."],
+      "ground_truth": "태양계에서 가장 큰 행성은 목성입니다."
+    },
+    {
+      "id": "tc-013",
+      "question": "대한민국의 공용어는 무엇인가요?",
+      "answer": "대한민국의 공용어는 한국어입니다.",
+      "contexts": ["대한민국의 공식 언어는 한국어(한국어 표준어)입니다."],
+      "ground_truth": "대한민국의 공용어는 한국어입니다."
+    },
+    {
+      "id": "tc-014",
+      "question": "지구에서 가장 높은 산은 무엇인가요?",
+      "answer": "지구에서 가장 높은 산은 에베레스트입니다.",
+      "contexts": ["에베레스트 산은 해발 약 8,848m로 지구에서 가장 높은 산입니다."],
+      "ground_truth": "지구에서 가장 높은 산은 에베레스트입니다."
+    },
+    {
+      "id": "tc-015",
+      "question": "대한민국의 국기는 무엇인가요?",
+      "answer": "대한민국의 국기는 태극기입니다.",
+      "contexts": ["태극기는 흰 바탕에 태극과 건곤감리가 그려진 대한민국의 국기입니다."],
+      "ground_truth": "대한민국의 국기는 태극기입니다."
+    },
+    {
+      "id": "tc-016",
+      "question": "광합성은 무엇을 하는 과정인가요?",
+      "answer": "광합성은 빛 에너지를 이용해 이산화탄소와 물로부터 유기물을 만드는 과정입니다.",
+      "contexts": ["광합성은 식물이 빛 에너지로 이산화탄소와 물을 이용해 포도당을 만드는 과정입니다."],
+      "ground_truth": "광합성은 빛 에너지로 유기물을 만드는 과정입니다."
+    },
+    {
+      "id": "tc-017",
+      "question": "대한민국의 최고 법원은 어디인가요?",
+      "answer": "대한민국의 최고 법원은 대법원입니다.",
+      "contexts": ["대한민국 사법부의 최고 기관은 대법원입니다."],
+      "ground_truth": "대한민국의 최고 법원은 대법원입니다."
+    },
+    {
+      "id": "tc-018",
+      "question": "인터넷 프로토콜에서 IP는 무엇의 약자인가요?",
+      "answer": "IP는 Internet Protocol의 약자입니다.",
+      "contexts": ["IP는 Internet Protocol을 의미하며 네트워크 주소 체계를 제공합니다."],
+      "ground_truth": "IP는 Internet Protocol의 약자입니다."
+    },
+    {
+      "id": "tc-019",
+      "question": "대한민국의 표준 시간대는 무엇인가요?",
+      "answer": "대한민국의 표준 시간대는 KST(UTC+9)입니다.",
+      "contexts": ["대한민국은 UTC+9 시간대를 사용하며 이를 KST라고 합니다."],
+      "ground_truth": "대한민국의 표준 시간대는 KST(UTC+9)입니다."
+    },
+    {
+      "id": "tc-020",
+      "question": "What is the chemical symbol for gold?",
+      "answer": "The chemical symbol for gold is Au.",
+      "contexts": ["Gold has the chemical symbol Au from the Latin word aurum."],
+      "ground_truth": "The chemical symbol for gold is Au."
+    },
+    {
+      "id": "tc-021",
+      "question": "대한민국의 국토 면적은 대략 얼마인가요?",
+      "answer": "대한민국의 국토 면적은 약 10만 km²입니다.",
+      "contexts": ["대한민국의 국토 면적은 약 100,000제곱킬로미터로 알려져 있습니다."],
+      "ground_truth": "대한민국의 국토 면적은 약 10만 km²입니다."
+    },
+    {
+      "id": "tc-022",
+      "question": "바닷물의 평균 염분 농도는 몇 퍼센트인가요?",
+      "answer": "바닷물의 평균 염분 농도는 약 3.5%입니다.",
+      "contexts": ["전 세계 바닷물의 평균 염분 농도는 약 3.5퍼센트입니다."],
+      "ground_truth": "바닷물의 평균 염분 농도는 약 3.5%입니다."
+    },
+    {
+      "id": "tc-023",
+      "question": "대한민국의 인구는 대략 얼마나 되나요?",
+      "answer": "대한민국의 인구는 약 5천만 명입니다.",
+      "contexts": ["대한민국 인구는 약 5천만 명 수준으로 알려져 있습니다."],
+      "ground_truth": "대한민국의 인구는 약 5천만 명입니다."
+    },
+    {
+      "id": "tc-024",
+      "question": "소금의 화학식은 무엇인가요?",
+      "answer": "일반적인 소금의 화학식은 NaCl입니다.",
+      "contexts": ["염화나트륨(NaCl)은 일반적으로 식용 소금으로 사용됩니다."],
+      "ground_truth": "소금의 화학식은 NaCl입니다."
+    },
+    {
+      "id": "tc-025",
+      "question": "대한민국의 법정 공휴일 중 설날은 며칠간인가요?",
+      "answer": "설날은 통상 3일간의 법정 공휴일입니다.",
+      "contexts": ["설날 연휴는 전날, 당일, 다음날로 3일 지정됩니다."],
+      "ground_truth": "설날은 3일간의 법정 공휴일입니다."
+    },
+    {
+      "id": "tc-026",
+      "question": "대기 중 가장 많은 기체는 무엇인가요?",
+      "answer": "대기 중 가장 많은 기체는 질소입니다.",
+      "contexts": ["지구 대기의 약 78%는 질소로 구성되어 있습니다."],
+      "ground_truth": "대기 중 가장 많은 기체는 질소입니다."
+    },
+    {
+      "id": "tc-027",
+      "question": "대한민국의 국토는 몇 개의 도로 나뉘나요?",
+      "answer": "대한민국은 8개의 도로 나뉘던 역사적 분류가 있으나 현재는 광역자치단체로 구분됩니다.",
+      "contexts": ["전통적으로는 8도로 불렸으나 현재 행정구역은 광역자치단체로 구분됩니다."],
+      "ground_truth": "전통적으로 8도로 불렸으나 현재는 광역자치단체로 구분됩니다."
+    },
+    {
+      "id": "tc-028",
+      "question": "컴퓨터에서 CPU는 어떤 역할을 하나요?",
+      "answer": "CPU는 프로그램의 명령을 해석하고 실행하는 중앙처리장치입니다.",
+      "contexts": ["CPU는 중앙처리장치로서 연산과 제어를 수행합니다."],
+      "ground_truth": "CPU는 중앙처리장치로 연산과 제어를 담당합니다."
+    },
+    {
+      "id": "tc-029",
+      "question": "대한민국의 국보는 누가 지정하나요?",
+      "answer": "대한민국의 국보는 문화재청 등 문화재 관련 기관이 지정합니다.",
+      "contexts": ["문화재청은 국보 등 국가 지정 문화재를 관리·지정합니다."],
+      "ground_truth": "국보는 문화재청 등 관련 기관이 지정합니다."
+    },
+    {
+      "id": "tc-030",
+      "question": "Which planet is known as the Red Planet?",
+      "answer": "Mars is known as the Red Planet.",
+      "contexts": ["Mars is often called the Red Planet because of its reddish appearance."],
+      "ground_truth": "Mars is known as the Red Planet."
+    }
+  ]
+}

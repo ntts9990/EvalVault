@@ -18,7 +18,8 @@ from evalvault.adapters.inbound.cli.utils.analysis_io import (
 )
 from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis_pipeline_service
 from evalvault.adapters.outbound.analysis.statistical_adapter import StatisticalAnalysisAdapter
-from evalvault.adapters.outbound.llm import get_llm_adapter
+from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
@@ -175,7 +176,9 @@ def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluat
         )
 
     storage = SQLiteStorageAdapter(db_path=db_path)
-    evaluator = RagasEvaluator()
+    llm_factory = SettingsLLMFactory(settings)
+    korean_toolkit = try_create_korean_toolkit()
+    evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
     adapter = WebUIAdapter(
         storage=storage,
         evaluator=evaluator,

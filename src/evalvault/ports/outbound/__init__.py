@@ -44,6 +44,7 @@ from evalvault.ports.outbound.korean_nlp_port import (
     RetrieverPort,
     RetrieverResultProtocol,
 )
+from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
 from evalvault.ports.outbound.method_port import MethodRuntime, RagMethodPort
 from evalvault.ports.outbound.nlp_analysis_port import NLPAnalysisPort
@@ -82,6 +83,7 @@ __all__ = [
     "PatternDefinitionProtocol",
     "MetricPlaybookProtocol",
     "ClaimImprovementProtocol",
+    "LLMFactoryPort",
     "LLMPort",
     "MethodRuntime",
     "RagMethodPort",

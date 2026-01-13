@@ -206,3 +206,41 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_results_intent
     ON pipeline_results(intent);
 CREATE INDEX IF NOT EXISTS idx_pipeline_results_run_id
     ON pipeline_results(run_id);
+
+CREATE TABLE IF NOT EXISTS stage_events (
+    id BIGSERIAL PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    stage_id TEXT NOT NULL,
+    parent_stage_id TEXT,
+    stage_type TEXT NOT NULL,
+    stage_name TEXT,
+    status TEXT,
+    attempt INTEGER DEFAULT 1,
+    started_at TIMESTAMP WITH TIME ZONE,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    duration_ms DOUBLE PRECISION,
+    input_ref JSONB,
+    output_ref JSONB,
+    attributes JSONB,
+    metadata JSONB,
+    trace_id TEXT,
+    span_id TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stage_events_run_stage_id
+    ON stage_events(run_id, stage_id);
+CREATE INDEX IF NOT EXISTS idx_stage_events_run_id ON stage_events(run_id);
+CREATE INDEX IF NOT EXISTS idx_stage_events_stage_type ON stage_events(stage_type);
+
+CREATE TABLE IF NOT EXISTS stage_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    stage_id TEXT NOT NULL,
+    metric_name TEXT NOT NULL,
+    score DOUBLE PRECISION NOT NULL,
+    threshold DOUBLE PRECISION,
+    evidence JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_metrics_run_id ON stage_metrics(run_id);
+CREATE INDEX IF NOT EXISTS idx_stage_metrics_stage_id ON stage_metrics(stage_id);

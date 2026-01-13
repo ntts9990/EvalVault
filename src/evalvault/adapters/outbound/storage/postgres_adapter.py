@@ -27,6 +27,7 @@ from evalvault.domain.entities.analysis import (
 )
 from evalvault.domain.entities.experiment import Experiment
 from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
+from evalvault.domain.entities.stage import StageEvent, StageMetric
 
 
 class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
@@ -823,6 +824,56 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             )
             conn.commit()
 
+    def save_analysis_report(
+        self,
+        *,
+        report_id: str | None,
+        run_id: str | None,
+        experiment_id: str | None,
+        report_type: str,
+        format: str,
+        content: str | None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> str:
+        report_id = report_id or str(uuid.uuid4())
+        if created_at is None:
+            created_at_value = datetime.now(UTC)
+        else:
+            created_at_value = (
+                datetime.fromisoformat(created_at) if isinstance(created_at, str) else created_at
+            )
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO analysis_reports (
+                    report_id, run_id, experiment_id, report_type, format, content, metadata, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (report_id) DO UPDATE SET
+                    run_id = EXCLUDED.run_id,
+                    experiment_id = EXCLUDED.experiment_id,
+                    report_type = EXCLUDED.report_type,
+                    format = EXCLUDED.format,
+                    content = EXCLUDED.content,
+                    metadata = EXCLUDED.metadata,
+                    created_at = EXCLUDED.created_at
+                """,
+                (
+                    report_id,
+                    run_id,
+                    experiment_id,
+                    report_type,
+                    format,
+                    content,
+                    self._serialize_pipeline_json(metadata),
+                    created_at_value,
+                ),
+            )
+            conn.commit()
+
+        return report_id
+
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """
@@ -836,6 +887,164 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         with self._get_connection() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return [self._deserialize_pipeline_result(row, include_payload=False) for row in rows]
+
+    def save_stage_events(self, events: list[StageEvent]) -> int:
+        if not events:
+            return 0
+        with self._get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO stage_events (
+                    run_id, stage_id, parent_stage_id, stage_type, stage_name,
+                    status, attempt, started_at, finished_at, duration_ms,
+                    input_ref, output_ref, attributes, metadata, trace_id, span_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (run_id, stage_id) DO UPDATE SET
+                    parent_stage_id = EXCLUDED.parent_stage_id,
+                    stage_type = EXCLUDED.stage_type,
+                    stage_name = EXCLUDED.stage_name,
+                    status = EXCLUDED.status,
+                    attempt = EXCLUDED.attempt,
+                    started_at = EXCLUDED.started_at,
+                    finished_at = EXCLUDED.finished_at,
+                    duration_ms = EXCLUDED.duration_ms,
+                    input_ref = EXCLUDED.input_ref,
+                    output_ref = EXCLUDED.output_ref,
+                    attributes = EXCLUDED.attributes,
+                    metadata = EXCLUDED.metadata,
+                    trace_id = EXCLUDED.trace_id,
+                    span_id = EXCLUDED.span_id
+                """,
+                [self._serialize_stage_event(event) for event in events],
+            )
+            conn.commit()
+        return len(events)
+
+    def list_stage_events(
+        self,
+        run_id: str,
+        *,
+        stage_type: str | None = None,
+    ) -> list[StageEvent]:
+        query = (
+            "SELECT run_id, stage_id, parent_stage_id, stage_type, stage_name, status, attempt, "
+            "started_at, finished_at, duration_ms, input_ref, output_ref, attributes, metadata, "
+            "trace_id, span_id FROM stage_events WHERE run_id = %s"
+        )
+        params: list[Any] = [run_id]
+        if stage_type:
+            query += " AND stage_type = %s"
+            params.append(stage_type)
+        query += " ORDER BY id"
+        with self._get_connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [self._deserialize_stage_event(row) for row in rows]
+
+    def save_stage_metrics(self, metrics: list[StageMetric]) -> int:
+        if not metrics:
+            return 0
+        with self._get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO stage_metrics (
+                    run_id, stage_id, metric_name, score, threshold, evidence
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                [self._serialize_stage_metric(metric) for metric in metrics],
+            )
+            conn.commit()
+        return len(metrics)
+
+    def list_stage_metrics(
+        self,
+        run_id: str,
+        *,
+        stage_id: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[StageMetric]:
+        query = (
+            "SELECT run_id, stage_id, metric_name, score, threshold, evidence "
+            "FROM stage_metrics WHERE run_id = %s"
+        )
+        params: list[Any] = [run_id]
+        if stage_id:
+            query += " AND stage_id = %s"
+            params.append(stage_id)
+        if metric_name:
+            query += " AND metric_name = %s"
+            params.append(metric_name)
+        query += " ORDER BY id"
+        with self._get_connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [self._deserialize_stage_metric(row) for row in rows]
+
+    def _serialize_stage_event(self, event: StageEvent) -> tuple[Any, ...]:
+        return (
+            event.run_id,
+            event.stage_id,
+            event.parent_stage_id,
+            event.stage_type,
+            event.stage_name,
+            event.status,
+            event.attempt,
+            event.started_at,
+            event.finished_at,
+            event.duration_ms,
+            self._serialize_payload_ref(event.input_ref),
+            self._serialize_payload_ref(event.output_ref),
+            self._serialize_pipeline_json(event.attributes),
+            self._serialize_pipeline_json(event.metadata),
+            event.trace_id,
+            event.span_id,
+        )
+
+    def _serialize_stage_metric(self, metric: StageMetric) -> tuple[Any, ...]:
+        return (
+            metric.run_id,
+            metric.stage_id,
+            metric.metric_name,
+            metric.score,
+            metric.threshold,
+            self._serialize_pipeline_json(metric.evidence),
+        )
+
+    def _serialize_payload_ref(self, ref: Any) -> str | None:
+        if ref is None:
+            return None
+        payload = ref.to_dict() if hasattr(ref, "to_dict") else ref
+        return self._serialize_pipeline_json(payload)
+
+    def _deserialize_stage_event(self, row: dict[str, Any]) -> StageEvent:
+        payload = {
+            "run_id": row.get("run_id"),
+            "stage_id": row.get("stage_id"),
+            "parent_stage_id": row.get("parent_stage_id"),
+            "stage_type": row.get("stage_type"),
+            "stage_name": row.get("stage_name"),
+            "status": row.get("status"),
+            "attempt": row.get("attempt"),
+            "started_at": row.get("started_at"),
+            "finished_at": row.get("finished_at"),
+            "duration_ms": row.get("duration_ms"),
+            "input_ref": self._ensure_json(row.get("input_ref")),
+            "output_ref": self._ensure_json(row.get("output_ref")),
+            "attributes": self._ensure_json(row.get("attributes")) or {},
+            "metadata": self._ensure_json(row.get("metadata")) or {},
+            "trace_id": row.get("trace_id"),
+            "span_id": row.get("span_id"),
+        }
+        return StageEvent.from_dict(payload)
+
+    def _deserialize_stage_metric(self, row: dict[str, Any]) -> StageMetric:
+        payload = {
+            "run_id": row.get("run_id"),
+            "stage_id": row.get("stage_id"),
+            "metric_name": row.get("metric_name"),
+            "score": row.get("score"),
+            "threshold": row.get("threshold"),
+            "evidence": self._ensure_json(row.get("evidence")),
+        }
+        return StageMetric.from_dict(payload)
 
     def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
         """저장된 파이프라인 분석 결과를 조회합니다."""

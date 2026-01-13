@@ -29,7 +29,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -516,13 +516,13 @@ class TestQuickSanityCheck:
 
         # Anthropic style
         config = ThinkingConfig(enabled=True, budget_tokens=10000)
-        param = config.to_anthropic_param()
+        param = cast(dict[str, Any], config.to_anthropic_param())
         assert param["type"] == "enabled"
         assert param["budget_tokens"] == 10000
 
         # Ollama style
         config = ThinkingConfig(enabled=True, think_level="medium")
-        options = config.to_ollama_options()
+        options = cast(dict[str, Any], config.to_ollama_options())
         assert options["think_level"] == "medium"
 
         # Disabled

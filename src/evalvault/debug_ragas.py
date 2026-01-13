@@ -5,6 +5,9 @@ from unittest.mock import MagicMock
 from ragas import SingleTurnSample
 from ragas.metrics import AnswerRelevancy, Faithfulness
 
+from evalvault.adapters.outbound.llm import SettingsLLMFactory
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
+from evalvault.config.settings import Settings
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.outbound.llm_port import LLMPort
 
@@ -29,7 +32,10 @@ async def debug_ragas():
     # Actually, Ragas metrics execute validation on `score` or `ascore`.
     # Failing at LLM call (e.g. no auth) is different from failing at argument passing.
 
-    evaluator = RagasEvaluator()
+    settings = Settings()
+    llm_factory = SettingsLLMFactory(settings)
+    korean_toolkit = try_create_korean_toolkit()
+    evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
 
     # Create sample similar to what we observed
     sample = SingleTurnSample(

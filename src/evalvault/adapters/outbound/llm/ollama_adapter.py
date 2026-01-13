@@ -19,7 +19,7 @@ from evalvault.adapters.outbound.llm.base import BaseLLMAdapter
 from evalvault.adapters.outbound.llm.instructor_factory import create_instructor_llm
 from evalvault.adapters.outbound.llm.token_aware_chat import ThinkingTokenTrackingAsyncOpenAI
 from evalvault.config.settings import Settings
-from evalvault.ports.outbound.llm_port import ThinkingConfig
+from evalvault.ports.outbound.llm_port import GenerationOptions, ThinkingConfig
 
 
 class OllamaAdapter(BaseLLMAdapter):
@@ -240,7 +240,12 @@ class OllamaAdapter(BaseLLMAdapter):
         else:
             return asyncio.run(self.embed(texts, model, dimension))
 
-    async def agenerate_text(self, prompt: str) -> str:
+    async def agenerate_text(
+        self,
+        prompt: str,
+        *,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (async).
 
         Uses the Ollama OpenAI-compatible API for simple text generation.
@@ -251,13 +256,30 @@ class OllamaAdapter(BaseLLMAdapter):
         Returns:
             Generated text string
         """
-        response = await self._embedding_client.chat.completions.create(
-            model=self._ollama_model,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        api_kwargs: dict[str, Any] = {
+            "model": self._ollama_model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if options and options.max_tokens is not None:
+            api_kwargs["max_completion_tokens"] = options.max_tokens
+        if options and options.temperature is not None:
+            api_kwargs["temperature"] = options.temperature
+        if options and options.top_p is not None:
+            api_kwargs["top_p"] = options.top_p
+        if options and options.n is not None:
+            api_kwargs["n"] = options.n
+        if options and options.seed is not None:
+            api_kwargs["seed"] = options.seed
+        response = await self._embedding_client.chat.completions.create(**api_kwargs)
         return response.choices[0].message.content or ""
 
-    def generate_text(self, prompt: str, *, json_mode: bool = False) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        options: GenerationOptions | None = None,
+    ) -> str:
         """Generate text from a prompt (sync).
 
         Args:
@@ -279,12 +301,14 @@ class OllamaAdapter(BaseLLMAdapter):
                 import nest_asyncio
 
                 nest_asyncio.apply()
-                return loop.run_until_complete(self.agenerate_text(prompt))
+                return loop.run_until_complete(self.agenerate_text(prompt, options=options))
             except ImportError:
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, self.agenerate_text(prompt))
+                    future = executor.submit(
+                        asyncio.run, self.agenerate_text(prompt, options=options)
+                    )
                     return future.result()
         else:
-            return asyncio.run(self.agenerate_text(prompt))
+            return asyncio.run(self.agenerate_text(prompt, options=options))

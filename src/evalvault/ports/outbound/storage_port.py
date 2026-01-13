@@ -12,6 +12,7 @@ from evalvault.domain.entities import (
     SatisfactionFeedback,
 )
 from evalvault.domain.entities.experiment import Experiment
+from evalvault.domain.entities.stage import StageEvent, StageMetric
 
 
 class StoragePort(Protocol):
@@ -80,6 +81,27 @@ class StoragePort(Protocol):
             EvaluationRun 객체 리스트 (최신순)
         """
         ...
+
+    def delete_run(self, run_id: str) -> bool: ...
+
+    def save_stage_events(self, events: list[StageEvent]) -> int: ...
+
+    def save_stage_metrics(self, metrics: list[StageMetric]) -> int: ...
+
+    def list_stage_events(
+        self,
+        run_id: str,
+        *,
+        stage_type: str | None = None,
+    ) -> list[StageEvent]: ...
+
+    def list_stage_metrics(
+        self,
+        run_id: str,
+        *,
+        stage_id: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[StageMetric]: ...
 
     def update_run_metadata(self, run_id: str, metadata: dict[str, Any]) -> None: ...
 
@@ -168,6 +190,19 @@ class StoragePort(Protocol):
     def save_pipeline_result(self, record: dict[str, Any]) -> None:
         """파이프라인 분석 결과 히스토리를 저장합니다."""
         ...
+
+    def save_analysis_report(
+        self,
+        *,
+        report_id: str | None,
+        run_id: str | None,
+        experiment_id: str | None,
+        report_type: str,
+        format: str,
+        content: str | None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> str: ...
 
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""

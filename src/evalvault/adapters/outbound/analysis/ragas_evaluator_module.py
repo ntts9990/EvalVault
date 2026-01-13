@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from evalvault.adapters.outbound.analysis.base_module import BaseAnalysisModule
 from evalvault.adapters.outbound.analysis.pipeline_helpers import (
@@ -12,6 +12,9 @@ from evalvault.adapters.outbound.analysis.pipeline_helpers import (
     safe_mean,
     truncate_text,
 )
+from evalvault.adapters.outbound.llm import SettingsLLMFactory
+from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
+from evalvault.config.settings import Settings
 from evalvault.domain.entities import Dataset, EvaluationRun, TestCase
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.outbound.llm_port import LLMPort
@@ -30,7 +33,10 @@ class RagasEvaluatorModule(BaseAnalysisModule):
 
     def __init__(self, llm_adapter: LLMPort | None = None) -> None:
         self._llm_adapter = llm_adapter
-        self._evaluator = RagasEvaluator()
+        settings = Settings()
+        llm_factory = SettingsLLMFactory(settings)
+        korean_toolkit = try_create_korean_toolkit()
+        self._evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
 
     def execute(
         self,
@@ -143,14 +149,12 @@ class RagasEvaluatorModule(BaseAnalysisModule):
         *,
         recomputed: bool,
     ) -> dict[str, Any]:
-        if metrics and isinstance(next(iter(metrics.values())), list):
-            avg_scores = average_scores(metrics)  # type: ignore[arg-type]
-            sample_count = max(
-                (len(values) for values in metrics.values()),
-                default=0,
-            )  # type: ignore[arg-type]
+        if metrics and all(isinstance(value, list) for value in metrics.values()):
+            metrics_lists = cast(dict[str, list[float]], metrics)
+            avg_scores = average_scores(metrics_lists)
+            sample_count = max((len(values) for values in metrics_lists.values()), default=0)
         else:
-            avg_scores = metrics  # type: ignore[assignment]
+            avg_scores = cast(dict[str, float], metrics)
             sample_count = len(per_case)
 
         overall = safe_mean(avg_scores.values()) if avg_scores else 0.0

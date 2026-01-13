@@ -220,8 +220,9 @@ class TestWebUIAdapter:
     def test_list_runs_without_storage(self):
         """저장소 없이 평가 목록 조회."""
         from evalvault.adapters.inbound.api.adapter import WebUIAdapter
+        from evalvault.config.settings import Settings
 
-        adapter = WebUIAdapter()
+        adapter = WebUIAdapter(settings=Settings(evalvault_db_path=""))
         runs = adapter.list_runs()
         assert runs == []
 

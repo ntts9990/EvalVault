@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
-from contextlib import contextmanager
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager, closing
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -182,24 +182,28 @@ class BaseSQLStorageAdapter(ABC):
     # Connection helpers -------------------------------------------------
 
     @abstractmethod
-    def _connect(self):
+    def _connect(self) -> Any:
         """Return a new DB-API compatible connection."""
+        raise NotImplementedError
 
-    @contextmanager
-    def _get_connection(self):
+    def _get_connection(self) -> AbstractContextManager[Any]:
         conn = self._connect()
-        try:
-            yield conn
-        finally:
-            conn.close()
+        if conn is None:
+            raise RuntimeError("Database connection not available")
+        return closing(conn)
 
     def _fetch_lastrowid(self, cursor) -> int:
         return cursor.lastrowid
 
-    def _execute(self, conn, query: str, params: Sequence[Any] | None = None):
+    def _execute(
+        self,
+        conn: Any,
+        query: str,
+        params: Sequence[object] | Mapping[str, object] | None = None,
+    ) -> Any:
         if params is None:
-            params = ()
-        return conn.execute(query, tuple(params))
+            return conn.execute(query)
+        return conn.execute(query, params)
 
     # CRUD helpers -------------------------------------------------------
 
@@ -245,7 +249,7 @@ class BaseSQLStorageAdapter(ABC):
                 dataset_name=run_row["dataset_name"],
                 dataset_version=run_row["dataset_version"],
                 model_name=run_row["model_name"],
-                started_at=self._deserialize_datetime(run_row["started_at"]),
+                started_at=self._deserialize_datetime(run_row["started_at"]) or datetime.now(),
                 finished_at=self._deserialize_datetime(run_row["finished_at"]),
                 total_tokens=run_row["total_tokens"],
                 total_cost_usd=self._maybe_float(run_row["total_cost_usd"]),
@@ -286,7 +290,7 @@ class BaseSQLStorageAdapter(ABC):
     def delete_run(self, run_id: str) -> bool:
         with self._get_connection() as conn:
             cursor = self._execute(conn, self.queries.delete_run(), (run_id,))
-            deleted = cursor.rowcount > 0
+            deleted = (cursor.rowcount or 0) > 0
             conn.commit()
             return deleted
 
@@ -429,8 +433,33 @@ class BaseSQLStorageAdapter(ABC):
 
     def get_feedback_summary(self, run_id: str) -> FeedbackSummary:
         feedbacks = self.list_feedback(run_id)
-        scores = [f.satisfaction_score for f in feedbacks if f.satisfaction_score is not None]
-        thumbs = [f.thumb_feedback for f in feedbacks if f.thumb_feedback in {"up", "down"}]
+        latest: dict[tuple[str, str | None], SatisfactionFeedback] = {}
+        for feedback in feedbacks:
+            key = (feedback.test_case_id, feedback.rater_id)
+            current = latest.get(key)
+            if current is None:
+                latest[key] = feedback
+                continue
+            current_time = current.created_at or datetime.min
+            feedback_time = feedback.created_at or datetime.min
+            if feedback_time >= current_time:
+                latest[key] = feedback
+
+        effective = [
+            feedback
+            for feedback in latest.values()
+            if feedback.satisfaction_score is not None or feedback.thumb_feedback in {"up", "down"}
+        ]
+        scores = [
+            feedback.satisfaction_score
+            for feedback in effective
+            if feedback.satisfaction_score is not None
+        ]
+        thumbs = [
+            feedback.thumb_feedback
+            for feedback in effective
+            if feedback.thumb_feedback in {"up", "down"}
+        ]
         avg_score = sum(scores) / len(scores) if scores else None
         thumb_up_rate = None
         if thumbs:
@@ -438,7 +467,7 @@ class BaseSQLStorageAdapter(ABC):
         return FeedbackSummary(
             avg_satisfaction_score=avg_score,
             thumb_up_rate=thumb_up_rate,
-            total_feedback=len(feedbacks),
+            total_feedback=len(effective),
         )
 
     # Serialization helpers --------------------------------------------
@@ -496,7 +525,7 @@ class BaseSQLStorageAdapter(ABC):
             latency_ms=row["latency_ms"],
             cost_usd=self._maybe_float(row["cost_usd"]),
             trace_id=row["trace_id"],
-            started_at=self._deserialize_datetime(row["started_at"]),
+            started_at=self._deserialize_datetime(row["started_at"]) or datetime.now(),
             finished_at=self._deserialize_datetime(row["finished_at"]),
             question=row["question"],
             answer=row["answer"],
@@ -526,8 +555,8 @@ class BaseSQLStorageAdapter(ABC):
         return [
             MetricScore(
                 name=self._resolve_metric_name(row, metric_column),
-                score=self._maybe_float(self._row_value(row, "score")),
-                threshold=self._maybe_float(self._row_value(row, "threshold")),
+                score=self._maybe_float(self._row_value(row, "score")) or 0.0,
+                threshold=self._maybe_float(self._row_value(row, "threshold")) or 0.7,
                 reason=self._row_value(row, "reason"),
             )
             for row in rows
