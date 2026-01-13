@@ -103,6 +103,7 @@ nav:
       - User Guide: guides/USER_GUIDE.md
       - Dev Guide: guides/DEV_GUIDE.md
       - CLI MCP Plan: guides/CLI_MCP_PLAN.md
+      - Diagnostic Playbook: guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md
       - Release Checklist: guides/RELEASE_CHECKLIST.md
       - Open RAG Trace Samples: guides/OPEN_RAG_TRACE_SAMPLES.md
       - Open RAG Trace Internal Adapter: guides/OPEN_RAG_TRACE_INTERNAL_ADAPTER.md

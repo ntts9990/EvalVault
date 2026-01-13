@@ -16,6 +16,8 @@
 - 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
 - 개발/기여: `guides/DEV_GUIDE.md`
 - CLI→MCP 이식 계획: `guides/CLI_MCP_PLAN.md`
+- RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
+- 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
 - 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
 - 상태 요약: `STATUS.md`
 - 로드맵: `ROADMAP.md`
@@ -36,6 +38,8 @@ docs/
 │   ├── USER_GUIDE.md            # 사용/운영 종합 가이드
 │   ├── DEV_GUIDE.md             # 개발 루틴/테스트/품질
 │   ├── CLI_MCP_PLAN.md          # CLI→MCP 이식 계획 (Living Doc)
+│   ├── RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md  # RAGAS 보정 방법론
+│   ├── EVALVAULT_DIAGNOSTIC_PLAYBOOK.md          # 진단 플레이북
 │   ├── RELEASE_CHECKLIST.md     # 배포 체크리스트
 │   ├── OPEN_RAG_TRACE_*.md      # Open RAG Trace 샘플/내부 래퍼
 │   └── OPEN_RAG_TRACE_*.md
