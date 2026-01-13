@@ -96,6 +96,76 @@ answer_relevancy: |
 
 ---
 
+## 프롬프트 후보 추천 (`evalvault prompts suggest`)
+
+특정 `run_id`의 프롬프트 스냅샷을 기준으로, **자동/수동 후보 프롬프트**를 모은 뒤 **holdout 분리 데이터**에서 Ragas 메트릭을 평가하고, **가중치 합산 점수**로 Top 후보를 추천합니다.
+
+- 필수 전제: `run_id`가 `--db`에 저장되어 있고, 해당 run에 **프롬프트 스냅샷**이 연결되어 있어야 합니다 (`evalvault run` 실행 시 `--db` 사용).
+- 자동 후보: 기본 프롬프트를 바탕으로 템플릿 기반 변형을 생성합니다. (`--candidates`, `--auto/--no-auto`)
+- 수동 후보: `--prompt`(반복 가능), `--prompt-file`(반복 가능)로 후보를 추가합니다. (`--no-auto` 사용 시 수동 후보는 필수)
+- holdout 분리: `--holdout-ratio`(기본 0.2)로 dev/holdout을 나누고, **holdout 쪽 점수로 랭킹**을 계산합니다. 재현이 필요하면 `--seed`를 지정하세요.
+- 가중치: `--weights faithfulness=0.7,answer_relevancy=0.3` 형태로 입력하며, 내부에서 합이 1이 되도록 정규화합니다. 미지정 시 메트릭 균등 가중치가 적용됩니다.
+
+### 사용 예시
+
+```bash
+# 기본 사용 (자동 후보 + 수동 후보 파일)
+uv run evalvault prompts suggest <RUN_ID> --db data/db/evalvault.db \
+  --role system \
+  --metrics faithfulness,answer_relevancy \
+  --weights faithfulness=0.7,answer_relevancy=0.3 \
+  --candidates 5 \
+  --prompt-file prompts/candidates.txt
+
+# 요약 평가(다중 메트릭) + 가중치
+uv run evalvault prompts suggest <RUN_ID> --db data/db/evalvault.db \
+  --metrics summary_score,summary_faithfulness,entity_preservation \
+  --weights summary_score=0.5,summary_faithfulness=0.3,entity_preservation=0.2 \
+  --candidates 3
+
+# 샘플링 2개 중 index 선택
+uv run evalvault prompts suggest <RUN_ID> --db data/db/evalvault.db \
+  --generation-n 2 \
+  --selection-policy index \
+  --selection-index 1
+```
+
+- `--prompt-file`은 **한 줄당 후보 프롬프트 1개**를 읽습니다(빈 줄 제외).
+
+### 주요 옵션 요약
+- `--role`: 개선 대상 프롬프트 role (기본 system)
+- `--metrics`: 평가 메트릭 목록 (기본 run에서 사용한 메트릭)
+- `--weights`: 메트릭 가중치 (합이 1이 되도록 정규화)
+- `--candidates`: 자동 후보 수 (기본 5)
+- `--auto/--no-auto`: 자동 후보 생성 on/off
+- `--holdout-ratio`: dev/holdout 분리 비율 (기본 0.2)
+- `--seed`: 분리/샘플 재현성
+- `--generation-n`: 후보당 샘플 수
+- `--selection-policy`: 샘플 선택 정책 (`best`|`index`)
+- `--selection-index`: `selection-policy=index` 시 선택할 샘플 인덱스
+
+### 출력(기본 경로)
+
+- 요약 JSON: `reports/analysis/prompt_suggestions_<RUN_ID>.json`
+- 보고서(Markdown): `reports/analysis/prompt_suggestions_<RUN_ID>.md`
+- 아티팩트 디렉터리: `reports/analysis/artifacts/prompt_suggestions_<RUN_ID>/`
+  - 후보 목록: `reports/analysis/artifacts/prompt_suggestions_<RUN_ID>/candidates.json`
+  - 후보 점수/샘플 점수: `reports/analysis/artifacts/prompt_suggestions_<RUN_ID>/scores.json`
+  - 최종 랭킹: `reports/analysis/artifacts/prompt_suggestions_<RUN_ID>/ranking.json`
+  - 인덱스: `reports/analysis/artifacts/prompt_suggestions_<RUN_ID>/index.json`
+
+경로를 바꾸려면 `--analysis-dir` 또는 `--output`/`--report`를 사용합니다. 설계 배경은 `docs/guides/prompt_suggestions_design.md`를 참고하세요.
+
+### FAQ
+- Q. "프롬프트 스냅샷이 없습니다" 오류가 납니다.
+  - A. 해당 run이 `--db`로 저장되었는지 확인하고, `evalvault run` 실행 시 `--db`를 지정하세요.
+- Q. 자동 후보를 끄면 어떻게 되나요?
+  - A. `--no-auto` 사용 시 `--prompt` 또는 `--prompt-file`로 수동 후보를 반드시 넣어야 합니다.
+- Q. 점수는 어떤 기준인가요?
+  - A. holdout 데이터에서 Ragas 메트릭을 평가하고, `--weights` 가중치로 합산한 점수입니다.
+
+---
+
 ## 엑셀 내보내기 (자동)
 
 **에디터 관점**: DB 저장과 동시에 Excel이 자동 생성됩니다.
@@ -109,20 +179,83 @@ answer_relevancy: |
 - `RunPromptSets`, `PromptSets`, `PromptSetItems`, `Prompts`
 - `Feedback`, `ClusterMaps`, `StageEvents`, `StageMetrics`
 - `AnalysisReports`, `PipelineResults`
+- 시트별 컬럼 설명: `docs/guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
 
 ---
 
 ## 외부 시스템 로그 연동 (의도분석/리트리브/리랭킹 등)
 
-**에디터 관점**: 표준 포맷(JSON/JSONL)으로 붙일 수 있어야 합니다.
-**개발자 관점**: OpenTelemetry 또는 Stage Events로 연결합니다.
+**에디터 관점**: 표준 포맷(OTel/JSON/JSONL)으로 붙일 수 있어야 합니다.
+**개발자 관점**: OpenTelemetry + OpenInference 또는 Stage Events로 연결합니다.
 
-1) **Open RAG Trace (권장)**
+### 1) Open RAG Trace (권장)
 - OpenTelemetry + OpenInference 기반 표준 스키마
-- 문서: `docs/architecture/open-rag-trace-spec.md`
+- 스펙: `docs/architecture/open-rag-trace-spec.md`
+- 연동 규격: `docs/guides/EXTERNAL_TRACE_API_SPEC.md`
 - 샘플: `docs/guides/OPEN_RAG_TRACE_SAMPLES.md`
 
-2) **Stage Events / Metrics 적재**
+**OTLP HTTP 전송(권장)**
+- 엔드포인트: `http://<host>:6006/v1/traces`
+- Collector 사용 시: `http://<collector-host>:4318/v1/traces`
+
+**OpenInference 필수 키(요약)**
+- `rag.module`, `spec.version`
+- 권장: `input.value`, `output.value`, `llm.model_name`, `retrieval.documents_json`
+
+### 2) EvalVault 직접 Ingest (Draft)
+- `POST /api/v1/ingest/otel-traces` (OTLP JSON)
+- `POST /api/v1/ingest/stage-events` (JSONL)
+- 예시: `docs/templates/otel_openinference_trace_example.json`
+
+**OTLP JSON 예시(요약)**
+```json
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "rag-service" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "00f067aa0ba902b7",
+              "name": "retrieve",
+              "startTimeUnixNano": 1730000000000000000,
+              "endTimeUnixNano": 1730000000500000000,
+              "attributes": [
+                { "key": "rag.module", "value": { "stringValue": "retrieve" } },
+                { "key": "spec.version", "value": { "stringValue": "0.1" } },
+                { "key": "input.value", "value": { "stringValue": "보험금 지급 조건" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**응답 예시(요약)**
+```json
+{
+  "status": "ok",
+  "ingested": 12,
+  "trace_ids": ["4bf92f3577b34da6a3ce929d0e0e4736"]
+}
+```
+
+**HTTP 상태 코드(요약)**
+- `200 OK`: 정상 수집
+- `400 Bad Request`: JSON/JSONL 파싱 실패
+- `422 Unprocessable Entity`: 필수 필드 누락/스키마 불일치
+- `500 Internal Server Error`: 저장/파이프라인 내부 오류
+
+### 3) Stage Events / Metrics 적재
 - 외부 파이프라인 로그를 JSON/JSONL로 저장 → DB ingest
 
 ```bash
@@ -130,8 +263,19 @@ uv run evalvault stage ingest path/to/stage_events.jsonl --db data/db/evalvault.
 uv run evalvault stage summary <RUN_ID> --db data/db/evalvault.db
 ```
 
+**Stage Event JSONL 예시(요약)**
+```jsonl
+{"run_id":"run_20260103_001","stage_id":"stg_sys_01","stage_type":"system_prompt","stage_name":"system_prompt_v1","duration_ms":18,"attributes":{"prompt_id":"sys-01"}}
+{"run_id":"run_20260103_001","stage_id":"stg_input_01","parent_stage_id":"stg_sys_01","stage_type":"input","stage_name":"user_query","duration_ms":6,"attributes":{"query":"보험금 지급 조건","language":"ko"}}
+```
+
 - Stage Event에는 **의도분석/리트리브/리랭킹**의 입력/출력/파라미터/결과를 넣습니다.
 - `--stage-store` 사용 시 EvalVault 내부 실행 로그도 자동 저장됩니다.
+
+### 4) 분석 전환 규칙(요약)
+- **RAGAS 형식 데이터셋**이면 `evalvault run` 기반 평가/분석
+- **OTel/OpenInference 트레이스**는 Phoenix로 트레이싱 연결
+- **비정형 로그(Stage Event)**는 `stage ingest` → `stage summary` → 분석 모듈로 전환
 
 ---
 
@@ -148,6 +292,11 @@ npm run dev
 ```
 
 브라우저에서 `http://localhost:5173` 접속 후, Evaluation Studio에서 실행/히스토리/리포트를 확인합니다.
+
+- LLM 보고서 언어: `/api/v1/runs/{run_id}/report?language=en` (기본 ko)
+  - 상세: `docs/guides/USER_GUIDE.md#보고서-언어-옵션`
+- 피드백 집계: 동일 `rater_id` + `test_case_id` 기준 최신 값만 집계, 취소 시 집계 제외
+  - 상세: `docs/guides/USER_GUIDE.md#피드백-집계-규칙`
 
 ---
 
@@ -212,6 +361,8 @@ npm run dev
 
 ### 2) 한국어/비영어권 대응 (프롬프트 언어 정렬)
 - **한국어 데이터셋 자동 감지** 후 `answer_relevancy`, `factual_correctness`에 한국어 프롬프트를 기본 적용합니다. (`src/evalvault/domain/services/evaluator.py`)
+- **요약/후보 평가 프롬프트 기본 한국어**: 요약 충실도 판정, 프롬프트 후보 평가, 지식그래프 관계 보강 프롬프트는 기본 `ko`로 동작합니다.
+  - 영어가 필요하면 API/SDK에서 `language="en"` 또는 `prompt_language="en"`을 지정하세요.
 - **사용자 프롬프트 오버라이드 지원**: 필요 시 YAML로 메트릭별 프롬프트를 덮어쓸 수 있습니다. (`src/evalvault/domain/services/ragas_prompt_overrides.py`)
 - **외부 근거(비영어권 이슈)**:
   - https://github.com/explodinggradients/ragas/issues/1829

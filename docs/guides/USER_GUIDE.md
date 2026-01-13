@@ -318,6 +318,9 @@ CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함�
 
 JSON 템플릿의 `thresholds` 값은 `null`로 비워져 있으므로 사용 전 숫자로 채우거나 삭제하세요. CSV/Excel은 `threshold_*` 컬럼에 값을 채우면 동일하게 적용됩니다.
 
+#### 실행 결과 엑셀(컬럼 설명)
+- 시트/컬럼 상세: `docs/guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
+
 ---
 
 ## CLI 명령어 참조
@@ -569,6 +572,10 @@ uv run evalvault prompts show <RUN_ID> --db data/db/evalvault.db
 uv run evalvault prompts diff <RUN_A> <RUN_B> --db data/db/evalvault.db
 ```
 
+프롬프트 언어 기본값은 `ko`이며, 필요 시 API/SDK에서 다음 옵션으로 영어를 지정할 수 있습니다.
+- 평가/요약 판정: `language="en"`
+- 프롬프트 후보 평가: `prompt_language="en"`
+
 #### `stage` - 단계별 성능 평가
 
 ```bash
@@ -623,6 +630,19 @@ CLI와 Web UI가 동일한 DB(`--db` 또는 `EVALVAULT_DB_PATH`)를 사용하면
 - CLI에서 실행한 평가 결과를 Web UI에서 바로 확인 가능
 - Web UI에서 실행한 평가 결과를 CLI `history` 명령으로 확인 가능
 - 분석 결과도 양쪽에서 공유
+
+### 보고서 언어 옵션
+
+LLM 보고서는 기본 한국어이며, 필요 시 영어로 요청할 수 있습니다.
+
+- `GET /api/v1/runs/{run_id}/report?language=en` (기본값: `ko`)
+
+### 피드백 집계 규칙
+
+Web UI의 별점/Thumb 피드백 집계는 다음 규칙을 따릅니다.
+
+- 집계 기준: 동일 `rater_id` + `test_case_id`의 **최신 피드백만** 반영
+- 취소(`thumb_feedback=none` 또는 빈 값)는 집계에서 제외
 
 ---
 

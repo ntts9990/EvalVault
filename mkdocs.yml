@@ -102,6 +102,7 @@ nav:
   - Guides:
       - User Guide: guides/USER_GUIDE.md
       - Dev Guide: guides/DEV_GUIDE.md
+      - Run Excel Sheet Guide: guides/EVALVAULT_RUN_EXCEL_SHEETS.md
       - CLI MCP Plan: guides/CLI_MCP_PLAN.md
       - Diagnostic Playbook: guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md
       - Release Checklist: guides/RELEASE_CHECKLIST.md

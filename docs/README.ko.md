@@ -79,6 +79,12 @@ Domain Memory를 켜면 자동 조정될 수 있습니다.
 
 ---
 
+## 실행 결과 엑셀 컬럼 설명
+
+- 시트/컬럼 상세: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
+
+---
+
 ## 검색 성능 평가 메트릭 흐름
 
 EvalVault의 검색 성능 메트릭은 크게 3갈래로 수집됩니다.

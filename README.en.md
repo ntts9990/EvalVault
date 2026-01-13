@@ -42,6 +42,11 @@ Open `http://localhost:5173`, run an evaluation in Evaluation Studio (for exampl
 `tests/fixtures/e2e/insurance_qa_korean.json`), then check Analysis Lab/Reports for scores
 and insights.
 
+- LLM report language: `/api/v1/runs/{run_id}/report?language=en` (default: ko)
+  - Details: `docs/guides/USER_GUIDE.md#보고서-언어-옵션`
+- Feedback aggregation: latest value per `rater_id` + `test_case_id` (cancellations excluded)
+  - Details: `docs/guides/USER_GUIDE.md#피드백-집계-규칙`
+
 **CLI (terminal view)**
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
@@ -333,6 +338,11 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 - The Web UI includes the same mode toggle and surfaces a "Mode" pill on Reports to make comparisons obvious.
 
 ---
+
+## Prompt Language Defaults (RAGAS)
+
+- Korean is the default for summary faithfulness judgment, prompt candidate scoring, and KG relation augmentation.
+- Use `language="en"` or `prompt_language="en"` in API/SDK when English is required.
 
 ## Supported Metrics
 
