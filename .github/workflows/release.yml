@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    concurrency: release
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use PAT to bypass branch protection rules for version commits
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Install semantic-release
+        run: uv pip install python-semantic-release
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get next version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current version from latest git tag
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
+          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+
+          # Check if there's a new version to release (based on conventional commits)
+          NEXT_VERSION=$(uv run semantic-release version --print 2>/dev/null || echo "")
+
+          # Check if tag already exists
+          if [ -n "$NEXT_VERSION" ]; then
+            if git rev-parse "v${NEXT_VERSION}" >/dev/null 2>&1; then
+              echo "Tag v${NEXT_VERSION} already exists, skipping release"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+            elif [ "$NEXT_VERSION" != "$CURRENT_VERSION" ]; then
+              echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              echo "Next version will be: $NEXT_VERSION"
+            else
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "No new version to release (current: $CURRENT_VERSION)"
+            fi
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "No version determined by semantic-release"
+          fi
+
+      - name: Sync pyproject version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+          # Regenerate lockfile with new version
+          uv lock
+          # Stage both files
+          git add pyproject.toml uv.lock
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit (version already up to date)"
+          fi
+
+      - name: Create release tag
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Build package with new version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          uv build
+
+      - name: Publish to PyPI
+        if: steps.version.outputs.should_release == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
+        # Uses OIDC Trusted Publisher - no API token needed
+        # Setup: PyPI → Manage → Publishing → Add trusted publisher
+        #   - Owner: ntts9990
+        #   - Repository: EvalVault
+        #   - Workflow: release.yml
+        #   - Environment: (empty)
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.next_version }}"
+          gh release create "v${VERSION}" dist/* \
+            --title "v${VERSION}" \
+            --generate-notes
