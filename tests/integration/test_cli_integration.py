@@ -7,6 +7,7 @@
 """
 
 import json
+import os
 from importlib.metadata import version as get_version
 from pathlib import Path
 
@@ -72,6 +73,10 @@ class TestCLIProfileIntegration:
         expected_version = get_version("evalvault")
         assert expected_version in result.stdout
 
+    @pytest.mark.skipif(
+        bool(os.environ.get("CI")),
+        reason="CI 환경에서는 Ollama 서버가 없습니다.",
+    )
     def test_run_with_retriever_populates_contexts(self, tmp_path: Path):
         dataset_path = tmp_path / "dataset.json"
         dataset_path.write_text(

@@ -1,6 +1,7 @@
 """Tests for CLI interface."""
 
 import json
+import os
 import re
 from importlib.metadata import version as get_version
 from types import SimpleNamespace
@@ -372,6 +373,10 @@ class TestCLIRun:
 
         assert result.exit_code == 0
 
+    @pytest.mark.skipif(
+        bool(os.environ.get("CI")),
+        reason="CI 환경에서는 Ollama 서버가 없습니다.",
+    )
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
@@ -1444,6 +1449,10 @@ class TestCLIRunModes:
         assert result.exit_code == 1
         assert "OPENAI_API_KEY" in result.stdout
 
+    @pytest.mark.skipif(
+        bool(os.environ.get("CI")),
+        reason="CI 환경에서는 Ollama 서버가 없습니다.",
+    )
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
