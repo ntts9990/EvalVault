@@ -622,7 +622,8 @@ class BaseSQLStorageAdapter(ABC):
         if isinstance(row, dict):
             return dict(row)
         if hasattr(row, "keys"):
-            return {key: row[key] for key in row}
+            keys = row.keys()
+            return {key: row[key] for key in keys}
         try:
             return dict(row)
         except Exception:

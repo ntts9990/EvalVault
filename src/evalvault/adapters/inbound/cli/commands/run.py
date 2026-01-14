@@ -213,7 +213,9 @@ def register_run_commands(
             None,
             "--output",
             "-o",
-            help="Output file for results (JSON format).",
+            help=(
+                "Output file for results (JSON format). If .xlsx/.xls, exports Excel via DB save."
+            ),
         ),
         auto_analyze: bool = typer.Option(
             False,
@@ -812,6 +814,27 @@ def register_run_commands(
 
         if db_path is None:
             db_path = Path(settings.evalvault_db_path)
+
+        excel_output: Path | None = None
+        if output and output.suffix.lower() in {".xlsx", ".xls"}:
+            excel_output = output
+            output = None
+            if db_path is None:
+                print_cli_error(
+                    console,
+                    "엑셀 출력은 DB 저장이 필요합니다.",
+                    fixes=["--db <sqlite_path> 옵션을 함께 지정하세요."],
+                )
+                raise typer.Exit(1)
+            print_cli_warning(
+                console,
+                "엑셀 출력은 DB 저장이 필수이며, 지정한 경로로만 저장됩니다.",
+                tips=[
+                    f"DB 저장 경로: {db_path}",
+                    "기본 DB 엑셀은 생성하지 않습니다.",
+                    "필요 시 --db로 경로를 변경하세요.",
+                ],
+            )
 
         # Override model if specified
         if model:
@@ -1954,8 +1977,23 @@ def register_run_commands(
                 console,
                 storage_cls=SQLiteStorageAdapter,
                 prompt_bundle=prompt_bundle,
+                export_excel=excel_output is None,
             )
             _log_duration(console, verbose, "DB 저장 완료", db_started_at)
+        if excel_output:
+            excel_started_at = datetime.now()
+            _log_timestamp(console, verbose, f"엑셀 저장 시작 ({excel_output})")
+            try:
+                storage = SQLiteStorageAdapter(db_path=db_path)
+                storage.export_run_to_excel(result.run_id, excel_output)
+                console.print(f"[green]Excel export saved: {excel_output}[/green]")
+            except Exception as exc:
+                print_cli_warning(
+                    console,
+                    "엑셀 내보내기에 실패했습니다.",
+                    tips=[str(exc)],
+                )
+            _log_duration(console, verbose, "엑셀 저장 완료", excel_started_at)
         if output:
             output_started_at = datetime.now()
             _log_timestamp(console, verbose, f"결과 저장 시작 ({output})")
@@ -2060,7 +2098,9 @@ def register_run_commands(
             None,
             "--output",
             "-o",
-            help="Output file for results (JSON format).",
+            help=(
+                "Output file for results (JSON format). If .xlsx/.xls, exports Excel via DB save."
+            ),
         ),
         auto_analyze: bool = typer.Option(
             False,
@@ -2344,7 +2384,9 @@ def register_run_commands(
             None,
             "--output",
             "-o",
-            help="Output file for results (JSON format).",
+            help=(
+                "Output file for results (JSON format). If .xlsx/.xls, exports Excel via DB save."
+            ),
         ),
         auto_analyze: bool = typer.Option(
             False,

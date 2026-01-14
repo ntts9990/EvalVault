@@ -430,6 +430,7 @@ def _save_to_db(
     *,
     storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
     prompt_bundle: PromptSetBundle | None = None,
+    export_excel: bool = True,
 ) -> None:
     """Persist evaluation run (and optional prompt set) to SQLite database."""
     with console.status(f"[bold green]Saving to database {db_path}..."):
@@ -443,16 +444,17 @@ def _save_to_db(
                     result.run_id,
                     prompt_bundle.prompt_set.prompt_set_id,
                 )
-            excel_path = db_path.parent / f"evalvault_run_{result.run_id}.xlsx"
-            try:
-                storage.export_run_to_excel(result.run_id, excel_path)
-                console.print(f"[green]Excel export saved: {excel_path}[/green]")
-            except Exception as exc:
-                print_cli_warning(
-                    console,
-                    "엑셀 내보내기에 실패했습니다.",
-                    tips=[str(exc)],
-                )
+            if export_excel:
+                excel_path = db_path.parent / f"evalvault_run_{result.run_id}.xlsx"
+                try:
+                    storage.export_run_to_excel(result.run_id, excel_path)
+                    console.print(f"[green]Excel export saved: {excel_path}[/green]")
+                except Exception as exc:
+                    print_cli_warning(
+                        console,
+                        "엑셀 내보내기에 실패했습니다.",
+                        tips=[str(exc)],
+                    )
             console.print(f"[green]Results saved to database: {db_path}[/green]")
             console.print(f"[dim]Run ID: {result.run_id}[/dim]")
             if prompt_bundle:
