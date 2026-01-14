@@ -3,8 +3,10 @@
 import json
 import os
 import re
+from email.message import Message
 from importlib.metadata import version as get_version
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from urllib.error import HTTPError
 
@@ -19,6 +21,7 @@ from evalvault.adapters.outbound.phoenix.sync_service import (
 )
 from evalvault.domain.entities import (
     Dataset,
+    EffortLevel,
     EvaluationRun,
     MetricScore,
     TestCase,
@@ -593,7 +596,11 @@ class TestKGCLI:
         mock_tracker.start_trace.assert_called_once()
         mock_tracker.save_artifact.assert_called_once()
         args, kwargs = mock_tracker.save_artifact.call_args
-        artifact_payload = kwargs.get("data") or (args[2] if len(args) >= 3 else None)
+        artifact_payload = kwargs.get("data")
+        if artifact_payload is None and len(args) >= 3:
+            artifact_payload = args[2]
+        assert isinstance(artifact_payload, dict)
+        artifact_payload = cast(dict[str, Any], artifact_payload)
         assert artifact_payload["type"] == "kg_stats"
         assert "Langfuse trace ID" in result.stdout
 
@@ -774,11 +781,12 @@ class TestLangfuseDashboard:
         mock_settings.langfuse_host = "https://example"
         mock_settings_cls.return_value = mock_settings
 
+        headers: Message = Message()
         mock_fetch.side_effect = HTTPError(
             url="https://example/api/public/traces",
             code=405,
             msg="Method Not Allowed",
-            hdrs=None,
+            hdrs=headers,
             fp=None,
         )
 
@@ -3564,7 +3572,7 @@ class TestCLIPhoenixUtilities:
                     title="Temperature 감소",
                     description="LLM의 창의성을 낮춤",
                     expected_improvement=0.08,
-                    effort="low",
+                    effort=EffortLevel.LOW,
                 )
             ],
             verification_command="evalvault run data.csv --metrics faithfulness",
