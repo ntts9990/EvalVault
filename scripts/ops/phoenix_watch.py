@@ -17,7 +17,7 @@ Optional:
     --drift-key metric_name     Drift 지표 키 (기본 embedding_drift_score)
     --drift-threshold value     해당 지표가 value 이상이면 Alert + Gate 실행
     --gate-command "...gate"    Drift 초과 시 실행할 EvalVault Gate 명령
-    --gate-shell                Gate 명령을 shell=True 로 실행
+    --gate-shell                Gate 명령을 shell=True 로 실행 (신뢰된 명령만, 단일 라인)
     --prompt-manifest path      Prompt manifest JSON (diff baseline)
     --prompt-files file [...]   Prompt 파일 리스트 (space separated)
     --prompt-diff-lines 20      Prompt diff 표시 라인 수 (0이면 비활성화)
@@ -32,6 +32,7 @@ import shlex
 import subprocess
 import sys
 import time
+import warnings
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -218,9 +219,25 @@ def extract_drift_score(exp: dict[str, Any], drift_key: str | None) -> float | N
     return None
 
 
+def _validate_gate_command(command: str, *, shell: bool) -> str | None:
+    if not command.strip():
+        return "Gate command is empty."
+    if shell and ("\n" in command or "\r" in command):
+        return "Gate command must be single-line when --gate-shell is enabled."
+    return None
+
+
 def run_gate_command(command: str, *, shell: bool = False) -> tuple[int, str]:
+    validation_error = _validate_gate_command(command, shell=shell)
+    if validation_error:
+        return 1, validation_error
     try:
         if shell:
+            warnings.warn(
+                "--gate-shell enables shell execution; use only trusted commands.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             completed = subprocess.run(
                 command,
                 shell=True,
@@ -317,7 +334,7 @@ def main() -> None:
     parser.add_argument(
         "--gate-shell",
         action="store_true",
-        help="Run gate command via shell=True (useful for complex pipelines).",
+        help=("Run gate command via shell=True (trusted commands only, single-line only)."),
     )
     parser.add_argument(
         "--prompt-manifest",

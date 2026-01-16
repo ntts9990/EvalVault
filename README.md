@@ -56,6 +56,9 @@ uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
   --auto-analyze
 ```
 
+- API 인증을 쓰려면 `.env`에 `API_AUTH_TOKENS`를 설정하세요.
+- `secret://` 참조를 쓰면 `SECRET_PROVIDER`와 `--extra secrets`가 필요합니다.
+- 레이트리밋은 `RATE_LIMIT_ENABLED`로 활성화합니다.
 - 결과는 기본 DB(`data/db/evalvault.db`)에 저장되어 `history`, Web UI, 비교 분석에서 재사용됩니다.
 - `--db`를 생략해도 기본 경로로 저장되며, 모든 데이터가 자동으로 엑셀로 내보내집니다.
 - `--auto-analyze`는 요약 리포트 + 모듈별 아티팩트를 함께 생성합니다.

@@ -4,6 +4,13 @@ from typing import Any
 
 from langfuse import Langfuse
 
+from evalvault.adapters.outbound.tracker.log_sanitizer import (
+    MAX_CONTEXT_CHARS,
+    MAX_LOG_CHARS,
+    sanitize_payload,
+    sanitize_text,
+    sanitize_text_list,
+)
 from evalvault.config.phoenix_support import extract_phoenix_links
 from evalvault.domain.entities import EvaluationRun
 from evalvault.ports.outbound.tracker_port import TrackerPort
@@ -88,21 +95,31 @@ class LangfuseAdapter(TrackerPort):
             raise ValueError(f"Trace not found: {trace_id}")
 
         trace_or_span = self._traces[trace_id]
+        safe_input = (
+            sanitize_payload(input_data, max_chars=MAX_LOG_CHARS)
+            if input_data is not None
+            else None
+        )
+        safe_output = (
+            sanitize_payload(output_data, max_chars=MAX_LOG_CHARS)
+            if output_data is not None
+            else None
+        )
         # Support both old and new Langfuse API
         if hasattr(trace_or_span, "start_span"):
             # Langfuse 3.x: create nested span
             child_span = trace_or_span.start_span(
                 name=name,
-                input=input_data,
-                output=output_data,
+                input=safe_input,
+                output=safe_output,
             )
             child_span.end()
         else:
             # Langfuse 2.x: use span method on trace
             trace_or_span.span(
                 name=name,
-                input=input_data,
-                output=output_data,
+                input=safe_input,
+                output=safe_output,
             )
 
     def log_score(
@@ -377,10 +394,13 @@ class LangfuseAdapter(TrackerPort):
             # Span input: test case data (question, answer, contexts, ground_truth)
             span_input = {
                 "test_case_id": result.test_case_id,
-                "question": result.question,
-                "answer": result.answer,
-                "contexts": result.contexts,
-                "ground_truth": result.ground_truth,
+                "question": sanitize_text(result.question, max_chars=MAX_LOG_CHARS),
+                "answer": sanitize_text(result.answer, max_chars=MAX_LOG_CHARS),
+                "contexts": sanitize_text_list(
+                    result.contexts,
+                    max_chars=MAX_CONTEXT_CHARS,
+                ),
+                "ground_truth": sanitize_text(result.ground_truth, max_chars=MAX_LOG_CHARS),
             }
 
             # Span output: evaluation results

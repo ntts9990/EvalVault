@@ -3,8 +3,15 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from evalvault.config.secret_manager import (
+    SecretProviderError,
+    build_secret_provider,
+    is_secret_reference,
+    resolve_secret_reference,
+)
 
 
 def _detect_repo_root(start: Path, max_depth: int = 6) -> Path | None:
@@ -38,6 +45,75 @@ def _ensure_http_scheme(url_value: str) -> str:
     return f"http://{value}"
 
 
+def is_production_profile(profile_name: str | None) -> bool:
+    return (profile_name or "").strip().lower() == "prod"
+
+
+def _parse_cors_origins(cors_origins: str | None) -> list[str]:
+    if not cors_origins:
+        return []
+    return [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
+
+SECRET_REFERENCE_FIELDS = (
+    "api_auth_tokens",
+    "knowledge_read_tokens",
+    "knowledge_write_tokens",
+    "openai_api_key",
+    "anthropic_api_key",
+    "azure_api_key",
+    "vllm_api_key",
+    "langfuse_public_key",
+    "langfuse_secret_key",
+    "phoenix_api_token",
+    "postgres_password",
+    "postgres_connection_string",
+)
+
+
+def _validate_production_settings(settings: "Settings") -> None:
+    if not is_production_profile(settings.evalvault_profile):
+        return
+
+    missing: list[str] = []
+
+    if not settings.api_auth_tokens:
+        missing.append("API_AUTH_TOKENS")
+
+    if settings.llm_provider == "openai" and not settings.openai_api_key:
+        missing.append("OPENAI_API_KEY")
+
+    if settings.tracker_provider == "langfuse":
+        if not settings.langfuse_public_key:
+            missing.append("LANGFUSE_PUBLIC_KEY")
+        if not settings.langfuse_secret_key:
+            missing.append("LANGFUSE_SECRET_KEY")
+
+    if settings.tracker_provider == "mlflow" and not settings.mlflow_tracking_uri:
+        missing.append("MLFLOW_TRACKING_URI")
+
+    if (
+        settings.postgres_connection_string is None
+        and settings.postgres_host
+        and not settings.postgres_password
+    ):
+        missing.append("POSTGRES_PASSWORD")
+
+    cors_origins = _parse_cors_origins(settings.cors_origins)
+    if not cors_origins:
+        missing.append("CORS_ORIGINS")
+    else:
+        localhost_origins = {"localhost", "127.0.0.1"}
+        for origin in cors_origins:
+            if any(host in origin for host in localhost_origins):
+                raise ValueError("Production profile forbids localhost in CORS_ORIGINS.")
+
+    if missing:
+        raise ValueError(
+            "Missing required settings for prod profile: " + ", ".join(sorted(set(missing)))
+        )
+
+
 class Settings(BaseSettings):
     """Application configuration settings."""
 
@@ -48,6 +124,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    _secret_cache: dict[str, str] = PrivateAttr(default_factory=dict)
+
     # Profile Configuration (YAML 기반 모델 프로필)
     evalvault_profile: str | None = Field(
         default=None,
@@ -57,6 +135,45 @@ class Settings(BaseSettings):
     cors_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated list of allowed CORS origins.",
+    )
+    secret_provider: str | None = Field(
+        default=None,
+        description="Secret provider name for secret:// references (env/aws/gcp/vault).",
+    )
+    secret_cache_enabled: bool = Field(
+        default=True,
+        description="Cache resolved secret references in memory.",
+    )
+    api_auth_tokens: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated list of API bearer tokens for FastAPI auth. "
+            "Leave empty to disable authentication."
+        ),
+    )
+    knowledge_read_tokens: str | None = Field(
+        default=None,
+        description="Comma-separated read tokens for knowledge endpoints.",
+    )
+    knowledge_write_tokens: str | None = Field(
+        default=None,
+        description="Comma-separated write tokens for knowledge endpoints.",
+    )
+    rate_limit_enabled: bool = Field(
+        default=False,
+        description="Enable API rate limiting for /api routes.",
+    )
+    rate_limit_requests: int = Field(
+        default=120,
+        description="Max requests allowed within rate_limit_window_seconds.",
+    )
+    rate_limit_window_seconds: int = Field(
+        default=60,
+        description="Window size for rate limit checks in seconds.",
+    )
+    rate_limit_block_threshold: int = Field(
+        default=10,
+        description="Log suspicious activity after this many rate limit blocks.",
     )
     evalvault_db_path: str = Field(
         default="data/db/evalvault.db",
@@ -71,6 +188,26 @@ class Settings(BaseSettings):
         self.evalvault_db_path = _resolve_storage_path(self.evalvault_db_path)
         self.evalvault_memory_db_path = _resolve_storage_path(self.evalvault_memory_db_path)
         self.ollama_base_url = _ensure_http_scheme(self.ollama_base_url)
+        self._resolve_secret_references()
+
+    def _resolve_secret_references(self) -> None:
+        secret_values = [
+            value
+            for value in (getattr(self, field, None) for field in SECRET_REFERENCE_FIELDS)
+            if isinstance(value, str)
+        ]
+        if not any(is_secret_reference(value) for value in secret_values):
+            return
+        try:
+            provider = build_secret_provider(self.secret_provider)
+        except SecretProviderError as exc:
+            raise ValueError(str(exc)) from exc
+        cache = self._secret_cache if self.secret_cache_enabled else None
+        for field in SECRET_REFERENCE_FIELDS:
+            value = getattr(self, field, None)
+            if isinstance(value, str) and is_secret_reference(value):
+                resolved = resolve_secret_reference(value, provider, cache)
+                setattr(self, field, resolved)
 
     # LLM Provider Selection
     llm_provider: str = Field(
@@ -314,6 +451,8 @@ def get_settings() -> Settings:
         if _settings.evalvault_profile:
             _settings = apply_profile(_settings, _settings.evalvault_profile)
 
+        _validate_production_settings(_settings)
+
     return _settings
 
 
@@ -346,6 +485,7 @@ def apply_runtime_overrides(overrides: dict[str, object]) -> Settings:
     updated = Settings.model_validate(payload)
     if updated.evalvault_profile:
         updated = apply_profile(updated, updated.evalvault_profile)
+    _validate_production_settings(updated)
     for key, value in updated.model_dump().items():
         setattr(settings, key, value)
 

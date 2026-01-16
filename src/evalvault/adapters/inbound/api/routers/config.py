@@ -28,6 +28,9 @@ def get_config():
             "phoenix_api_token",
             "postgres_password",
             "postgres_connection_string",
+            "api_auth_tokens",
+            "knowledge_read_tokens",
+            "knowledge_write_tokens",
         }
     )
 
@@ -80,7 +83,6 @@ def update_config(
     payload: ConfigUpdateRequest,
     adapter: AdapterDep,
 ):
-    """Update runtime configuration (non-secret fields only)."""
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         return get_config()
@@ -96,6 +98,9 @@ def update_config(
             "phoenix_api_token",
             "postgres_password",
             "postgres_connection_string",
+            "api_auth_tokens",
+            "knowledge_read_tokens",
+            "knowledge_write_tokens",
         }
     )
 

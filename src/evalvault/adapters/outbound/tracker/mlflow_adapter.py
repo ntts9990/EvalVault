@@ -4,6 +4,7 @@ import json
 import tempfile
 from typing import Any
 
+from evalvault.adapters.outbound.tracker.log_sanitizer import MAX_LOG_CHARS, sanitize_payload
 from evalvault.domain.entities import EvaluationRun
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
@@ -85,8 +86,8 @@ class MLflowAdapter(TrackerPort):
         # Store span data as JSON artifact
         span_data = {
             "name": name,
-            "input": input_data,
-            "output": output_data,
+            "input": sanitize_payload(input_data, max_chars=MAX_LOG_CHARS),
+            "output": sanitize_payload(output_data, max_chars=MAX_LOG_CHARS),
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:

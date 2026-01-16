@@ -9,8 +9,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette import status
 
 from evalvault.adapters.inbound.api.main import create_app
+from evalvault.config.model_config import reset_model_config
+from evalvault.config.settings import reset_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 
 
@@ -156,6 +159,39 @@ def api_client() -> TestClient:
 
 
 @pytest.fixture()
+def knowledge_client(monkeypatch) -> TestClient:
+    reset_settings()
+    reset_model_config()
+    monkeypatch.setenv("KNOWLEDGE_READ_TOKENS", "read-token")
+    monkeypatch.setenv("KNOWLEDGE_WRITE_TOKENS", "write-token")
+    with patch(
+        "evalvault.adapters.inbound.api.main.create_adapter",
+        return_value=MagicMock(),
+    ):
+        app = create_app()
+        with TestClient(app) as client:
+            yield client
+
+
+@pytest.fixture()
+def rate_limited_client(monkeypatch) -> TestClient:
+    reset_settings()
+    reset_model_config()
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("RATE_LIMIT_REQUESTS", "2")
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "60")
+    monkeypatch.setenv("RATE_LIMIT_BLOCK_THRESHOLD", "1")
+    monkeypatch.delenv("API_AUTH_TOKENS", raising=False)
+    with patch(
+        "evalvault.adapters.inbound.api.main.create_adapter",
+        return_value=MagicMock(),
+    ):
+        app = create_app()
+        with TestClient(app) as client:
+            yield client
+
+
+@pytest.fixture()
 def pipeline_mocks() -> tuple[FakePipelineService, FakeStorage]:
     """Service/storage stubs for pipeline endpoints."""
     result = FakePipelineResult()
@@ -286,3 +322,46 @@ def test_pipeline_results_save_contract(
     payload = response.json()
     assert payload["intent"] == "generate_summary"
     assert "result_id" in payload
+
+
+def test_knowledge_requires_read_token(knowledge_client: TestClient) -> None:
+    response = knowledge_client.get("/api/v1/knowledge/files")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    response = knowledge_client.get(
+        "/api/v1/knowledge/files",
+        headers={"Authorization": "Bearer read-token"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    response = knowledge_client.get(
+        "/api/v1/knowledge/files",
+        headers={"Authorization": "Bearer write-token"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_knowledge_requires_write_token(knowledge_client: TestClient) -> None:
+    files = {"files": ("doc.txt", b"hello", "text/plain")}
+
+    response = knowledge_client.post("/api/v1/knowledge/upload", files=files)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    response = knowledge_client.post(
+        "/api/v1/knowledge/upload",
+        headers={"Authorization": "Bearer write-token"},
+        files=files,
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_rate_limit_blocks_excess_requests(rate_limited_client: TestClient) -> None:
+    response = rate_limited_client.get("/api/v1/config/profiles")
+    assert response.status_code == status.HTTP_200_OK
+
+    response = rate_limited_client.get("/api/v1/config/profiles")
+    assert response.status_code == status.HTTP_200_OK
+
+    response = rate_limited_client.get("/api/v1/config/profiles")
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert response.headers.get("Retry-After")

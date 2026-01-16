@@ -9,6 +9,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from evalvault.adapters.outbound.tracer.open_rag_trace_helpers import serialize_json
+from evalvault.adapters.outbound.tracker.log_sanitizer import (
+    MAX_CONTEXT_CHARS,
+    MAX_LOG_CHARS,
+    sanitize_payload,
+    sanitize_text,
+    sanitize_text_list,
+)
 from evalvault.domain.entities import (
     EvaluationRun,
     GenerationData,
@@ -171,9 +178,11 @@ class PhoenixAdapter(TrackerPort):
 
         with self._tracer.start_span(name, context=context) as span:
             if input_data is not None:
-                span.set_attribute("input", json.dumps(input_data, default=str))
+                safe_input = sanitize_payload(input_data, max_chars=MAX_LOG_CHARS)
+                span.set_attribute("input", json.dumps(safe_input, default=str))
             if output_data is not None:
-                span.set_attribute("output", json.dumps(output_data, default=str))
+                safe_output = sanitize_payload(output_data, max_chars=MAX_LOG_CHARS)
+                span.set_attribute("output", json.dumps(safe_output, default=str))
 
     def log_score(
         self,
@@ -368,12 +377,20 @@ class PhoenixAdapter(TrackerPort):
             context=context,
         ) as span:
             # Input data
-            span.set_attribute("input.question", result.question or "")
-            span.set_attribute("input.answer", result.answer or "")
+            safe_question = sanitize_text(result.question, max_chars=MAX_LOG_CHARS) or ""
+            safe_answer = sanitize_text(result.answer, max_chars=MAX_LOG_CHARS) or ""
+            span.set_attribute("input.question", safe_question)
+            span.set_attribute("input.answer", safe_answer)
             if result.contexts:
-                span.set_attribute("input.contexts", json.dumps(result.contexts))
+                safe_contexts = sanitize_text_list(
+                    result.contexts,
+                    max_chars=MAX_CONTEXT_CHARS,
+                )
+                span.set_attribute("input.contexts", json.dumps(safe_contexts))
             if result.ground_truth:
-                span.set_attribute("input.ground_truth", result.ground_truth)
+                safe_ground_truth = sanitize_text(result.ground_truth, max_chars=MAX_LOG_CHARS)
+                if safe_ground_truth:
+                    span.set_attribute("input.ground_truth", safe_ground_truth)
 
             # Metrics
             span.set_attribute("output.all_passed", result.all_passed)
@@ -468,8 +485,10 @@ class PhoenixAdapter(TrackerPort):
 
             # Set query
             if data.query:
-                span.set_attribute("retrieval.query", data.query)
-                span.set_attribute("input.value", data.query)
+                safe_query = sanitize_text(data.query, max_chars=MAX_LOG_CHARS)
+                if safe_query:
+                    span.set_attribute("retrieval.query", safe_query)
+                    span.set_attribute("input.value", safe_query)
 
             span.set_attribute("spec.version", "0.1")
             span.set_attribute("rag.module", "retrieve")
@@ -495,11 +514,14 @@ class PhoenixAdapter(TrackerPort):
                     event_attrs["doc.rerank_rank"] = doc.rerank_rank
                 if doc.chunk_id:
                     event_attrs["doc.chunk_id"] = doc.chunk_id
-                preview = doc.content[:200] if doc.content else ""
-                if preview:
-                    event_attrs["doc.preview"] = preview
+                safe_preview = (
+                    sanitize_text(doc.content, max_chars=MAX_CONTEXT_CHARS) if doc.content else ""
+                )
+                if safe_preview:
+                    event_attrs["doc.preview"] = safe_preview
                 if doc.metadata:
-                    event_attrs["doc.metadata"] = json.dumps(doc.metadata, default=str)
+                    safe_metadata = sanitize_payload(doc.metadata, max_chars=MAX_LOG_CHARS)
+                    event_attrs["doc.metadata"] = json.dumps(safe_metadata, default=str)
                 span.add_event(f"retrieved_doc_{i}", attributes=event_attrs)
 
     def log_generation(
@@ -544,9 +566,8 @@ class PhoenixAdapter(TrackerPort):
                 span.set_attribute(key, value)
 
             # Set prompt/response (truncate if too long)
-            max_len = 10000
-            prompt = data.prompt[:max_len] if data.prompt else ""
-            response = data.response[:max_len] if data.response else ""
+            prompt = sanitize_text(data.prompt, max_chars=MAX_LOG_CHARS) or ""
+            response = sanitize_text(data.response, max_chars=MAX_LOG_CHARS) or ""
             if prompt:
                 span.set_attribute("generation.prompt", prompt)
                 span.set_attribute("input.value", prompt)
@@ -559,24 +580,28 @@ class PhoenixAdapter(TrackerPort):
 
             # Set prompt template if available
             if data.prompt_template:
-                span.set_attribute("generation.prompt_template", data.prompt_template[:max_len])
+                safe_template = sanitize_text(data.prompt_template, max_chars=MAX_LOG_CHARS)
+                if safe_template:
+                    span.set_attribute("generation.prompt_template", safe_template)
 
     def log_rag_trace(self, data: RAGTraceData) -> str:
         """Log a full RAG trace (retrieval + generation) to Phoenix."""
 
         self._ensure_initialized()
         metadata = {"event_type": "rag_trace", "total_time_ms": data.total_time_ms}
-        if data.query:
-            metadata["query"] = data.query
+        safe_query = sanitize_text(data.query, max_chars=MAX_LOG_CHARS)
+        if safe_query:
+            metadata["query"] = safe_query
         if data.metadata:
-            metadata.update(data.metadata)
+            safe_metadata = sanitize_payload(data.metadata, max_chars=MAX_LOG_CHARS)
+            metadata.update(safe_metadata)
 
         should_end = False
         trace_id = data.trace_id
         if trace_id and trace_id in self._active_spans:
             span = self._active_spans[trace_id]
         else:
-            trace_name = f"rag-trace-{(data.query or 'run')[:12]}"
+            trace_name = f"rag-trace-{(safe_query or 'run')[:12]}"
             trace_id = self.start_trace(trace_name, metadata=metadata)
             span = self._active_spans[trace_id]
             should_end = True
@@ -589,12 +614,13 @@ class PhoenixAdapter(TrackerPort):
         if data.generation:
             self.log_generation(trace_id, data.generation)
         if data.final_answer:
-            preview = data.final_answer[:1000]
-            span.set_attribute("rag.final_answer", preview)
-            span.set_attribute("output.value", preview)
+            preview = sanitize_text(data.final_answer, max_chars=MAX_LOG_CHARS)
+            if preview:
+                span.set_attribute("rag.final_answer", preview)
+                span.set_attribute("output.value", preview)
 
-        if data.query:
-            span.set_attribute("input.value", data.query)
+        if safe_query:
+            span.set_attribute("input.value", safe_query)
 
         span.set_attribute("spec.version", "0.1")
         span.set_attribute("rag.module", "custom.pipeline")

@@ -2,14 +2,59 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.responses import JSONResponse
 
 from evalvault.adapters.inbound.api.adapter import WebUIAdapter, create_adapter
-from evalvault.config.settings import get_settings
+from evalvault.config.settings import Settings, get_settings, is_production_profile
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimiter:
+    def __init__(self) -> None:
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
+        self._blocked_counts: dict[str, int] = defaultdict(int)
+
+    def check(self, key: str, limit: int, window_seconds: int) -> tuple[bool, int | None, int]:
+        now = time.monotonic()
+        window = max(window_seconds, 1)
+        queue = self._requests[key]
+        while queue and now - queue[0] >= window:
+            queue.popleft()
+        if len(queue) >= limit:
+            self._blocked_counts[key] += 1
+            retry_after = int(window - (now - queue[0])) if queue else window
+            return False, max(retry_after, 1), self._blocked_counts[key]
+        queue.append(now)
+        return True, None, self._blocked_counts[key]
+
+
+rate_limiter = RateLimiter()
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
+
+
+def _rate_limit_key(request: Request) -> str:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+        if token:
+            return f"token:{_hash_token(token)}"
+    client = request.client
+    host = client.host if client else "unknown"
+    return f"ip:{host}"
 
 
 @asynccontextmanager
@@ -23,6 +68,31 @@ async def lifespan(app: FastAPI):
     pass
 
 
+auth_scheme = HTTPBearer(auto_error=False)
+
+
+def _normalize_api_tokens(raw_tokens: str | None) -> set[str]:
+    if not raw_tokens:
+        return set()
+    return {token.strip() for token in raw_tokens.split(",") if token.strip()}
+
+
+def require_api_token(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(auth_scheme)],
+    settings: Settings = Depends(get_settings),
+) -> str | None:
+    tokens = _normalize_api_tokens(settings.api_auth_tokens)
+    if not tokens:
+        return None
+    if credentials is None or credentials.credentials not in tokens:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return credentials.credentials
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
@@ -32,10 +102,46 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        settings = get_settings()
+        if not settings.rate_limit_enabled:
+            return await call_next(request)
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+        limit = max(settings.rate_limit_requests, 1)
+        window_seconds = max(settings.rate_limit_window_seconds, 1)
+        key = _rate_limit_key(request)
+        allowed, retry_after, blocked_count = rate_limiter.check(
+            key,
+            limit,
+            window_seconds,
+        )
+        if not allowed:
+            if blocked_count >= settings.rate_limit_block_threshold:
+                logger.warning(
+                    "Rate limit blocked request",
+                    extra={
+                        "rate_limit_key": key,
+                        "blocked_count": blocked_count,
+                    },
+                )
+            headers = {"Retry-After": str(retry_after)} if retry_after else None
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded"},
+                headers=headers,
+            )
+        return await call_next(request)
+
     settings = get_settings()
     cors_origins = [
         origin.strip() for origin in (settings.cors_origins or "").split(",") if origin.strip()
-    ] or ["http://localhost:5173"]
+    ]
+    if not cors_origins:
+        if is_production_profile(settings.evalvault_profile):
+            raise RuntimeError("CORS_ORIGINS must be set for production profile.")
+        cors_origins = ["http://localhost:5173"]
 
     # Configure CORS
     app.add_middleware(
@@ -48,12 +154,44 @@ def create_app() -> FastAPI:
 
     from .routers import benchmark, config, domain, knowledge, pipeline, runs
 
-    app.include_router(runs.router, prefix="/api/v1/runs", tags=["runs"])
-    app.include_router(benchmark.router, prefix="/api/v1/benchmarks", tags=["benchmarks"])
-    app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
-    app.include_router(pipeline.router, prefix="/api/v1/pipeline", tags=["pipeline"])
-    app.include_router(domain.router, prefix="/api/v1/domain", tags=["domain"])
-    app.include_router(config.router, prefix="/api/v1/config", tags=["config"])
+    auth_dependencies = [Depends(require_api_token)]
+
+    app.include_router(
+        runs.router,
+        prefix="/api/v1/runs",
+        tags=["runs"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        benchmark.router,
+        prefix="/api/v1/benchmarks",
+        tags=["benchmarks"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        knowledge.router,
+        prefix="/api/v1/knowledge",
+        tags=["knowledge"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        pipeline.router,
+        prefix="/api/v1/pipeline",
+        tags=["pipeline"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        domain.router,
+        prefix="/api/v1/domain",
+        tags=["domain"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        config.router,
+        prefix="/api/v1/config",
+        tags=["config"],
+        dependencies=auth_dependencies,
+    )
 
     @app.get("/health")
     def health_check():

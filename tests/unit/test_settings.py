@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from evalvault.config.model_config import reset_model_config
 from evalvault.config.settings import Settings, get_settings, reset_settings
 
@@ -71,3 +73,22 @@ def test_settings_resolves_db_path_from_cwd_when_no_repo(monkeypatch, tmp_path) 
 
     assert settings.evalvault_db_path == str(expected_db)
     assert settings.evalvault_memory_db_path == str(expected_memory_db)
+
+
+def test_settings_resolves_secret_reference_from_env_provider(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_PROVIDER", "env")
+    monkeypatch.setenv("OPENAI_TOKEN", "sk-secret-value")
+    monkeypatch.setenv("OPENAI_API_KEY", "secret://OPENAI_TOKEN")
+
+    settings = Settings()
+
+    assert settings.openai_api_key == "sk-secret-value"
+
+
+def test_settings_requires_secret_provider_for_reference(monkeypatch) -> None:
+    monkeypatch.delenv("SECRET_PROVIDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "secret://OPENAI_TOKEN")
+    monkeypatch.setenv("OPENAI_TOKEN", "sk-secret-value")
+
+    with pytest.raises(ValueError, match="Secret provider is not configured"):
+        Settings()

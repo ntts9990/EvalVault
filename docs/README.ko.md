@@ -210,6 +210,7 @@ uv sync --extra dev
 | `phoenix` | arize-phoenix + OpenTelemetry | Phoenix 트레이싱/데이터셋/실험 연동 |
 | `anthropic` | anthropic | Anthropic LLM 어댑터 |
 | `perf` | faiss-cpu, ijson | 대용량 데이터셋 성능 보조 |
+| `secrets` | boto3, google-cloud-secret-manager, hvac | Secret Manager 연동 |
 
 `.python-version` 덕분에 uv가 Python 3.12를 자동으로 내려받습니다.
 
@@ -221,6 +222,9 @@ uv sync --extra dev
    ```bash
    cp .env.example .env
    # OPENAI_API_KEY, OLLAMA_BASE_URL, LANGFUSE_* , PHOENIX_* 등을 채워 넣으세요.
+   # API 인증을 쓰려면 API_AUTH_TOKENS를 설정하세요.
+   # secret:// 참조를 쓰려면 SECRET_PROVIDER 설정 및 secrets extra가 필요합니다.
+   # 레이트리밋은 RATE_LIMIT_ENABLED로 활성화합니다.
    ```
    SQLite 경로를 바꾸려면 아래 값을 추가합니다.
    ```bash

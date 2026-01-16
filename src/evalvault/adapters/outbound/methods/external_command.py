@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import warnings
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,9 @@ class ExternalCommandMethod(RagMethodPort):
 
     name = "external_command"
     version = "0.1.0"
-    description = "Execute a method in a separate process."
+    description = (
+        "Execute a method in a separate process (shell=True requires a trusted command string)."
+    )
     tags = ("external", "isolation")
 
     def __init__(
@@ -67,6 +70,7 @@ class ExternalCommandMethod(RagMethodPort):
         )
 
         command = self._build_command(runtime)
+        self._validate_shell_usage(command)
         result = subprocess.run(  # noqa: S603 - user-controlled command by design
             command,
             cwd=self._workdir,
@@ -103,6 +107,23 @@ class ExternalCommandMethod(RagMethodPort):
             return [str(part).format(**replacements) for part in self._command]
         except KeyError as exc:
             raise ValueError(f"Unknown command placeholder: {exc}") from exc
+
+    def _validate_shell_usage(self, command: list[str] | str) -> None:
+        if not self._shell:
+            return
+        if not isinstance(command, str):
+            raise ValueError(
+                "shell=True requires a single command string; list arguments are rejected."
+            )
+        if not command.strip():
+            raise ValueError("shell=True requires a non-empty command string.")
+        if "\n" in command or "\r" in command:
+            raise ValueError("shell=True command must not contain newlines.")
+        warnings.warn(
+            "shell=True executes through the system shell. Use only trusted commands.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     @staticmethod
     def _load_payload(path: Path) -> Any:

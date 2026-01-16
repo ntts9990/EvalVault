@@ -156,6 +156,11 @@ benchmark = [
     "lm_eval[api]>=0.4.0",            # lm-evaluation-harness with OpenAI-compatible API (Ollama 등)
     "datasets>=2.0.0",                # HuggingFace datasets (KMMLU 등)
 ]
+secrets = [
+    "boto3",
+    "google-cloud-secret-manager",
+    "hvac",
+]
 
 [project.scripts]
 evalvault = "evalvault.adapters.inbound.cli:app"
