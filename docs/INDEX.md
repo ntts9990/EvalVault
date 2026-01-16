@@ -19,6 +19,7 @@
 - Web UI 확장 설계서: `guides/WEBUI_CLI_ROLLOUT_PLAN.md` (1단계 구현 파일 목록 포함)
 - RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
+- RAG 성능 개선 제안서: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md` (목적/미션·KPI·로드맵)
 - 실행 결과 엑셀 시트 요약: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
 - 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
 - 상태 요약: `STATUS.md`

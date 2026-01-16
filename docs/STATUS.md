@@ -12,6 +12,7 @@ EvalVault의 목표는 **RAG 평가/분석/추적을 하나의 Run 단위로 연
 - **Observability**: Phoenix(OpenTelemetry/OpenInference) 및 (선택) Langfuse/MLflow
 - **프로필 기반 모델 전환**: `config/models.yaml` + `.env`로 OpenAI/Ollama/vLLM/Anthropic 등
 - **Open RAG Trace 표준**: 외부/내부 RAG 시스템을 표준 스키마로 계측/수집
+- **성능 개선 프레임**: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`에 KPI/평가/로드맵 정리
 
 ## 현재 제약 (투명 공개)
 
