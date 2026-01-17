@@ -18,6 +18,7 @@
 - Stage Events/Stage Metrics: `stage_event_builder.py`, `stage_metric_service.py`.
 - Observability: Langfuse/Phoenix/MLflow Tracker + OpenTelemetry Tracer.
 - GraphRAG: `GraphRAGRetriever` 존재, CLI `--retriever graphrag` 지원.
+- 노이즈 저감 정리서: `docs/guides/RAG_NOISE_REDUCTION_GUIDE.md`
 
 ## 작업 티켓 백로그 (세분화)
 
