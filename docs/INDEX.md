@@ -20,6 +20,7 @@
 - RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
 - RAG 성능 개선 제안서: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md` (목적/미션·KPI·로드맵)
+- CLI 병렬 기능 설계서: `guides/CLI_PARALLEL_FEATURES_SPEC.md`
 - 실행 결과 엑셀 시트 요약: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
 - 평가 리포트 템플릿: `templates/eval_report_templates.md`
 - 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
