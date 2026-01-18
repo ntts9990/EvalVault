@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -83,8 +84,16 @@ class StageMetricService:
         relevance_map: Mapping[str, set[str]],
     ) -> list[StageMetric]:
         metrics: list[StageMetric] = []
-        doc_ids = _to_str_list(event.attributes.get("doc_ids"))
-        scores = _to_float_list(event.attributes.get("scores"))
+        raw_doc_ids = event.attributes.get("doc_ids")
+        raw_scores = event.attributes.get("scores")
+        unordered_doc_ids = isinstance(raw_doc_ids, set | frozenset)
+        unordered_scores = isinstance(raw_scores, set | frozenset)
+        doc_ids = _to_str_list(raw_doc_ids)
+        scores = _to_float_list(raw_scores)
+        order_reconstructed = None
+        if unordered_doc_ids:
+            doc_ids = sorted(doc_ids)
+            order_reconstructed = "doc_id_asc"
 
         metrics.append(
             StageMetric(
@@ -92,19 +101,36 @@ class StageMetricService:
                 stage_id=event.stage_id,
                 metric_name="retrieval.result_count",
                 score=float(len(doc_ids)),
-                evidence={"count": len(doc_ids)},
+                evidence=_with_order_evidence({"count": len(doc_ids)}, unordered_doc_ids, None),
             )
         )
+        if unordered_doc_ids or unordered_scores:
+            metrics.append(
+                StageMetric(
+                    run_id=event.run_id,
+                    stage_id=event.stage_id,
+                    metric_name="retrieval.ordering_warning",
+                    score=1.0,
+                    evidence=_with_order_evidence(
+                        {
+                            "doc_ids_unordered": unordered_doc_ids,
+                            "scores_unordered": unordered_scores,
+                        },
+                        True,
+                        order_reconstructed,
+                    ),
+                )
+            )
 
         if scores:
-            avg_score = sum(scores) / len(scores)
+            avg_score = _safe_avg(scores)
             metrics.append(
                 StageMetric(
                     run_id=event.run_id,
                     stage_id=event.stage_id,
                     metric_name="retrieval.avg_score",
                     score=avg_score,
-                    evidence={"count": len(scores)},
+                    evidence=_with_order_evidence({"count": len(scores)}, unordered_scores, None),
                 )
             )
             if len(scores) > 1:
@@ -115,14 +141,22 @@ class StageMetricService:
                         stage_id=event.stage_id,
                         metric_name="retrieval.score_gap",
                         score=score_gap,
-                        evidence={"max": max(scores), "min": min(scores)},
+                        evidence=_with_order_evidence(
+                            {"max": max(scores), "min": min(scores)}, unordered_scores, None
+                        ),
                     )
                 )
 
         relevant_docs = _get_relevant_docs(event, relevance_map)
         if doc_ids and relevant_docs:
             top_k = _coerce_int(event.attributes.get("top_k"), default=len(doc_ids))
-            k = min(top_k, len(doc_ids)) if top_k > 0 else len(doc_ids)
+            k = len(doc_ids) if top_k is None or top_k <= 0 else min(top_k, len(doc_ids))
+            if unordered_scores and scores:
+                score_pairs = list(zip(doc_ids, scores, strict=False))
+                score_pairs.sort(key=lambda item: (-item[1], item[0]))
+                doc_ids = [doc_id for doc_id, _score in score_pairs]
+                scores = [score for _doc_id, score in score_pairs]
+                order_reconstructed = "score_desc_then_id"
             retrieved_top_k = doc_ids[:k]
             relevant_found = len(set(retrieved_top_k) & relevant_docs)
 
@@ -135,11 +169,15 @@ class StageMetricService:
                     stage_id=event.stage_id,
                     metric_name="retrieval.precision_at_k",
                     score=precision,
-                    evidence={
-                        "k": k,
-                        "relevant_found": relevant_found,
-                        "retrieved_count": k,
-                    },
+                    evidence=_with_order_evidence(
+                        {
+                            "k": k,
+                            "relevant_found": relevant_found,
+                            "retrieved_count": k,
+                        },
+                        unordered_doc_ids or unordered_scores,
+                        order_reconstructed,
+                    ),
                 )
             )
             metrics.append(
@@ -148,11 +186,15 @@ class StageMetricService:
                     stage_id=event.stage_id,
                     metric_name="retrieval.recall_at_k",
                     score=recall,
-                    evidence={
-                        "k": k,
-                        "relevant_found": relevant_found,
-                        "relevant_total": len(relevant_docs),
-                    },
+                    evidence=_with_order_evidence(
+                        {
+                            "k": k,
+                            "relevant_found": relevant_found,
+                            "relevant_total": len(relevant_docs),
+                        },
+                        unordered_doc_ids or unordered_scores,
+                        order_reconstructed,
+                    ),
                 )
             )
 
@@ -180,7 +222,7 @@ class StageMetricService:
 
         scores = _to_float_list(event.attributes.get("scores"))
         if scores:
-            avg_score = sum(scores) / len(scores)
+            avg_score = _safe_avg(scores)
             metrics.append(
                 StageMetric(
                     run_id=event.run_id,
@@ -358,6 +400,8 @@ def _to_str_list(value: Any) -> list[str]:
         return []
     if isinstance(value, str):
         return [value]
+    if isinstance(value, set | frozenset):
+        return [str(item) for item in value if not isinstance(item, bytes | bytearray)]
     if isinstance(value, Sequence):
         return [str(item) for item in value if not isinstance(item, bytes | bytearray)]
     return [str(value)]
@@ -370,6 +414,8 @@ def _to_str_set(value: Any) -> set[str]:
 def _to_float_list(value: Any) -> list[float]:
     if value is None:
         return []
+    if isinstance(value, set | frozenset):
+        return [float(item) for item in value]
     if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
         return [float(item) for item in value]
     return [float(value)]
@@ -388,6 +434,25 @@ def _coerce_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _safe_avg(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    total = math.fsum(values)
+    return total / len(values)
+
+
+def _with_order_evidence(
+    evidence: dict[str, Any], unordered: bool, order_reconstructed: str | None
+) -> dict[str, Any]:
+    if not unordered:
+        return evidence
+    enriched = dict(evidence)
+    enriched["unordered_input"] = True
+    if order_reconstructed:
+        enriched["order_reconstructed"] = order_reconstructed
+    return enriched
 
 
 def _extract_violation_count(attributes: Mapping[str, Any]) -> int | None:

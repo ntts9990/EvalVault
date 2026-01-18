@@ -1,5 +1,7 @@
 """Unit tests for StageMetricService."""
 
+import pytest
+
 from evalvault.domain.entities.stage import StageEvent
 from evalvault.domain.services.stage_metric_service import StageMetricService
 
@@ -106,6 +108,7 @@ def test_output_metrics_missing_citations() -> None:
     assert by_name["output.citation_count"].score == 0.0
     assert by_name["output.citation_count"].threshold == 1.0
     assert by_name["output.citation_count"].passed is False
+    assert by_name["output.citation_count"].evidence is not None
     assert by_name["output.citation_count"].evidence["missing"] is True
 
 
@@ -151,6 +154,7 @@ def test_safety_check_metrics() -> None:
 
     assert by_name["safety_check.violation_rate"].score == 1.0
     assert by_name["safety_check.block_rate"].score == 1.0
+    assert by_name["safety_check.violation_rate"].evidence is not None
     assert by_name["safety_check.violation_rate"].evidence["comparison"] == "max"
 
 
@@ -166,3 +170,34 @@ def test_retrieval_metrics_empty_docs() -> None:
     by_name = _metric_by_name(metrics)
 
     assert by_name["retrieval.result_count"].score == 0.0
+
+
+def test_retrieval_metrics_set_inputs_are_deterministic() -> None:
+    event = StageEvent(
+        run_id="run-007",
+        stage_id="stg-retrieval-set",
+        stage_type="retrieval",
+        attributes={
+            "doc_ids": {"doc-2", "doc-1", "doc-3"},
+            "scores": {0.6, 0.2, 0.9},
+            "top_k": 2,
+        },
+        metadata={"test_case_id": "tc-002"},
+    )
+
+    metrics = StageMetricService().build_metrics([event], relevance_map={"tc-002": ["doc-1"]})
+    by_name = _metric_by_name(metrics)
+
+    assert by_name["retrieval.result_count"].score == 3.0
+    assert by_name["retrieval.avg_score"].score == pytest.approx((0.2 + 0.6 + 0.9) / 3)
+    assert by_name["retrieval.precision_at_k"].score == 0.5
+    assert by_name["retrieval.recall_at_k"].score == 1.0
+    ordering_warning = by_name["retrieval.ordering_warning"]
+    assert ordering_warning.score == 1.0
+    assert ordering_warning.evidence is not None
+    assert ordering_warning.evidence["doc_ids_unordered"] is True
+    assert ordering_warning.evidence["scores_unordered"] is True
+    precision_metric = by_name["retrieval.precision_at_k"]
+    assert precision_metric.evidence is not None
+    assert precision_metric.evidence["unordered_input"] is True
+    assert precision_metric.evidence["order_reconstructed"] == "score_desc_then_id"

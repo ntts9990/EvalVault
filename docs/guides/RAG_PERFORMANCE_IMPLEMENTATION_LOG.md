@@ -148,4 +148,31 @@
   - 검증: 분기 1회 생성 가능 상태 확인
 
 ## 진행 로그
-- (비어 있음)
+- 2026-01-18: 병렬 스트림 동시 착수 계획 수립. 스트림별 담당/규칙/검증 기준은 `docs/guides/RAG_NOISE_REDUCTION_GUIDE.md`의 병렬 작업 규칙 섹션을 따른다.
+- 2026-01-18: 병렬 작업 진행 로그는 아래 섹션에 기록한다.
+
+## 병렬 작업 로그 (Ralph Loop)
+- 상태: 진행
+- 스트림: A(데이터 전처리), B(평가 로직), C(Stage 메트릭), D(캘리브레이션 가이드), E(정책/로드맵)
+- 공통 규칙: 서로 다른 파일에서 작업, 공유 스키마/출력 포맷 변경은 사전 합의, 문서 오너 지정, 겹치는 내용은 한쪽 문서만 관리
+- 검증 기준: 변경 코드에 대한 `pytest` 범위 테스트 실행 및 관련 테스트 통과
+- 스트림 A(데이터 전처리)
+  - 변경: 노이즈 텍스트/플레이스홀더 제거, 레퍼런스 정규화
+  - 파일: `src/evalvault/domain/services/dataset_preprocessor.py`, `tests/unit/domain/services/test_dataset_preprocessor.py`
+  - 테스트: `uv run pytest tests/unit/domain/services/test_dataset_preprocessor.py` (6 passed)
+- 스트림 B(평가 로직)
+  - 변경: 프롬프트 언어 결정 고정(단일 결정) 및 테스트 추가
+  - 파일: `src/evalvault/domain/services/evaluator.py`, `tests/unit/domain/services/test_evaluator_comprehensive.py`
+  - 테스트: `uv run pytest tests/unit/domain/services/test_evaluator_comprehensive.py` (47 passed)
+- 스트림 C(Stage 메트릭)
+  - 변경: 평균 계산 안정화(`math.fsum`), 순서 복원/경고 메트릭(`retrieval.ordering_warning`) 추가
+  - 파일: `src/evalvault/domain/services/stage_metric_service.py`, `tests/unit/test_stage_metric_service.py`
+  - 테스트: `uv run pytest tests/unit/test_stage_metric_service.py` (9 passed)
+- 스트림 D(캘리브레이션 가이드)
+  - 변경: 운영 체크리스트/노이즈 가드레일 명시
+  - 파일: `docs/guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
+  - 테스트: 문서 변경(실행 테스트 없음)
+- 스트림 E(정책/로드맵)
+  - 변경: 노이즈 저감 원칙 및 artifacts 추적 규칙 보강
+  - 파일: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
+  - 테스트: 문서 변경(실행 테스트 없음)
