@@ -92,3 +92,48 @@ def test_preprocess_prefers_same_language_reference():
 
     assert dataset.test_cases[0].ground_truth == "사망보험금은 1억원입니다."
     assert report.references_filled_from_context == 1
+
+
+def test_preprocess_drops_noise_contexts():
+    dataset = Dataset(
+        name="sample",
+        version="1",
+        test_cases=[
+            TestCase(
+                id="tc-5",
+                question="질문",
+                answer="답변",
+                contexts=["---", "...", "내용"],
+                ground_truth="정답",
+            )
+        ],
+    )
+    preprocessor = DatasetPreprocessor(DatasetPreprocessConfig(min_reference_chars=2))
+
+    report = preprocessor.apply(dataset, metrics=["faithfulness"])
+
+    assert dataset.test_cases[0].contexts == ["내용"]
+    assert report.contexts_removed == 2
+
+
+def test_preprocess_treats_placeholder_reference_as_missing():
+    dataset = Dataset(
+        name="sample",
+        version="1",
+        test_cases=[
+            TestCase(
+                id="tc-6",
+                question="사망보험금은 얼마인가요?",
+                answer="N/A",
+                contexts=["사망보험금은 1억원입니다."],
+                ground_truth="null",
+            )
+        ],
+    )
+    preprocessor = DatasetPreprocessor(DatasetPreprocessConfig(min_reference_chars=6))
+
+    report = preprocessor.apply(dataset, metrics=["context_recall"])
+
+    assert dataset.test_cases[0].ground_truth == "사망보험금은 1억원입니다."
+    assert report.references_filled_from_context == 1
+    assert report.references_missing == 1

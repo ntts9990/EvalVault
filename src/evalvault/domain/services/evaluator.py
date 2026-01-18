@@ -330,6 +330,8 @@ class RagasEvaluator:
         self._active_llm_model = llm.get_model_name()
         self._active_llm = llm
         self._prompt_language = self._normalize_language_hint(language) if language else None
+        if self._prompt_language is None:
+            self._prompt_language = self._resolve_dataset_language(dataset)
         # Resolve thresholds: CLI > dataset > default(0.7)
         resolved_thresholds = {}
         for metric in metrics:

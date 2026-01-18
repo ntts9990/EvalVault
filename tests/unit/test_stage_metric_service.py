@@ -201,3 +201,26 @@ def test_retrieval_metrics_set_inputs_are_deterministic() -> None:
     assert precision_metric.evidence is not None
     assert precision_metric.evidence["unordered_input"] is True
     assert precision_metric.evidence["order_reconstructed"] == "score_desc_then_id"
+
+
+def test_retrieval_metrics_ordered_inputs_no_warning() -> None:
+    event = StageEvent(
+        run_id="run-008",
+        stage_id="stg-retrieval-ordered",
+        stage_type="retrieval",
+        attributes={
+            "doc_ids": ["doc-1", "doc-2"],
+            "scores": [0.8, 0.6],
+            "top_k": 1,
+        },
+        metadata={"test_case_id": "tc-003"},
+    )
+
+    metrics = StageMetricService().build_metrics([event], relevance_map={"tc-003": ["doc-1"]})
+    by_name = _metric_by_name(metrics)
+
+    assert "retrieval.ordering_warning" not in by_name
+    precision_metric = by_name["retrieval.precision_at_k"]
+    assert precision_metric.evidence is not None
+    assert "unordered_input" not in precision_metric.evidence
+    assert "order_reconstructed" not in precision_metric.evidence

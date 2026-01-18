@@ -894,6 +894,33 @@ class TestAnswerRelevancyPromptTuning:
 
         assert metric.question_generation.instruction == original
 
+    def test_english_language_override_skips_korean_defaults(self):
+        evaluator = RagasEvaluator()
+        dataset = Dataset(
+            name="korean-dataset",
+            version="1.0.0",
+            test_cases=[
+                TestCase(
+                    id="kr-001",
+                    question="사망 시 보상 한도는 얼마인가요?",
+                    answer="사망 시 1억 5천만원까지 보장됩니다.",
+                    contexts=["사망 시 1억 5천만원까지 보장됩니다."],
+                )
+            ],
+        )
+        prompt = build_dummy_prompt()
+        prompt.instruction = "기존 지시문"
+        metric = SimpleNamespace(name="answer_relevancy", question_generation=prompt)
+
+        evaluator._prompt_language = "en"
+        evaluator._apply_answer_relevancy_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=[metric],
+            prompt_overrides=None,
+        )
+
+        assert metric.question_generation.instruction == "기존 지시문"
+
 
 class TestFactualCorrectnessPromptTuning:
     """Factual correctness 프롬프트 튜닝 테스트."""
@@ -1124,8 +1151,13 @@ class TestEvaluatorIntegration:
 
         assert len(result.results) == 1
         tc_result = result.results[0]
-        assert tc_result.get_metric("faithfulness").score == 0.9
-        assert tc_result.get_metric("insurance_term_accuracy").score == 0.85
+        faithfulness_metric = tc_result.get_metric("faithfulness")
+        insurance_metric = tc_result.get_metric("insurance_term_accuracy")
+
+        assert faithfulness_metric is not None
+        assert insurance_metric is not None
+        assert faithfulness_metric.score == 0.9
+        assert insurance_metric.score == 0.85
 
     @pytest.mark.asyncio
     async def test_evaluate_stores_preprocess_report(self, mock_llm):

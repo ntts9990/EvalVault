@@ -91,6 +91,10 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
   - CLI 스펙 문서는 실행 인터페이스/출력 규격 중심
   - 공통 스키마 변경은 별도 합의 후 반영
 - 연계 정보는 이 문서에만 기록하고, CLI 스펙 문서는 침범하지 않음
+- 병렬 에이전트 실행 계획(참조용 요약)
+  - compare / calibrate-judge / profile-difficulty / regress / artifacts lint / ops snapshot
+  - 각 명령은 1명 오너가 end-to-end로 담당
+  - 공유 파일(`commands/__init__.py`, 공통 스키마)은 사전 합의 필요
 
 ### 3.4 순서 불명 입력 처리 정책(Stage Metrics)
 - 목적: 순서가 깨진 입력에서도 결과를 유지하고, 장기적으로 strict 전환 가능하게 근거를 남긴다.
@@ -98,8 +102,22 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
   - `doc_ids`/`scores`가 set 등 순서 없는 타입이면 ordering_warning 메트릭을 기록한다.
   - `scores`가 있으면 점수 내림차순 + doc_id tie-break로 순서를 복원한다.
   - 복원 여부와 원본 상태를 evidence에 기록한다.
+- 활용 가이드
+  - ordering_warning이 있으면 해당 run을 “순서 복원 적용”으로 표시한다.
+  - 비교 리포트에서는 ordering_warning 비율을 함께 확인한다.
+  - ordering_warning이 발생한 케이스는 원본 stage 이벤트(`doc_ids`, `scores`)를 점검한다.
+  - evidence에 기록된 `unordered_input`/`order_reconstructed`는 재현 분석용으로 보존한다.
 - 후속 활용
   - ordering_warning이 있는 케이스만 추적해 strict 기준(순서 강제)으로 전환 가능
+
+### 3.5 strict 전환 기준(권장)
+- 전환 목표: 순서 복원 대신 “입력 순서 강제”로 품질 게이트를 강화한다.
+- 기준(예시)
+  - 최근 3회 run에서 ordering_warning 비율이 1% 미만
+  - 같은 데이터셋에서 ordering_warning이 반복적으로 발생하지 않음
+  - 주요 메트릭(precision/recall)의 분산이 안정화됨
+- 전환 방식
+  - strict 전환 후 ordering_warning이 발생하면 해당 메트릭은 실패 처리하고, 원인 분석 리포트를 남긴다.
 
 ---
 

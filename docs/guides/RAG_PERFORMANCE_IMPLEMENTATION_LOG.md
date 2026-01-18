@@ -167,7 +167,8 @@
 - 스트림 C(Stage 메트릭)
   - 변경: 평균 계산 안정화(`math.fsum`), 순서 복원/경고 메트릭(`retrieval.ordering_warning`) 추가
   - 파일: `src/evalvault/domain/services/stage_metric_service.py`, `tests/unit/test_stage_metric_service.py`
-  - 테스트: `uv run pytest tests/unit/test_stage_metric_service.py` (9 passed)
+  - 테스트: `uv run pytest tests/unit/test_stage_metric_service.py` (10 passed)
+  - 문서: ordering_warning 증거 보존 가이드 추가
 - 스트림 D(캘리브레이션 가이드)
   - 변경: 운영 체크리스트/노이즈 가드레일 명시
   - 파일: `docs/guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`

@@ -17,8 +17,21 @@ REFERENCE_REQUIRED_METRICS = {
 }
 
 _WHITESPACE_RE = re.compile(r"\s+")
+_PUNCT_ONLY_RE = re.compile(r"^[\W_]+$")
 _HANGUL_RE = re.compile(r"[\uac00-\ud7a3]")
 _LATIN_RE = re.compile(r"[A-Za-z]")
+
+_PLACEHOLDER_TEXT = {
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "nil",
+    "unknown",
+    "tbd",
+    "todo",
+    "undefined",
+}
 
 
 @dataclass(frozen=True)
@@ -205,7 +218,17 @@ class DatasetPreprocessor:
         if self._config.trim_whitespace:
             text = text.replace("\u00a0", " ")
             text = _WHITESPACE_RE.sub(" ", text).strip()
+        if self._is_noise_text(text):
+            return ""
         return text
+
+    def _is_noise_text(self, text: str) -> bool:
+        if not text:
+            return True
+        if _PUNCT_ONLY_RE.fullmatch(text):
+            return True
+        lower_text = text.casefold()
+        return lower_text in _PLACEHOLDER_TEXT
 
     def _normalize_contexts(self, contexts: Any) -> tuple[list[str], dict[str, int]]:
         removed = 0
@@ -291,6 +314,9 @@ class DatasetPreprocessor:
                     filled_from_answer = 1
                 elif source == "context":
                     filled_from_context = 1
+
+        if reference:
+            reference = self._normalize_text(reference)
 
         if reference and self._config.max_reference_chars > 0:
             reference, did_truncate = self._truncate_text(
