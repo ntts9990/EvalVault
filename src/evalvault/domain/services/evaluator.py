@@ -11,8 +11,9 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, overload
 
+from pydantic import BaseModel, Field, field_validator
 from ragas import SingleTurnSample
 
 from evalvault.domain.entities import (
@@ -55,14 +56,53 @@ _SUMMARY_FAITHFULNESS_PROMPT_EN = (
 )
 
 
+def _patch_ragas_faithfulness_output() -> None:
+    try:
+        from ragas.metrics import Faithfulness
+    except Exception:
+        return
+
+    prompt = getattr(Faithfulness, "nli_statements_prompt", None)
+    if prompt is None:
+        return
+
+    output_model = getattr(prompt, "output_model", None)
+    if output_model is None:
+        return
+
+    class _StatementFaithfulnessAnswer(BaseModel):
+        statement: str = Field(..., description="the original statement, word-by-word")
+        reason: str = Field(..., description="the reason of the verdict")
+        verdict: int = Field(..., description="the verdict(0/1) of the faithfulness.")
+
+        @field_validator("verdict", mode="before")
+        @classmethod
+        def _coerce_verdict(cls, value):
+            if isinstance(value, str):
+                normalized = value.strip()
+                if normalized.isdigit():
+                    return int(normalized)
+            return value
+
+    class _NLIStatementOutput(BaseModel):
+        statements: list[_StatementFaithfulnessAnswer]
+
+    try:
+        prompt.output_model = _NLIStatementOutput
+    except Exception:
+        return
+
+
 def _import_metric(name: str) -> type[Any]:
     for module_name in ("ragas.metrics.collections", "ragas.metrics"):
         try:
             module = importlib.import_module(module_name)
-        except Exception:
+            if hasattr(module, name):
+                if name == "Faithfulness":
+                    _patch_ragas_faithfulness_output()
+                return getattr(module, name)
+        except ImportError:
             continue
-        if hasattr(module, name):
-            return cast(type[Any], getattr(module, name))
     raise ImportError(f"Missing ragas metric: {name}")
 
 
@@ -819,6 +859,8 @@ class RagasEvaluator:
                 continue
             prompt_text = prompt_overrides[metric_name]
             applied = self._override_metric_prompt(metric, prompt_text)
+            if not applied and metric_name == "faithfulness":
+                applied = self._override_faithfulness_prompt(metric, prompt_text)
             statuses[metric_name] = "applied" if applied else "unsupported"
             if not applied:
                 logger.warning("Prompt override for metric '%s' could not be applied.", metric_name)
@@ -876,6 +918,16 @@ class RagasEvaluator:
                 value.instruction = prompt_text
                 return True
 
+        return False
+
+    @staticmethod
+    def _override_faithfulness_prompt(metric: Any, prompt_text: str) -> bool:
+        target = getattr(metric, "nli_statements_prompt", None)
+        if target is None:
+            return False
+        if hasattr(target, "instruction"):
+            target.instruction = prompt_text
+            return True
         return False
 
     @staticmethod
@@ -1135,16 +1187,26 @@ class RagasEvaluator:
         claim_details: dict[str, ClaimLevelResult] = {}
 
         for metric in ragas_metrics:
-            if metric.name in self.FAITHFULNESS_METRICS and self._faithfulness_ragas_failed:
-                if metric.name == "summary_faithfulness":
-                    judge_score = await self._score_summary_faithfulness_judge(sample)
-                    if judge_score is not None:
-                        scores[metric.name] = judge_score
+            if metric.name in self.FAITHFULNESS_METRICS:
+                if self._active_llm_provider == "ollama":
+                    fallback_score = self._fallback_korean_faithfulness(
+                        sample, return_details=False
+                    )
+                    if fallback_score is None:
+                        fallback_score = await self._score_faithfulness_with_fallback(sample)
+                    if fallback_score is not None:
+                        scores[metric.name] = fallback_score
                         continue
-                fallback_score = await self._score_faithfulness_with_fallback(sample)
-                if fallback_score is not None:
-                    scores[metric.name] = fallback_score
-                    continue
+                if self._faithfulness_ragas_failed:
+                    if metric.name == "summary_faithfulness":
+                        judge_score = await self._score_summary_faithfulness_judge(sample)
+                        if judge_score is not None:
+                            scores[metric.name] = judge_score
+                            continue
+                    fallback_score = await self._score_faithfulness_with_fallback(sample)
+                    if fallback_score is not None:
+                        scores[metric.name] = fallback_score
+                        continue
             try:
                 # Ragas >=0.4 uses ascore() with kwargs
                 if hasattr(metric, "ascore"):
