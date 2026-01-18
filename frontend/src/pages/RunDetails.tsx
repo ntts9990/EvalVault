@@ -249,6 +249,9 @@ export function RunDetails() {
     const [runListLoaded, setRunListLoaded] = useState(false);
     const [runListError, setRunListError] = useState<string | null>(null);
 
+    const [orderingWarnings, setOrderingWarnings] = useState<StageMetric[]>([]);
+    const [loadingWarnings, setLoadingWarnings] = useState(false);
+
     const summaryMetricSet = new Set<string>(SUMMARY_METRICS);
 
     const previewPrompt = (content?: string) => {
@@ -412,6 +415,15 @@ export function RunDetails() {
                 setRunListLoaded(true);
             });
     }, [activeTab, runListLoaded]);
+
+    useEffect(() => {
+        if (!id) return;
+        setLoadingWarnings(true);
+        fetchStageMetrics(id, undefined, "retrieval.ordering_warning")
+            .then(setOrderingWarnings)
+            .catch((err) => console.error("Failed to load ordering warnings", err))
+            .finally(() => setLoadingWarnings(false));
+    }, [id]);
 
     useEffect(() => {
         if (!id || !diffTargetRunId) return;
@@ -613,6 +625,19 @@ export function RunDetails() {
                                 Debug
                             </button>
                         </div>
+
+                        {(loadingWarnings || orderingWarnings.length > 0) && (
+                            <div className="text-right">
+                                <p className="text-sm text-muted-foreground flex items-center gap-1 justify-end" title="Retrieval Ordering Warning Ratio">
+                                    Ordering Warning
+                                </p>
+                                <p className="text-xl font-bold font-mono text-amber-500">
+                                    {loadingWarnings
+                                        ? "..."
+                                        : `${((orderingWarnings.length / (summary.total_test_cases || 1)) * 100).toFixed(1)}%`}
+                                </p>
+                            </div>
+                        )}
 
                         {summary.phoenix_drift != null && (
                             <div className="text-right">

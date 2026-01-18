@@ -13,6 +13,7 @@ import {
     fetchAnalysisMetricSpecs,
     fetchRuns,
     fetchImprovementGuide,
+    fetchStageMetrics,
     runAnalysis,
     saveAnalysisResult,
     type AnalysisHistoryItem,
@@ -21,6 +22,7 @@ import {
     type AnalysisResult,
     type ImprovementReport,
     type RunSummary,
+    type StageMetric,
 } from "../services/api";
 import {
     ANALYSIS_LARGE_RAW_THRESHOLD,
@@ -313,6 +315,18 @@ export function AnalysisLab() {
     const [includeImprovementLlm, setIncludeImprovementLlm] = useState(false);
     const [apiStatus, setApiStatus] = useState<"loading" | "ok" | "error">("loading");
     const [apiError, setApiError] = useState<string | null>(null);
+
+    const [orderingWarnings, setOrderingWarnings] = useState<StageMetric[]>([]);
+
+    useEffect(() => {
+        if (!selectedRunId) {
+            setOrderingWarnings([]);
+            return;
+        }
+        fetchStageMetrics(selectedRunId, undefined, "retrieval.ordering_warning")
+            .then(setOrderingWarnings)
+            .catch((err) => console.error("Failed to load ordering warnings", err));
+    }, [selectedRunId]);
 
     useEffect(() => {
         async function loadCatalog() {
@@ -1251,6 +1265,20 @@ export function AnalysisLab() {
                             {runError && (
                                 <p className="text-xs text-destructive mt-2">{runError}</p>
                             )}
+
+                            {orderingWarnings.length > 0 && (
+                                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-600">
+                                    <div className="flex items-center gap-2 mb-1 font-semibold">
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Ordering Warning Detected
+                                    </div>
+                                    <p>
+                                        이 Run에는 검색 순서 경고가 {orderingWarnings.length}건 있습니다.
+                                        점수에 영향을 줄 수 있습니다.
+                                    </p>
+                                </div>
+                            )}
+
                         {!selectedRunId && (
                             <p className="text-xs text-muted-foreground mt-3">
                                 Run을 선택하지 않으면 샘플 메트릭 기반으로 분석합니다.

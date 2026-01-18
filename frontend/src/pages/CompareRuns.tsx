@@ -4,9 +4,11 @@ import { Layout } from "../components/Layout";
 import {
     fetchRunComparison,
     fetchPromptDiff,
+    fetchStageMetrics,
     type PromptDiffResponse,
     type RunComparisonCounts,
     type RunDetailsResponse,
+    type StageMetric,
 } from "../services/api";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
 import {
@@ -40,6 +42,9 @@ export function CompareRuns() {
     const [diffLoading, setDiffLoading] = useState(false);
     const [diffError, setDiffError] = useState<string | null>(null);
     const [showDiff, setShowDiff] = useState(false);
+
+    const [orderingWarningsBase, setOrderingWarningsBase] = useState<StageMetric[]>([]);
+    const [orderingWarningsTarget, setOrderingWarningsTarget] = useState<StageMetric[]>([]);
 
     // View state
     const [filterMode, setFilterMode] = useState<"all" | "changes" | "regressions">("all");
@@ -76,6 +81,14 @@ export function CompareRuns() {
                 setDiffError(err instanceof Error ? err.message : "프롬프트 비교를 불러오지 못했습니다.");
             })
             .finally(() => setDiffLoading(false));
+
+        Promise.all([
+            fetchStageMetrics(baseId, undefined, "retrieval.ordering_warning"),
+            fetchStageMetrics(targetId, undefined, "retrieval.ordering_warning")
+        ]).then(([base, target]) => {
+            setOrderingWarningsBase(base);
+            setOrderingWarningsTarget(target);
+        }).catch(err => console.error("Failed to fetch ordering warnings", err));
     }, [baseId, targetId]);
 
     if (loading) return (
@@ -238,7 +251,7 @@ export function CompareRuns() {
                 </div>
 
                 {/* Top Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Pass Rate Delta */}
                     <div className="surface-panel p-6 flex items-center justify-between">
                         <div>
@@ -274,6 +287,21 @@ export function CompareRuns() {
                             {resolvedCounts.improvements}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">Test cases that flipped from Fail to Pass</p>
+                    </div>
+
+                    <div className="surface-panel p-6">
+                        <p className="text-sm text-muted-foreground mb-1">Ordering Warning</p>
+                        <div className="flex items-baseline gap-2">
+                            <h2 className="text-3xl font-bold text-amber-500">
+                                {((orderingWarningsTarget.length / (targetRun.summary.total_test_cases || 1)) * 100).toFixed(1)}%
+                            </h2>
+                            <span className="text-sm text-muted-foreground">
+                                vs {((orderingWarningsBase.length / (baseRun.summary.total_test_cases || 1)) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Retrieval consistency check
+                        </p>
                     </div>
                 </div>
 

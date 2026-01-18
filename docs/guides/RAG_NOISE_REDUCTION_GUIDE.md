@@ -202,7 +202,29 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 
 ---
 
-## 6) 적용 우선순위 (권장)
+## 6) WebUI 적용 계획 (ordering_warning 중심)
+
+### 6.1 데이터 소스 위치(Frontend)
+- Stage Metrics: `frontend/src/services/api.ts` → `fetchStageMetrics`
+- Run 상세: `frontend/src/pages/RunDetails.tsx`
+- Run 비교: `frontend/src/pages/CompareRuns.tsx`
+- 분석 요약: `frontend/src/pages/AnalysisLab.tsx`
+
+### 6.2 UI 적용 항목
+- RunDetails: ordering_warning 배지 + 복원 방식(`order_reconstructed`) 표시
+- CompareRuns: base/target ordering_warning 비율 노출
+- AnalysisLab: 개선 요약 카드에 ordering_warning 상태 표시
+- 운영 문서 링크: ordering_warning 런북 섹션 안내 링크
+
+### 6.3 구현 순서(안전)
+1. RunDetails ordering_warning 섹션 추가
+2. CompareRuns ordering_warning 비율 표시
+3. AnalysisLab 요약 카드에 경고 연결
+4. (선택) API 확장: run summary에 ordering_warning_ratio 추가
+
+---
+
+## 7) 적용 우선순위 (권장)
 
 ### 6.1 Judge 캐스케이드 평가
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
@@ -243,7 +265,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 
 ---
 
-## 4) 적용 우선순위 (권장)
+## 8) 적용 우선순위 (권장)
 1. 데이터 전처리 고정 및 기준선 유지
 2. 언어 정렬(한국어 프롬프트 기본 적용)
 3. NaN/폴백 경로 안정화
@@ -253,7 +275,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 
 ---
 
-## 5) Evidence Index
+## 9) Evidence Index
 - 데이터 전처리: `src/evalvault/domain/services/dataset_preprocessor.py`
 - 언어 정렬/폴백: `src/evalvault/domain/services/evaluator.py`
 - Stage 메트릭: `src/evalvault/domain/services/stage_metric_service.py`
