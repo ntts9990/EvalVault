@@ -26,8 +26,7 @@ from evalvault.domain.entities import (
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 if TYPE_CHECKING:
-    from opentelemetry.sdk.trace import Span, TracerProvider
-    from opentelemetry.trace import Tracer
+    from opentelemetry.sdk.trace import TracerProvider
 
 
 class PhoenixAdapter(TrackerPort):
@@ -62,9 +61,10 @@ class PhoenixAdapter(TrackerPort):
         """
         self._endpoint = endpoint
         self._service_name = service_name
-        self._tracer: Tracer | None = None
+        self._tracer: Any | None = None
         self._tracer_provider: TracerProvider | None = None
-        self._active_spans: dict[str, Span] = {}
+        self._active_spans: dict[str, Any] = {}
+        self._tracer_any: Any | None = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -90,7 +90,8 @@ class PhoenixAdapter(TrackerPort):
                 provider = get_tracer_provider()
                 if provider:
                     self._tracer_provider = provider
-                    self._tracer = trace.get_tracer(__name__)
+                    self._tracer_any = trace.get_tracer(__name__)
+                    self._tracer = self._tracer_any
                     self._initialized = True
                     return
 
@@ -109,7 +110,8 @@ class PhoenixAdapter(TrackerPort):
             trace.set_tracer_provider(self._tracer_provider)
 
             # Get tracer
-            self._tracer = trace.get_tracer(__name__)
+            self._tracer_any = trace.get_tracer(__name__)
+            self._tracer = self._tracer_any
             self._initialized = True
 
         except ImportError as e:
@@ -134,7 +136,12 @@ class PhoenixAdapter(TrackerPort):
         self._ensure_initialized()
 
         # Start a new span as root
-        span = self._tracer.start_span(name)
+        tracer = self._tracer_any
+        if tracer is None:
+            tracer = self._tracer
+        if tracer is None:
+            raise RuntimeError("Phoenix tracer is not initialized")
+        span = tracer.start_span(name)
         trace_id = str(uuid.uuid4())
 
         # Set metadata as span attributes
@@ -173,10 +180,15 @@ class PhoenixAdapter(TrackerPort):
 
         from opentelemetry import trace
 
+        tracer = self._tracer_any
+        if tracer is None:
+            tracer = self._tracer
+        if tracer is None:
+            raise RuntimeError("Phoenix tracer is not initialized")
         parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
-        with self._tracer.start_span(name, context=context) as span:
+        with tracer.start_span(name, context=context) as span:
             if input_data is not None:
                 safe_input = sanitize_payload(input_data, max_chars=MAX_LOG_CHARS)
                 span.set_attribute("input", json.dumps(safe_input, default=str))
@@ -279,7 +291,7 @@ class PhoenixAdapter(TrackerPort):
             passed_count = sum(
                 1
                 for r in run.results
-                if r.get_metric(metric_name) and r.get_metric(metric_name).passed
+                if (metric := r.get_metric(metric_name)) and metric.passed is True
             )
             avg_score = run.get_avg_score(metric_name)
             threshold = run.thresholds.get(metric_name, 0.7)
@@ -369,10 +381,15 @@ class PhoenixAdapter(TrackerPort):
         """
         from opentelemetry import trace
 
+        tracer = self._tracer_any
+        if tracer is None:
+            tracer = self._tracer
+        if tracer is None:
+            raise RuntimeError("Phoenix tracer is not initialized")
         parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
-        with self._tracer.start_span(
+        with tracer.start_span(
             f"test-case-{result.test_case_id}",
             context=context,
         ) as span:
@@ -478,7 +495,12 @@ class PhoenixAdapter(TrackerPort):
         parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
-        with self._tracer.start_span("retrieval", context=context) as span:
+        tracer = self._tracer_any
+        if tracer is None:
+            tracer = self._tracer
+        if tracer is None:
+            raise RuntimeError("Phoenix tracer is not initialized")
+        with tracer.start_span("retrieval", context=context) as span:
             # Set retrieval attributes
             for key, value in data.to_span_attributes().items():
                 span.set_attribute(key, value)
@@ -560,7 +582,12 @@ class PhoenixAdapter(TrackerPort):
         parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
-        with self._tracer.start_span("generation", context=context) as span:
+        tracer = self._tracer_any
+        if tracer is None:
+            tracer = self._tracer
+        if tracer is None:
+            raise RuntimeError("Phoenix tracer is not initialized")
+        with tracer.start_span("generation", context=context) as span:
             # Set generation attributes
             for key, value in data.to_span_attributes().items():
                 span.set_attribute(key, value)

@@ -255,7 +255,12 @@ def _normalize_scores(value: Any) -> list[float]:
     if value is None:
         return []
     if isinstance(value, list | tuple | set):
-        return [_coerce_float(item) for item in value if _coerce_float(item) is not None]
+        scores: list[float] = []
+        for item in value:
+            score = _coerce_float(item)
+            if score is not None:
+                scores.append(score)
+        return scores
     coerced = _coerce_float(value)
     return [coerced] if coerced is not None else []
 

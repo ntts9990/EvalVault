@@ -63,13 +63,15 @@ class LangfuseAdapter(TrackerPort):
                 span.update_trace(name=name, metadata=metadata)
             self._traces[trace_id] = span
         else:
-            # Langfuse 2.x: use trace method
-            trace = self._client.trace(
+            trace_fn: Any = getattr(self._client, "trace", None)
+            if trace_fn is None:
+                raise RuntimeError("Langfuse client does not expose trace API")
+            trace_obj = trace_fn(
                 name=name,
                 metadata=metadata,
             )
-            trace_id = trace.id
-            self._traces[trace_id] = trace
+            trace_id = trace_obj.id
+            self._traces[trace_id] = trace_obj
         return trace_id
 
     def add_span(
@@ -240,7 +242,7 @@ class LangfuseAdapter(TrackerPort):
             passed_count = sum(
                 1
                 for r in run.results
-                if r.get_metric(metric_name) and r.get_metric(metric_name).passed
+                if (metric := r.get_metric(metric_name)) and metric.passed is True
             )
             avg_score = run.get_avg_score(metric_name)
             threshold = run.thresholds.get(metric_name, 0.7)
@@ -421,12 +423,15 @@ class LangfuseAdapter(TrackerPort):
             }
 
             # Span metadata: additional info
-            span_metadata = {
+            span_metadata: dict[str, float | int] = {
                 "tokens_used": result.tokens_used,
                 "latency_ms": result.latency_ms,
             }
             if result.cost_usd:
-                span_metadata["cost_usd"] = result.cost_usd
+                span_metadata = {
+                    **span_metadata,
+                    "cost_usd": float(result.cost_usd),
+                }
 
             if hasattr(root_span, "start_span"):
                 child_span = root_span.start_span(

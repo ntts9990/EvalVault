@@ -414,12 +414,7 @@ class KoreanRAGBenchmarkRunner:
             try:
                 # 형태소 분석 기반 검색
                 if retriever:
-                    if self.use_hybrid_search and hasattr(retriever, "has_embeddings"):
-                        results = retriever.search(
-                            query, top_k=recall_k, use_dense=retriever.has_embeddings
-                        )
-                    else:
-                        results = retriever.search(query, top_k=recall_k)
+                    results = retriever.search(query, top_k=recall_k)
                     retrieved_doc_ids = [
                         resolve_doc_id(getattr(res, "doc_id", None), doc_ids, idx)
                         for idx, res in enumerate(results, start=1)

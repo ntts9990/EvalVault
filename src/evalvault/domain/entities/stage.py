@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, overload
 from uuid import uuid4
 
 REQUIRED_STAGE_TYPES: tuple[str, ...] = ("system_prompt", "input", "retrieval", "output")
@@ -82,8 +82,8 @@ class StageEvent:
             duration_ms=_optional_float(payload.get("duration_ms")),
             input_ref=input_ref,
             output_ref=output_ref,
-            attributes=_ensure_dict(payload.get("attributes")),
-            metadata=_ensure_dict(payload.get("metadata")),
+            attributes=_ensure_dict(payload.get("attributes"), allow_none=False),
+            metadata=_ensure_dict(payload.get("metadata"), allow_none=False),
             trace_id=_optional_str(payload.get("trace_id") or trace_payload.get("trace_id")),
             span_id=_optional_str(payload.get("span_id") or trace_payload.get("span_id")),
         )
@@ -185,6 +185,14 @@ def _parse_datetime(value: Any) -> datetime | None:
             normalized = normalized[:-1] + "+00:00"
         return datetime.fromisoformat(normalized)
     raise ValueError("Invalid datetime value")
+
+
+@overload
+def _ensure_dict(value: None, *, allow_none: Literal[True]) -> None: ...
+
+
+@overload
+def _ensure_dict(value: Any, *, allow_none: Literal[False] = False) -> dict[str, Any]: ...
 
 
 def _ensure_dict(value: Any, *, allow_none: bool = False) -> dict[str, Any] | None:
