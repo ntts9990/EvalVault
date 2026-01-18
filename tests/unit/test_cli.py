@@ -2233,6 +2233,8 @@ class TestCLICompare:
         pipeline_result.total_duration_ms = 1200
         pipeline_result.started_at = datetime.now()
         pipeline_result.finished_at = datetime.now()
+        pipeline_result.pipeline_id = "pipeline-1"
+        pipeline_result.intent = SimpleNamespace(value="generate_comparison")
 
         comparison_result = ComparisonResult.from_values(
             run_id_a="run-1",
