@@ -627,15 +627,45 @@ export function RunDetails() {
                         </div>
 
                         {(loadingWarnings || orderingWarnings.length > 0) && (
-                            <div className="text-right">
-                                <p className="text-sm text-muted-foreground flex items-center gap-1 justify-end" title="Retrieval Ordering Warning Ratio">
+                            <div className="text-right group relative">
+                                <p className="text-sm text-muted-foreground flex items-center gap-1 justify-end cursor-help">
                                     Ordering Warning
+                                    <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
                                 </p>
-                                <p className="text-xl font-bold font-mono text-amber-500">
+                                <p
+                                    className="text-xl font-bold font-mono text-amber-500 cursor-help"
+                                    title={(() => {
+                                        if (loadingWarnings) return "Loading...";
+                                        const reconstructed = orderingWarnings.filter(w => w.evidence?.order_reconstructed).length;
+                                        const unordered = orderingWarnings.filter(w => w.evidence?.unordered_input).length;
+                                        return `Total Warnings: ${orderingWarnings.length}\nOrder Reconstructed: ${reconstructed}\nUnordered (Raw): ${unordered}`;
+                                    })()}
+                                >
                                     {loadingWarnings
                                         ? "..."
                                         : `${((orderingWarnings.length / (summary.total_test_cases || 1)) * 100).toFixed(1)}%`}
                                 </p>
+
+                                <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-popover border border-border rounded-lg shadow-xl z-50 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                                    <h4 className="font-semibold text-xs mb-2 flex items-center gap-1.5">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                                        Strict Mode Checklist
+                                    </h4>
+                                    <ul className="space-y-1.5">
+                                        <li className="text-[10px] text-muted-foreground flex items-start gap-1.5">
+                                            <span className="mt-0.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                                            <span>Recent 3 runs: Warning ratio &lt; 1%</span>
+                                        </li>
+                                        <li className="text-[10px] text-muted-foreground flex items-start gap-1.5">
+                                            <span className="mt-0.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                                            <span>No recurring warnings in dataset</span>
+                                        </li>
+                                        <li className="text-[10px] text-muted-foreground flex items-start gap-1.5">
+                                            <span className="mt-0.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                                            <span>Check label noise on transition</span>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         )}
 

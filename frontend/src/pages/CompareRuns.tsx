@@ -289,8 +289,21 @@ export function CompareRuns() {
                         <p className="text-xs text-muted-foreground mt-1">Test cases that flipped from Fail to Pass</p>
                     </div>
 
-                    <div className="surface-panel p-6">
-                        <p className="text-sm text-muted-foreground mb-1">Ordering Warning</p>
+                    <div
+                        className="surface-panel p-6 cursor-help"
+                        title={(() => {
+                            const getStats = (warnings: StageMetric[]) => {
+                                const reconstructed = warnings.filter(w => w.evidence?.order_reconstructed).length;
+                                const unordered = warnings.filter(w => w.evidence?.unordered_input).length;
+                                return `${warnings.length} (Recon: ${reconstructed}, Raw: ${unordered})`;
+                            };
+                            return `Target: ${getStats(orderingWarningsTarget)}\nBase: ${getStats(orderingWarningsBase)}`;
+                        })()}
+                    >
+                        <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                            Ordering Warning
+                            <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+                        </p>
                         <div className="flex items-baseline gap-2">
                             <h2 className="text-3xl font-bold text-amber-500">
                                 {((orderingWarningsTarget.length / (targetRun.summary.total_test_cases || 1)) * 100).toFixed(1)}%

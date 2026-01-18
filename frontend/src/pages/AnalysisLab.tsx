@@ -1275,6 +1275,14 @@ export function AnalysisLab() {
                                     <p>
                                         이 Run에는 검색 순서 경고가 {orderingWarnings.length}건 있습니다.
                                         점수에 영향을 줄 수 있습니다.
+                                        <a
+                                            href="https://github.com/ntts9990/EvalVault/blob/main/docs/guides/RAG_NOISE_REDUCTION_GUIDE.md#35-ordering_warning-%EB%9F%B0%EB%B6%81%EB%B9%84%EC%9C%A8%EB%B6%84%ED%8F%AC-%ED%99%95%EC%9D%B8"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="underline font-semibold ml-2 hover:text-amber-800 inline-flex items-center gap-0.5"
+                                        >
+                                            런북 보기 <ExternalLink className="w-3 h-3" />
+                                        </a>
                                     </p>
                                 </div>
                             )}
