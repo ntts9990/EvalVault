@@ -19,6 +19,44 @@ Collaboration rules (conflict avoidance):
 - Shared schemas or interfaces change only after explicit agreement.
 - Documentation edits are assigned to a single owner to avoid merge conflicts.
 
+## 1.1 Parallel Agent Implementation Plan (Execution)
+
+Scope:
+- Implement all commands below in parallel (CLI + domain services + ports + adapters).
+- Each command is owned by exactly one agent end-to-end.
+
+Ownership:
+- Agent Compare: `evalvault compare`
+- Agent Calibrate: `evalvault calibrate-judge`
+- Agent Difficulty: `evalvault profile-difficulty`
+- Agent Regress: `evalvault regress`
+- Agent Artifacts: `evalvault artifacts lint`
+- Agent Ops: `evalvault ops snapshot`
+
+File boundaries (default):
+- CLI command module for the command
+- Domain service (one use-case service per command)
+- Outbound port interfaces needed by that service
+- Outbound adapters for storage/reporting/FS as needed
+- Tests for the command/service
+
+Shared files (change only with explicit agreement):
+- `adapters/inbound/cli/app.py`
+- `adapters/inbound/cli/commands/__init__.py`
+- Common JSON envelope schema or report templates
+- `domain/services/async_batch_executor.py`
+
+Definition of done (per agent):
+- CLI command registered and functional with `--help` and a basic run path
+- Domain service + ports/adapters implemented for the use-case
+- Tests added for core logic and CLI wiring
+- Tests and lint pass with the standard project commands
+
+Test commands (standard project flow):
+- `uv run ruff check src/ tests/`
+- `uv run ruff format src/ tests/`
+- `uv run pytest tests -v`
+
 ## 2. Command Specs
 
 ### 2.1 `evalvault compare`

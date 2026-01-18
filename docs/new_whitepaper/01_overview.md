@@ -11,6 +11,7 @@
 ## TL;DR
 
 - EvalVault는 RAG 시스템을 **평가(Evaluation)**하고, 실행 단위를 `run_id`로 묶어 **분석(Analysis)**과 **비교(Compare)**를 가능하게 하는 플랫폼이다.
+- 노이즈 저감(입력 편차/LLM-as-judge 변동성 완화)은 `run_id` 비교의 전제이며, 원인 역추적은 `run_id`와 아티팩트 인덱스(`reports/analysis/artifacts/analysis_<RUN_ID>/index.json`)를 함께 보는 방식으로 수행한다.
 - CLI와 Web UI는 **동일한 DB**를 공유하면 실행 결과를 이어서 볼 수 있다.
 - 시스템은 5대 축으로 설명한다: **평가 · 관측 · 표준 연동 · 학습(Domain Memory) · 분석 파이프라인**.
 - 설계 원칙은 `domain`의 순수성(외부 의존성 격리)이며, 이를 위해 **Hexagonal Architecture(Ports & Adapters)**를 채택한다.

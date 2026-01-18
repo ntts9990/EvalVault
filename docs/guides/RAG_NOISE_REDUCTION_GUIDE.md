@@ -110,7 +110,18 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 후속 활용
   - ordering_warning이 있는 케이스만 추적해 strict 기준(순서 강제)으로 전환 가능
 
-### 3.5 strict 전환 기준(권장)
+### 3.5 ordering_warning 런북(비율/분포 확인)
+- 목적: ordering_warning의 빈도와 영향 범위를 주기적으로 확인한다.
+- 확인 대상(권장)
+  - 최근 N회 run의 ordering_warning 비율
+  - 데이터셋별 ordering_warning 분포
+  - ordering_warning이 있는 케이스의 precision/recall 변동
+- 실행 절차(예시)
+  - 비교 리포트에 ordering_warning 비율을 추가로 기록한다.
+  - ordering_warning이 1% 이상이면 원본 stage 이벤트를 샘플링 확인한다.
+  - 경고가 반복되는 데이터셋은 입력 파이프라인에서 list/tuple 유지 여부를 점검한다.
+
+### 3.6 strict 전환 기준(권장)
 - 전환 목표: 순서 복원 대신 “입력 순서 강제”로 품질 게이트를 강화한다.
 - 기준(예시)
   - 최근 3회 run에서 ordering_warning 비율이 1% 미만
@@ -118,12 +129,24 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
   - 주요 메트릭(precision/recall)의 분산이 안정화됨
 - 전환 방식
   - strict 전환 후 ordering_warning이 발생하면 해당 메트릭은 실패 처리하고, 원인 분석 리포트를 남긴다.
+- 운영 가이드 연결
+  - strict 전환 시 `docs/guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`의 라벨 노이즈 체크리스트와 함께 점검한다.
 
 ---
 
-## 4) 향후 적용 계획 (Planned)
+## 4) 전처리 노이즈 규칙 확장(정의)
+- 목적: 데이터 입력 단계에서 발생하는 노이즈를 일관된 규칙으로 차단한다.
+- 확장 규칙(정의)
+  - 숫자만 존재하는 필드(예: "0000")는 노이즈 후보로 표시
+  - 특수문자 반복("====", "----")은 노이즈로 제거
+  - 동일 토큰 반복("테스트 테스트 테스트")은 중복 제거 후 길이 제한 적용
+- 적용 원칙
+  - 실제 값과 혼동될 수 있는 경우(보험약관 번호 등)는 제거하지 않고 태깅만 한다.
+  - 규칙 적용 시 원본 값을 evidence로 남긴다.
 
-### 4.1 Judge 캐스케이드 평가
+## 5) 향후 적용 계획 (Planned)
+
+### 5.1 Judge 캐스케이드 평가
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 소형 judge로 대량 평가 후 경계 케이스만 상위 모델로 승격
@@ -132,7 +155,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 병렬 개발 연계
   - Stream B(평가 로직)와 Stream D(캘리브레이션) 분리
 
-### 4.2 난이도 프로파일링
+### 5.2 난이도 프로파일링
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - v0 휴리스틱 기반 난이도 지표 도입
@@ -142,7 +165,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 병렬 개발 연계
   - Stream A(데이터 전처리)와 Stream C(메트릭) 분리
 
-### 4.3 Judge 캘리브레이션 표준화
+### 5.3 Judge 캘리브레이션 표준화
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 표준 예제/다중 judge/휴먼 샘플링을 정례화
@@ -151,7 +174,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 병렬 개발 연계
   - Stream D(가이드) 단독 진행, Stream B는 API/데이터 포맷만 공유
 
-### 4.4 멀티턴 평가 체계
+### 5.4 멀티턴 평가 체계
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 턴 단위 벤치마크/메트릭 설계 및 운영 적용
@@ -160,7 +183,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 병렬 개발 연계
   - Stream A(데이터셋 구조)와 Stream B(평가 로직) 협업 필요
 
-### 4.5 Observability 고도화
+### 5.5 Observability 고도화
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
 - 계획
   - 운영 KPI(p95 latency/cost/timeout)와 품질 지표의 결합
@@ -181,14 +204,14 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 
 ## 6) 적용 우선순위 (권장)
 
-### 3.1 Judge 캐스케이드 평가
+### 6.1 Judge 캐스케이드 평가
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 소형 judge로 대량 평가 후 경계 케이스만 상위 모델로 승격
 - 기대 효과
   - 비용 절감 + 평가 변동성 완화
 
-### 3.2 난이도 프로파일링
+### 6.2 난이도 프로파일링
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - v0 휴리스틱 기반 난이도 지표 도입
@@ -196,21 +219,21 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - 기대 효과
   - 데이터 난이도 변화로 인한 점수 변동을 분리/설명 가능
 
-### 3.3 Judge 캘리브레이션 표준화
+### 6.3 Judge 캘리브레이션 표준화
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 표준 예제/다중 judge/휴먼 샘플링을 정례화
 - 기대 효과
   - judge drift를 감시하고 점수 신뢰도 향상
 
-### 3.4 멀티턴 평가 체계
+### 6.4 멀티턴 평가 체계
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
 - 계획
   - 턴 단위 벤치마크/메트릭 설계 및 운영 적용
 - 기대 효과
   - 대화형 RAG에서 노이즈 증폭을 억제
 
-### 3.5 Observability 고도화
+### 6.5 Observability 고도화
 - 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
 - 계획
   - 운영 KPI(p95 latency/cost/timeout)와 품질 지표의 결합
