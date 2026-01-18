@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import typer
 from rich.console import Console
@@ -46,7 +47,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             "--mode",
             help="Filter by run mode: 'simple' or 'full'.",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Show evaluation run history.
 
@@ -75,7 +76,6 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
 
         \b
         See also:
-          evalvault compare  — Compare two runs side by side
           evalvault export   — Export run details to JSON
           evalvault run      — Create new evaluation runs
         """
@@ -88,7 +88,11 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
                     "[red]Error:[/red] --mode must be one of: " + ", ".join(RUN_MODE_CHOICES)
                 )
                 raise typer.Exit(2)
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = db_path or Settings().evalvault_db_path
+        if resolved_db_path is None:
+            console.print("[red]Error:[/red] Database path is not configured.")
+            raise typer.Exit(1)
+        storage = SQLiteStorageAdapter(db_path=cast(Path, resolved_db_path))
         runs = storage.list_runs(limit=limit, dataset_name=dataset, model_name=model)
         if normalized_mode:
             runs = [
@@ -157,86 +161,6 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         console.print(table)
         console.print(f"\n[dim]Showing {len(runs)} of {limit} runs[/dim]\n")
 
-    @app.command()
-    def compare(
-        run_id1: str = typer.Argument(..., help="First run ID to compare."),
-        run_id2: str = typer.Argument(..., help="Second run ID to compare."),
-        db_path: Path = db_option(help_text="Path to database file."),
-    ) -> None:
-        """Compare two evaluation runs.
-
-        Show a side-by-side comparison of metrics, pass rates, and scores
-        between two evaluation runs.
-
-        \b
-        Examples:
-          # Compare two runs by ID
-          evalvault compare abc12345 def67890
-
-          # Compare runs from a custom database
-          evalvault compare abc12345 def67890 --db custom.db
-
-        \b
-        See also:
-          evalvault history  — List runs to find IDs
-          evalvault export   — Export run details to JSON
-          evalvault analyze  — Deep analysis of a single run
-        """
-        console.print("\n[bold]Comparing Evaluation Runs[/bold]\n")
-
-        storage = SQLiteStorageAdapter(db_path=db_path)
-
-        try:
-            run1 = storage.get_run(run_id1)
-            run2 = storage.get_run(run_id2)
-        except KeyError as exc:
-            console.print(f"[red]Error:[/red] {exc}")
-            raise typer.Exit(1) from exc
-
-        table = Table(show_header=True, header_style="bold cyan")
-        table.add_column("Metric")
-        table.add_column(f"Run 1\n{run_id1[:12]}...", justify="right")
-        table.add_column(f"Run 2\n{run_id2[:12]}...", justify="right")
-        table.add_column("Difference", justify="right")
-
-        table.add_row("Dataset", run1.dataset_name, run2.dataset_name, "-")
-        table.add_row("Model", run1.model_name, run2.model_name, "-")
-        table.add_row(
-            "Test Cases",
-            str(run1.total_test_cases),
-            str(run2.total_test_cases),
-            str(run2.total_test_cases - run1.total_test_cases),
-        )
-
-        pass_rate_diff = run2.pass_rate - run1.pass_rate
-        diff_color = "green" if pass_rate_diff > 0 else "red" if pass_rate_diff < 0 else "dim"
-        table.add_row(
-            "Pass Rate",
-            f"{run1.pass_rate:.1%}",
-            f"{run2.pass_rate:.1%}",
-            f"[{diff_color}]{pass_rate_diff:+.1%}[/{diff_color}]",
-        )
-
-        for metric in run1.metrics_evaluated:
-            if metric in run2.metrics_evaluated:
-                score1 = run1.get_avg_score(metric)
-                score2 = run2.get_avg_score(metric)
-                diff = score2 - score1 if score1 is not None and score2 is not None else None
-                diff_str = (
-                    f"[{'green' if diff and diff > 0 else 'red' if diff and diff < 0 else 'dim'}]{diff:+.3f}[/{'green' if diff and diff > 0 else 'red' if diff and diff < 0 else 'dim'}]"
-                    if diff is not None
-                    else "-"
-                )
-                table.add_row(
-                    f"Avg {metric}",
-                    f"{score1:.3f}" if score1 is not None else "-",
-                    f"{score2:.3f}" if score2 is not None else "-",
-                    diff_str,
-                )
-
-        console.print(table)
-        console.print()
-
     @app.command(name="export")
     def export_cmd(
         run_id: str = typer.Argument(..., help="Run ID to export."),
@@ -246,7 +170,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             "-o",
             help="Output file path (JSON format).",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Export evaluation run to JSON file.
 
@@ -275,7 +199,11 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         """
         console.print(f"\n[bold]Exporting Run {run_id}[/bold]\n")
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = db_path or Settings().evalvault_db_path
+        if resolved_db_path is None:
+            console.print("[red]Error:[/red] Database path is not configured.")
+            raise typer.Exit(1)
+        storage = SQLiteStorageAdapter(db_path=cast(Path, resolved_db_path))
 
         try:
             run = storage.get_run(run_id)

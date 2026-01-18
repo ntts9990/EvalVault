@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from datetime import datetime
 from email.message import Message
 from importlib.metadata import version as get_version
 from types import SimpleNamespace
@@ -27,12 +28,12 @@ from evalvault.domain.entities import (
     TestCase,
     TestCaseResult,
 )
+from evalvault.domain.entities.analysis import ComparisonResult
 from tests.optional_deps import sklearn_ready
 from tests.unit.conftest import get_test_model
 
 
 def strip_ansi(text: str) -> str:
-    """Remove ANSI escape codes from text for cross-platform testing."""
     ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
     return ansi_pattern.sub("", text)
 
@@ -40,6 +41,7 @@ def strip_ansi(text: str) -> str:
 runner = CliRunner()
 RUN_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.run"
 HISTORY_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.history"
+COMPARE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.compare"
 ANALYZE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.analyze"
 PIPELINE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.pipeline"
 GATE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.gate"
@@ -52,25 +54,63 @@ KG_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.kg"
 BENCHMARK_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.benchmark"
 CONFIG_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.config"
 LANGFUSE_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.langfuse"
+PROFILE_DIFFICULTY_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.profile_difficulty"
 
 
 class TestCLIVersion:
-    """CLI 버전 명령 테스트."""
-
     def test_version_command(self):
-        """--version 플래그 테스트."""
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
         expected_version = get_version("evalvault")
         assert expected_version in result.stdout
 
 
-class TestCLIRun:
-    """CLI run 명령 테스트."""
+class TestCLIProfileDifficulty:
+    def test_profile_difficulty_requires_target(self):
+        result = runner.invoke(app, ["profile-difficulty", "--db", "data/db/evalvault.db"])
+        assert result.exit_code != 0
 
+    @patch(f"{PROFILE_DIFFICULTY_COMMAND_MODULE}.DifficultyProfilingService")
+    @patch(f"{PROFILE_DIFFICULTY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    def test_profile_difficulty_writes_output(
+        self,
+        mock_storage_cls,
+        mock_service_cls,
+        tmp_path,
+    ):
+        output_path = tmp_path / "difficulty.json"
+        artifacts_dir = tmp_path / "artifacts"
+        mock_storage_cls.return_value = MagicMock()
+        mock_service = MagicMock()
+        mock_service.profile.return_value = {"artifacts": {"dir": str(artifacts_dir)}}
+        mock_service_cls.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            [
+                "profile-difficulty",
+                "--dataset-name",
+                "demo",
+                "--db",
+                "data/db/evalvault.db",
+                "--output",
+                str(output_path),
+                "--artifacts-dir",
+                str(artifacts_dir),
+            ],
+        )
+
+        assert result.exit_code == 0, result.stdout
+        mock_service.profile.assert_called_once()
+        call_args = mock_service.profile.call_args[0][0]
+        assert call_args.dataset_name == "demo"
+        assert call_args.output_path == output_path
+        assert call_args.artifacts_dir == artifacts_dir
+
+
+class TestCLIRun:
     @pytest.fixture
     def mock_dataset(self):
-        """테스트용 데이터셋."""
         return Dataset(
             name="test-dataset",
             version="1.0.0",
@@ -87,7 +127,6 @@ class TestCLIRun:
 
     @pytest.fixture
     def mock_evaluation_run(self):
-        """테스트용 평가 결과."""
         from datetime import datetime, timedelta
 
         start = datetime.now()
@@ -112,14 +151,12 @@ class TestCLIRun:
         )
 
     def test_run_help(self):
-        """run 명령 help 테스트."""
         result = runner.invoke(app, ["run", "--help"])
         assert result.exit_code == 0
         assert "dataset" in result.stdout.lower()
         assert "metrics" in result.stdout.lower()
 
     def test_run_missing_dataset(self):
-        """데이터셋 파일 누락 시 에러."""
         result = runner.invoke(app, ["run", "nonexistent.csv"])
         assert result.exit_code != 0
 
@@ -138,7 +175,6 @@ class TestCLIRun:
         mock_evaluation_run,
         tmp_path,
     ):
-        """--stream 플래그 사용 시 스트리밍 헬퍼 호출."""
         dataset_file = tmp_path / "dataset.csv"
         dataset_file.write_text("id,question,answer,contexts\n", encoding="utf-8")
 
@@ -2128,12 +2164,24 @@ class TestCLICompare:
         result = runner.invoke(app, ["compare", "--help"])
         assert result.exit_code == 0
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
-    def test_compare_run_not_found(self, mock_storage_cls, tmp_path):
+    @patch(f"{COMPARE_COMMAND_MODULE}.ComparisonPipelineAdapter")
+    @patch(f"{COMPARE_COMMAND_MODULE}.build_analysis_pipeline_service")
+    @patch(f"{COMPARE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    def test_compare_run_not_found(
+        self,
+        mock_storage_cls,
+        mock_pipeline_factory,
+        mock_pipeline_adapter_cls,
+        tmp_path,
+    ):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
         mock_storage.get_run.side_effect = KeyError("Run not found")
         mock_storage_cls.return_value = mock_storage
+
+        mock_pipeline_adapter = MagicMock()
+        mock_pipeline_adapter_cls.return_value = mock_pipeline_adapter
+        mock_pipeline_factory.return_value = MagicMock()
 
         result = runner.invoke(
             app,
@@ -2141,36 +2189,76 @@ class TestCLICompare:
         )
         assert result.exit_code == 1
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
-    def test_compare_two_runs(self, mock_storage_cls, tmp_path):
+    @patch(f"{COMPARE_COMMAND_MODULE}.ComparisonPipelineAdapter")
+    @patch(f"{COMPARE_COMMAND_MODULE}.build_analysis_pipeline_service")
+    @patch(f"{COMPARE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    def test_compare_two_runs(
+        self,
+        mock_storage_cls,
+        mock_pipeline_factory,
+        mock_pipeline_adapter_cls,
+        tmp_path,
+    ):
         """두 실행 결과 비교 테스트."""
 
         mock_run1 = MagicMock()
+        mock_run1.run_id = "run-1"
         mock_run1.dataset_name = "test-dataset"
         mock_run1.model_name = "gpt-4"
         mock_run1.total_test_cases = 10
         mock_run1.pass_rate = 0.8
         mock_run1.metrics_evaluated = ["faithfulness"]
         mock_run1.get_avg_score.return_value = 0.85
+        mock_run1.thresholds = {"faithfulness": 0.7}
 
         mock_run2 = MagicMock()
+        mock_run2.run_id = "run-2"
         mock_run2.dataset_name = "test-dataset"
         mock_run2.model_name = "gpt-4o"
         mock_run2.total_test_cases = 10
         mock_run2.pass_rate = 0.9
         mock_run2.metrics_evaluated = ["faithfulness"]
         mock_run2.get_avg_score.return_value = 0.90
+        mock_run2.thresholds = {"faithfulness": 0.7}
 
         mock_storage = MagicMock()
         mock_storage.get_run.side_effect = [mock_run1, mock_run2]
         mock_storage_cls.return_value = mock_storage
 
-        result = runner.invoke(
-            app,
-            ["compare", "run-1", "run-2", "--db", str(tmp_path / "test.db")],
+        pipeline_result = MagicMock()
+        pipeline_result.final_output = {"report": "# 비교 분석 보고서"}
+        pipeline_result.all_succeeded = True
+        pipeline_result.node_results = {}
+        pipeline_result.is_complete = True
+        pipeline_result.total_duration_ms = 1200
+        pipeline_result.started_at = datetime.now()
+        pipeline_result.finished_at = datetime.now()
+
+        comparison_result = ComparisonResult.from_values(
+            run_id_a="run-1",
+            run_id_b="run-2",
+            metric="faithfulness",
+            mean_a=0.85,
+            mean_b=0.90,
+            p_value=0.03,
+            effect_size=0.4,
         )
+
+        mock_pipeline_adapter = MagicMock()
+        mock_pipeline_adapter.run_comparison.return_value = pipeline_result
+        mock_pipeline_adapter_cls.return_value = mock_pipeline_adapter
+        mock_pipeline_factory.return_value = MagicMock()
+
+        with patch(f"{COMPARE_COMMAND_MODULE}.StatisticalAnalysisAdapter") as mock_analysis_cls:
+            mock_analysis = mock_analysis_cls.return_value
+            mock_analysis.compare_runs.return_value = [comparison_result]
+
+            result = runner.invoke(
+                app,
+                ["compare", "run-1", "run-2", "--db", str(tmp_path / "test.db")],
+            )
         assert result.exit_code == 0
-        assert "Comparing" in result.stdout
+        assert "비교" in result.stdout or "comparison" in result.stdout.lower()
 
 
 class TestCLIExport:

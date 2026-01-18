@@ -11,6 +11,7 @@ from evalvault.ports.outbound.benchmark_port import (
     BenchmarkTaskResult,
 )
 from evalvault.ports.outbound.causal_analysis_port import CausalAnalysisPort
+from evalvault.ports.outbound.comparison_pipeline_port import ComparisonPipelinePort
 from evalvault.ports.outbound.dataset_port import DatasetPort
 from evalvault.ports.outbound.domain_memory_port import (
     BehaviorMemoryPort,
@@ -38,6 +39,7 @@ from evalvault.ports.outbound.improvement_port import (
     PlaybookPort,
 )
 from evalvault.ports.outbound.intent_classifier_port import IntentClassifierPort
+from evalvault.ports.outbound.judge_calibration_port import JudgeCalibrationPort
 from evalvault.ports.outbound.korean_nlp_port import (
     FaithfulnessResultProtocol,
     KoreanNLPToolkitPort,
@@ -58,6 +60,7 @@ from evalvault.ports.outbound.tracker_port import TrackerPort
 __all__ = [
     "AnalysisCachePort",
     "AnalysisPort",
+    "ComparisonPipelinePort",
     "CausalAnalysisPort",
     "DatasetPort",
     "DomainMemoryPort",
@@ -83,6 +86,7 @@ __all__ = [
     "PatternDefinitionProtocol",
     "MetricPlaybookProtocol",
     "ClaimImprovementProtocol",
+    "JudgeCalibrationPort",
     "LLMFactoryPort",
     "LLMPort",
     "MethodRuntime",

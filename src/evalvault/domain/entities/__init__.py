@@ -34,6 +34,12 @@ from evalvault.domain.entities.improvement import (
     RAGComponent,
     RAGImprovementGuide,
 )
+from evalvault.domain.entities.judge_calibration import (
+    JudgeCalibrationCase,
+    JudgeCalibrationMetric,
+    JudgeCalibrationResult,
+    JudgeCalibrationSummary,
+)
 from evalvault.domain.entities.kg import EntityModel, RelationModel
 from evalvault.domain.entities.method import MethodInput, MethodInputDataset, MethodOutput
 from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
@@ -104,6 +110,10 @@ __all__ = [
     "PatternType",
     "RAGComponent",
     "RAGImprovementGuide",
+    "JudgeCalibrationCase",
+    "JudgeCalibrationMetric",
+    "JudgeCalibrationResult",
+    "JudgeCalibrationSummary",
     # KG
     "EntityModel",
     "RelationModel",
