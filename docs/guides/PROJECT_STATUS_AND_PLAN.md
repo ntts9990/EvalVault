@@ -175,7 +175,109 @@ EPIC-6  [===============>---] 80%
 
 ---
 
-## 7) 다음 액션(추천)
+## 7) 에픽별 병렬 작업 메타데이터(초안)
+
+### EPIC-0 기준선/범위 고정
+```
+[WORK ITEM]
+- ID: EV-RAG-001~004
+- Owner: Metrics/Analysis/Observability (각 1명)
+- Scope Files: metrics/registry.py, evaluator.py, analysis_io.py, pipeline_template_registry.py, stage_event_builder.py
+- Blocked Files: commands/__init__.py, shared report schemas
+- Shared Schemas/Formats: comparison report JSON, artifacts/index.json
+- Dependencies: 없음(선행)
+- Validation: uv run pytest tests/unit/... + ruff
+- Outputs: baseline report, index.json
+- Risks: KPI 기준 충돌, 템플릿 불일치
+```
+
+### EPIC-1 Retrieval 개선 체계화
+```
+[WORK ITEM]
+- ID: EV-RAG-101~103
+- Owner: Retrieval/GraphRAG/Benchmark
+- Scope Files: stage_metric_service.py, graphrag_retriever.py, retrieval_benchmark_module.py
+- Blocked Files: shared report templates
+- Shared Schemas/Formats: retrieval report JSON, stage metrics keys
+- Dependencies: EPIC-0 완료
+- Validation: pytest retrieval + ruff
+- Outputs: rerank report, GraphRAG artifacts
+- Risks: stage metric 충돌, GraphRAG artifact 불일치
+```
+
+### EPIC-2 Grounding/환각 대응
+```
+[WORK ITEM]
+- ID: EV-RAG-201~203
+- Owner: Safety/Analysis/Policy
+- Scope Files: stage_metric_service.py, improvement_guide_service.py, cli flags/config
+- Blocked Files: shared CLI registry
+- Shared Schemas/Formats: grounding metrics, policy flags
+- Dependencies: EPIC-0 부분 완료
+- Validation: pytest grounding + ruff
+- Outputs: grounding report, policy flags
+- Risks: 정책/메트릭 충돌
+```
+
+### EPIC-3 Observability/운영 게이트
+```
+[WORK ITEM]
+- ID: EV-RAG-301~303
+- Owner: Observability/Tracker/DevOps
+- Scope Files: tracker adapters, stage_metric_service.py, CI workflow
+- Blocked Files: shared report schemas
+- Shared Schemas/Formats: KPI metadata, CI gate report
+- Dependencies: EPIC-0, EPIC-5
+- Validation: pytest tracker + CI smoke
+- Outputs: ops KPI report, CI gate summary
+- Risks: tracker schema 불일치, CI 실패
+```
+
+### EPIC-4 Judge/난이도 프로파일링
+```
+[WORK ITEM]
+- ID: EV-RAG-401~403
+- Owner: Evaluation/QA/Data
+- Scope Files: evaluator.py, dataset_preprocessor.py, calibration guide
+- Blocked Files: shared scoring schema
+- Shared Schemas/Formats: difficulty profile JSON, calibration report
+- Dependencies: EPIC-0/1/2 일부 완료
+- Validation: pytest evaluation + calibration report check
+- Outputs: difficulty profile, calibration report
+- Risks: 데이터 부족, 편향
+```
+
+### EPIC-5 병렬 CLI 명령군
+```
+[WORK ITEM]
+- ID: EV-CLI-001~006
+- Owner: CLI/Platform
+- Scope Files: cli commands, domain services, ports/adapters
+- Blocked Files: commands/__init__.py (합의 필요)
+- Shared Schemas/Formats: CLI JSON envelope
+- Dependencies: 없음(완료)
+- Validation: pytest cli + ruff
+- Outputs: CLI reports
+- Risks: 없음(현재 완료)
+```
+
+### EPIC-6 WebUI 노이즈 경고 전달
+```
+[WORK ITEM]
+- ID: EV-UI-001~004
+- Owner: Frontend
+- Scope Files: RunDetails.tsx, CompareRuns.tsx, AnalysisLab.tsx
+- Blocked Files: shared frontend layout tokens
+- Shared Schemas/Formats: stage metrics evidence keys
+- Dependencies: ordering_warning 메트릭
+- Validation: npm run lint/build
+- Outputs: UI warning panels
+- Risks: evidence 키 불일치
+```
+
+---
+
+## 8) 다음 액션(추천)
 1. EPIC-0 KPI baseline 확정 및 run 비교 리포트 생성
 2. ordering_warning 런북 운영 자동화(비율 집계/경고)
 3. CI gate(regress)와 baseline 연동
@@ -183,7 +285,7 @@ EPIC-6  [===============>---] 80%
 
 ---
 
-## 8) 참고 문서
+## 9) 참고 문서
 - `docs/guides/RAG_NOISE_REDUCTION_GUIDE.md`
 - `docs/guides/CLI_PARALLEL_FEATURES_SPEC.md`
 - `docs/guides/RAG_PERFORMANCE_IMPLEMENTATION_LOG.md`
