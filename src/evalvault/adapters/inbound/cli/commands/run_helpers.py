@@ -88,7 +88,25 @@ RUN_MODE_PRESETS: dict[str, RunModePreset] = {
     ),
 }
 
-SUMMARY_METRIC_ORDER = ("summary_faithfulness", "summary_score", "entity_preservation")
+SUMMARY_METRIC_ORDER = (
+    "summary_faithfulness",
+    "summary_score",
+    "entity_preservation",
+    "summary_accuracy",
+    "summary_risk_coverage",
+    "summary_non_definitive",
+    "summary_needs_followup",
+)
+
+SUMMARY_METRIC_SOURCE = {
+    "summary_faithfulness": "LLM",
+    "summary_score": "LLM",
+    "entity_preservation": "Rule",
+    "summary_accuracy": "Rule",
+    "summary_risk_coverage": "Rule",
+    "summary_non_definitive": "Rule",
+    "summary_needs_followup": "Rule",
+}
 
 
 def _display_results(result, console: Console, verbose: bool = False) -> None:
@@ -180,8 +198,9 @@ def _display_summary_guidance(result, console: Console) -> None:
         if score is None:
             continue
         recommended = SUMMARY_RECOMMENDED_THRESHOLDS[metric]
+        source = SUMMARY_METRIC_SOURCE.get(metric, "Rule")
         if score < recommended:
-            warnings.append(f"- {metric}: {score:.3f} < {recommended:.2f}")
+            warnings.append(f"- {metric} ({source}): {score:.3f} < {recommended:.2f}")
 
     if warnings:
         header = "[bold red]사용자 노출 기준 미달[/bold red]"

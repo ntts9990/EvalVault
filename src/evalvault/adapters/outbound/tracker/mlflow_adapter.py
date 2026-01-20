@@ -220,6 +220,11 @@ class MLflowAdapter(TrackerPort):
             results_data.append(result_dict)
 
         self.save_artifact(trace_id, "test_results", results_data)
+        self.save_artifact(
+            trace_id,
+            "custom_metric_snapshot",
+            (run.tracker_metadata or {}).get("custom_metric_snapshot"),
+        )
 
         # 6. End MLflow run
         self.end_trace(trace_id)

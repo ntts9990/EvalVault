@@ -664,6 +664,8 @@ class BaseSQLStorageAdapter(ABC):
     def export_run_to_excel(self, run_id: str, output_path) -> Path:
         from openpyxl import Workbook
 
+        from evalvault.domain.metrics.registry import get_metric_spec_map
+
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -837,6 +839,23 @@ class BaseSQLStorageAdapter(ABC):
 
         summary_rows: list[dict[str, Any]] = []
         run_payload = run_rows[0] if run_rows else {}
+        custom_metric_rows: list[dict[str, Any]] = []
+        run_metadata = self._deserialize_json(run_payload.get("metadata")) if run_payload else None
+        if isinstance(run_metadata, dict):
+            custom_snapshot = run_metadata.get("custom_metric_snapshot")
+            if isinstance(custom_snapshot, dict):
+                entries = custom_snapshot.get("metrics")
+                if isinstance(entries, list):
+                    for entry in entries:
+                        if isinstance(entry, dict):
+                            row = dict(entry)
+                            row["schema_version"] = custom_snapshot.get("schema_version")
+                            custom_metric_rows.append(row)
+        if custom_metric_rows:
+            custom_metric_rows = self._normalize_rows(
+                custom_metric_rows,
+                json_columns={"inputs", "rules"},
+            )
         prompt_set_id = None
         prompt_set_name = None
         if run_prompt_payloads:
@@ -878,14 +897,17 @@ class BaseSQLStorageAdapter(ABC):
                 if isinstance(threshold, (int, float)) and score >= threshold:
                     entry["pass_count"] += 1
 
+        metric_spec_map = get_metric_spec_map()
         for entry in metrics_index.values():
             count = entry["count"] or 0
+            spec = metric_spec_map.get(entry["metric_name"])
             metric_summary_rows.append(
                 {
                     "metric_name": entry["metric_name"],
                     "avg_score": (entry["score_sum"] / count) if count else None,
                     "pass_rate": (entry["pass_count"] / count) if count else None,
                     "samples": count,
+                    "source": spec.source if spec else None,
                 }
             )
 
@@ -956,7 +978,25 @@ class BaseSQLStorageAdapter(ABC):
             (
                 "MetricsSummary",
                 metric_summary_rows,
-                ["metric_name", "avg_score", "pass_rate", "samples"],
+                ["metric_name", "avg_score", "pass_rate", "samples", "source"],
+            ),
+            (
+                "CustomMetrics",
+                custom_metric_rows,
+                [
+                    "schema_version",
+                    "metric_name",
+                    "source",
+                    "description",
+                    "evaluation_method",
+                    "inputs",
+                    "output",
+                    "evaluation_process",
+                    "rules",
+                    "notes",
+                    "implementation_path",
+                    "implementation_hash",
+                ],
             ),
             (
                 "RunPromptSets",

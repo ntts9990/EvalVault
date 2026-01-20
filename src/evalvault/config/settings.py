@@ -321,6 +321,27 @@ class Settings(BaseSettings):
         default="https://cloud.langfuse.com", description="Langfuse host URL"
     )
 
+    mcp_enabled: bool = Field(
+        default=False,
+        description="Enable MCP JSON-RPC endpoint over HTTP.",
+    )
+    mcp_protocol_version: str = Field(
+        default="2025-11-25",
+        description="MCP protocol version to advertise.",
+    )
+    mcp_server_version: str = Field(
+        default="0.1.0",
+        description="EvalVault MCP server version.",
+    )
+    mcp_auth_tokens: str | None = Field(
+        default=None,
+        description="Comma-separated bearer tokens for MCP endpoint (required).",
+    )
+    mcp_allowed_tools: str | None = Field(
+        default=None,
+        description="Comma-separated allowlist of MCP tool names.",
+    )
+
     # MLflow Configuration (optional)
     mlflow_tracking_uri: str | None = Field(default=None, description="MLflow tracking server URI")
     mlflow_experiment_name: str = Field(default="evalvault", description="MLflow experiment name")

@@ -31,8 +31,13 @@ from evalvault.domain.metrics.entity_preservation import EntityPreservation
 from evalvault.domain.metrics.insurance import InsuranceTermAccuracy
 from evalvault.domain.metrics.no_answer import NoAnswerAccuracy
 from evalvault.domain.metrics.retrieval_rank import MRR, NDCG, HitRate
+from evalvault.domain.metrics.summary_accuracy import SummaryAccuracy
+from evalvault.domain.metrics.summary_needs_followup import SummaryNeedsFollowup
+from evalvault.domain.metrics.summary_non_definitive import SummaryNonDefinitive
+from evalvault.domain.metrics.summary_risk_coverage import SummaryRiskCoverage
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services.batch_executor import run_in_batches
+from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
 from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort, RetrieverPort
@@ -187,6 +192,10 @@ class RagasEvaluator:
     CUSTOM_METRIC_MAP = {
         "insurance_term_accuracy": InsuranceTermAccuracy,
         "entity_preservation": EntityPreservation,
+        "summary_accuracy": SummaryAccuracy,
+        "summary_risk_coverage": SummaryRiskCoverage,
+        "summary_non_definitive": SummaryNonDefinitive,
+        "summary_needs_followup": SummaryNeedsFollowup,
         "exact_match": ExactMatch,
         "f1_score": F1Score,
         "no_answer_accuracy": NoAnswerAccuracy,
@@ -238,6 +247,10 @@ class RagasEvaluator:
         "summary_faithfulness": 0.9,
         "summary_score": 0.85,
         "entity_preservation": 0.9,
+        "summary_accuracy": 0.9,
+        "summary_risk_coverage": 0.9,
+        "summary_non_definitive": 0.8,
+        "summary_needs_followup": 0.8,
         "contextual_relevancy": 0.35,
     }
     LANGUAGE_SAMPLE_LIMIT = 5
@@ -265,10 +278,28 @@ class RagasEvaluator:
         "예시의 원자성 수준을 따르세요."
     )
     FACTUAL_CORRECTNESS_NLI_INSTRUCTION = (
-        "다음 CONTEXT를 바탕으로 각 STATEMENT가 직접적으로 "
-        "추론 가능한지 판단하세요. "
-        "가능하면 verdict=1, 불가능하면 verdict=0으로 표시하고, "
-        "간단한 이유를 한국어로 적으세요."
+        "주어진 컨텍스트를 보고 각 진술이 직접적으로 도출 가능한지 판단하세요. "
+        "가능하면 verdict=1, 불가능하면 verdict=0을 JSON으로 반환하세요."
+    )
+    SUMMARY_SCORE_QUESTION_INSTRUCTION = (
+        "다음 텍스트와 핵심 키워드를 기반으로, "
+        "텍스트에 근거해 반드시 1로 답할 수 있는 폐쇄형 질문을 생성하세요. "
+        "질문은 한국어로 작성하세요."
+    )
+    SUMMARY_SCORE_ANSWER_INSTRUCTION = (
+        "다음 질문 목록에 대해, 제공된 요약이 각 질문에 답할 수 있으면 '1', "
+        "그렇지 않으면 '0'을 JSON 배열로 반환하세요."
+    )
+    SUMMARY_SCORE_KEYPHRASE_INSTRUCTION = (
+        "다음 텍스트에서 인물, 기관, 위치, 날짜/시간, 금액, 비율과 같은 핵심 키워드를 추출하세요."
+    )
+    SUMMARY_FAITHFULNESS_STATEMENT_INSTRUCTION = (
+        "질문과 답변을 보고 각 문장을 이해 가능한 주장으로 분해하세요. "
+        "각 주장은 대명사 없이 독립적으로 이해 가능해야 합니다."
+    )
+    SUMMARY_FAITHFULNESS_NLI_INSTRUCTION = (
+        "주어진 컨텍스트를 보고 각 진술이 직접적으로 도출 가능한지 판단하세요. "
+        "가능하면 verdict=1, 불가능하면 verdict=0을 JSON으로 반환하세요."
     )
     FACTUAL_CORRECTNESS_CLAIM_EXAMPLES = [
         {
@@ -430,6 +461,7 @@ class RagasEvaluator:
 
         # Evaluate with Ragas (if any Ragas metrics)
         eval_results_by_test_case = {}
+        prompt_snapshots = {}
         if ragas_metrics:
             run.tracker_metadata["ragas_config"] = self._build_ragas_config(llm)
             (
@@ -451,6 +483,13 @@ class RagasEvaluator:
                 run.tracker_metadata["ragas_prompt_snapshots"] = prompt_snapshots
         elif prompt_overrides:
             logger.warning("Ragas prompt overrides provided but no Ragas metrics requested.")
+
+        custom_snapshot = build_custom_metric_snapshot(self.CUSTOM_METRIC_MAP, metrics)
+        if custom_snapshot:
+            run.tracker_metadata["custom_metric_snapshot"] = custom_snapshot
+            custom_prompt_snapshots = self._build_custom_prompt_snapshots(custom_snapshot)
+            if custom_prompt_snapshots:
+                run.tracker_metadata["custom_prompt_snapshots"] = custom_prompt_snapshots
 
         # Evaluate with custom metrics (if any custom metrics)
         if custom_metrics:
@@ -623,6 +662,11 @@ class RagasEvaluator:
             ragas_metrics=ragas_metrics,
             prompt_overrides=prompt_overrides,
         )
+        self._apply_summary_prompt_defaults(
+            dataset=dataset,
+            ragas_metrics=ragas_metrics,
+            prompt_overrides=prompt_overrides,
+        )
         self._apply_factual_correctness_prompt_defaults(
             dataset=dataset,
             ragas_metrics=ragas_metrics,
@@ -684,6 +728,30 @@ class RagasEvaluator:
             if getattr(metric, "name", None) != "answer_relevancy":
                 continue
             self._apply_korean_answer_relevancy_prompt(metric)
+
+    def _apply_summary_prompt_defaults(
+        self,
+        *,
+        dataset: Dataset,
+        ragas_metrics: list[Any],
+        prompt_overrides: dict[str, str] | None,
+    ) -> None:
+        if not ragas_metrics:
+            return
+        if prompt_overrides and any(
+            metric in prompt_overrides for metric in ("summary_score", "summary_faithfulness")
+        ):
+            return
+        resolved_language = self._resolve_dataset_language(dataset)
+        if resolved_language == "en":
+            return
+
+        for metric in ragas_metrics:
+            metric_name = getattr(metric, "name", None)
+            if metric_name == "summary_score":
+                self._apply_korean_summary_score_prompts(metric)
+            elif metric_name == "summary_faithfulness":
+                self._apply_korean_summary_faithfulness_prompts(metric)
 
     def _apply_factual_correctness_prompt_defaults(
         self,
@@ -784,6 +852,56 @@ class RagasEvaluator:
             with suppress(Exception):  # pragma: no cover - best effort metadata
                 prompt.language = "ko"
         return True
+
+    def _apply_korean_summary_score_prompts(self, metric: Any) -> bool:
+        question_prompt = getattr(metric, "question_generation_prompt", None)
+        answer_prompt = getattr(metric, "answer_generation_prompt", None)
+        keyphrase_prompt = getattr(metric, "extract_keyphrases_prompt", None)
+        applied = False
+
+        if question_prompt and hasattr(question_prompt, "instruction"):
+            question_prompt.instruction = self.SUMMARY_SCORE_QUESTION_INSTRUCTION
+            if hasattr(question_prompt, "language"):
+                with suppress(Exception):
+                    question_prompt.language = "ko"
+            applied = True
+
+        if answer_prompt and hasattr(answer_prompt, "instruction"):
+            answer_prompt.instruction = self.SUMMARY_SCORE_ANSWER_INSTRUCTION
+            if hasattr(answer_prompt, "language"):
+                with suppress(Exception):
+                    answer_prompt.language = "ko"
+            applied = True
+
+        if keyphrase_prompt and hasattr(keyphrase_prompt, "instruction"):
+            keyphrase_prompt.instruction = self.SUMMARY_SCORE_KEYPHRASE_INSTRUCTION
+            if hasattr(keyphrase_prompt, "language"):
+                with suppress(Exception):
+                    keyphrase_prompt.language = "ko"
+            applied = True
+
+        return applied
+
+    def _apply_korean_summary_faithfulness_prompts(self, metric: Any) -> bool:
+        statement_prompt = getattr(metric, "statement_generator_prompt", None)
+        nli_prompt = getattr(metric, "nli_statements_prompt", None)
+        applied = False
+
+        if statement_prompt and hasattr(statement_prompt, "instruction"):
+            statement_prompt.instruction = self.SUMMARY_FAITHFULNESS_STATEMENT_INSTRUCTION
+            if hasattr(statement_prompt, "language"):
+                with suppress(Exception):
+                    statement_prompt.language = "ko"
+            applied = True
+
+        if nli_prompt and hasattr(nli_prompt, "instruction"):
+            nli_prompt.instruction = self.SUMMARY_FAITHFULNESS_NLI_INSTRUCTION
+            if hasattr(nli_prompt, "language"):
+                with suppress(Exception):
+                    nli_prompt.language = "ko"
+            applied = True
+
+        return applied
 
     def _apply_korean_factual_correctness_prompts(self, metric: Any) -> bool:
         claim_prompt = getattr(metric, "claim_decomposition_prompt", None)
@@ -978,18 +1096,50 @@ class RagasEvaluator:
             metric_name = getattr(metric, "name", None)
             if not metric_name:
                 continue
-            prompt_text = self._collect_metric_prompt_text(metric)
-            if not prompt_text:
-                continue
             requested = bool(prompt_overrides and metric_name in prompt_overrides)
             status = override_status.get(metric_name)
             source = "override" if status == "applied" else "default"
-            snapshots[str(metric_name)] = {
-                "prompt": prompt_text,
-                "source": source,
-                "override_requested": requested,
-                "override_status": status,
-            }
+
+            prompts: dict[str, str] = {}
+            if metric_name == "summary_score":
+                prompts["question_generation"] = (
+                    self._extract_prompt_text(getattr(metric, "question_generation_prompt", None))
+                    or ""
+                )
+                prompts["answer_generation"] = (
+                    self._extract_prompt_text(getattr(metric, "answer_generation_prompt", None))
+                    or ""
+                )
+                prompts["extract_keyphrases"] = (
+                    self._extract_prompt_text(getattr(metric, "extract_keyphrases_prompt", None))
+                    or ""
+                )
+                prompts = {k: v for k, v in prompts.items() if v}
+            elif metric_name == "summary_faithfulness":
+                prompts["statement_generation"] = (
+                    self._extract_prompt_text(getattr(metric, "statement_generator_prompt", None))
+                    or ""
+                )
+                prompts["nli_statements"] = (
+                    self._extract_prompt_text(getattr(metric, "nli_statements_prompt", None)) or ""
+                )
+                prompts = {k: v for k, v in prompts.items() if v}
+
+            prompt_text = self._collect_metric_prompt_text(metric)
+            if prompts:
+                snapshots[str(metric_name)] = {
+                    "prompts": prompts,
+                    "source": source,
+                    "override_requested": requested,
+                    "override_status": status,
+                }
+            elif prompt_text:
+                snapshots[str(metric_name)] = {
+                    "prompt": prompt_text,
+                    "source": source,
+                    "override_requested": requested,
+                    "override_status": status,
+                }
         return snapshots
 
     async def _evaluate_sequential(
@@ -1333,6 +1483,32 @@ class RagasEvaluator:
             return cls.SUMMARY_SCORE_COEFF
         normalized = str(domain).strip().lower()
         return cls.SUMMARY_SCORE_COEFF_BY_DOMAIN.get(normalized, cls.SUMMARY_SCORE_COEFF)
+
+    def _build_custom_prompt_snapshots(self, snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        entries = snapshot.get("metrics") if isinstance(snapshot, dict) else None
+        if not isinstance(entries, list):
+            return {}
+        prompt_snapshot: dict[str, dict[str, Any]] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("metric_name")
+            if not isinstance(name, str) or not name:
+                continue
+            evaluation_process = entry.get("evaluation_process")
+            if not isinstance(evaluation_process, str) or not evaluation_process:
+                continue
+            rules = entry.get("rules") if isinstance(entry.get("rules"), dict) else None
+            prompts: dict[str, str] = {"rule": evaluation_process}
+            if rules:
+                prompts["rules"] = json.dumps(rules, ensure_ascii=False, indent=2)
+            prompt_snapshot[name] = {
+                "prompts": prompts,
+                "source": "custom_rules",
+                "rules": rules,
+                "inputs": entry.get("inputs"),
+            }
+        return prompt_snapshot
 
     def _build_summary_score_metric(self, metric_class, ragas_llm, coeff: float | None = None):
         if coeff is None:
@@ -1715,9 +1891,11 @@ class RagasEvaluator:
                             contexts=test_case.contexts,
                         )
                     else:
-                        score = metric_instance.score(
+                        score = self._score_custom_metric_with_metadata(
+                            metric_instance,
                             answer=test_case.answer,
                             contexts=test_case.contexts,
+                            metadata=test_case.metadata,
                         )
                 scores[metric_name] = score
 
@@ -1737,6 +1915,19 @@ class RagasEvaluator:
             )
 
         return results
+
+    def _score_custom_metric_with_metadata(
+        self,
+        metric_instance: Any,
+        *,
+        answer: str,
+        contexts: list[str],
+        metadata: dict[str, Any],
+    ) -> float:
+        try:
+            return float(metric_instance.score(answer=answer, contexts=contexts, metadata=metadata))
+        except TypeError:
+            return float(metric_instance.score(answer=answer, contexts=contexts))
 
     def _calculate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
         """Calculate estimated cost in USD based on model pricing."""

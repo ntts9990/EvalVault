@@ -360,6 +360,7 @@ class LangfuseAdapter(TrackerPort):
             "summary": trace_output["summary"],
             "metrics": metric_summary,
             "phoenix_links": phoenix_links or {},
+            "custom_metrics": (run.tracker_metadata or {}).get("custom_metric_snapshot"),
             "test_cases": [
                 {
                     "test_case_id": result.test_case_id,

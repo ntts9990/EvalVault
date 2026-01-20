@@ -499,8 +499,20 @@ SUMMARY_RECOMMENDED_THRESHOLDS = {
     "summary_faithfulness": 0.90,
     "summary_score": 0.85,
     "entity_preservation": 0.90,
+    "summary_accuracy": 0.90,
+    "summary_risk_coverage": 0.90,
+    "summary_non_definitive": 0.80,
+    "summary_needs_followup": 0.80,
 }
-SUMMARY_METRIC_ORDER = ("summary_faithfulness", "summary_score", "entity_preservation")
+SUMMARY_METRIC_ORDER = (
+    "summary_faithfulness",
+    "summary_score",
+    "entity_preservation",
+    "summary_accuracy",
+    "summary_risk_coverage",
+    "summary_non_definitive",
+    "summary_needs_followup",
+)
 
 
 @dataclass

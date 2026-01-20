@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import uuid4
 
-PromptKind = Literal["system", "ragas"]
+PromptKind = Literal["system", "ragas", "custom"]
 
 
 @dataclass

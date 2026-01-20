@@ -352,13 +352,40 @@ class PhoenixAdapter(TrackerPort):
                 "version": run.dataset_version,
                 "total_test_cases": run.total_test_cases,
             },
+            "evaluation_config": {
+                "model": run.model_name,
+                "metrics": run.metrics_evaluated,
+                "thresholds": run.thresholds,
+            },
             "summary": {
-                "pass_rate": run.pass_rate,
+                "total_test_cases": run.total_test_cases,
+                "passed": run.passed_test_cases,
+                "failed": run.total_test_cases - run.passed_test_cases,
+                "pass_rate": round(run.pass_rate, 4),
+                "duration_seconds": round(run.duration_seconds, 2)
+                if run.duration_seconds
+                else None,
                 "total_tokens": run.total_tokens,
-                "duration_seconds": run.duration_seconds,
             },
             "metrics": metric_summary,
+            "custom_metrics": (run.tracker_metadata or {}).get("custom_metric_snapshot"),
+            "test_cases": [
+                {
+                    "test_case_id": result.test_case_id,
+                    "all_passed": result.all_passed,
+                    "metrics": {
+                        metric.name: {
+                            "score": metric.score,
+                            "threshold": metric.threshold,
+                            "passed": metric.passed,
+                        }
+                        for metric in result.metrics
+                    },
+                }
+                for result in run.results
+            ],
         }
+
         self.save_artifact(trace_id, "ragas_evaluation", structured_artifact)
 
         # End the trace

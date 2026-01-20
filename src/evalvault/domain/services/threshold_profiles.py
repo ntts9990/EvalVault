@@ -8,6 +8,10 @@ SUMMARY_RECOMMENDED_THRESHOLDS = {
     "summary_faithfulness": 0.90,
     "summary_score": 0.85,
     "entity_preservation": 0.90,
+    "summary_accuracy": 0.90,
+    "summary_risk_coverage": 0.90,
+    "summary_non_definitive": 0.80,
+    "summary_needs_followup": 0.80,
 }
 QA_RECOMMENDED_THRESHOLDS = {
     "faithfulness": 0.70,

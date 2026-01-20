@@ -16,7 +16,11 @@
         "이 상품은 암 진단 시 3,000만원을 지급합니다. 단, 계약일로부터 90일 이내 진단된 암은 면책입니다.",
         "보험료 납입기간은 20년이며 보장기간은 80세 만기입니다."
       ],
-      "ground_truth": "암 진단 3,000만원, 90일 면책, 20년 납입, 80세 만기"
+      "ground_truth": "암 진단 3,000만원, 90일 면책, 20년 납입, 80세 만기",
+      "metadata": {
+        "summary_intent": "agent_notes",
+        "summary_tags": ["exclusion", "waiting_period"]
+      }
     },
     {
       "id": "sum-002-pass-ko-amount-rate",
@@ -61,7 +65,11 @@
       "contexts": [
         "뇌출혈 진단 시 2,000만원이 지급됩니다. 단, 기존 질환으로 인한 재발은 면책입니다.",
         "진단 관련 검사비는 연 1회 30만원 한도로 지원됩니다."
-      ]
+      ],
+      "metadata": {
+        "summary_intent": "agent_notes",
+        "summary_tags": ["exclusion"]
+      }
     },
     {
       "id": "sum-007-fail-ko-inverted-condition",
@@ -70,7 +78,11 @@
       "contexts": [
         "납입기간 5년을 모두 완료한 경우에만 납입보험료의 100%가 환급됩니다.",
         "중도 해지 시에는 해지환급금이 없습니다."
-      ]
+      ],
+      "metadata": {
+        "summary_intent": "agent_notes",
+        "summary_tags": ["condition", "needs_followup"]
+      }
     },
     {
       "id": "sum-008-fail-en-hallucination",

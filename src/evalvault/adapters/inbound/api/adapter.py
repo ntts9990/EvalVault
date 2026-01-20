@@ -596,6 +596,14 @@ class WebUIAdapter:
         ragas_snapshots = tracker_meta.get("ragas_prompt_snapshots")
         ragas_snapshot_inputs = build_prompt_inputs_from_snapshots(
             ragas_snapshots if isinstance(ragas_snapshots, dict) else None,
+            kind="ragas",
+            source="ragas",
+        )
+        custom_snapshots = tracker_meta.get("custom_prompt_snapshots")
+        custom_snapshot_inputs = build_prompt_inputs_from_snapshots(
+            custom_snapshots if isinstance(custom_snapshots, dict) else None,
+            kind="custom",
+            source="custom_rules",
         )
         override_status: dict[str, str] = {}
         raw_override = tracker_meta.get("ragas_prompt_overrides")
@@ -616,6 +624,12 @@ class WebUIAdapter:
             existing_roles = {entry.role for entry in prompt_inputs if entry.kind == "ragas"}
             for entry in ragas_snapshot_inputs:
                 if entry.role in existing_roles and override_status.get(entry.role) == "applied":
+                    continue
+                prompt_inputs.append(entry)
+        if custom_snapshot_inputs:
+            existing_roles = {entry.role for entry in prompt_inputs if entry.kind == "custom"}
+            for entry in custom_snapshot_inputs:
+                if entry.role in existing_roles:
                     continue
                 prompt_inputs.append(entry)
 

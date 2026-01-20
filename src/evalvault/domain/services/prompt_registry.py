@@ -109,30 +109,59 @@ def build_prompt_summary(bundle: PromptSetBundle) -> dict[str, Any]:
 
 def build_prompt_inputs_from_snapshots(
     snapshots: dict[str, dict[str, Any]] | None,
+    *,
+    kind: PromptKind = "ragas",
+    source: str | None = None,
 ) -> list[PromptInput]:
     if not snapshots:
         return []
     prompt_inputs: list[PromptInput] = []
     for metric_name, entry in snapshots.items():
-        prompt_text = entry.get("prompt") if isinstance(entry, dict) else None
+        if not isinstance(entry, dict):
+            continue
+        entry_source = entry.get("source")
+        resolved_source = source if source else entry_source
+        metadata = {key: value for key, value in entry.items() if key != "prompt"}
+
+        prompts_map = entry.get("prompts")
+        if isinstance(prompts_map, dict) and prompts_map:
+            for prompt_key, prompt_text in prompts_map.items():
+                if not isinstance(prompt_text, str):
+                    continue
+                normalized = prompt_text.strip()
+                if not normalized:
+                    continue
+                prompt_inputs.append(
+                    PromptInput(
+                        content=normalized,
+                        name=f"{kind}.{metric_name}.{prompt_key}",
+                        kind=kind,
+                        role=f"{metric_name}.{prompt_key}",
+                        source=(
+                            resolved_source
+                            if isinstance(resolved_source, str) and resolved_source
+                            else kind
+                        ),
+                        metadata=metadata or None,
+                    )
+                )
+            continue
+
+        prompt_text = entry.get("prompt")
         if not isinstance(prompt_text, str):
             continue
         prompt_text = prompt_text.strip()
         if not prompt_text:
             continue
-        source = entry.get("source") if isinstance(entry, dict) else None
-        metadata = {
-            key: value
-            for key, value in entry.items()
-            if key != "prompt" and isinstance(entry, dict)
-        }
         prompt_inputs.append(
             PromptInput(
                 content=prompt_text,
-                name=f"ragas.{metric_name}",
-                kind="ragas",
+                name=f"{kind}.{metric_name}",
+                kind=kind,
                 role=str(metric_name),
-                source=source if isinstance(source, str) and source else "ragas",
+                source=resolved_source
+                if isinstance(resolved_source, str) and resolved_source
+                else kind,
                 metadata=metadata or None,
             )
         )
