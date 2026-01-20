@@ -61,6 +61,7 @@ dependencies = [
     "python-multipart",
     "uvicorn>=0.40.0",
     "matplotlib>=3.8.0,<3.9.0",
+    "chainlit>=2.9.5",
 ]
 
 [project.urls]
