@@ -586,24 +586,34 @@ export function EvaluationStudio() {
                                 <p className="font-medium text-sm">
                                     Enable summary-focused preset
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Locks metrics to summary_faithfulness, summary_score, entity_preservation.
-                                </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Locks metrics to summary_faithfulness(LLM), summary_score(LLM),
+                                        entity_preservation(Rule), summary_accuracy(Rule), summary_risk_coverage(Rule),
+                                        summary_non_definitive(Rule), summary_needs_followup(Rule).
+                                    </p>
+
                             </div>
                         </div>
                         <div className="mt-3 text-xs text-muted-foreground space-y-1">
                             <p>Defaults apply when dataset thresholds are missing.</p>
                             <p>{summaryThresholdLabel}</p>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {SUMMARY_METRICS.map(metric => (
-                                <span
-                                    key={metric}
-                                    className="px-2 py-0.5 rounded-full border border-border bg-secondary text-[11px] text-muted-foreground"
-                                >
-                                    {metric}
-                                </span>
-                            ))}
+                        <div className="mt-3 space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                                {SUMMARY_METRICS.map(metric => (
+                                    <span
+                                        key={metric}
+                                        className="px-2 py-0.5 rounded-full border border-border bg-secondary text-[11px] text-muted-foreground"
+                                    >
+                                        {metric}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                                LLM: summary_faithfulness, summary_score · Rule: entity_preservation,
+                                summary_accuracy, summary_risk_coverage, summary_non_definitive,
+                                summary_needs_followup
+                            </div>
                         </div>
                     </section>
 

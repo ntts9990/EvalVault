@@ -40,6 +40,25 @@ export function InsightSpacePanel({ runId }: { runId: string }) {
         }
     }, [granularity, clusterMap]);
 
+    const quadrantCounts = useMemo(() => {
+        if (!data) return null;
+        if (data.summary?.quadrant_counts) return data.summary.quadrant_counts;
+
+        const counts: Record<string, number> = {};
+        data.points.forEach((p) => {
+            const q = p.labels?.quadrant;
+            if (q) counts[q] = (counts[q] || 0) + 1;
+        });
+        return counts;
+    }, [data]);
+
+    const QUADRANT_DISPLAY = [
+        { key: "search_boost", label: "좌상단" },
+        { key: "expand", label: "우상단" },
+        { key: "reset", label: "좌하단" },
+        { key: "generation_fix", label: "우하단" },
+    ];
+
     const handleClusterUpload = async (file: File) => {
         setClusterError(null);
         try {
@@ -220,8 +239,21 @@ export function InsightSpacePanel({ runId }: { runId: string }) {
                 </div>
             )}
 
+            {quadrantCounts && (
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs border-t border-border/40 pt-3">
+                    {QUADRANT_DISPLAY.map(({ key, label }) => (
+                        <div key={key} className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-mono font-medium text-foreground">
+                                {quadrantCounts[key] || 0}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {data?.summary && (
-                <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     {"regressions" in data.summary && (
                         <span>Regressions: {String(data.summary.regressions)}</span>
                     )}

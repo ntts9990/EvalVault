@@ -62,12 +62,29 @@ export const SUMMARY_METRICS = [
     "summary_faithfulness",
     "summary_score",
     "entity_preservation",
+    "summary_accuracy",
+    "summary_risk_coverage",
+    "summary_non_definitive",
+    "summary_needs_followup",
+] as const;
+
+export const SUMMARY_METRICS_LLM = ["summary_faithfulness", "summary_score"] as const;
+export const SUMMARY_METRICS_RULE = [
+    "entity_preservation",
+    "summary_accuracy",
+    "summary_risk_coverage",
+    "summary_non_definitive",
+    "summary_needs_followup",
 ] as const;
 
 export const SUMMARY_METRIC_THRESHOLDS: Record<string, number> = {
     summary_faithfulness: 0.9,
     summary_score: 0.85,
     entity_preservation: 0.9,
+    summary_accuracy: 0.9,
+    summary_risk_coverage: 0.9,
+    summary_non_definitive: 0.8,
+    summary_needs_followup: 0.8,
 };
 
 export type SummaryMetric = (typeof SUMMARY_METRICS)[number];

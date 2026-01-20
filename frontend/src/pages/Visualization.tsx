@@ -66,6 +66,7 @@ type ScatterPoint = {
     passRate: number;
     failedMetrics: string[];
     clusterId?: string;
+    quadrant: string | null;
     metrics: RunDetailsResponse["results"][number]["metrics"];
 };
 
@@ -168,11 +169,19 @@ const FALLBACK_AXIS_SPECS: AxisSpec[] = [
     {
         key: "z",
         label: "요약 품질",
-        metrics: ["summary_score", "summary_faithfulness", "entity_preservation"],
+        metrics: [
+            "summary_score",
+            "summary_faithfulness",
+            "entity_preservation",
+            "summary_accuracy",
+            "summary_risk_coverage",
+            "summary_non_definitive",
+            "summary_needs_followup",
+        ],
         description: "요약/보존 지표의 평균",
         detail: {
-            calc: "(summary_score + summary_faithfulness + entity_preservation) / 3 (누락 시 전체 평균으로 보정)",
-            meaning: "요약의 핵심 보존과 충실도를 통합한 품질 지표입니다.",
+            calc: "(summary_score + summary_faithfulness + entity_preservation + summary_accuracy + summary_risk_coverage + summary_non_definitive + summary_needs_followup) / 7 (누락 시 전체 평균으로 보정)",
+            meaning: "요약의 핵심 보존, 근거성, 리스크 안내, 단정 표현 억제를 통합한 품질 지표입니다.",
             effect: "낮으면 요약이 왜곡되거나 핵심 정보가 누락됩니다.",
         },
     },
@@ -673,17 +682,29 @@ export function Visualization() {
                 ? result.metrics.filter((metric) => metric.passed).length / result.metrics.length
                 : 0;
             const failedMetrics = result.metrics.filter((metric) => !metric.passed).map((m) => m.name);
+
+            const x = axisValues[0] ?? avgAll;
+            const y = axisValues[1] ?? avgAll;
+            let quadrant: string | null = null;
+            if (typeof x === "number" && typeof y === "number") {
+                if (x >= CHART_THRESHOLD && y >= CHART_THRESHOLD) quadrant = "우상단";
+                else if (x < CHART_THRESHOLD && y >= CHART_THRESHOLD) quadrant = "좌상단";
+                else if (x >= CHART_THRESHOLD && y < CHART_THRESHOLD) quadrant = "우하단";
+                else quadrant = "좌하단";
+            }
+
             return {
                 id: result.test_case_id,
                 question: result.question,
                 answer: result.answer,
-                x: axisValues[0] ?? avgAll,
-                y: axisValues[1] ?? avgAll,
+                x,
+                y,
                 z: axisValues[2] ?? avgAll,
                 avg: avgAll,
                 passRate,
                 failedMetrics,
                 clusterId: clusterMap.get(result.test_case_id),
+                quadrant,
                 metrics: result.metrics,
             };
         });
@@ -1212,6 +1233,7 @@ export function Visualization() {
                                                                     평균 {formatScore(point.avg)} · 통과율{" "}
                                                                     {(point.passRate * 100).toFixed(0)}%
                                                                 </p>
+                                                                {point.quadrant && <p>사분면: {point.quadrant}</p>}
                                                                 {point.clusterId && <p>클러스터 {point.clusterId}</p>}
                                                             </div>
                                                         </div>
@@ -1396,6 +1418,11 @@ export function Visualization() {
                                     <div>
                                         <p className="text-xs text-muted-foreground">Test Case</p>
                                         <p className="font-semibold text-foreground">{selectedPoint.id}</p>
+                                        {selectedPoint.quadrant && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                사분면: {selectedPoint.quadrant}
+                                            </p>
+                                        )}
                                         {selectedPoint.clusterId && (
                                             <p className="text-xs text-muted-foreground mt-1">
                                                 클러스터 {selectedPoint.clusterId}

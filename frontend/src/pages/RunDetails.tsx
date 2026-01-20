@@ -546,6 +546,8 @@ export function RunDetails() {
             avg,
             threshold,
             passed: avg >= threshold,
+            sourceLabel:
+                metric === "summary_faithfulness" || metric === "summary_score" ? "LLM" : "Rule",
         };
     });
     const summarySafetyAlert = summarySafetyRows.some((row) => !row.passed);
@@ -736,7 +738,14 @@ export function RunDetails() {
                                         : "bg-rose-500/5 border-rose-500/20"
                                         }`}
                                 >
-                                    <p className="text-sm text-muted-foreground">{row.metric}</p>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <span>{row.metric}</span>
+                                        {row.sourceLabel && (
+                                            <span className="px-1.5 py-0.5 rounded-full border border-border text-[10px]">
+                                                {row.sourceLabel}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p
                                         className={`text-2xl font-bold ${row.passed
                                             ? "text-emerald-600"
@@ -832,7 +841,11 @@ export function RunDetails() {
                                             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                 <span className="font-semibold text-foreground">{item.role}</span>
                                                 <span className="px-2 py-0.5 rounded-full border border-border bg-secondary">
-                                                    {item.prompt.kind}
+                                                    {item.prompt.kind === "ragas"
+                                                        ? "LLM"
+                                                        : item.prompt.kind === "custom"
+                                                            ? "Rule"
+                                                            : item.prompt.kind}
                                                 </span>
                                                 <span className="font-mono">{item.prompt.checksum.slice(0, 12)}</span>
                                                 {item.prompt.source && (
@@ -1106,7 +1119,11 @@ export function RunDetails() {
                                             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                 <span className="font-semibold text-foreground">{item.role}</span>
                                                 <span className="px-2 py-0.5 rounded-full border border-border bg-secondary">
-                                                    {item.prompt.kind}
+                                                    {item.prompt.kind === "ragas"
+                                                        ? "LLM"
+                                                        : item.prompt.kind === "custom"
+                                                            ? "Rule"
+                                                            : item.prompt.kind}
                                                 </span>
                                                 <span className="font-mono">{item.prompt.checksum.slice(0, 12)}</span>
                                                 {item.prompt.source && (
