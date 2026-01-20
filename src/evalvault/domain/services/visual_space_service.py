@@ -233,13 +233,13 @@ def _aggregate_stage_metrics(metrics: Iterable[StageMetric]) -> dict[str, dict[s
 
     aggregated: dict[str, dict[str, float]] = {}
     for name, entries in buckets.items():
-        scores = [m.score for m in entries]
+        scores = [m.score for m in entries if m.score is not None]
         threshold = next(
             (m.threshold for m in entries if m.threshold is not None),
             DEFAULT_STAGE_THRESHOLDS.get(name),
         )
         aggregated[name] = {
-            "avg": mean(scores) if scores else None,
+            "avg": mean(scores) if scores else 0.0,
             "threshold": threshold if threshold is not None else DEFAULT_METRIC_THRESHOLD,
         }
     return aggregated
@@ -770,6 +770,77 @@ def _build_case_coords(result: TestCaseResult) -> dict[str, float | None]:
             ),
         ]
     )
+
+    if x_value is None:
+        x_value = _weighted_average(
+            [
+                (
+                    _centered_norm(
+                        scores.get("summary_accuracy"), thresholds.get("summary_accuracy")
+                    ),
+                    0.4,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("summary_risk_coverage"),
+                        thresholds.get("summary_risk_coverage"),
+                    ),
+                    0.3,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("summary_faithfulness"),
+                        thresholds.get("summary_faithfulness"),
+                    ),
+                    0.2,
+                ),
+                (
+                    _centered_norm(scores.get("summary_score"), thresholds.get("summary_score")),
+                    0.1,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("entity_preservation"),
+                        thresholds.get("entity_preservation"),
+                    ),
+                    0.2,
+                ),
+            ]
+        )
+
+    if y_value is None:
+        y_value = _weighted_average(
+            [
+                (
+                    _centered_norm(
+                        scores.get("summary_accuracy"), thresholds.get("summary_accuracy")
+                    ),
+                    0.35,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("summary_non_definitive"),
+                        thresholds.get("summary_non_definitive"),
+                    ),
+                    0.35,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("summary_needs_followup"),
+                        thresholds.get("summary_needs_followup"),
+                    ),
+                    0.3,
+                ),
+                (
+                    _centered_norm(
+                        scores.get("entity_preservation"),
+                        thresholds.get("entity_preservation"),
+                    ),
+                    0.2,
+                ),
+            ]
+        )
+
     return {"x": x_value, "y": y_value}
 
 
@@ -799,8 +870,12 @@ def _build_cluster_points(
 
     points = []
     for cluster_id, coords_list in clusters.items():
-        x_values = [c.get("x") for c in coords_list if c.get("x") is not None]
-        y_values = [c.get("y") for c in coords_list if c.get("y") is not None]
+        x_values = [
+            value for value in (c.get("x") for c in coords_list) if isinstance(value, (int, float))
+        ]
+        y_values = [
+            value for value in (c.get("y") for c in coords_list) if isinstance(value, (int, float))
+        ]
         x_avg = mean(x_values) if x_values else None
         y_avg = mean(y_values) if y_values else None
         quadrant = _quadrant_label(x_avg, y_avg)
