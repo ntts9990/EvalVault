@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import logging
 import os
 import re
 import time
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +19,14 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["chat"])
 
+logger = logging.getLogger(__name__)
+
 MCP_URL = os.getenv("EVALVAULT_MCP_URL", "http://localhost:8000/api/v1/mcp")
 MCP_TOKEN = os.getenv("EVALVAULT_MCP_TOKEN", "mcp-local-dev-token")
+
+USER_GUIDE_PATH = Path(os.getenv("EVALVAULT_RAG_USER_GUIDE", "docs/guides/USER_GUIDE.md"))
+RAG_INDEX_DIR = Path(os.getenv("EVALVAULT_RAG_INDEX_DIR", "data/rag"))
+RAG_INDEX_PATH = RAG_INDEX_DIR / "user_guide_bm25.json"
 
 _RAG_RETRIEVER = None
 _RAG_DOCS_COUNT = 0
@@ -129,25 +138,98 @@ def _summarize_result(tool_name: str, payload: dict[str, Any]) -> str:
     return str(payload)
 
 
-def _load_text_files(root: Path, extensions: tuple[str, ...], limit: int) -> list[str]:
-    texts: list[str] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in extensions:
-            continue
-        if limit and len(texts) >= limit:
-            break
-        try:
-            content = path.read_text(encoding="utf-8")
-        except Exception:
-            continue
-        if content.strip():
-            texts.append(content)
-    return texts
+def _load_user_guide_text() -> str | None:
+    if not USER_GUIDE_PATH.exists():
+        logger.warning("USER_GUIDE.md not found at %s", USER_GUIDE_PATH)
+        return None
+    try:
+        content = USER_GUIDE_PATH.read_text(encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Failed to read USER_GUIDE.md: %s", exc)
+        return None
+    if not content.strip():
+        return None
+    return content
 
 
-async def _get_rag_retriever():
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _chunk_user_guide(content: str, chunk_limit: int) -> list[str]:
+    try:
+        from evalvault.adapters.outbound.nlp.korean.document_chunker import ParagraphChunker
+        from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
+
+        tokenizer = KiwiTokenizer()
+        chunker = ParagraphChunker(tokenizer=tokenizer, chunk_size=450, overlap_tokens=80)
+        chunks = [
+            chunk.text
+            for chunk in chunker.chunk_with_metadata(content, source=str(USER_GUIDE_PATH))
+        ]
+        if chunk_limit > 0:
+            return chunks[:chunk_limit]
+        return chunks
+    except Exception as exc:
+        logger.warning("Failed to chunk USER_GUIDE.md, using fallback split: %s", exc)
+        paragraphs = [block.strip() for block in content.split("\n\n") if block.strip()]
+        if chunk_limit > 0:
+            return paragraphs[:chunk_limit]
+        return paragraphs
+
+
+def _build_bm25_tokens(texts: list[str]) -> list[list[str]]:
+    try:
+        from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
+
+        tokenizer = KiwiTokenizer()
+        tokens = []
+        for text in texts:
+            doc_tokens = tokenizer.tokenize(text)
+            if not doc_tokens:
+                doc_tokens = re.findall(r"[A-Za-z0-9가-힣]+", text)
+            tokens.append(doc_tokens)
+        return tokens
+    except Exception as exc:
+        logger.warning("Failed to tokenize with Kiwi, using regex: %s", exc)
+        return [re.findall(r"[A-Za-z0-9가-힣]+", text) for text in texts]
+
+
+def _load_bm25_index() -> dict[str, Any] | None:
+    if not RAG_INDEX_PATH.exists():
+        return None
+    try:
+        payload = json.loads(RAG_INDEX_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Failed to read BM25 index: %s", exc)
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _save_bm25_index(payload: dict[str, Any]) -> None:
+    RAG_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    RAG_INDEX_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _build_bm25_index(content: str, chunk_limit: int) -> dict[str, Any] | None:
+    chunks = _chunk_user_guide(content, chunk_limit)
+    if not chunks:
+        return None
+    tokens = _build_bm25_tokens(chunks)
+    return {
+        "version": 1,
+        "source": str(USER_GUIDE_PATH),
+        "source_hash": _hash_text(content),
+        "chunk_limit": chunk_limit,
+        "created_at": datetime.now(UTC).isoformat(),
+        "documents": chunks,
+        "tokens": tokens,
+    }
+
+
+async def _get_rag_retriever() -> tuple[Any | None, int]:
     global _RAG_RETRIEVER
     global _RAG_DOCS_COUNT
     global _RAG_TEXTS
@@ -156,48 +238,49 @@ async def _get_rag_retriever():
     if _RAG_RETRIEVER is not None:
         return _RAG_RETRIEVER, _RAG_DOCS_COUNT
 
-    if not _RAG_INITIALIZED:
-        docs_root = Path(os.getenv("EVALVAULT_RAG_DOCS", "docs"))
-        src_root = Path(os.getenv("EVALVAULT_RAG_SRC", "src"))
-        docs_limit = int(os.getenv("EVALVAULT_RAG_DOCS_LIMIT", "120"))
-        src_limit = int(os.getenv("EVALVAULT_RAG_SRC_LIMIT", "120"))
+    user_guide_limit = int(os.getenv("EVALVAULT_RAG_USER_GUIDE_LIMIT", "80"))
+    content = _load_user_guide_text()
+    if content is None:
+        return None, 0
+    source_hash = _hash_text(content)
 
-        texts: list[str] = []
-        if docs_root.exists():
-            texts.extend(_load_text_files(docs_root, (".md", ".txt"), docs_limit))
-        if src_root.exists():
-            texts.extend(_load_text_files(src_root, (".py",), src_limit))
+    index_payload = _load_bm25_index()
+    if index_payload is None or index_payload.get("source_hash") != source_hash:
+        index_payload = _build_bm25_index(content, user_guide_limit)
+        if index_payload is None:
+            return None, 0
+        _save_bm25_index(index_payload)
 
-        _RAG_TEXTS = texts
-        _RAG_DOCS_COUNT = len(texts)
-        _RAG_INITIALIZED = True
+    documents = index_payload.get("documents")
+    tokens = index_payload.get("tokens")
+    if not isinstance(documents, list) or not isinstance(tokens, list):
+        return None, 0
+
+    _RAG_TEXTS = documents
+    _RAG_DOCS_COUNT = len(documents)
+    _RAG_INITIALIZED = True
 
     if not _RAG_TEXTS:
         return None, 0
 
-    from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
-    from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
-    from evalvault.config.settings import Settings
+    from evalvault.adapters.outbound.nlp.korean.bm25_retriever import KoreanBM25Retriever
+    from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
 
-    settings = Settings()
-    ollama_adapter = OllamaAdapter(settings)
-    toolkit = try_create_korean_toolkit()
-    if toolkit is None:
-        return None, 0
-
-    use_hybrid = os.getenv("EVALVAULT_RAG_USE_HYBRID", "true").lower() == "true"
-    retriever = toolkit.build_retriever(
-        documents=_RAG_TEXTS,
-        use_hybrid=use_hybrid,
-        ollama_adapter=ollama_adapter if use_hybrid else None,
-        embedding_profile=os.getenv("EVALVAULT_RAG_EMBEDDING_PROFILE", "dev"),
-        verbose=False,
-    )
-    if retriever is None:
-        return None, 0
+    tokenizer = KiwiTokenizer()
+    retriever = KoreanBM25Retriever(tokenizer=tokenizer)
+    retriever.index(list(_RAG_TEXTS))
+    if tokens and len(tokens) == len(_RAG_TEXTS):
+        retriever._tokenized_docs = tokens
 
     _RAG_RETRIEVER = retriever
     return retriever, _RAG_DOCS_COUNT
+
+
+async def warm_rag_index() -> None:
+    try:
+        await _get_rag_retriever()
+    except Exception as exc:
+        logger.warning("RAG preload failed: %s", exc)
 
 
 async def _direct_chat_answer(user_text: str) -> str | None:
@@ -351,15 +434,17 @@ async def _resolve_tool_with_llm(user_text: str) -> dict[str, Any] | None:
 
 
 def _extract_json_content(result: Any) -> dict[str, Any] | None:
-    if isinstance(result, dict) and isinstance(result.get("structuredContent"), dict):
-        return result.get("structuredContent")
+    if isinstance(result, dict):
+        structured = result.get("structuredContent")
+        if isinstance(structured, dict):
+            return structured
+    else:
+        if hasattr(result, "structuredContent"):
+            payload = result.structuredContent
+            if isinstance(payload, dict):
+                return payload
 
-    if hasattr(result, "structuredContent"):
-        payload = result.structuredContent
-        if isinstance(payload, dict):
-            return payload
-
-    if hasattr(result, "content"):
+    if not isinstance(result, dict) and hasattr(result, "content"):
         content = result.content
     elif isinstance(result, dict):
         content = result.get("content")
@@ -378,17 +463,6 @@ def _extract_json_content(result: Any) -> dict[str, Any] | None:
                     return payload
             if item_type == "text":
                 text = item.get("text")
-                if isinstance(text, str):
-                    try:
-                        parsed = json.loads(text)
-                    except Exception:
-                        return None
-                    if isinstance(parsed, dict):
-                        return parsed
-        else:
-            item_type = getattr(item, "type", None)
-            if item_type == "text":
-                text = getattr(item, "text", None)
                 if isinstance(text, str):
                     try:
                         parsed = json.loads(text)

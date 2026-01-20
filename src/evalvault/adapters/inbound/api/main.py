@@ -63,6 +63,12 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize adapter
     adapter = create_adapter()
     app.state.adapter = adapter
+    try:
+        from evalvault.adapters.inbound.api.routers.chat import warm_rag_index
+
+        await warm_rag_index()
+    except Exception as exc:
+        logger.warning("RAG preload failed: %s", exc)
     yield
     # Shutdown: Cleanup if necessary
     pass
