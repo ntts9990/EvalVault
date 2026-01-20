@@ -13,16 +13,17 @@
 ## 빠른 링크
 
 - 설치: `getting-started/INSTALLATION.md`
+- CLI 실행 시나리오 가이드: `guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
 - 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
 - 개발/기여: `guides/DEV_GUIDE.md`
-- CLI→MCP 이식 계획: `guides/CLI_MCP_PLAN.md`
-- Web UI 확장 설계서: `guides/WEBUI_CLI_ROLLOUT_PLAN.md` (1단계 구현 파일 목록 포함)
-- RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
 - RAG 성능 개선 제안서: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md` (목적/미션·KPI·로드맵)
-- CLI 병렬 기능 설계서: `guides/CLI_PARALLEL_FEATURES_SPEC.md`
+- RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - 실행 결과 엑셀 시트 요약: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
 - 평가 리포트 템플릿: `templates/eval_report_templates.md`
+- CLI→MCP 이식 계획: `guides/CLI_MCP_PLAN.md`
+- Web UI 확장 설계서: `guides/WEBUI_CLI_ROLLOUT_PLAN.md`
+- 문서 최신화 작업 계획: `guides/DOCS_REFRESH_PLAN.md`
 - 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
 - 상태 요약: `STATUS.md`
 - 로드맵: `ROADMAP.md`

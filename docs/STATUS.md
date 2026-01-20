@@ -1,7 +1,7 @@
 # EvalVault 상태 요약 (Status)
 
 > Audience: 사용자 · 개발자 · 운영자
-> Last Updated: 2026-01-11
+> Last Updated: 2026-01-18
 
 EvalVault의 목표는 **RAG 평가/분석/추적을 하나의 Run 단위로 연결**해, 실험→회귀→개선 루프를 빠르게 만드는 것입니다.
 
@@ -13,6 +13,18 @@ EvalVault의 목표는 **RAG 평가/분석/추적을 하나의 Run 단위로 연
 - **프로필 기반 모델 전환**: `config/models.yaml` + `.env`로 OpenAI/Ollama/vLLM/Anthropic 등
 - **Open RAG Trace 표준**: 외부/내부 RAG 시스템을 표준 스키마로 계측/수집
 - **성능 개선 프레임**: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`에 KPI/평가/로드맵 정리
+
+## 최근 완료 사항
+
+- **CLI 병렬 명령군 완료**: compare/calibrate-judge/profile-difficulty/regress/artifacts lint/ops snapshot
+- **노이즈 저감 파이프라인 강화**: dataset_preprocessor/evaluator/stage_metric_service 개선
+- **ordering_warning 도입**: 순서 복원/경고 메트릭 + 런북/strict 기준 문서화
+- **Web UI 반영**: RunDetails/CompareRuns/AnalysisLab에 경고 표시 및 런북 링크 추가
+
+## 품질/검증 상태
+
+- Python unit smoke: dataset_preprocessor/evaluator_comprehensive/stage_metric_service PASS
+- Frontend lint/build: eslint PASS, vite build PASS (bundle size warning only)
 
 ## 현재 제약 (투명 공개)
 

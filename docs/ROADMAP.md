@@ -1,6 +1,6 @@
 # EvalVault 로드맵 (Roadmap)
 
-> Last Updated: 2026-01-11
+> Last Updated: 2026-01-18
 
 이 문서는 **"우리가 다음으로 무엇을, 왜 하는가"**를 외부(사용자/기여자) 관점에서 간단히 공유합니다.
 
@@ -19,15 +19,18 @@
 ### P1 (사용성)
 - Web UI에서 핵심 워크플로(Evaluation → History → Reports) 완성도 향상
 - CLI/웹 공통 DB/아티팩트 경로 규약을 문서/UX에 일관되게 노출
+- Run 상세 탭(Staging/Prompts/Gate/Debug)과 분석 실험실 연동 강화
 
 ### P2 (관측성/표준)
 - Open RAG Trace 스펙/샘플을 실제 운영 요구에 맞춰 점진 확장(버전 정책 준수)
 - Collector 구성 및 데이터 보존(artifact 분리, PII 마스킹) 가이드 강화
+- Stage Events 최소 스키마 표준화 및 문서 동기화
 
 ### P3 (성능 개선 로드맵)
 - RAG 성능 개선 제안서 기반으로 KPI/평가 프로토콜/로드맵 정립
 - Retrieval/리랭킹/GraphRAG 실험과 운영 지표 통합
 - 전문가 관점(인지/UX/운영) 기반 개선 루프 고도화
+- 노이즈 저감/ordering_warning 운영 기준 정착
 
 ## 작업 트래킹
 

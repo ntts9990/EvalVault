@@ -1,10 +1,9 @@
-# EvalVault 작업 계획서 (RAGAS/Tracing/Prompt Override)
+# EvalVault 작업 계획서 (Archived)
 
 ## 0) 목적
 
-- RAGAS 평가 → 결과 저장 → Phoenix 트레이싱 → 추가 분석 → 보고서(Markdown)까지 **정상 동작** 확인
-- 외부 로그 API 입력(JSON 가정)을 **RAGAS형/비정형**으로 분기해 분석 수행
-- RAGAS 프롬프트와 시스템 프롬프트를 **분리 오버라이드**하고 실제 실행으로 검증
+- 본 문서는 과거 작업 계획서로 분류되어 보존용으로만 남깁니다.
+- 최신 실행 시나리오는 `docs/guides/RAG_CLI_WORKFLOW_TEMPLATES.md`를 기준으로 합니다.
 
 ## 1) 전제 및 범위
 

@@ -1,8 +1,8 @@
-# EvalVault 현재 개발 상황 및 실행 계획
+# EvalVault 개발 상태/실행 계획 (Archived)
 
 ## 목적
-- 현재 개발 현황을 한눈에 요약하고, 목표/골/에픽/작업을 일관된 구조로 정리한다.
-- 진행 상태를 시각적으로 표현해 팀 내 공유/점검을 쉽게 한다.
+- 본 문서는 과거 작업 로그/계획 성격 문서로 분류되어 보존용으로만 남깁니다.
+- 최신 상태는 `docs/STATUS.md`, `docs/ROADMAP.md`, `docs/guides/RAG_PERFORMANCE_IMPLEMENTATION_LOG.md`를 기준으로 합니다.
 
 ---
 

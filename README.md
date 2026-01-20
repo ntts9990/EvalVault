@@ -14,11 +14,16 @@ English version? See `README.en.md`.
 ## Quick Links
 
 - 문서 허브: `docs/INDEX.md`
+- CLI 실행 시나리오 가이드: `docs/guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
 - 사용자 가이드: `docs/guides/USER_GUIDE.md`
 - 개발 가이드: `docs/guides/DEV_GUIDE.md`
 - 상태/로드맵: `docs/STATUS.md`, `docs/ROADMAP.md`
 - 개발 백서(설계/운영/품질 기준): `docs/new_whitepaper/INDEX.md`
 - Open RAG Trace: `docs/architecture/open-rag-trace-spec.md`
+
+### 다음 개선 작업 메모
+- 보험 요약 메트릭 확장 계획: `docs/guides/INSURANCE_SUMMARY_METRICS_PLAN.md`
+- Prompt 반복 적용 계획: `docs/guides/repeat_query.md`
 
 ---
 
@@ -346,6 +351,24 @@ npm run dev
 
 - Ragas 계열: `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity`
 - 커스텀 예시(도메인): `insurance_term_accuracy`
+
+### 요약 메트릭 설계 근거 (summary_score, summary_faithfulness, entity_preservation)
+
+### 커스텀 메트릭 스냅샷 (평가 방식/과정/결과 기록)
+- 평가 방식/입출력/규칙/구현 파일 해시를 `run.tracker_metadata.custom_metric_snapshot`에 기록합니다.
+- Excel `CustomMetrics` 시트와 Langfuse/Phoenix/MLflow artifact에도 함께 저장됩니다.
+
+- `summary_faithfulness`: 요약의 모든 주장이 컨텍스트에 근거하는지 평가합니다. 환각/왜곡 리스크를 직접적으로 측정합니다.
+- `summary_score`: 컨텍스트 대비 요약의 핵심 정보 보존/간결성 균형을 평가합니다. 정답 요약 단일 기준의 편향을 줄입니다.
+- `entity_preservation`: 금액·기간·조건·면책 등 보험 약관에서 중요한 엔티티가 요약에 유지되는지 측정합니다.
+
+**보험 도메인 특화 근거**
+- 보험 약관에서 치명적인 요소(면책, 자기부담, 한도, 조건 등)를 키워드로 직접 반영하고, 금액/기간/비율 같은 핵심 엔티티를 보존하도록 설계했습니다.
+- 범용 규칙(숫자/기간/금액)과 보험 특화 키워드를 함께 사용하므로, 현재 상태는 “보험 리스크 중심의 약한 도메인 특화”로 보는 것이 정확합니다.
+
+**해석 주의사항**
+- 세 메트릭 모두 `contexts` 품질에 크게 의존합니다. 컨텍스트가 부정확/과도하면 점수가 낮아질 수 있습니다.
+- `summary_score`는 키프레이즈 기반이므로, 표현이 달라지면 점수가 낮게 나올 수 있습니다.
 
 정확한 옵션/운영 레시피는 `docs/guides/USER_GUIDE.md`를 기준으로 최신화합니다.
 

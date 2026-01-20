@@ -65,6 +65,22 @@
   - `samples`: 샘플 수
 - 샘플: `avg_score=0.7200`, `pass_rate=0.6`, `samples=30`
 
+## CustomMetrics
+- 컬럼 설명
+  - `schema_version`: 스냅샷 스키마 버전
+  - `metric_name`: 메트릭 이름
+  - `source`: 메트릭 출처 (custom)
+  - `description`: 메트릭 설명
+  - `evaluation_method`: 평가 방식
+  - `inputs`: 입력 필드 목록
+  - `output`: 점수 범위/판정 규칙
+  - `evaluation_process`: 평가 과정 요약
+  - `rules`: 키워드/정규식/가중치 등
+  - `notes`: 도메인 특화/해석 주의사항
+  - `implementation_path`: 구현 파일 경로
+  - `implementation_hash`: 구현 파일 해시
+- 샘플: `metric_name=entity_preservation`, `evaluation_method=rule-based`
+
 ## RunPromptSets
 - 컬럼 설명
   - `run_id`: 실행 ID
