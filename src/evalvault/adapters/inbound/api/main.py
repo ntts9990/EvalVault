@@ -152,7 +152,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from .routers import benchmark, config, domain, knowledge, pipeline, runs
+    from .routers import benchmark, chat, config, domain, knowledge, mcp, pipeline, runs
 
     auth_dependencies = [Depends(require_api_token)]
 
@@ -160,6 +160,12 @@ def create_app() -> FastAPI:
         runs.router,
         prefix="/api/v1/runs",
         tags=["runs"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        chat.router,
+        prefix="/api/v1/chat",
+        tags=["chat"],
         dependencies=auth_dependencies,
     )
     app.include_router(
@@ -192,6 +198,12 @@ def create_app() -> FastAPI:
         tags=["config"],
         dependencies=auth_dependencies,
     )
+    app.include_router(
+        mcp.router,
+        prefix="/api/v1/mcp",
+        tags=["mcp"],
+        dependencies=auth_dependencies,
+    )
 
     @app.get("/health")
     def health_check():
@@ -209,9 +221,7 @@ def create_app() -> FastAPI:
 # Dependency to get the adapter
 def get_adapter(app: FastAPI) -> WebUIAdapter:
     """Dependency to retrieve the WebUIAdapter from app state."""
-    # When using Depends(), we can't easily access 'app' directly in standard dependency signature
-    # unless we use Request. So we usually do:
-    pass
+    return app.state.adapter
 
 
 def get_web_adapter(request: Request) -> WebUIAdapter:

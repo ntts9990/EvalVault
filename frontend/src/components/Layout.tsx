@@ -9,7 +9,8 @@ import {
     X,
     Orbit,
     FlaskConical,
-    FileText
+    FileText,
+    MessageSquare
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -19,6 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     const navItems = [
         { icon: LayoutDashboard, label: "대시보드", href: "/" },
+        { icon: MessageSquare, label: "AI Chat", href: "/chat" },
         { icon: Orbit, label: "시각화", href: "/visualization" },
         { icon: PlayCircle, label: "평가 스튜디오", href: "/studio" },
         { icon: Brain, label: "도메인 메모리", href: "/domain" },
