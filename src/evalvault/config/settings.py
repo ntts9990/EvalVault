@@ -424,9 +424,13 @@ def apply_profile(settings: Settings, profile_name: str) -> Settings:
     """
     from evalvault.config.model_config import get_model_config
 
+    normalized = profile_name.strip() if isinstance(profile_name, str) else profile_name
+    if not normalized:
+        return settings
+
     try:
         model_config = get_model_config()
-        profile = model_config.get_profile(profile_name)
+        profile = model_config.get_profile(normalized)
 
         # LLM 설정 적용 (모델명과 provider만)
         settings.llm_provider = profile.llm.provider
@@ -449,9 +453,16 @@ def apply_profile(settings: Settings, profile_name: str) -> Settings:
         elif profile.embedding.provider == "vllm":
             settings.vllm_embedding_model = profile.embedding.model
 
-    except FileNotFoundError:
-        # 설정 파일이 없으면 프로필 무시
-        pass
+    except FileNotFoundError as exc:
+        raise ValueError(
+            "Model profile config not found. Create 'config/models.yaml' or 'evalvault.yaml' "
+            f"to use profile '{normalized}'."
+        ) from exc
+    except KeyError as exc:
+        available = ", ".join(sorted(model_config.profiles.keys()))
+        raise ValueError(
+            f"Unknown profile '{normalized}'. Available profiles: {available}"
+        ) from exc
 
     return settings
 
