@@ -96,12 +96,28 @@ class ExcelDatasetLoader(BaseDatasetLoader):
                 else None
             )
 
+            metadata = {}
+            if "metadata" in df.columns:
+                try:
+                    metadata = self._parse_metadata_cell(row["metadata"])
+                except ValueError as exc:
+                    raise ValueError(f"Test case {row['id']}: {exc}") from exc
+            if "summary_tags" in df.columns:
+                tags = self._parse_summary_tags_cell(row["summary_tags"])
+                if tags:
+                    metadata["summary_tags"] = tags
+            if "summary_intent" in df.columns:
+                intent = self._parse_summary_intent_cell(row["summary_intent"])
+                if intent:
+                    metadata["summary_intent"] = intent
+
             test_case = TestCase(
                 id=str(row["id"]),
                 question=str(row["question"]),
                 answer=str(row["answer"]),
                 contexts=contexts,
                 ground_truth=ground_truth,
+                metadata=metadata,
             )
             test_cases.append(test_case)
 

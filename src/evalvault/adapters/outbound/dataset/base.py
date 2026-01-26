@@ -3,6 +3,7 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 from evalvault.domain.entities.dataset import Dataset
 
@@ -117,6 +118,45 @@ class BaseDatasetLoader(ABC):
 
         # Fall back to pipe-separated format
         return [ctx.strip() for ctx in contexts_str.split("|")]
+
+    def _parse_metadata_cell(self, raw: Any) -> dict[str, Any]:
+        if raw is None or (isinstance(raw, float) and str(raw) == "nan"):
+            return {}
+        text = str(raw).strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Invalid metadata JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("metadata must be a JSON object")
+        return parsed
+
+    def _parse_summary_tags_cell(self, raw: Any) -> list[str]:
+        if raw is None or (isinstance(raw, float) and str(raw) == "nan"):
+            return []
+        if isinstance(raw, list):
+            return [str(item).strip().lower() for item in raw if str(item).strip()]
+        text = str(raw).strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                return [str(item).strip().lower() for item in parsed if str(item).strip()]
+        delimiter = "," if "," in text else "|" if "|" in text else None
+        parts = text.split(delimiter) if delimiter else [text]
+        return [part.strip().lower() for part in parts if part.strip()]
+
+    def _parse_summary_intent_cell(self, raw: Any) -> str | None:
+        if raw is None or (isinstance(raw, float) and str(raw) == "nan"):
+            return None
+        text = str(raw).strip()
+        return text or None
 
     def _get_default_name(self, file_path: Path) -> str:
         """Get default dataset name from file path.
