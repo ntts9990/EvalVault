@@ -16,6 +16,7 @@
 - CLI 실행 시나리오 가이드: `guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
 - 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
 - 개발/기여: `guides/DEV_GUIDE.md`
+- 다음 개발 실행 계획: `guides/NEXT_STEPS_EXECUTION_PLAN.md`
 - P0~P3 작업 보고서: `guides/P0_P3_EXECUTION_REPORT.md`
 - 폐쇄망 Docker: `guides/OFFLINE_DOCKER.md`
 - 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
