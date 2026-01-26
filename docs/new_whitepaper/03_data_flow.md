@@ -92,6 +92,20 @@ uv run evalvault analyze-compare <RUN_A> <RUN_B> --db data/db/evalvault.db
 
 > Stage 이벤트는 `--stage-events`(JSONL로 내보내기), `--stage-store`(DB 저장) 같은 옵션과 연결된다.
 
+최소 스키마(필수):
+- `run_id` (string)
+- `stage_type` (string, 소문자 정규화)
+
+권장 필드:
+- `stage_id`, `parent_stage_id`
+- `status` (예: success/failed)
+- `started_at`, `finished_at`, `duration_ms`
+- `attributes`, `metadata`
+- `trace_id`, `span_id`
+
+표준 stage_type 최소 집합:
+- `system_prompt`, `input`, `retrieval`, `output`
+
 ### 3.4 자동 분석(`--auto-analyze`)
 
 CLI 구현 흐름(요약):

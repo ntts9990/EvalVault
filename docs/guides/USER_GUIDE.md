@@ -497,6 +497,12 @@ JSON 예시는 아래와 같습니다.
 CSV/Excel의 경우 `id,question,answer,contexts,ground_truth` 컬럼을 포함하고,
 선택적으로 `threshold_*` 컬럼을 넣을 수 있습니다. `threshold_*` 값은 **첫 번째로 채워진 행 기준**으로
 데이터셋 전체 임계값으로 사용됩니다. `contexts`는 JSON 배열 문자열 또는 `|` 로 구분합니다.
+
+요약 메트릭용 선택 컬럼:
+- `summary_tags`: 콤마/파이프 구분 또는 JSON 배열 문자열
+- `summary_intent`: 예) `agent_notes`
+- `metadata`: JSON 객체 문자열 (예: `{ "priority": "high" }`)
+
 대용량 파일은 `--stream` 옵션으로 스트리밍 평가를 활성화하세요.
 
 #### 데이터셋 템플릿

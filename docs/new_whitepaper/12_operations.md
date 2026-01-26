@@ -94,6 +94,15 @@ docker compose -f docker-compose.phoenix.yaml up
   - 옵션: `--stage-events <path>`
   - 근거: `src/evalvault/adapters/inbound/cli/commands/run.py`
 
+최소 스키마(필수):
+- `run_id` (string)
+- `stage_type` (string, 소문자 정규화)
+
+표준 stage_type 최소 집합:
+- `system_prompt`, `input`, `retrieval`, `output`
+
+필드가 누락되면 `stage summary`에서 `missing_required_stage_types`로 표시된다.
+
 ### 3.2 Stage Metrics(단계 지표)
 
 - `StageMetricService.build_metrics(...)`가 stage 이벤트에서
