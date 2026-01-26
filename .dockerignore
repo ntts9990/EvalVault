@@ -34,7 +34,8 @@ htmlcov
 docs/_build
 
 # Local data (mounted as volume)
-data/
+# Note: data/ is included for offline packaging when needed.
+!data/**
 reports/
 
 # Environment files (use docker env instead)

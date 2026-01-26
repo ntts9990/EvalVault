@@ -1,0 +1,118 @@
+# EvalVault Offline Deployment - Docker Compose Configuration
+# Air-gapped environment: PostgreSQL + EvalVault API + Web UI
+#
+# Usage:
+#   docker compose -f docker-compose.offline.yml --env-file .env.offline.example config
+#   docker compose -f docker-compose.offline.yml --env-file .env.offline up -d
+#
+# Prerequisites:
+#   - External LLM server (Ollama/vLLM) must be accessible within the air-gapped network
+#   - Model weights are NOT shipped; configure OLLAMA_BASE_URL or VLLM_BASE_URL in .env.offline
+#
+# Architecture (linux/amd64 assumed for most air-gapped deployments):
+#   - postgres: Evaluation data storage
+#   - evalvault-api: FastAPI backend (port 8000 internal)
+#   - evalvault-web: Nginx reverse proxy + React frontend (port 5173 exposed on 127.0.0.1)
+
+services:
+  # PostgreSQL database for evaluation storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: evalvault-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-evalvault}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evalvault}
+      POSTGRES_DB: ${POSTGRES_DB:-evalvault}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evalvault}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evalvault-net
+
+  # EvalVault API service (FastAPI backend)
+  evalvault-api:
+    image: evalvault-api:offline
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evalvault-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Profile selection (dev/prod/vllm - see config/models.yaml)
+      EVALVAULT_PROFILE: ${EVALVAULT_PROFILE:-dev}
+      # SQLite paths (for local file-based storage if needed)
+      EVALVAULT_DB_PATH: ${EVALVAULT_DB_PATH:-data/db/evalvault.db}
+      EVALVAULT_MEMORY_DB_PATH: ${EVALVAULT_MEMORY_DB_PATH:-data/db/evalvault_memory.db}
+      # PostgreSQL connection
+      EVALVAULT_DB_HOST: postgres
+      EVALVAULT_DB_PORT: 5432
+      EVALVAULT_DB_NAME: ${POSTGRES_DB:-evalvault}
+      EVALVAULT_DB_USER: ${POSTGRES_USER:-evalvault}
+      EVALVAULT_DB_PASSWORD: ${POSTGRES_PASSWORD:-evalvault}
+      # Ollama configuration (air-gapped LLM server - user must provide URL)
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-120}
+      OLLAMA_TOOL_MODELS: ${OLLAMA_TOOL_MODELS:-}
+      # vLLM configuration (alternative air-gapped LLM server - user must provide URL)
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+      VLLM_MODEL: ${VLLM_MODEL:-}
+      VLLM_EMBEDDING_MODEL: ${VLLM_EMBEDDING_MODEL:-}
+      VLLM_EMBEDDING_BASE_URL: ${VLLM_EMBEDDING_BASE_URL:-}
+      # Faithfulness fallback (optional)
+      FAITHFULNESS_FALLBACK_PROVIDER: ${FAITHFULNESS_FALLBACK_PROVIDER:-}
+      FAITHFULNESS_FALLBACK_MODEL: ${FAITHFULNESS_FALLBACK_MODEL:-}
+      # API authentication (optional)
+      API_AUTH_TOKENS: ${API_AUTH_TOKENS:-}
+      KNOWLEDGE_READ_TOKENS: ${KNOWLEDGE_READ_TOKENS:-}
+      KNOWLEDGE_WRITE_TOKENS: ${KNOWLEDGE_WRITE_TOKENS:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    # Override entrypoint to run API server
+    command: ["serve-api", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - evalvault-net
+
+  # EvalVault Web UI (Nginx reverse proxy + React frontend)
+  # Nginx proxies /api/ to evalvault-api:8000
+  evalvault-web:
+    image: evalvault-web:offline
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: evalvault-web
+    restart: unless-stopped
+    depends_on:
+      evalvault-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:80"
+    environment:
+      # API backend URL for nginx proxy_pass (used by nginx config)
+      API_BACKEND_URL: http://evalvault-api:8000
+    networks:
+      - evalvault-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  evalvault-net:
+    driver: bridge
