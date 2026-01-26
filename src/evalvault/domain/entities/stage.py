@@ -60,18 +60,16 @@ class StageEvent:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> StageEvent:
-        if "run_id" not in payload:
-            raise ValueError("StageEvent requires 'run_id'")
-        if "stage_type" not in payload:
-            raise ValueError("StageEvent requires 'stage_type'")
+        run_id = _require_str(payload, "run_id")
+        stage_type = _normalize_stage_type(payload)
 
         trace_payload = payload.get("trace") or {}
         input_ref = _parse_payload_ref(payload.get("input_ref"))
         output_ref = _parse_payload_ref(payload.get("output_ref"))
 
         return cls(
-            run_id=str(payload["run_id"]),
-            stage_type=str(payload["stage_type"]),
+            run_id=run_id,
+            stage_type=stage_type,
             stage_id=str(payload.get("stage_id") or uuid4()),
             stage_name=_optional_str(payload.get("stage_name")),
             parent_stage_id=_optional_str(payload.get("parent_stage_id")),
@@ -185,6 +183,24 @@ def _parse_datetime(value: Any) -> datetime | None:
             normalized = normalized[:-1] + "+00:00"
         return datetime.fromisoformat(normalized)
     raise ValueError("Invalid datetime value")
+
+
+def _require_str(payload: dict[str, Any], key: str) -> str:
+    if key not in payload:
+        raise ValueError(f"StageEvent requires '{key}'")
+    value = str(payload.get(key, "")).strip()
+    if not value:
+        raise ValueError(f"StageEvent requires non-empty '{key}'")
+    return value
+
+
+def _normalize_stage_type(payload: dict[str, Any]) -> str:
+    if "stage_type" not in payload:
+        raise ValueError("StageEvent requires 'stage_type'")
+    value = str(payload.get("stage_type", "")).strip()
+    if not value:
+        raise ValueError("StageEvent requires non-empty 'stage_type'")
+    return value.lower()
 
 
 @overload
