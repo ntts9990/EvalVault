@@ -185,9 +185,9 @@ class TestApplyProfileIntegration:
         assert settings.ollama_timeout == original_timeout
 
     def test_profile_not_found_raises_error(self):
-        """존재하지 않는 프로필은 KeyError를 발생."""
+        """존재하지 않는 프로필은 ValueError를 발생."""
         settings = Settings()
 
-        # apply_profile should raise KeyError for unknown profiles
-        with pytest.raises(KeyError, match="not found"):
+        # apply_profile should raise ValueError for unknown profiles
+        with pytest.raises(ValueError, match="Unknown profile"):
             apply_profile(settings, "nonexistent_profile_12345")

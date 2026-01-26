@@ -1,8 +1,10 @@
 """Tests for dataset loaders."""
 
+import csv
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from evalvault.adapters.outbound.dataset.csv_loader import CSVDatasetLoader
@@ -92,6 +94,42 @@ class TestCSVDatasetLoader:
         assert dataset.thresholds["faithfulness"] == pytest.approx(0.7)
         assert dataset.thresholds["answer_relevancy"] == pytest.approx(0.7)
 
+    def test_csv_loader_reads_metadata_columns(self, tmp_path):
+        """Test CSV loader reads summary tags/intent and metadata JSON."""
+        csv_path = tmp_path / "metadata_dataset.csv"
+        with csv_path.open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                [
+                    "id",
+                    "question",
+                    "answer",
+                    "contexts",
+                    "summary_tags",
+                    "summary_intent",
+                    "metadata",
+                ]
+            )
+            writer.writerow(
+                [
+                    "tc-001",
+                    "Question?",
+                    "Answer",
+                    json.dumps(["ctx"]),
+                    "exclusion|limit",
+                    "agent_notes",
+                    json.dumps({"priority": "high"}),
+                ]
+            )
+
+        loader = CSVDatasetLoader()
+        dataset = loader.load(csv_path)
+
+        metadata = dataset.test_cases[0].metadata
+        assert metadata["summary_tags"] == ["exclusion", "limit"]
+        assert metadata["summary_intent"] == "agent_notes"
+        assert metadata["priority"] == "high"
+
 
 class TestExcelDatasetLoader:
     """Tests for Excel dataset loader."""
@@ -132,6 +170,32 @@ class TestExcelDatasetLoader:
 
         assert dataset.thresholds["faithfulness"] == pytest.approx(0.7)
         assert dataset.thresholds["answer_relevancy"] == pytest.approx(0.7)
+
+    def test_excel_loader_reads_metadata_columns(self, tmp_path):
+        """Test Excel loader reads summary tags/intent and metadata JSON."""
+        df = pd.DataFrame(
+            [
+                {
+                    "id": "tc-001",
+                    "question": "Question?",
+                    "answer": "Answer",
+                    "contexts": '["ctx"]',
+                    "summary_tags": "exclusion,limit",
+                    "summary_intent": "agent_notes",
+                    "metadata": '{"priority":"high"}',
+                }
+            ]
+        )
+        excel_path = tmp_path / "metadata_dataset.xlsx"
+        df.to_excel(excel_path, index=False)
+
+        loader = ExcelDatasetLoader()
+        dataset = loader.load(excel_path)
+
+        metadata = dataset.test_cases[0].metadata
+        assert metadata["summary_tags"] == ["exclusion", "limit"]
+        assert metadata["summary_intent"] == "agent_notes"
+        assert metadata["priority"] == "high"
 
 
 class TestJSONDatasetLoader:

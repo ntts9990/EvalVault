@@ -22,6 +22,53 @@ def test_get_settings_applies_profile(monkeypatch) -> None:
     assert settings.ollama_embedding_model == "qwen3-embedding:0.6b"
 
 
+def test_get_settings_rejects_unknown_profile(monkeypatch) -> None:
+    reset_settings()
+    reset_model_config()
+
+    monkeypatch.setenv("EVALVAULT_PROFILE", "unknown")
+
+    with pytest.raises(ValueError, match="Unknown profile 'unknown'"):
+        get_settings()
+
+
+def test_get_settings_requires_model_config_for_profile(monkeypatch) -> None:
+    from evalvault.config import model_config as model_config_module
+
+    reset_settings()
+    reset_model_config()
+
+    monkeypatch.setattr(model_config_module, "find_config_file", lambda: None)
+    monkeypatch.setenv("EVALVAULT_PROFILE", "dev")
+
+    with pytest.raises(ValueError, match="Model profile config not found"):
+        get_settings()
+
+
+def test_get_settings_prod_requires_api_auth_tokens(monkeypatch) -> None:
+    reset_settings()
+    reset_model_config()
+
+    monkeypatch.setenv("EVALVAULT_PROFILE", "prod")
+    monkeypatch.setenv("CORS_ORIGINS", "https://example.com")
+    monkeypatch.delenv("API_AUTH_TOKENS", raising=False)
+
+    with pytest.raises(ValueError, match="API_AUTH_TOKENS"):
+        get_settings()
+
+
+def test_get_settings_prod_rejects_localhost_cors(monkeypatch) -> None:
+    reset_settings()
+    reset_model_config()
+
+    monkeypatch.setenv("EVALVAULT_PROFILE", "prod")
+    monkeypatch.setenv("API_AUTH_TOKENS", "token")
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:8080")
+
+    with pytest.raises(ValueError, match="CORS_ORIGINS"):
+        get_settings()
+
+
 def test_get_settings_reads_env(monkeypatch) -> None:
     reset_settings()
     reset_model_config()

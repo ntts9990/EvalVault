@@ -445,7 +445,8 @@ class TestMLflowAdapterEvaluationRun:
 
         # Verify test results artifact was saved
         assert mock_json.dump.called
-        results_data = mock_json.dump.call_args[0][0]
+        # Get the first json.dump call (test_results), not the last (custom_metric_snapshot)
+        results_data = mock_json.dump.call_args_list[0][0][0]
         assert len(results_data) == 2
         assert results_data[0]["test_case_id"] == "tc-001"
         assert results_data[0]["all_passed"] is True
