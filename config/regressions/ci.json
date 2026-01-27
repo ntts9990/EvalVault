@@ -1,0 +1,20 @@
+{
+  "suites": [
+    {
+      "name": "unit-cli-gate",
+      "description": "Quality gate related CLI behavior",
+      "command": ["pytest", "tests/unit/test_cli.py", "-k", "gate", "-q"],
+      "timeout": 600
+    },
+    {
+      "name": "integration-cli-e2e",
+      "description": "CLI E2E smoke tests without API keys",
+      "command": [
+        "pytest",
+        "tests/integration/test_e2e_scenarios.py::TestCLIIntegrationE2E",
+        "-vv"
+      ],
+      "timeout": 900
+    }
+  ]
+}
