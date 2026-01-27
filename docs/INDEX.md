@@ -1,6 +1,6 @@
 # EvalVault 문서 인덱스
 
-> Last Updated: 2026-01-11
+> Last Updated: 2026-01-27
 
 이 디렉터리(`docs/`)는 **사용자/기여자에게 필요한 문서만** 유지합니다.
 
@@ -18,6 +18,8 @@
 - 개발/기여: `guides/DEV_GUIDE.md`
 - 다음 개발 실행 계획: `guides/NEXT_STEPS_EXECUTION_PLAN.md`
 - P0~P3 작업 보고서: `guides/P0_P3_EXECUTION_REPORT.md`
+- P1~P4 작업 계획서: `guides/P1_P4_WORK_PLAN.md`
+- 기능 종합 검증 보고서: `../reports/feature_verification_report.md`
 - 폐쇄망 Docker: `guides/OFFLINE_DOCKER.md`
 - 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
 - RAG 성능 개선 제안서: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md` (목적/미션·KPI·로드맵)
@@ -52,6 +54,7 @@ docs/
 │   ├── RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md  # RAGAS 보정 방법론
 │   ├── EVALVAULT_DIAGNOSTIC_PLAYBOOK.md          # 진단 플레이북
 │   ├── RELEASE_CHECKLIST.md     # 배포 체크리스트
+│   ├── P1_P4_WORK_PLAN.md       # P1-P4 작업 계획서
 │   ├── OPEN_RAG_TRACE_*.md      # Open RAG Trace 샘플/내부 래퍼
 │   └── OPEN_RAG_TRACE_*.md
 ├── architecture/
