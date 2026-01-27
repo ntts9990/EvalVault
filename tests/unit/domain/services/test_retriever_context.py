@@ -65,6 +65,9 @@ def test_apply_retriever_populates_contexts_and_metadata() -> None:
     assert metadata["tc-1"]["graph_nodes"] == 1
     assert metadata["tc-1"]["graph_edges"] == 1
     assert metadata["tc-1"]["community_id"] == "c1"
+    assert metadata["tc-1"]["retriever"] == "graphrag"
+    assert metadata["tc-1"]["graphrag"]["docs"][0]["doc_id"] == "doc-b"
+    assert metadata["tc-1"]["graphrag"]["docs"][0]["sources"]["kg"]["entities"] == ["e1"]
 
 
 def test_normalize_retrieval_results_ignores_missing_scores() -> None:

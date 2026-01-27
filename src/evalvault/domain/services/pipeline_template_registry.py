@@ -659,6 +659,12 @@ class PipelineTemplateRegistry:
                 depends_on=["load_data"],
             ),
             AnalysisNode(
+                id="retrieval_analysis",
+                name="검색 분석",
+                module="retrieval_analyzer",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
                 id="priority_summary",
                 name="우선순위 요약",
                 module="priority_summary",
@@ -669,7 +675,7 @@ class PipelineTemplateRegistry:
                 name="LLM 요약 보고서",
                 module="llm_report",
                 params={"report_type": "summary"},
-                depends_on=["load_data", "statistics"],
+                depends_on=["load_data", "statistics", "retrieval_analysis"],
             ),
         ]
         return AnalysisPipeline(
@@ -699,6 +705,12 @@ class PipelineTemplateRegistry:
                 depends_on=["load_data"],
             ),
             AnalysisNode(
+                id="retrieval_analysis",
+                name="검색 분석",
+                module="retrieval_analyzer",
+                depends_on=["load_data"],
+            ),
+            AnalysisNode(
                 id="low_samples",
                 name="낮은 성능 케이스 추출",
                 module="low_performer_extractor",
@@ -708,6 +720,12 @@ class PipelineTemplateRegistry:
                 id="diagnostic",
                 name="진단 분석",
                 module="diagnostic_playbook",
+                depends_on=["load_data", "ragas_eval"],
+            ),
+            AnalysisNode(
+                id="multiturn",
+                name="멀티턴 분석",
+                module="multiturn_analyzer",
                 depends_on=["load_data", "ragas_eval"],
             ),
             AnalysisNode(
@@ -767,11 +785,13 @@ class PipelineTemplateRegistry:
                     "load_data",
                     "statistics",
                     "ragas_eval",
+                    "retrieval_analysis",
                     "nlp_analysis",
                     "pattern_detection",
                     "causal_analysis",
                     "root_cause",
                     "priority_summary",
+                    "multiturn",
                     "trend_detection",
                 ],
             ),

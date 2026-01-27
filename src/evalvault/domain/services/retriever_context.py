@@ -48,6 +48,14 @@ def apply_retriever_to_dataset(
         if scores:
             metadata["scores"] = scores
         metadata.update(_extract_graph_attributes(results))
+        graphrag_details = _build_graphrag_details(
+            results,
+            doc_ids=resolved_doc_ids,
+            max_docs=top_k,
+        )
+        if graphrag_details:
+            metadata["retriever"] = "graphrag"
+            metadata["graphrag"] = graphrag_details
         retrieval_metadata[test_case.id] = metadata
 
     return retrieval_metadata
@@ -162,6 +170,114 @@ def _compact_values(values: set[str]) -> str | list[str]:
     if len(values) == 1:
         return next(iter(values))
     return sorted(values)
+
+
+def _build_graphrag_details(
+    results: Sequence[RetrieverResultProtocol],
+    *,
+    doc_ids: Sequence[str],
+    max_docs: int,
+    max_entities: int = 20,
+    max_relations: int = 20,
+) -> dict[str, Any] | None:
+    details: list[dict[str, Any]] = []
+    for rank, result in enumerate(results, start=1):
+        metadata = getattr(result, "metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+
+        kg_meta = metadata.get("kg") if isinstance(metadata.get("kg"), dict) else None
+        bm25_meta = metadata.get("bm25") if isinstance(metadata.get("bm25"), dict) else None
+        dense_meta = metadata.get("dense") if isinstance(metadata.get("dense"), dict) else None
+        community_id = metadata.get("community_id")
+
+        if not (kg_meta or bm25_meta or dense_meta or community_id is not None):
+            continue
+
+        doc_id = _resolve_doc_id(result, doc_ids, rank)
+        entry: dict[str, Any] = {
+            "doc_id": doc_id,
+            "rank": rank,
+        }
+        score = _extract_score(result)
+        if score is not None:
+            entry["score"] = score
+
+        sources: dict[str, Any] = {}
+        if kg_meta:
+            sources["kg"] = {
+                "entity_score": _coerce_float_or_none(kg_meta.get("entity_score")),
+                "relation_score": _coerce_float_or_none(kg_meta.get("relation_score")),
+                "entities": _limit_strings(kg_meta.get("entities"), max_entities),
+                "relations": _limit_strings(kg_meta.get("relations"), max_relations),
+                "community_id": _coerce_text_or_list(kg_meta.get("community_id")),
+            }
+        if bm25_meta:
+            sources["bm25"] = _build_rank_score(bm25_meta)
+        if dense_meta:
+            sources["dense"] = _build_rank_score(dense_meta)
+        if community_id is not None:
+            sources["community_id"] = _coerce_text_or_list(community_id)
+        if sources:
+            entry["sources"] = sources
+
+        details.append(entry)
+        if len(details) >= max_docs:
+            break
+
+    if not details:
+        return None
+
+    return {
+        "docs": details,
+        "max_docs": max_docs,
+        "max_entities": max_entities,
+        "max_relations": max_relations,
+    }
+
+
+def _build_rank_score(payload: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    rank = _coerce_int_optional(payload.get("rank"))
+    if rank is not None:
+        out["rank"] = rank
+    score = _coerce_float_or_none(payload.get("score"))
+    if score is not None:
+        out["score"] = score
+    return out
+
+
+def _coerce_float_or_none(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int_optional(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_text_or_list(value: Any) -> str | list[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value]
+    return str(value)
+
+
+def _limit_strings(value: Any, limit: int) -> list[str]:
+    if not value:
+        return []
+    items = list(value) if isinstance(value, (list, tuple, set)) else [value]
+    return [str(item) for item in items[:limit]]
 
 
 def apply_versioned_retriever_to_dataset(
