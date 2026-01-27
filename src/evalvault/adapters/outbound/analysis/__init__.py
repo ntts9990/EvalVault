@@ -56,6 +56,9 @@ from evalvault.adapters.outbound.analysis.morpheme_analyzer_module import (
 from evalvault.adapters.outbound.analysis.morpheme_quality_checker_module import (
     MorphemeQualityCheckerModule,
 )
+from evalvault.adapters.outbound.analysis.multiturn_analyzer_module import (
+    MultiTurnAnalyzerModule,
+)
 from evalvault.adapters.outbound.analysis.network_analyzer_module import (
     NetworkAnalyzerModule,
 )
@@ -146,6 +149,7 @@ __all__ = [
     "ModelAnalyzerModule",
     "MorphemeAnalyzerModule",
     "MorphemeQualityCheckerModule",
+    "MultiTurnAnalyzerModule",
     "NLPAnalyzerModule",
     "PatternDetectorModule",
     "PrioritySummaryModule",
