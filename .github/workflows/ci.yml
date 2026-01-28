@@ -135,6 +135,44 @@ jobs:
       - name: Check linting
         run: uv run ruff check src/ tests/
 
+  regression-gate:
+    name: Regression Gate (CLI)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: regression-gate-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            regression-gate-uv-
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Prepare regression directories
+        run: |
+          mkdir -p reports/regression
+
+      - name: Run regression gate suites
+        run: |
+          uv run python scripts/ci/run_regression_gate.py \
+            --config config/regressions/ci.json \
+            --format github-actions \
+            --summary reports/regression/ci_gate.json
+
   # Optional: Integration tests with real APIs (only on main branch)
   integration-test:
     name: Integration Tests

@@ -1,0 +1,197 @@
+name: RAG Regression Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    env:
+      EVALVAULT_PROFILE: openai-mini
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: regression-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            regression-uv-
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra korean
+
+      - name: Prepare regression directories
+        run: |
+          mkdir -p data/db
+          mkdir -p reports/regression
+
+      - name: Run baseline evaluation (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          uv run evalvault run tests/fixtures/e2e/regression_baseline.json \
+            --metrics faithfulness,answer_relevancy \
+            --profile openai-mini \
+            --db data/db/evalvault.db \
+            --output reports/regression/baseline_run.json
+
+      - name: Save baseline run id (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path('reports/regression/baseline_run.json').read_text())
+          run_id = payload.get('run_id') or payload.get('run_id'.upper())
+          if not run_id:
+              raise SystemExit('run_id not found in baseline output')
+          Path('reports/regression/baseline_run_id.txt').write_text(run_id)
+          PY
+
+      - name: Upload baseline run id artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-baseline-run-id
+          path: reports/regression/baseline_run_id.txt
+          retention-days: 30
+
+      - name: Upload baseline db artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-baseline-db
+          path: data/db/evalvault.db
+          retention-days: 30
+
+      - name: Fetch baseline artifacts (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+
+          def api_get(url: str) -> dict:
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                  },
+              )
+              with urllib.request.urlopen(req) as resp:
+                  return json.loads(resp.read().decode('utf-8'))
+
+          runs_url = (
+              f'https://api.github.com/repos/{repo}/actions/workflows/'
+              'regression-gate.yml/runs?branch=main&status=success&per_page=1'
+          )
+          runs = api_get(runs_url).get('workflow_runs', [])
+          if not runs:
+              raise SystemExit('No successful main workflow run found.')
+
+          run_id = runs[0]['id']
+          artifacts_url = f'https://api.github.com/repos/{repo}/actions/runs/{run_id}/artifacts'
+          artifacts = api_get(artifacts_url).get('artifacts', [])
+          required = [
+              'regression-baseline-run-id',
+              'regression-baseline-db',
+          ]
+          for artifact_name in required:
+              artifact = next((a for a in artifacts if a['name'] == artifact_name), None)
+              if not artifact:
+                  raise SystemExit(f'Baseline artifact not found: {artifact_name}')
+
+              download_url = artifact['archive_download_url']
+              req = urllib.request.Request(
+                  download_url,
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                  },
+              )
+              data = urllib.request.urlopen(req).read()
+              Path('reports/regression').mkdir(parents=True, exist_ok=True)
+              zip_path = Path(f'reports/regression/{artifact_name}.zip')
+              zip_path.write_bytes(data)
+
+              with zipfile.ZipFile(zip_path) as zf:
+                  zf.extractall('.')
+          PY
+
+      - name: Run current evaluation (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run evalvault run tests/fixtures/e2e/regression_baseline.json \
+            --metrics faithfulness,answer_relevancy \
+            --profile openai-mini \
+            --db data/db/evalvault.db \
+            --output reports/regression/current_run.json
+
+      - name: Run regression gate (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          baseline_run_id = Path('reports/regression/baseline_run_id.txt').read_text().strip()
+          current_payload = json.loads(Path('reports/regression/current_run.json').read_text())
+          current_run_id = current_payload.get('run_id')
+          if not current_run_id:
+              raise SystemExit('run_id not found in current run output')
+          Path('reports/regression/current_run_id.txt').write_text(current_run_id)
+          Path('reports/regression/baseline_run_id.txt').write_text(baseline_run_id)
+          PY
+          uv run evalvault ci-gate \
+            $(cat reports/regression/baseline_run_id.txt) \
+            $(cat reports/regression/current_run_id.txt) \
+            --format pr-comment \
+            --regression-threshold 0.05 \
+            --db data/db/evalvault.db \
+            | tee reports/regression/ci_gate.md
+
+      - name: Find existing regression comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/find-comment@v4
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "## EvalVault CI Gate"
+
+      - name: Post regression gate comment
+        if: always() && github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: reports/regression/ci_gate.md
+          edit-mode: replace
