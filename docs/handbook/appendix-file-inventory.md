@@ -1845,13 +1845,13 @@
 | `./.sisyphus/plans/project-handbook.md` | Markdown | meta | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: - \[ \] 외부 공개 파트에서 민감 정보 제외 | Markdown file: 프로젝트 교과서형 총정리 문서화 계획 | 내부 |
 | `./AGENTS.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: 사용자에게는 반드시 한글 위주로 설명해줘야 함. | Markdown file: Repository Guidelines | 내부 |
 | `./CHANGELOG.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: \[0.1.0\]: https://github.com/ntts9990/EvalVault/releases/tag/v0.1.0 | Markdown file: Changelog | 내부 |
-| `./CLAUDE.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: See \[agent/README.md\](agent/README.md) for full documentation. | Markdown file: CLAUDE.md | 내부 |
+| `./CLAUDE.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: See \[agent/README.md\](../../agent/README.md) for full documentation. | Markdown file: CLAUDE.md | 내부 |
 | `./CODE_OF_CONDUCT.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: \[homepage\]: https://www.contributor-covenant.org | Markdown file: Contributor Covenant Code of Conduct | 내부 |
 | `./CONTRIBUTING.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: Thank you for contributing! | Markdown file: Contributing to EvalVault | 내부 |
 | `./Dockerfile` | File | infra | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:50:13 | binary-scan | size: 1399 bytes | File binary file (1399 bytes) | 내부 |
 | `./LICENSE.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last:    limitations under the License. | Markdown file: LICENSE.md | 내부 |
-| `./README.en.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: EvalVault is licensed under the \[Apache 2.0\](LICENSE.md) license. | Markdown file: EvalVault | 내부 |
-| `./README.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: EvalVault is licensed under the \[Apache 2.0\](LICENSE.md) license. | Markdown file: EvalVault | 내부 |
+| `./README.en.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: EvalVault is licensed under the \[Apache 2.0\](../../LICENSE.md) license. | Markdown file: EvalVault | 내부 |
+| `./README.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: EvalVault is licensed under the \[Apache 2.0\](../../LICENSE.md) license. | Markdown file: EvalVault | 내부 |
 | `./SECURITY.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: Thank you for helping keep EvalVault safe for the community. | Markdown file: Security Policy | 내부 |
 | `./agent/README.md` | Markdown | scripts | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: ``` | Markdown file: EvalVault Development Agents | 내부 |
 | `./agent/agent.py` | Python | scripts | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last:     ) | Python file: Agent Session Logic | 내부 |
@@ -2316,14 +2316,14 @@
 | `./docs/README.ko.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: EvalVault는 \[Apache 2.0\](https://github.com/ntts9990/EvalVault/blob/main/LICENSE.md) 라이선스를 따릅니다. | Markdown file: EvalVault (한국어) | 내부 |
 | `./docs/ROADMAP.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - 설계/운영 원칙과 변경 시 업데이트 가이드는 `new_whitepaper/INDEX.md` 및 각 챕터의 "향후 변경 시 업데이트 가이드"를 기준으로 동기화합니다. | Markdown file: EvalVault 로드맵 (Roadmap) | 내부 |
 | `./docs/STATUS.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - 트레이싱 표준: `architecture/open-rag-trace-spec.md` | Markdown file: EvalVault 상태 요약 (Status) | 내부 |
-| `./docs/api/adapters/inbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: For detailed CLI usage, see the \[User Guide\](../../guides/USER_GUIDE.md). | Markdown file: Inbound Adapters | 내부 |
+| `./docs/api/adapters/inbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: For detailed CLI usage, see the \[User Guide\](../guides/USER_GUIDE.md). | Markdown file: Inbound Adapters | 내부 |
 | `./docs/api/adapters/outbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: ``` | Markdown file: Outbound Adapters | 내부 |
 | `./docs/api/config.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: Invalid configuration will raise a clear error message at startup. | Markdown file: Configuration | 내부 |
 | `./docs/api/domain/entities.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last:       show_root_heading: false | Markdown file: Domain Entities | 내부 |
-| `./docs/api/domain/metrics.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: For detailed metric descriptions, see the \[User Guide\](../../guides/USER_GUIDE.md#metrics). | Markdown file: Custom Metrics | 내부 |
+| `./docs/api/domain/metrics.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: For detailed metric descriptions, see the \[User Guide\](../guides/USER_GUIDE.md#metrics). | Markdown file: Custom Metrics | 내부 |
 | `./docs/api/domain/services.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last:       show_source: true | Markdown file: Domain Services | 내부 |
 | `./docs/api/ports/inbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - **Isolation**: Domain logic independent of external dependencies | Markdown file: Inbound Ports | 내부 |
-| `./docs/api/ports/outbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: See the \[Developer Whitepaper\](../../new_whitepaper/02_architecture.md) for details on boundaries/ports/adapters when im | Markdown file: Outbound Ports | 내부 |
+| `./docs/api/ports/outbound.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: See the \[Developer Whitepaper\](../new_whitepaper/02_architecture.md) for details on boundaries/ports/adapters when im | Markdown file: Outbound Ports | 내부 |
 | `./docs/architecture/open-rag-trace-collector.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - 2026-01-10: Draft v0.1 최초 작성 | Markdown file: Open RAG Trace Collector 구성 (Draft) | 내부 |
 | `./docs/architecture/open-rag-trace-spec.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - 2026-01-10: Draft v0.1 최초 작성 | Markdown file: Open RAG Trace Spec (Draft) | 내부 |
 | `./docs/getting-started/INSTALLATION.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - 프로젝트 개요(영문): \[README.en.md\](../../README.en.md) | Markdown file: EvalVault 설치 가이드 | 내부 |
@@ -2411,7 +2411,7 @@
 | `./dummy_test_dataset.json` | JSON | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: } | JSON file: keys: name,version,test_cases | 내부 |
 | `./evalvault.db` | DB | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:51:27 | binary-scan | size: 1220608 bytes | DB binary file (1220608 bytes) | 내부 |
 | `./evalvault_memory.db` | DB | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:51:27 | binary-scan | size: 237568 bytes | DB binary file (237568 bytes) | 내부 |
-| `./examples/README.md` | Markdown | examples | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - \[Developer Whitepaper\](../docs/new_whitepaper/INDEX.md) - 설계/운영/품질 기준 | Markdown file: Examples | 내부 |
+| `./examples/README.md` | Markdown | examples | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: - \[Developer Whitepaper\](../new_whitepaper/INDEX.md) - 설계/운영/품질 기준 | Markdown file: Examples | 내부 |
 | `./examples/benchmarks/README.md` | Markdown | examples | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: **문서 끝** | Markdown file: Korean RAG Benchmark Guide | 내부 |
 | `./examples/benchmarks/korean_rag/faithfulness_test.json` | JSON | examples | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: } | JSON file: keys: name,version,description,purpose,evaluation_metrics,test_categories,test_cases | 내부 |
 | `./examples/benchmarks/korean_rag/insurance_qa_100.json` | JSON | examples | lens:개발;type:소스 | 포함 | - | 2026-01-28T17:51:27 | read-full | last: } | JSON file: keys: name,version,description,language,domain,metrics,test_cases | 내부 |
@@ -2684,7 +2684,7 @@
 | `./prompts/system_override.txt` | Text | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: 너는 정확한 지식 기반의 도우미다. 질문에 대해 간결하고 근거 중심으로 답하라. | Text text file: system_override.txt | 내부 |
 | `./pyproject.toml` | TOML | infra | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: upload_to_vcs_release = true | TOML text file: pyproject.toml | 내부 |
 | `./reports/.gitkeep` | File | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | binary-scan | size: 86 bytes | File binary file (86 bytes) | 내부 |
-| `./reports/README.md` | Markdown | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: - \[STRUCTURE_REVIEW.md\](../docs/STRUCTURE_REVIEW.md) - 프로젝트 구조 리뷰 | Markdown text file: Reports | 내부 |
+| `./reports/README.md` | Markdown | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: - \[STRUCTURE_REVIEW.md\](../STRUCTURE_REVIEW.md) - 프로젝트 구조 리뷰 | Markdown text file: Reports | 내부 |
 | `./reports/analysis/analysis_0aa9fab0-6c2c-4c1c-b228-202a38a2f00c.json` | JSON | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
 | `./reports/analysis/analysis_0aa9fab0-6c2c-4c1c-b228-202a38a2f00c.md` | Markdown | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
 | `./reports/analysis/analysis_2163f844-ee2c-4630-9ba8-35cd9954d92e.json` | JSON | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
