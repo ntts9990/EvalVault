@@ -139,6 +139,10 @@ class PatternDetector:
 
         return results
 
+    def extract_feature_vectors(self, run: EvaluationRun) -> list[FeatureVector]:
+        """Expose feature vectors for downstream analysis."""
+        return self._extract_features(run)
+
     def _extract_features(self, run: EvaluationRun) -> list[FeatureVector]:
         """테스트 케이스별 피처 추출."""
         vectors = []

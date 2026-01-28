@@ -53,10 +53,10 @@ jobs:
             --db data/db/evalvault.db \
             --output reports/regression/baseline_run.json
 
-      - name: Save baseline run id (main)
+      - name: Save baseline to registry (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          python - <<'PY'
+          BASELINE_RUN_ID=$(python - <<'PY'
           import json
           from pathlib import Path
 
@@ -64,16 +64,15 @@ jobs:
           run_id = payload.get('run_id') or payload.get('run_id'.upper())
           if not run_id:
               raise SystemExit('run_id not found in baseline output')
-          Path('reports/regression/baseline_run_id.txt').write_text(run_id)
+          print(run_id)
           PY
-
-      - name: Upload baseline run id artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: regression-baseline-run-id
-          path: reports/regression/baseline_run_id.txt
-          retention-days: 30
+          )
+          uv run evalvault regress-baseline set \
+            --key default \
+            --run-id "$BASELINE_RUN_ID" \
+            --branch main \
+            --commit "${{ github.sha }}" \
+            --db data/db/evalvault.db
 
       - name: Upload baseline db artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -83,7 +82,7 @@ jobs:
           path: data/db/evalvault.db
           retention-days: 30
 
-      - name: Fetch baseline artifacts (PR)
+      - name: Fetch baseline db artifact (PR)
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,30 +119,25 @@ jobs:
           run_id = runs[0]['id']
           artifacts_url = f'https://api.github.com/repos/{repo}/actions/runs/{run_id}/artifacts'
           artifacts = api_get(artifacts_url).get('artifacts', [])
-          required = [
-              'regression-baseline-run-id',
-              'regression-baseline-db',
-          ]
-          for artifact_name in required:
-              artifact = next((a for a in artifacts if a['name'] == artifact_name), None)
-              if not artifact:
-                  raise SystemExit(f'Baseline artifact not found: {artifact_name}')
+          artifact = next((a for a in artifacts if a['name'] == 'regression-baseline-db'), None)
+          if not artifact:
+              raise SystemExit('Baseline DB artifact not found')
 
-              download_url = artifact['archive_download_url']
-              req = urllib.request.Request(
-                  download_url,
-                  headers={
-                      'Authorization': f'Bearer {token}',
-                      'Accept': 'application/vnd.github+json',
-                  },
-              )
-              data = urllib.request.urlopen(req).read()
-              Path('reports/regression').mkdir(parents=True, exist_ok=True)
-              zip_path = Path(f'reports/regression/{artifact_name}.zip')
-              zip_path.write_bytes(data)
+          download_url = artifact['archive_download_url']
+          req = urllib.request.Request(
+              download_url,
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+              },
+          )
+          data = urllib.request.urlopen(req).read()
+          Path('data/db').mkdir(parents=True, exist_ok=True)
+          zip_path = Path('reports/regression/regression-baseline-db.zip')
+          zip_path.write_bytes(data)
 
-              with zipfile.ZipFile(zip_path) as zf:
-                  zf.extractall('.')
+          with zipfile.ZipFile(zip_path) as zf:
+              zf.extractall('data/db')
           PY
 
       - name: Run current evaluation (PR)
@@ -158,21 +152,28 @@ jobs:
       - name: Run regression gate (PR)
         if: github.event_name == 'pull_request'
         run: |
-          python - <<'PY'
+          BASELINE_RUN_ID=$(uv run evalvault regress-baseline get \
+            --key default \
+            --db data/db/evalvault.db \
+            --format plain)
+          if [ -z "$BASELINE_RUN_ID" ]; then
+            echo "Error: No baseline found in registry"
+            exit 1
+          fi
+          CURRENT_RUN_ID=$(python - <<'PY'
           import json
           from pathlib import Path
 
-          baseline_run_id = Path('reports/regression/baseline_run_id.txt').read_text().strip()
-          current_payload = json.loads(Path('reports/regression/current_run.json').read_text())
-          current_run_id = current_payload.get('run_id')
-          if not current_run_id:
+          payload = json.loads(Path('reports/regression/current_run.json').read_text())
+          run_id = payload.get('run_id')
+          if not run_id:
               raise SystemExit('run_id not found in current run output')
-          Path('reports/regression/current_run_id.txt').write_text(current_run_id)
-          Path('reports/regression/baseline_run_id.txt').write_text(baseline_run_id)
+          print(run_id)
           PY
+          )
           uv run evalvault ci-gate \
-            $(cat reports/regression/baseline_run_id.txt) \
-            $(cat reports/regression/current_run_id.txt) \
+            "$BASELINE_RUN_ID" \
+            "$CURRENT_RUN_ID" \
             --format pr-comment \
             --regression-threshold 0.05 \
             --db data/db/evalvault.db \

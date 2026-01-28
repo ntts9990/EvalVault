@@ -21,6 +21,18 @@ class OpenRagTraceConfig:
     spec_version: str = "0.1"
     module_attribute: str = "rag.module"
     custom_prefix: str = "custom."
+    allowed_modules: tuple[str, ...] = (
+        "ingest",
+        "chunk",
+        "embed",
+        "retrieve",
+        "rerank",
+        "prompt",
+        "llm",
+        "postprocess",
+        "eval",
+        "cache",
+    )
 
 
 class _NoOpSpan:
@@ -126,9 +138,19 @@ class OpenRagTraceAdapter:
         attributes: Mapping[str, Any] | None,
     ) -> None:
         span.set_attribute("spec.version", self._config.spec_version)
-        span.set_attribute(self._config.module_attribute, str(module))
+        span.set_attribute(self._config.module_attribute, self._normalize_module(module))
         if attributes:
             self.set_span_attributes(span, attributes)
+
+    def _normalize_module(self, module: str) -> str:
+        normalized = str(module).strip().lower()
+        if not normalized:
+            return f"{self._config.custom_prefix}unknown"
+        if normalized in self._config.allowed_modules:
+            return normalized
+        if normalized.startswith(self._config.custom_prefix):
+            return normalized
+        return f"{self._config.custom_prefix}{normalized}"
 
 
 def _coerce_attribute_value(value: Any) -> Any:

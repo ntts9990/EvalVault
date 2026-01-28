@@ -84,6 +84,12 @@ INTENT_CATALOG = {
         "description": "질문/답변 텍스트를 분석합니다.",
         "sample_query": "텍스트 분석해줘",
     },
+    AnalysisIntent.ANALYZE_DATASET_FEATURES: {
+        "label": "데이터셋 특성 분석",
+        "category": "analysis",
+        "description": "질문/답변/컨텍스트 특성을 추출하고 메트릭 상관을 분석합니다.",
+        "sample_query": "데이터셋 특성 분석해줘",
+    },
     AnalysisIntent.ANALYZE_CAUSAL: {
         "label": "인과 관계 분석",
         "category": "analysis",

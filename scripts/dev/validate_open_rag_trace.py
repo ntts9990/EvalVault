@@ -13,8 +13,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+DEFAULT_SPEC_VERSION = "0.1"
 
 ALLOWED_MODULES = {
     "ingest",
@@ -28,6 +32,31 @@ ALLOWED_MODULES = {
     "eval",
     "cache",
 }
+
+
+@dataclass
+class ModuleStats:
+    """Stats for rag.module attribute across spans."""
+
+    missing_count: int = 0
+    standard_counts: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    nonstandard_counts: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
+    def record(self, module: str | None) -> None:
+        if not module:
+            self.missing_count += 1
+        elif module in ALLOWED_MODULES or str(module).startswith("custom."):
+            self.standard_counts[module] += 1
+        else:
+            self.nonstandard_counts[module] += 1
+
+    @property
+    def total_standard(self) -> int:
+        return sum(self.standard_counts.values())
+
+    @property
+    def total_nonstandard(self) -> int:
+        return sum(self.nonstandard_counts.values())
 
 
 def _coerce_otlp_value(value: dict[str, Any]) -> Any:
@@ -122,13 +151,48 @@ def _validate_span(span: dict[str, Any], require_spec_version: bool) -> tuple[li
     return missing, warnings
 
 
-def _summarize(issues: list[dict[str, Any]], warnings: list[dict[str, Any]], total: int) -> str:
+def _summarize(
+    issues: list[dict[str, Any]],
+    warnings: list[dict[str, Any]],
+    total: int,
+    module_stats: ModuleStats | None = None,
+    filled_spec_version: int = 0,
+) -> str:
     lines = [
         f"총 span: {total}",
         f"필수 누락: {len(issues)}",
         f"경고: {len(warnings)}",
     ]
+    if filled_spec_version > 0:
+        lines.append(f"spec.version 자동 채움: {filled_spec_version}")
+    if module_stats:
+        lines.append("")
+        lines.append("[rag.module 통계]")
+        lines.append(f"  표준 모듈: {module_stats.total_standard}")
+        lines.append(f"  비표준 모듈: {module_stats.total_nonstandard}")
+        lines.append(f"  누락: {module_stats.missing_count}")
+        if module_stats.nonstandard_counts:
+            nonstandard_list = ", ".join(
+                f"{k}({v})" for k, v in sorted(module_stats.nonstandard_counts.items())
+            )
+            lines.append(f"  비표준 상세: {nonstandard_list}")
+            lines.append("  권장: 표준 모듈 사용 또는 custom.<name> 형식으로 정규화")
+        if module_stats.missing_count:
+            lines.append("  권장: attributes.rag.module 필수 입력")
     return "\n".join(lines)
+
+
+def _fill_spec_version(spans: list[dict[str, Any]], version: str) -> int:
+    filled_count = 0
+    for span in spans:
+        attributes = span.get("attributes")
+        if attributes is None:
+            span["attributes"] = {"spec.version": version}
+            filled_count += 1
+        elif not attributes.get("spec.version"):
+            attributes["spec.version"] = version
+            filled_count += 1
+    return filled_count
 
 
 def main() -> int:
@@ -140,10 +204,22 @@ def main() -> int:
         help="Fail if attributes.spec.version is missing",
     )
     parser.add_argument(
+        "--fill-spec-version",
+        nargs="?",
+        const=DEFAULT_SPEC_VERSION,
+        metavar="VERSION",
+        help=f"Auto-fill missing spec.version before validation (default: {DEFAULT_SPEC_VERSION})",
+    )
+    parser.add_argument(
         "--max-report",
         type=int,
         default=20,
         help="Max issues to print per category",
+    )
+    parser.add_argument(
+        "--module-stats",
+        action="store_true",
+        help="Report rag.module missing/nonstandard statistics",
     )
     args = parser.parse_args()
 
@@ -156,6 +232,11 @@ def main() -> int:
         print("유효한 span을 찾지 못했습니다.", file=sys.stderr)
         return 2
 
+    filled_count = 0
+    if args.fill_spec_version:
+        filled_count = _fill_spec_version(spans, args.fill_spec_version)
+
+    module_stats = ModuleStats() if args.module_stats else None
     missing_issues: list[dict[str, Any]] = []
     warning_issues: list[dict[str, Any]] = []
     for index, span in enumerate(spans):
@@ -164,8 +245,19 @@ def main() -> int:
             missing_issues.append({"index": index, "missing": missing, "name": span.get("name")})
         if warnings:
             warning_issues.append({"index": index, "warnings": warnings, "name": span.get("name")})
+        if module_stats:
+            attributes = span.get("attributes") or {}
+            module_stats.record(attributes.get("rag.module"))
 
-    print(_summarize(missing_issues, warning_issues, len(spans)))
+    print(
+        _summarize(
+            missing_issues,
+            warning_issues,
+            len(spans),
+            module_stats=module_stats,
+            filled_spec_version=filled_count,
+        )
+    )
 
     for issue in missing_issues[: args.max_report]:
         print(f"[누락] #{issue['index']} {issue.get('name')}: {', '.join(issue['missing'])}")

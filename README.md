@@ -14,6 +14,7 @@ English version? See `README.en.md`.
 ## Quick Links
 
 - 문서 허브: `docs/INDEX.md`
+- 핸드북(내부 교과서형): `docs/handbook/INDEX.md`
 - CLI 실행 시나리오 가이드: `docs/guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
 - 사용자 가이드: `docs/guides/USER_GUIDE.md`
 - 개발 가이드: `docs/guides/DEV_GUIDE.md`

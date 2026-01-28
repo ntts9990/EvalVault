@@ -17,6 +17,7 @@
 7) `CHAPTERS/06_quality_and_testing.md`
 8) `CHAPTERS/07_ux_and_product.md`
 9) `CHAPTERS/08_roadmap.md`
+10) `CHAPTERS/09_competitive_positioning.md`
 
 ### 부록 (Appendices)
 
