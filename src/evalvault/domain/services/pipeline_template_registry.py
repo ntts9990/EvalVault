@@ -55,6 +55,9 @@ class PipelineTemplateRegistry:
             self._create_analyze_statistical_template()
         )
         self._templates[AnalysisIntent.ANALYZE_NLP] = self._create_analyze_nlp_template()
+        self._templates[AnalysisIntent.ANALYZE_DATASET_FEATURES] = (
+            self._create_analyze_dataset_features_template()
+        )
         self._templates[AnalysisIntent.ANALYZE_CAUSAL] = self._create_analyze_causal_template()
         self._templates[AnalysisIntent.ANALYZE_NETWORK] = self._create_analyze_network_template()
         self._templates[AnalysisIntent.ANALYZE_PLAYBOOK] = self._create_analyze_playbook_template()
@@ -477,6 +480,25 @@ class PipelineTemplateRegistry:
         ]
         return AnalysisPipeline(
             intent=AnalysisIntent.ANALYZE_NLP,
+            nodes=nodes,
+        )
+
+    def _create_analyze_dataset_features_template(self) -> AnalysisPipeline:
+        nodes = [
+            AnalysisNode(
+                id="load_data",
+                name="데이터 로드",
+                module="data_loader",
+            ),
+            AnalysisNode(
+                id="dataset_feature_analysis",
+                name="데이터셋 특성 분석",
+                module="dataset_feature_analyzer",
+                depends_on=["load_data"],
+            ),
+        ]
+        return AnalysisPipeline(
+            intent=AnalysisIntent.ANALYZE_DATASET_FEATURES,
             nodes=nodes,
         )
 

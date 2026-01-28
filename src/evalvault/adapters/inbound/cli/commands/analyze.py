@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -21,6 +22,7 @@ from evalvault.adapters.outbound.analysis import (
 from evalvault.adapters.outbound.analysis.pipeline_factory import (
     build_analysis_pipeline_service,
 )
+from evalvault.adapters.outbound.analysis.pipeline_helpers import to_serializable
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.report import DashboardGenerator, MarkdownReportAdapter
@@ -101,6 +103,9 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         output: Path | None = typer.Option(None, "--output", "-o", help="JSON 출력 파일"),
         report: Path | None = typer.Option(
             None, "--report", "-r", help="리포트 출력 파일 (*.md 또는 *.html)"
+        ),
+        excel_output: Path | None = typer.Option(
+            None, "--excel-output", help="분석 결과 Excel 출력 경로"
         ),
         save: bool = typer.Option(False, "--save", "-S", help="분석 결과 DB 저장"),
         db_path: Path | None = db_option(help_text="DB 경로"),
@@ -194,8 +199,24 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                 stage_metrics=stage_metrics,
             )
 
-        if save:
+        def _save_analysis_payload(payload: Any, analysis_type: str) -> None:
+            serialized = to_serializable(payload)
+            if not isinstance(serialized, dict):
+                serialized = {"value": serialized}
+            storage.save_analysis_result(
+                run_id=run_id,
+                analysis_type=analysis_type,
+                result_data=serialized,
+            )
+
+        if save or excel_output:
             storage.save_analysis(analysis)
+            if bundle.nlp is not None:
+                storage.save_nlp_analysis(bundle.nlp)
+            if bundle.causal is not None:
+                _save_analysis_payload(bundle.causal, "causal")
+            if improvement_report is not None:
+                _save_analysis_payload(improvement_report, "playbook")
             _console.print(f"\n[green]분석 결과 DB 저장: {resolved_db_path}[/green]")
 
         if dashboard:
@@ -211,6 +232,8 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             fig.savefig(output_path, dpi=300, bbox_inches="tight")
             _console.print(f"\n[green]Dashboard saved to: {output_path}[/green]")
 
+        anomaly_result = None
+        forecast_result = None
         if anomaly_detect or forecast:
             ts_analyzer = TimeSeriesAdvancedModule(window_size=window_size)
             run_history = storage.list_runs(limit=50)
@@ -241,6 +264,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                     )
                     _display_forecast_result(forecast_result)
 
+        net_result = None
         if network:
             _console.print("\n[bold cyan]Building metric correlation network...[/bold cyan]")
             net_analyzer = NetworkAnalyzerModule()
@@ -264,6 +288,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                 net_result = net_analyzer.analyze_metric_network(graph)
                 _display_network_analysis(net_result)
 
+        hypotheses = None
         if generate_hypothesis:
             _console.print(
                 f"\n[bold cyan]Generating hypotheses ({hypothesis_method})...[/bold cyan]"
@@ -289,6 +314,16 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             )
             _display_hypothesis_generation(hypotheses, hypothesis_method)
 
+        if save or excel_output:
+            if anomaly_result is not None:
+                _save_analysis_payload(anomaly_result, "time_series_anomaly")
+            if forecast_result is not None:
+                _save_analysis_payload(forecast_result, "time_series_forecast")
+            if net_result is not None:
+                _save_analysis_payload(net_result, "network")
+            if hypotheses is not None:
+                _save_analysis_payload(hypotheses, "hypotheses")
+
         if output:
             _export_analysis_json(analysis, output, bundle.nlp if nlp else None, improvement_report)
             _console.print(f"\n[green]분석 결과 내보냄: {output}[/green]")
@@ -296,6 +331,10 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         if report:
             _generate_report(bundle, report, include_nlp=nlp, improvement_report=improvement_report)
             _console.print(f"\n[green]리포트 생성: {report}[/green]")
+
+        if excel_output:
+            exported = storage.export_analysis_results_to_excel(run_id, excel_output)
+            _console.print(f"\n[green]Excel 생성: {exported}[/green]")
 
     @app.command(name="analyze-compare")
     @app.command(name="compare-analysis")

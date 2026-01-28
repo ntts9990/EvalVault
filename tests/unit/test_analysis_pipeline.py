@@ -114,10 +114,10 @@ class TestAnalysisIntent:
         assert isinstance(AnalysisIntent.VERIFY_MORPHEME, str)
 
     def test_all_intents_count(self):
-        """모든 의도가 21개인지 확인."""
+        """모든 의도가 22개인지 확인."""
         from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 
-        assert len(AnalysisIntent) == 21
+        assert len(AnalysisIntent) == 22
 
 
 # =============================================================================

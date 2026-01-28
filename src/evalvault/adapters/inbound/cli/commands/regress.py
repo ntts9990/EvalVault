@@ -368,6 +368,102 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
         if not gate_passed and fail_on_regression:
             raise typer.Exit(2)
 
+    @app.command(name="regress-baseline")
+    def regress_baseline(
+        action: str = typer.Argument(
+            ...,
+            help="Action: 'set' to save baseline, 'get' to retrieve baseline run_id.",
+        ),
+        baseline_key: str = typer.Option(
+            "default",
+            "--key",
+            "-k",
+            help="Baseline key identifier (default: 'default').",
+        ),
+        run_id: str | None = typer.Option(
+            None,
+            "--run-id",
+            "-r",
+            help="Run ID to set as baseline (required for 'set').",
+        ),
+        dataset_name: str | None = typer.Option(
+            None,
+            "--dataset",
+            help="Dataset name for the baseline.",
+        ),
+        branch: str | None = typer.Option(
+            None,
+            "--branch",
+            help="Git branch name.",
+        ),
+        commit_sha: str | None = typer.Option(
+            None,
+            "--commit",
+            help="Git commit SHA.",
+        ),
+        output_format: str = typer.Option(
+            "text",
+            "--format",
+            "-f",
+            help="Output format: text, json.",
+        ),
+        db_path: Path | None = db_option(default=None, help_text="Database path"),
+    ) -> None:
+        """Manage regression baselines for CI/CD integration."""
+        if db_path is None:
+            console.print("[red]Error:[/red] Database path is not configured.")
+            raise typer.Exit(1)
+
+        storage = SQLiteStorageAdapter(db_path=db_path)
+
+        if action == "set":
+            if not run_id:
+                console.print("[red]Error:[/red] --run-id is required for 'set' action.")
+                raise typer.Exit(1)
+            try:
+                storage.get_run(run_id)
+            except KeyError:
+                console.print(f"[red]Error:[/red] Run not found: {run_id}")
+                raise typer.Exit(1)
+
+            storage.set_regression_baseline(
+                baseline_key,
+                run_id,
+                dataset_name=dataset_name,
+                branch=branch,
+                commit_sha=commit_sha,
+            )
+            if output_format == "json":
+                console.print(
+                    json.dumps(
+                        {"status": "ok", "baseline_key": baseline_key, "run_id": run_id},
+                        ensure_ascii=False,
+                    )
+                )
+            else:
+                console.print(f"[green]Baseline '{baseline_key}' set to run_id: {run_id}[/green]")
+        elif action == "get":
+            baseline = storage.get_regression_baseline(baseline_key)
+            if not baseline:
+                if output_format == "json":
+                    console.print(
+                        json.dumps(
+                            {"status": "not_found", "baseline_key": baseline_key},
+                            ensure_ascii=False,
+                        )
+                    )
+                else:
+                    console.print(f"[yellow]Baseline '{baseline_key}' not found.[/yellow]")
+                raise typer.Exit(1)
+
+            if output_format == "json":
+                console.print(json.dumps(baseline, ensure_ascii=False, indent=2, default=str))
+            else:
+                console.print(baseline["run_id"])
+        else:
+            console.print(f"[red]Error:[/red] Unknown action: {action}. Use 'set' or 'get'.")
+            raise typer.Exit(1)
+
 
 def _render_table(report: RegressionGateReport, console: Console) -> None:
     console.print(f"\n[bold]Regression Gate Check: {report.candidate_run_id}[/bold]\n")

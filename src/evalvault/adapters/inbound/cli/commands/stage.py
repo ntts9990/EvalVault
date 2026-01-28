@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import typer
@@ -23,6 +25,62 @@ from evalvault.domain.services.stage_summary_service import StageSummaryService
 
 from ..utils.options import db_option
 
+logger = logging.getLogger(__name__)
+
+
+def _resolve_db_path(db_path: Path | None) -> Path:
+    resolved = db_path or Settings().evalvault_db_path
+    if resolved is None:
+        raise typer.BadParameter("Database path is not configured.")
+    return resolved
+
+
+@dataclass
+class ValidationStats:
+    """Tracks StageEvent validation failures by error type."""
+
+    total_processed: int = 0
+    valid_count: int = 0
+    error_counts: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
+    def record_success(self) -> None:
+        self.total_processed += 1
+        self.valid_count += 1
+
+    def record_failure(self, error_message: str) -> None:
+        self.total_processed += 1
+        error_type = self._classify_error(error_message)
+        self.error_counts[error_type] += 1
+
+    def _classify_error(self, message: str) -> str:
+        """Classify error messages into aggregate types."""
+        lower_msg = message.lower()
+        if "run_id" in lower_msg:
+            return "missing_run_id"
+        if "stage_type" in lower_msg:
+            return "invalid_stage_type"
+        if "attributes" in lower_msg:
+            return "invalid_attributes"
+        if "metadata" in lower_msg:
+            return "invalid_metadata"
+        if "attempt" in lower_msg:
+            return "invalid_attempt"
+        if "duration" in lower_msg:
+            return "invalid_duration"
+        if "datetime" in lower_msg or "started_at" in lower_msg or "finished_at" in lower_msg:
+            return "invalid_datetime"
+        if "payload" in lower_msg or "ref" in lower_msg:
+            return "invalid_payload_ref"
+        return "other"
+
+    @property
+    def failed_count(self) -> int:
+        return self.total_processed - self.valid_count
+
+    @property
+    def has_failures(self) -> bool:
+        return self.failed_count > 0
+
 
 def create_stage_app(console: Console) -> typer.Typer:
     """Create the stage Typer sub-application."""
@@ -32,15 +90,40 @@ def create_stage_app(console: Console) -> typer.Typer:
     @stage_app.command("ingest")
     def ingest(
         file: Path = typer.Argument(..., help="Stage events JSON/JSONL file."),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
+        failed_output: Path | None = typer.Option(
+            None,
+            "--failed-output",
+            help="Write invalid samples to JSONL for inspection.",
+        ),
+        skip_invalid: bool = typer.Option(
+            False,
+            "--skip-invalid",
+            help="Continue processing after validation failures, logging aggregate counts.",
+        ),
     ) -> None:
         """Ingest stage events from JSON or JSONL."""
-        events = _load_stage_events(file)
+        events, stats = _load_stage_events_with_stats(
+            file,
+            skip_invalid=skip_invalid,
+            failed_output=failed_output,
+        )
+
+        if stats.has_failures:
+            _print_validation_stats(console, stats)
+            logger.warning(
+                "StageEvent validation failures: %d/%d (types: %s)",
+                stats.failed_count,
+                stats.total_processed,
+                dict(stats.error_counts),
+            )
+
         if not events:
-            console.print("[yellow]No stage events found in the input file.[/yellow]")
+            console.print("[yellow]No valid stage events found in the input file.[/yellow]")
             raise typer.Exit(1)
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = _resolve_db_path(db_path)
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
         stored = storage.save_stage_events(events)
 
         console.print(f"[green]Stored {stored} stage event(s).[/green]")
@@ -61,10 +144,11 @@ def create_stage_app(console: Console) -> typer.Typer:
             "-n",
             help="Maximum number of rows to display.",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """List stage events for a run."""
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = _resolve_db_path(db_path)
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
         events = storage.list_stage_events(run_id, stage_type=stage_type)
 
         if not events:
@@ -97,10 +181,11 @@ def create_stage_app(console: Console) -> typer.Typer:
     @stage_app.command("summary")
     def summary(
         run_id: str = typer.Argument(..., help="Run ID to summarize."),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Show summary stats for stage events."""
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = _resolve_db_path(db_path)
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -130,10 +215,11 @@ def create_stage_app(console: Console) -> typer.Typer:
             "--thresholds-profile",
             help="Profile key for thresholds JSON (defaults to Settings profile).",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Compute stage metrics from stored events."""
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = _resolve_db_path(db_path)
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -187,10 +273,11 @@ def create_stage_app(console: Console) -> typer.Typer:
             "--save-metrics/--no-save-metrics",
             help="Store computed stage metrics in the database.",
         ),
-        db_path: Path = db_option(help_text="Path to database file."),
+        db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Report stage summary, metrics, and improvement guides."""
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        resolved_db_path = _resolve_db_path(db_path)
+        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -227,17 +314,36 @@ def create_stage_app(console: Console) -> typer.Typer:
     return stage_app
 
 
-def _load_stage_events(file_path: Path) -> list[StageEvent]:
+def _load_stage_events_with_stats(
+    file_path: Path,
+    *,
+    skip_invalid: bool = False,
+    failed_output: Path | None = None,
+) -> tuple[list[StageEvent], ValidationStats]:
     suffix = file_path.suffix.lower()
     if suffix == ".jsonl":
-        return _load_jsonl(file_path)
+        return _load_jsonl_with_stats(
+            file_path,
+            skip_invalid=skip_invalid,
+            failed_output=failed_output,
+        )
     if suffix == ".json":
-        return _load_json(file_path)
+        return _load_json_with_stats(
+            file_path,
+            skip_invalid=skip_invalid,
+            failed_output=failed_output,
+        )
     raise typer.BadParameter("Unsupported file format. Use .json or .jsonl")
 
 
-def _load_jsonl(file_path: Path) -> list[StageEvent]:
+def _load_jsonl_with_stats(
+    file_path: Path,
+    *,
+    skip_invalid: bool = False,
+    failed_output: Path | None = None,
+) -> tuple[list[StageEvent], ValidationStats]:
     events: list[StageEvent] = []
+    stats = ValidationStats()
     with file_path.open(encoding="utf-8") as handle:
         for idx, line in enumerate(handle, start=1):
             raw = line.strip()
@@ -246,15 +352,43 @@ def _load_jsonl(file_path: Path) -> list[StageEvent]:
             try:
                 payload = json.loads(raw)
             except json.JSONDecodeError as exc:
+                if failed_output:
+                    _record_failed_sample(
+                        failed_output,
+                        {"raw": raw},
+                        error=f"JSON parse error at line {idx}: {exc}",
+                        line=idx,
+                    )
+                if skip_invalid:
+                    stats.record_failure(f"JSON parse error at line {idx}")
+                    logger.debug("Skipped invalid JSON at line %d: %s", idx, exc)
+                    continue
                 raise typer.BadParameter(f"Invalid JSON at line {idx}") from exc
             try:
                 events.append(StageEvent.from_dict(payload))
+                stats.record_success()
             except ValueError as exc:
+                if failed_output:
+                    _record_failed_sample(
+                        failed_output,
+                        payload,
+                        error=f"Invalid stage event at line {idx}: {exc}",
+                        line=idx,
+                    )
+                if skip_invalid:
+                    stats.record_failure(str(exc))
+                    logger.debug("Skipped invalid stage event at line %d: %s", idx, exc)
+                    continue
                 raise typer.BadParameter(f"Invalid stage event at line {idx}: {exc}") from exc
-    return events
+    return events, stats
 
 
-def _load_json(file_path: Path) -> list[StageEvent]:
+def _load_json_with_stats(
+    file_path: Path,
+    *,
+    skip_invalid: bool = False,
+    failed_output: Path | None = None,
+) -> tuple[list[StageEvent], ValidationStats]:
     with file_path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
 
@@ -267,13 +401,61 @@ def _load_json(file_path: Path) -> list[StageEvent]:
     else:
         raise typer.BadParameter("Unsupported JSON structure for stage events")
 
-    events = []
+    events: list[StageEvent] = []
+    stats = ValidationStats()
     for idx, item in enumerate(raw_events, start=1):
         try:
             events.append(StageEvent.from_dict(item))
+            stats.record_success()
         except ValueError as exc:
+            if failed_output:
+                _record_failed_sample(
+                    failed_output,
+                    item,
+                    error=f"Invalid stage event at index {idx}: {exc}",
+                    index=idx,
+                )
+            if skip_invalid:
+                stats.record_failure(str(exc))
+                logger.debug("Skipped invalid stage event at index %d: %s", idx, exc)
+                continue
             raise typer.BadParameter(f"Invalid stage event at index {idx}: {exc}") from exc
-    return events
+    return events, stats
+
+
+def _record_failed_sample(
+    output_path: Path | None,
+    payload: object,
+    *,
+    error: str,
+    index: int | None = None,
+    line: int | None = None,
+) -> None:
+    if output_path is None:
+        return
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "error": error,
+        "index": index,
+        "line": line,
+        "payload": payload,
+    }
+    with output_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _print_validation_stats(console: Console, stats: ValidationStats) -> None:
+    console.print(
+        f"[yellow]Validation: {stats.valid_count}/{stats.total_processed} valid, "
+        f"{stats.failed_count} failed[/yellow]"
+    )
+    if stats.error_counts:
+        table = Table(show_header=True, header_style="bold yellow")
+        table.add_column("Error Type")
+        table.add_column("Count", justify="right")
+        for error_type, count in sorted(stats.error_counts.items(), key=lambda x: -x[1]):
+            table.add_row(error_type, str(count))
+        console.print(table)
 
 
 def _print_ingest_summary(console: Console, events: Iterable[StageEvent]) -> None:
@@ -324,7 +506,10 @@ def _load_thresholds_map(file_path: Path, *, profile: str | None = None) -> dict
 
     thresholds: dict[str, float] = {}
     for key, value in thresholds_payload.items():
-        thresholds[str(key)] = float(value)
+        if isinstance(value, (int, float, str)):
+            thresholds[str(key)] = float(value)
+            continue
+        raise typer.BadParameter(f"Invalid threshold value for '{key}': {value}")
 
     return thresholds
 
@@ -362,6 +547,13 @@ def _load_default_profile() -> str | None:
         return None
 
 
+def _resolve_db_path(db_path: Path | None) -> Path:
+    resolved = db_path or Settings().evalvault_db_path
+    if resolved is None:
+        raise typer.BadParameter("Database path is not configured.")
+    return resolved
+
+
 def _print_stage_summary(console: Console, summary_data) -> None:
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("Stage Type")
@@ -397,24 +589,25 @@ def _print_metric_summary(console: Console, metrics: list[StageMetric]) -> None:
     table.add_column("Pass Rate", justify="right")
 
     for metric_name, stats in sorted(aggregates.items()):
+        pass_rate = str(stats.get("pass_rate", "-"))
         table.add_row(
             metric_name,
             str(stats["count"]),
             f"{stats['avg']:.4f}",
             f"{stats['min']:.4f}",
             f"{stats['max']:.4f}",
-            stats.get("pass_rate", "-"),
+            pass_rate,
         )
 
     console.print(table)
 
 
-def _aggregate_metrics(metrics: list[StageMetric]) -> dict[str, dict[str, float]]:
+def _aggregate_metrics(metrics: list[StageMetric]) -> dict[str, dict[str, float | str]]:
     grouped: dict[str, list[StageMetric]] = defaultdict(list)
     for metric in metrics:
         grouped[metric.metric_name].append(metric)
 
-    aggregates: dict[str, dict[str, float]] = {}
+    aggregates: dict[str, dict[str, float | str]] = {}
     for name, items in grouped.items():
         scores = [item.score for item in items]
         pass_values = [item.passed for item in items if item.passed is not None]

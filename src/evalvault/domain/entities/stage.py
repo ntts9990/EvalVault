@@ -54,6 +54,19 @@ class StageEvent:
     span_id: str | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.attributes, dict):
+            raise ValueError("StageEvent requires attributes dict")
+        if not isinstance(self.metadata, dict):
+            raise ValueError("StageEvent requires metadata dict")
+        self.stage_type = str(self.stage_type).strip().lower()
+        if not self.stage_type:
+            raise ValueError("StageEvent requires non-empty 'stage_type'")
+        if self.attempt < 1:
+            raise ValueError("StageEvent requires attempt >= 1")
+        if self.duration_ms is not None and self.duration_ms < 0:
+            raise ValueError("StageEvent requires non-negative duration_ms")
+        if self.started_at and self.finished_at and self.finished_at < self.started_at:
+            raise ValueError("StageEvent requires finished_at >= started_at")
         if self.duration_ms is None and self.started_at and self.finished_at:
             delta = self.finished_at - self.started_at
             self.duration_ms = delta.total_seconds() * 1000

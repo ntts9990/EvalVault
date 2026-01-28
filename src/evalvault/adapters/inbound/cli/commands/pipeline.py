@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 import typer
 from rich.panel import Panel
@@ -36,6 +38,11 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             "--output",
             "-o",
             help="Output file for results (JSON format).",
+        ),
+        excel_output: Path | None = typer.Option(
+            None,
+            "--excel-output",
+            help="분석 결과 Excel 출력 경로",
         ),
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
@@ -73,6 +80,8 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             result = service.analyze(query, run_id=run_id)
 
         saved_analysis_id: str | None = None
+        saved_dataset_features_id: str | None = None
+        saved_additional_ids: list[str] = []
         stats_node = result.get_node_result("statistical_analyzer")
         if stats_node and isinstance(stats_node.output, dict):
             analysis_obj = stats_node.output.get("analysis")
@@ -84,12 +93,92 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
                         f"[yellow]Warning: Failed to store analysis result ({exc})[/yellow]"
                     )
 
+        dataset_node = result.get_node_result("dataset_feature_analysis")
+        if dataset_node and isinstance(dataset_node.output, dict):
+            dataset_run_id = None
+            summary = dataset_node.output.get("summary")
+            if isinstance(summary, dict):
+                dataset_run_id = summary.get("run_id")
+            resolved_run_id = dataset_run_id or run_id
+            if resolved_run_id:
+                try:
+                    saved_dataset_features_id = storage.save_dataset_feature_analysis(
+                        run_id=resolved_run_id,
+                        result_data=dataset_node.output,
+                    )
+                except Exception as exc:  # pragma: no cover - best effort for CLI UX
+                    console.print(
+                        "[yellow]Warning: Failed to store dataset feature analysis "
+                        f"({exc})[/yellow]"
+                    )
+
+        skip_nodes = {
+            "load_data",
+            "load_runs",
+            "load_run",
+            "statistical_analyzer",
+            "dataset_feature_analysis",
+        }
+        for node_id, node_result in result.node_results.items():
+            if node_id in skip_nodes:
+                continue
+            if not isinstance(node_result.output, dict) or not node_result.output:
+                continue
+            resolved_run_id = run_id
+            if resolved_run_id is None:
+                summary = (
+                    node_result.output.get("summary")
+                    if isinstance(node_result.output, dict)
+                    else None
+                )
+                if isinstance(summary, dict) and summary.get("run_id"):
+                    resolved_run_id = summary.get("run_id")
+                elif node_result.output.get("run_id"):
+                    resolved_run_id = node_result.output.get("run_id")
+            if not resolved_run_id:
+                continue
+            try:
+                saved_id = storage.save_analysis_result(
+                    run_id=resolved_run_id,
+                    analysis_type=node_id,
+                    result_data=node_result.output,
+                )
+                saved_additional_ids.append(saved_id)
+            except Exception as exc:  # pragma: no cover - best effort for CLI UX
+                console.print(
+                    f"[yellow]Warning: Failed to store {node_id} analysis ({exc})[/yellow]"
+                )
+
+        try:
+            record = serialize_pipeline_result(result)
+            record.update(
+                {
+                    "result_id": str(uuid4()),
+                    "intent": result.intent.value if result.intent else None,
+                    "query": query,
+                    "run_id": run_id,
+                    "pipeline_id": result.pipeline_id,
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
+            storage.save_pipeline_result(record)
+        except Exception as exc:  # pragma: no cover - best effort for CLI UX
+            console.print(f"[yellow]Warning: Failed to store pipeline result ({exc})[/yellow]")
+
         if result.is_complete:
             console.print("[green]Pipeline completed successfully![/green]")
             console.print(f"Duration: {result.total_duration_ms}ms")
             console.print(f"Nodes executed: {len(result.node_results)}")
             if saved_analysis_id:
                 console.print(f"Analysis saved as [blue]{saved_analysis_id}[/blue]")
+            if saved_dataset_features_id:
+                console.print(
+                    f"Dataset feature analysis saved as [blue]{saved_dataset_features_id}[/blue]"
+                )
+            if saved_additional_ids:
+                console.print(
+                    f"Additional analysis saved: [blue]{len(saved_additional_ids)}[/blue] entries"
+                )
 
             if result.final_output:
                 console.print("\n[bold]Results:[/bold]")
@@ -110,6 +199,16 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             with open(output, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
             console.print(f"\n[green]Results saved to {output}[/green]")
+
+        if excel_output:
+            if not run_id:
+                console.print("[yellow]Warning: run_id is required for Excel export.[/yellow]")
+            else:
+                try:
+                    exported = storage.export_analysis_results_to_excel(run_id, excel_output)
+                    console.print(f"\n[green]Excel saved to {exported}[/green]")
+                except Exception as exc:  # pragma: no cover - best effort for CLI UX
+                    console.print(f"[yellow]Warning: Excel export failed ({exc})[/yellow]")
 
         console.print()
 
@@ -139,6 +238,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             AnalysisIntent.ANALYZE_PATTERNS: ("Analysis", "패턴 분석"),
             AnalysisIntent.ANALYZE_TRENDS: ("Analysis", "추세 분석"),
             AnalysisIntent.BENCHMARK_RETRIEVAL: ("Benchmark", "검색 벤치마크"),
+            AnalysisIntent.ANALYZE_DATASET_FEATURES: ("Analysis", "데이터셋 특성 분석"),
             AnalysisIntent.GENERATE_SUMMARY: ("Report", "요약 보고서 생성"),
             AnalysisIntent.GENERATE_DETAILED: ("Report", "상세 보고서 생성"),
             AnalysisIntent.GENERATE_COMPARISON: ("Report", "비교 보고서 생성"),
