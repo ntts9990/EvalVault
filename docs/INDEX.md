@@ -34,6 +34,7 @@
 - 상태 요약: `STATUS.md`
 - 로드맵: `ROADMAP.md`
 - 개발 백서(설계/운영/품질 기준): `new_whitepaper/INDEX.md`
+- 교과서형 총정리(handbook): `handbook/INDEX.md`
 
 ---
 
