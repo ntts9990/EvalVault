@@ -34,6 +34,27 @@ The web UI provides:
 
 The FastAPI routes live in `src/evalvault/adapters/inbound/api/`, and the web adapter implementation is in `src/evalvault/adapters/inbound/api/adapter.py`. The React frontend is under `frontend/`.
 
+### 주요 API 엔드포인트 (발췌)
+
+Runs:
+- `GET /api/v1/runs` 평가 실행 목록
+- `GET /api/v1/runs/{run_id}` 실행 상세
+- `GET /api/v1/runs/{run_id}/report` LLM 보고서
+- `GET /api/v1/runs/{run_id}/analysis-report` 분석 보고서 (markdown/html)
+- `GET /api/v1/runs/{run_id}/dashboard` 대시보드 이미지 (png/svg/pdf)
+- `GET /api/v1/runs/{run_id}/quality-gate` 품질 게이트
+- `GET /api/v1/runs/{run_id}/debug-report` 디버그 리포트
+- `GET /api/v1/runs/{run_id}/improvement` 개선 가이드
+- `GET /api/v1/runs/prompt-diff` 프롬프트 비교
+
+Calibration:
+- `POST /api/v1/calibration/judge`
+- `GET /api/v1/calibration/judge/{calibration_id}`
+- `GET /api/v1/calibration/judge/history`
+
+참고:
+- `/dashboard` 엔드포인트는 `dashboard` extra(matplotlib)가 필요합니다.
+
 ## Usage Examples
 
 ### CLI

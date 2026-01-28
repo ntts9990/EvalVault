@@ -200,3 +200,53 @@
   - `node_results`: 노드 결과(JSON)
   - `started_at` / `finished_at` / `created_at`: 시각 정보
 - 샘플: 데이터 없음
+
+## MultiTurnRun
+- 컬럼 설명
+  - `run_id`: 멀티턴 실행 ID
+  - `dataset_name` / `dataset_version`: 데이터셋 이름/버전
+  - `model_name`: 사용 모델
+  - `started_at` / `finished_at`: 실행 시작/종료 시각
+  - `conversation_count`: 대화 수
+  - `turn_count`: 턴 수
+  - `metrics_evaluated`: 평가 메트릭 목록
+  - `drift_threshold`: 드리프트 임계값
+  - `summary`: 요약(JSON)
+  - `metadata`: 메타데이터(JSON)
+  - `created_at`: 저장 시각
+- 샘플: `conversation_count=50`, `drift_threshold=0.1`
+
+## MultiTurnConversations
+- 컬럼 설명
+  - `run_id`: 멀티턴 실행 ID
+  - `conversation_id`: 대화 ID
+  - `turn_count`: 대화별 턴 수
+  - `drift_score`: 드리프트 점수
+  - `drift_threshold`: 드리프트 임계값
+  - `drift_detected`: 드리프트 감지 여부
+  - `summary`: 대화 요약(JSON)
+- 샘플: `drift_detected=1`
+
+## MultiTurnTurns
+- 컬럼 설명
+  - `id`: 턴 결과 ID
+  - `run_id`: 멀티턴 실행 ID
+  - `conversation_id`: 대화 ID
+  - `turn_id`: 턴 ID
+  - `turn_index`: 턴 인덱스
+  - `role`: user/assistant
+  - `passed`: 턴 통과 여부
+  - `latency_ms`: 응답 지연(ms)
+  - `metadata`: 턴 메타데이터(JSON)
+- 샘플: `role=assistant`, `turn_index=3`
+
+## MultiTurnTurnMetrics
+- 컬럼 설명
+  - `turn_result_id`: 턴 결과 ID
+  - `conversation_id`: 대화 ID
+  - `turn_id`: 턴 ID
+  - `turn_index`: 턴 인덱스
+  - `metric_name`: 메트릭 이름
+  - `score`: 점수
+  - `threshold`: 임계값
+- 샘플: `metric_name=faithfulness`, `score=0.82`

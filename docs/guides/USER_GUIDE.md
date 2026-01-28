@@ -645,6 +645,40 @@ uv run evalvault analyze-compare <RUN_A> <RUN_B> \
 
 비교 보고서는 **프롬프트 변경 요약 + 통계 비교 + 개선 제안**을 자동으로 포함합니다.
 
+#### `calibrate-judge` - 판정자 보정
+
+```bash
+uv run evalvault calibrate-judge --db data/db/evalvault.db --profile dev
+```
+
+판정 편향을 보정하고 보정 결과를 저장합니다.
+
+#### `profile-difficulty` - 난이도 프로파일링
+
+```bash
+uv run evalvault profile-difficulty <RUN_ID> --db data/db/evalvault.db
+```
+
+#### `prompts` - 프롬프트 스냅샷/비교/추천
+
+```bash
+uv run evalvault prompts show <RUN_ID> --db data/db/evalvault.db
+uv run evalvault prompts diff <RUN_A> <RUN_B> --db data/db/evalvault.db
+uv run evalvault prompts suggest <RUN_ID> --db data/db/evalvault.db
+```
+
+#### `artifacts` - 아티팩트 점검
+
+```bash
+uv run evalvault artifacts lint reports/analysis/artifacts/analysis_<RUN_ID>
+```
+
+#### `ops` - 운영 스냅샷
+
+```bash
+uv run evalvault ops snapshot --output reports/ops_snapshot.json
+```
+
 #### `generate` - 테스트셋 생성
 
 ```bash
@@ -738,6 +772,16 @@ uv run evalvault benchmark kmmlu -s Insurance --limit 10 -o results.json
 - `-s, --subjects`: 평가할 KMMLU 도메인 (Insurance, Finance, Accounting 등)
 - `--backend`: 백엔드 선택 (`ollama`, `vllm`, `hf`, `openai`)
 - `-m, --model`: 모델 이름
+
+**추가 서브커맨드**:
+
+```bash
+uv run evalvault benchmark retrieval --backend ollama -m gemma3:1b
+uv run evalvault benchmark list
+uv run evalvault benchmark history
+uv run evalvault benchmark report <RUN_ID>
+uv run evalvault benchmark compare <RUN_A> <RUN_B>
+```
 - `--limit`: 테스트 샘플 수 제한
 - `--phoenix`: Phoenix 트레이싱 활성화
 - `-o, --output`: 결과 JSON 파일 경로
@@ -830,11 +874,47 @@ CLI와 Web UI가 동일한 DB(`--db` 또는 `EVALVAULT_DB_PATH`)를 사용하면
 - Web UI에서 실행한 평가 결과를 CLI `history` 명령으로 확인 가능
 - 분석 결과도 양쪽에서 공유
 
+Run 상세 페이지에는 **Analysis Report**와 **Dashboard** 탭이 있으며,
+`/api/v1/runs/{run_id}/analysis-report`, `/api/v1/runs/{run_id}/dashboard`를 사용합니다.
+Dashboard 이미지는 `dashboard` extra(matplotlib)가 필요합니다.
+
 ### 보고서 언어 옵션
 
 LLM 보고서는 기본 한국어이며, 필요 시 영어로 요청할 수 있습니다.
 
 - `GET /api/v1/runs/{run_id}/report?language=en` (기본값: `ko`)
+
+### 분석 보고서 API
+
+분석 보고서는 Markdown/HTML로 즉시 생성할 수 있습니다.
+
+- `GET /api/v1/runs/{run_id}/analysis-report`
+  - `format`: `markdown | html` (기본값: `markdown`)
+  - `include_nlp`: `true | false` (기본값: `true`)
+  - `include_causal`: `true | false` (기본값: `true`)
+  - `use_cache`: `true | false` (기본값: `true`)
+  - `save`: `true | false` (기본값: `false`, DB 저장)
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/v1/runs/{run_id}/analysis-report?format=html&include_nlp=false&save=true"
+```
+
+### 대시보드 이미지 API
+
+대시보드는 분석 결과를 기반으로 PNG/SVG/PDF 이미지를 반환합니다.
+
+- `GET /api/v1/runs/{run_id}/dashboard`
+  - `format`: `png | svg | pdf` (기본값: `png`)
+  - `include_nlp`: `true | false` (기본값: `true`)
+  - `include_causal`: `true | false` (기본값: `true`)
+
+예시:
+
+```bash
+curl -o dashboard.png "http://localhost:8000/api/v1/runs/{run_id}/dashboard?format=png"
+```
 
 ### 피드백 집계 규칙
 
@@ -876,6 +956,8 @@ uv run evalvault run data.json \
   --analysis-report reports/custom/run_001.md
 ```
 
+`--analysis-report`는 `--report`로도 사용할 수 있습니다.
+
 ### 단일 실행 분석 (수동)
 
 ```bash
@@ -894,6 +976,8 @@ uv run evalvault analyze-compare RUN_A RUN_B \
   --metrics faithfulness,answer_relevancy \
   --test t-test
 ```
+
+`analyze-compare`는 `compare-analysis` 별칭을 제공합니다.
 
 기본 저장 위치:
 - JSON 결과: `reports/comparison/comparison_<run_a>_<run_b>.json`

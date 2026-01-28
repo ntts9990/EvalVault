@@ -34,3 +34,12 @@ uv run python scripts/ci/run_regression_gate.py \
 
 ## 요약 파일
 - `reports/regression/ci_gate.json`에 요약이 저장됩니다.
+
+## CI Gate CLI 종료 코드 정책
+
+`evalvault ci-gate`는 CI/CD 스크립트에서 종료 코드로 상태를 판별합니다.
+
+- `0`: 성공 (게이트 통과)
+- `1`: 임계치 미달/검증 실패 또는 잘못된 입력 (예: DB 경로 누락, 잘못된 포맷)
+- `2`: 회귀 감지 및 `--fail-on-regression` 활성화
+- `3`: 런 조회 실패/데이터 누락 등 **복구 불가능한 오류**

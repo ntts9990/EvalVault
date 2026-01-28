@@ -282,7 +282,7 @@ class GraphRetrieverPort(Protocol):
 
 **구현 옵션**:
 - Option A: NetworkX + LLM 엔티티 추출
-- Option B: Microsoft GraphRAG 라이브러리 래핑
+- Option B: LightRAG 라이브러리 래핑
 - Option C: Neo4j 연동 (선택적)
 
 #### 3.4 A/B 비교 실험 템플릿
@@ -505,7 +505,7 @@ P3                                   ░░░░░░░░░░░░░░�
 ### P3: GraphRAG
 - 개발자: 2명
 - 예상 공수: 160시간
-- 외부 의존성: Microsoft GraphRAG 또는 Neo4j (선택)
+- 외부 의존성: LightRAG 또는 Neo4j (선택)
 
 ### P4: Judge 캘리브레이션 UI
 - 개발자: 1명 (프론트엔드)
@@ -546,6 +546,16 @@ P3                                   ░░░░░░░░░░░░░░�
 - [ ] Web UI에서 캘리브레이션 실행 가능
 - [ ] 결과 시각화 (히트맵, 차트)
 - [ ] 히스토리 조회 가능
+
+---
+
+## 추가 검증 스크립트
+
+Web UI의 Dashboard 렌더링 이슈(맥OS GUI 백엔드 충돌)를 방지하기 위해
+Dashboard 엔드포인트 검증 스크립트를 추가했다.
+
+- 스크립트: `scripts/dev/verify_dashboard_endpoint.sh`
+- 용도: `/api/v1/runs/{run_id}/dashboard` 응답이 정상 PNG로 내려오는지 확인
 
 ---
 

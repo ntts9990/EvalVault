@@ -31,6 +31,7 @@ uv sync --extra dev
 |-------|--------|------|
 | `analysis` | scikit-learn | 통계/NLP 분석 모듈 |
 | `korean` | kiwipiepy, rank-bm25, sentence-transformers | 한국어 형태소·검색 |
+| `dashboard` | matplotlib | 대시보드 이미지 생성 |
 | `postgres` | psycopg[binary] | PostgreSQL 저장소 |
 | `mlflow` | mlflow | MLflow 추적기 |
 | `phoenix` | arize-phoenix + OpenTelemetry exporters | Phoenix 트레이싱, 데이터셋/실험 동기화 |

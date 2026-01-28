@@ -51,5 +51,43 @@
 3) 커밋/푸시
 4) CI 상태 확인 및 실패 시 수정 반복
 
+## 추가 개선 작업 (2026-01)
+
+### 1) CI Gate 종료코드 정책 정리
+- 목적: CI 스크립트가 종료코드로 실패 원인을 구분 가능하도록 명문화
+- 변경: `docs/guides/CI_REGRESSION_GATE.md`
+- 기준: `ci-gate` 종료코드 0/1/2/3 정의 및 예외 케이스 명시
+
+### 2) Analysis Report API 스펙 문서화
+- 목적: Web UI/외부 도구에서 동일 파라미터로 호출 가능하도록 API 스펙 명시
+- 변경: `docs/guides/USER_GUIDE.md`
+- 포함 항목: `format`, `include_nlp`, `include_causal`, `use_cache`, `save`
+
+### 3) Analysis Report 저장/캐싱 옵션 추가
+- 목적: 보고서 생성 비용 절감 및 재사용 가능
+- 변경 파일:
+  - `src/evalvault/ports/outbound/storage_port.py`
+  - `src/evalvault/adapters/outbound/storage/sqlite_adapter.py`
+  - `src/evalvault/adapters/outbound/storage/postgres_adapter.py`
+  - `src/evalvault/adapters/inbound/api/adapter.py`
+  - `src/evalvault/adapters/inbound/api/routers/runs.py`
+- 동작:
+  - `use_cache=true`: DB에 동일 조건의 보고서가 있으면 재사용
+  - `save=true`: 생성된 보고서를 DB에 저장
+
+### 4) DashboardGenerator API 엔드포인트 추가
+- 목적: Web UI가 CLI 없이 대시보드를 직접 렌더링 가능
+- 변경 파일:
+  - `src/evalvault/adapters/outbound/report/dashboard_generator.py`
+  - `src/evalvault/adapters/inbound/api/adapter.py`
+  - `src/evalvault/adapters/inbound/api/routers/runs.py`
+- 엔드포인트: `GET /api/v1/runs/{run_id}/dashboard` (png/svg/pdf)
+
+### 5) Deprecation 경고 정리
+- 목적: 런타임 경고 최소화 및 차기 버전 호환성 확보
+- 변경 파일:
+  - `src/evalvault/domain/services/evaluator.py`
+- 대응: `ragas.metrics.collections.Faithfulness` 우선 사용 (구버전 fallback)
+
 ## 작업 로그
 - 작업 완료 시 `.sisyphus/notepads/*/worklog.md`에 기록

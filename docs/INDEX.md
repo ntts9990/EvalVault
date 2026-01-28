@@ -17,6 +17,7 @@
 - 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
 - 개발/기여: `guides/DEV_GUIDE.md`
 - 다음 개발 실행 계획: `guides/NEXT_STEPS_EXECUTION_PLAN.md`
+- CLI UX 개선 설계서: `guides/CLI_UX_REDESIGN.md`
 - P0~P3 작업 보고서: `guides/P0_P3_EXECUTION_REPORT.md`
 - P1~P4 작업 계획서: `guides/P1_P4_WORK_PLAN.md`
 - 기능 종합 검증 보고서: `../reports/feature_verification_report.md`
