@@ -28,7 +28,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
             10,
             "--limit",
             "-n",
-            help="Maximum number of runs to show.",
+            help="Maximum number of runs to show (default: 10).",
         ),
         dataset: str | None = typer.Option(
             None,

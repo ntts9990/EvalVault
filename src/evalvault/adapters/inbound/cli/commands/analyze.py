@@ -298,6 +298,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
             _console.print(f"\n[green]리포트 생성: {report}[/green]")
 
     @app.command(name="analyze-compare")
+    @app.command(name="compare-analysis")
     def analyze_compare(
         run_id1: str = typer.Argument(..., help="첫 번째 Run ID"),
         run_id2: str = typer.Argument(..., help="두 번째 Run ID"),

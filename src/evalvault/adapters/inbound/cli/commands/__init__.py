@@ -23,6 +23,7 @@ from .domain import create_domain_app
 from .experiment import register_experiment_commands
 from .gate import register_gate_commands
 from .generate import register_generate_commands
+from .graph_rag import create_graph_rag_app
 from .history import register_history_commands
 from .init import register_init_command
 from .kg import create_kg_app
@@ -82,6 +83,7 @@ SUB_APPLICATIONS: tuple[SubAppModule, ...] = (
     SubAppModule("kg", create_kg_app),
     SubAppModule("domain", create_domain_app),
     SubAppModule("benchmark", create_benchmark_app),
+    SubAppModule("graphrag", create_graph_rag_app),
     SubAppModule("method", create_method_app),
     SubAppModule("ops", create_ops_app),
     SubAppModule("phoenix", create_phoenix_app),

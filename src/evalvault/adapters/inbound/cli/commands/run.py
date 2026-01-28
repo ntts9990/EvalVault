@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Callable, Sequence
+from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 import click
 import typer
@@ -15,7 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis_pipeline_service
-from evalvault.adapters.outbound.dataset import get_loader
+from evalvault.adapters.outbound.dataset import get_loader, load_multiturn_dataset
 from evalvault.adapters.outbound.documents.versioned_loader import (
     load_versioned_chunks_from_pdf_dir,
 )
@@ -33,10 +35,16 @@ from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTra
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+from evalvault.domain.entities.multiturn import (
+    MultiTurnConversationRecord,
+    MultiTurnRunRecord,
+    MultiTurnTurnResult,
+)
 from evalvault.domain.services.document_versioning import parse_contract_date
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 from evalvault.domain.services.memory_based_analysis import MemoryBasedAnalysis
+from evalvault.domain.services.multiturn_evaluator import MultiTurnEvaluator
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
@@ -81,6 +89,7 @@ from .run_helpers import (
     _option_was_provided,
     _print_run_mode_banner,
     _resolve_thresholds,
+    _save_multiturn_to_db,
     _save_results,
     _save_to_db,
     _write_stage_events_jsonl,
@@ -221,21 +230,26 @@ def register_run_commands(
             False,
             "--auto-analyze",
             help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_output: Path | None = typer.Option(
             None,
             "--analysis-json",
             help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_report: Path | None = typer.Option(
             None,
             "--analysis-report",
+            "--report",
             help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_dir: Path | None = typer.Option(
             None,
             "--analysis-dir",
             help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -428,6 +442,18 @@ def register_run_commands(
             help="실행 모드 선택: 'simple'은 간편 실행, 'full'은 모든 옵션 노출.",
             rich_help_panel="Run modes",
         ),
+        max_turns: int | None = typer.Option(
+            None,
+            "--max-turns",
+            help="멀티턴 모드에서 사용할 최대 턴 수 (지정 시 앞에서부터 절단).",
+            rich_help_panel="Multiturn options",
+        ),
+        drift_threshold: float = typer.Option(
+            0.1,
+            "--drift-threshold",
+            help="멀티턴 모드에서 드리프트 경고 임계값.",
+            rich_help_panel="Multiturn options",
+        ),
         db_path: Path | None = db_option(
             help_text="Path to SQLite database file for storing results.",
         ),
@@ -462,6 +488,7 @@ def register_run_commands(
             False,
             "--verbose",
             "-v",
+            "-V",
             help="Show detailed output.",
         ),
         parallel: bool = typer.Option(
@@ -982,6 +1009,191 @@ def register_run_commands(
         }
         if threshold_profile:
             phoenix_trace_metadata["threshold.profile"] = str(threshold_profile).strip().lower()
+
+        if preset.name == "multiturn":
+            llm_factory = SettingsLLMFactory(settings)
+            korean_toolkit = try_create_korean_toolkit()
+            evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
+            try:
+                llm_adapter = get_llm_adapter(settings)
+            except Exception as exc:
+                provider = str(getattr(settings, "llm_provider", "")).strip().lower()
+                fixes: list[str]
+                if provider == "ollama":
+                    fixes = [
+                        "Ollama 서버가 실행 중인지 확인하세요 (기본: http://localhost:11434).",
+                        "필요 모델을 받아두세요: `ollama pull gpt-oss-safeguard:20b` 및 `ollama pull qwen3-embedding:0.6b`.",
+                        "URL을 바꿨다면 .env의 `OLLAMA_BASE_URL`을 확인하세요.",
+                    ]
+                elif provider == "openai":
+                    fixes = [
+                        "`.env`에 `OPENAI_API_KEY`를 설정하세요.",
+                        "프록시/네트워크가 필요한 환경이면 연결 가능 여부를 확인하세요.",
+                    ]
+                elif provider == "vllm":
+                    fixes = [
+                        "`.env`의 `VLLM_BASE_URL`/`VLLM_MODEL` 설정을 확인하세요.",
+                        "vLLM 서버가 OpenAI 호환 API로 실행 중인지 확인하세요.",
+                    ]
+                else:
+                    fixes = ["--profile 또는 환경변수 설정을 확인하세요."]
+                print_cli_error(
+                    console,
+                    "LLM/임베딩 어댑터를 초기화하지 못했습니다.",
+                    details=str(exc),
+                    fixes=fixes,
+                )
+                raise typer.Exit(1) from exc
+
+            multiturn_started_at = datetime.now()
+            _log_timestamp(console, verbose, "멀티턴 데이터셋 로딩 시작")
+            try:
+                multiturn_dataset = load_multiturn_dataset(dataset)
+            except Exception as exc:
+                _log_duration(console, verbose, "멀티턴 데이터셋 로딩 실패", multiturn_started_at)
+                print_cli_error(
+                    console,
+                    "멀티턴 데이터셋을 불러오지 못했습니다.",
+                    details=str(exc),
+                    fixes=[
+                        "파일 경로/형식을 확인하세요.",
+                        "멀티턴 스키마(turns, conversation_id)가 문서와 동일한지 확인하세요.",
+                    ],
+                )
+                raise typer.Exit(1) from exc
+            _log_duration(console, verbose, "멀티턴 데이터셋 로딩 완료", multiturn_started_at)
+
+            if stream:
+                print_cli_warning(
+                    console,
+                    "멀티턴 모드에서는 streaming 옵션을 무시합니다.",
+                    tips=["--stream을 제거하거나 일반 모드로 실행하세요."],
+                )
+            if retriever:
+                print_cli_warning(
+                    console,
+                    "멀티턴 모드에서는 retriever 적용을 지원하지 않습니다.",
+                    tips=["단일 턴 모드에서 retriever를 사용하세요."],
+                )
+            if use_domain_memory:
+                print_cli_warning(
+                    console,
+                    "멀티턴 모드에서는 Domain Memory를 지원하지 않습니다.",
+                    tips=["--use-domain-memory 옵션을 제거하세요."],
+                )
+
+            if max_turns and max_turns > 0:
+                trimmed = 0
+                for case in multiturn_dataset.test_cases:
+                    if len(case.turns) > max_turns:
+                        case.turns = case.turns[:max_turns]
+                        trimmed += 1
+                if trimmed:
+                    console.print(f"[dim]Trimmed turns in {trimmed} conversation(s).[/dim]")
+
+            evaluation_started_at = datetime.now()
+            multiturn_evaluator = MultiTurnEvaluator(evaluator=evaluator, llm=llm_adapter)
+            results = []
+            drift_flags = 0
+            turn_count = 0
+            for case in multiturn_dataset.test_cases:
+                result = multiturn_evaluator.evaluate_conversation(case, metric_list)
+                drift = multiturn_evaluator.detect_drift(case, threshold=drift_threshold)
+                result.summary["drift_detected"] = drift.drift_detected
+                result.summary["drift_threshold"] = drift.drift_threshold
+                result.summary["drift_score"] = drift.drift_score
+                results.append(result)
+                turn_count += len(result.turn_results)
+                if drift.drift_detected:
+                    drift_flags += 1
+
+            multiturn_summary: dict[str, object] = {
+                "conversation_count": len(results),
+                "turn_count": turn_count,
+                "drift_detected_count": drift_flags,
+                "drift_threshold": drift_threshold,
+            }
+            for metric in metric_list:
+                scores = [
+                    result.summary.get(metric)
+                    for result in results
+                    if isinstance(result.summary.get(metric), (int, float))
+                ]
+                if scores:
+                    multiturn_summary[metric] = sum(scores) / len(scores)
+
+            payload = {
+                "dataset": {
+                    "name": multiturn_dataset.name,
+                    "version": multiturn_dataset.version,
+                    "metadata": multiturn_dataset.metadata,
+                    "source_file": multiturn_dataset.source_file,
+                },
+                "metrics": metric_list,
+                "summary": multiturn_summary,
+                "conversations": [asdict(item) for item in results],
+            }
+
+            table = Table(title="Multi-turn Summary", show_header=True, header_style="bold cyan")
+            table.add_column("Metric", style="bold")
+            table.add_column("Value", justify="right")
+            for metric in metric_list:
+                value = multiturn_summary.get(metric)
+                if isinstance(value, float):
+                    display = f"{value:.3f}"
+                else:
+                    display = str(value) if value is not None else "-"
+                table.add_row(metric, display)
+            table.add_row("conversation_count", str(multiturn_summary.get("conversation_count")))
+            table.add_row("turn_count", str(multiturn_summary.get("turn_count")))
+            table.add_row("drift_detected", str(multiturn_summary.get("drift_detected_count")))
+            console.print(table)
+
+            if output:
+                write_json(output, payload)
+                console.print(f"[green]멀티턴 결과 저장:[/green] {output}")
+            if db_path:
+                run_id = str(uuid4())
+                run_record = MultiTurnRunRecord(
+                    run_id=run_id,
+                    dataset_name=multiturn_dataset.name,
+                    dataset_version=multiturn_dataset.version,
+                    model_name=llm_adapter.get_model_name(),
+                    started_at=evaluation_started_at,
+                    finished_at=datetime.now(),
+                    conversation_count=len(results),
+                    turn_count=turn_count,
+                    metrics_evaluated=list(metric_list),
+                    drift_threshold=drift_threshold,
+                    summary=multiturn_summary,
+                    metadata={"dataset": multiturn_dataset.metadata},
+                )
+                conversation_records = [
+                    MultiTurnConversationRecord(
+                        run_id=run_id,
+                        conversation_id=conversation.conversation_id,
+                        turn_count=len(conversation.turn_results),
+                        drift_score=conversation.summary.get("drift_score"),
+                        drift_threshold=conversation.summary.get("drift_threshold"),
+                        drift_detected=bool(conversation.summary.get("drift_detected")),
+                        summary=dict(conversation.summary),
+                    )
+                    for conversation in results
+                ]
+                turn_results: list[MultiTurnTurnResult] = []
+                for conversation in results:
+                    for turn in conversation.turn_results:
+                        turn_results.append(turn)
+                _save_multiturn_to_db(
+                    db_path,
+                    run_record,
+                    conversation_records,
+                    turn_results,
+                    console,
+                    export_excel=True,
+                    excel_output_path=excel_output,
+                )
+            return
 
         # Load dataset or configure streaming metadata
         if stream:
@@ -2120,21 +2332,26 @@ def register_run_commands(
             False,
             "--auto-analyze",
             help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_output: Path | None = typer.Option(
             None,
             "--analysis-json",
             help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_report: Path | None = typer.Option(
             None,
             "--analysis-report",
+            "--report",
             help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_dir: Path | None = typer.Option(
             None,
             "--analysis-dir",
             help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -2273,6 +2490,7 @@ def register_run_commands(
         verbose: bool = typer.Option(
             False,
             "--verbose",
+            "-V",
             help="Show detailed output.",
         ),
         parallel: bool = typer.Option(
@@ -2406,21 +2624,26 @@ def register_run_commands(
             False,
             "--auto-analyze",
             help="평가 완료 후 통합 분석을 자동 실행하고 보고서를 저장합니다.",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_output: Path | None = typer.Option(
             None,
             "--analysis-json",
             help="자동 분석 JSON 결과 파일 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_report: Path | None = typer.Option(
             None,
             "--analysis-report",
+            "--report",
             help="자동 분석 Markdown 보고서 경로 (기본값: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         analysis_dir: Path | None = typer.Option(
             None,
             "--analysis-dir",
             help="자동 분석 결과 저장 디렉터리 (기본: reports/analysis).",
+            rich_help_panel="Auto Analysis",
         ),
         retriever: str | None = typer.Option(
             None,
@@ -2559,6 +2782,7 @@ def register_run_commands(
         verbose: bool = typer.Option(
             False,
             "--verbose",
+            "-V",
             help="Show detailed output.",
         ),
         parallel: bool = typer.Option(

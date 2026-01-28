@@ -29,6 +29,9 @@ from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
     GenerationData,
+    MultiTurnConversationRecord,
+    MultiTurnRunRecord,
+    MultiTurnTurnResult,
     PromptSetBundle,
     RAGTraceData,
     RetrievalData,
@@ -85,6 +88,14 @@ RUN_MODE_PRESETS: dict[str, RunModePreset] = {
         name="full",
         label="Full",
         description="모든 CLI 옵션과 Domain Memory, Prompt manifest를 활용하는 전체 모드.",
+    ),
+    "multiturn": RunModePreset(
+        name="multiturn",
+        label="Multiturn",
+        description="멀티턴 대화 평가 전용 모드 (멀티턴 메트릭만 지원).",
+        default_metrics=("turn_faithfulness", "context_coherence", "drift_rate"),
+        allow_domain_memory=False,
+        allow_prompt_metadata=False,
     ),
 }
 
@@ -485,6 +496,52 @@ def _save_to_db(
             print_cli_error(
                 console,
                 "데이터베이스에 저장하지 못했습니다.",
+                details=str(exc),
+                fixes=["경로 권한과 DB 파일 잠금 상태를 확인하세요."],
+            )
+
+
+def _save_multiturn_to_db(
+    db_path: Path,
+    run_record: MultiTurnRunRecord,
+    conversations: list[MultiTurnConversationRecord],
+    turn_results: list[MultiTurnTurnResult],
+    console: Console,
+    *,
+    storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
+    export_excel: bool = True,
+    excel_output_path: Path | None = None,
+    metric_thresholds: dict[str, float] | None = None,
+) -> None:
+    """Persist multiturn evaluation run to SQLite database."""
+    with console.status(f"[bold green]Saving multiturn run to {db_path}..."):
+        try:
+            storage = storage_cls(db_path=db_path)
+            storage.save_multiturn_run(
+                run_record,
+                conversations,
+                turn_results,
+                metric_thresholds=metric_thresholds,
+            )
+            if export_excel:
+                excel_path = excel_output_path or (
+                    db_path.parent / f"evalvault_multiturn_{run_record.run_id}.xlsx"
+                )
+                try:
+                    storage.export_multiturn_run_to_excel(run_record.run_id, excel_path)
+                    console.print(f"[green]Multiturn Excel export saved: {excel_path}[/green]")
+                except Exception as exc:
+                    print_cli_warning(
+                        console,
+                        "멀티턴 엑셀 내보내기에 실패했습니다.",
+                        tips=[str(exc)],
+                    )
+            console.print(f"[green]Multiturn results saved to database: {db_path}[/green]")
+            console.print(f"[dim]Run ID: {run_record.run_id}[/dim]")
+        except Exception as exc:  # pragma: no cover - persistence errors
+            print_cli_error(
+                console,
+                "멀티턴 결과를 데이터베이스에 저장하지 못했습니다.",
                 details=str(exc),
                 fixes=["경로 권한과 DB 파일 잠금 상태를 확인하세요."],
             )

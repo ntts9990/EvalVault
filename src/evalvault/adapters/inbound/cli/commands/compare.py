@@ -54,7 +54,7 @@ def register_compare_commands(app: typer.Typer, console: Console) -> None:
             "t-test",
             "--test",
             "-t",
-            help="통계 검정 (t-test, mann-whitney)",
+            help="통계 검정 (t-test | mann-whitney)",
         ),
         output_format: str = typer.Option(
             "table",

@@ -12,7 +12,7 @@ from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdap
 from evalvault.domain.services.experiment_manager import ExperimentManager
 
 from ..utils.options import db_option
-from ..utils.validators import parse_csv_option
+from ..utils.validators import parse_csv_option, validate_choice
 
 
 def register_experiment_commands(app: typer.Typer, console: Console) -> None:
@@ -29,9 +29,23 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
             "-m",
             help="Comma-separated list of metrics to compare.",
         ),
+        control_retriever: str | None = typer.Option(
+            None,
+            "--control-retriever",
+            help="Control retriever (bm25, dense, hybrid, graphrag).",
+        ),
+        variant_retriever: str | None = typer.Option(
+            None,
+            "--variant-retriever",
+            help="Variant retriever (bm25, dense, hybrid, graphrag).",
+        ),
         db_path: Path = db_option(help_text="Path to database file."),
     ) -> None:
         """Create a new experiment for A/B testing."""
+
+        for retriever_name in (control_retriever, variant_retriever):
+            if retriever_name:
+                validate_choice(retriever_name, ["bm25", "dense", "hybrid", "graphrag"], console)
 
         console.print("\n[bold]Creating Experiment[/bold]\n")
         storage = SQLiteStorageAdapter(db_path=db_path)
@@ -44,6 +58,18 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
             hypothesis=hypothesis,
             metrics=metric_list,
         )
+        if control_retriever:
+            manager.add_group_to_experiment(
+                experiment.experiment_id,
+                "control",
+                f"retriever={control_retriever}",
+            )
+        if variant_retriever:
+            manager.add_group_to_experiment(
+                experiment.experiment_id,
+                "variant",
+                f"retriever={variant_retriever}",
+            )
         console.print(f"[green]Created experiment:[/green] {experiment.experiment_id}")
         console.print(f"  Name: {experiment.name}")
         console.print(f"  Status: {experiment.status}")

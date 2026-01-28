@@ -13,6 +13,13 @@ from evalvault.adapters.inbound.cli.utils.analysis_io import write_json
 from evalvault.adapters.outbound.analysis.statistical_adapter import (
     StatisticalAnalysisAdapter,
 )
+from evalvault.adapters.outbound.report.ci_report_formatter import (
+    CIGateMetricRow,
+    format_ci_regression_report,
+)
+from evalvault.adapters.outbound.report.pr_comment_formatter import (
+    format_ci_gate_pr_comment,
+)
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.domain.services.regression_gate_service import (
     RegressionGateReport,
@@ -25,13 +32,14 @@ from ..utils.options import db_option
 from ..utils.validators import parse_csv_option, validate_choice
 
 
-def _coerce_test_type(value: Literal["t-test", "mann-whitney"]) -> TestType:
+def _coerce_test_type(value: str) -> TestType:
     if value == "t-test":
         return "t-test"
     return "mann-whitney"
 
 
 OutputFormat = Literal["table", "json", "github-actions"]
+CIGateOutputFormat = Literal["github", "gitlab", "json", "pr-comment"]
 
 
 def _format_timestamp(value: datetime) -> str:
@@ -198,6 +206,166 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
             _render_table(report, console)
 
         if report.regression_detected:
+            raise typer.Exit(2)
+
+    @app.command(name="ci-gate")
+    def ci_gate(
+        baseline_run_id: str = typer.Argument(..., help="Baseline run ID."),
+        current_run_id: str = typer.Argument(..., help="Current run ID."),
+        regression_threshold: float = typer.Option(
+            0.05,
+            "--regression-threshold",
+            help="Fail if regression rate exceeds this threshold (default: 0.05).",
+        ),
+        output_format: str = typer.Option(
+            "github",
+            "--format",
+            "-f",
+            help="Output format: github, gitlab, json, or pr-comment.",
+        ),
+        fail_on_regression: bool = typer.Option(
+            True,
+            "--fail-on-regression/--no-fail-on-regression",
+            help="Fail the command when regression rate exceeds threshold.",
+        ),
+        db_path: Path | None = db_option(default=None, help_text="Database path"),
+    ) -> None:
+        """CI/CD 파이프라인용 회귀 게이트 체크."""
+        started_at = datetime.now(UTC)
+        if db_path is None:
+            console.print("[red]Error:[/red] Database path is not configured.")
+            raise typer.Exit(1)
+
+        validate_choice(
+            output_format,
+            ["github", "gitlab", "json", "pr-comment"],
+            console,
+            value_label="format",
+        )
+
+        storage = SQLiteStorageAdapter(db_path=db_path)
+        analysis_adapter = StatisticalAnalysisAdapter()
+        service = RegressionGateService(storage=storage, analysis_adapter=analysis_adapter)
+
+        try:
+            current_run = storage.get_run(current_run_id)
+            storage.get_run(baseline_run_id)
+            report = service.run_gate(
+                current_run_id,
+                baseline_run_id,
+            )
+        except KeyError as exc:
+            finished_at = datetime.now(UTC)
+            duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+            payload = _build_envelope(
+                report=None,
+                status="error",
+                started_at=started_at,
+                finished_at=finished_at,
+                duration_ms=duration_ms,
+                message=str(exc),
+                error_type=type(exc).__name__,
+            )
+            if output_format == "json":
+                console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(3) from exc
+        except (ValueError, RuntimeError) as exc:
+            finished_at = datetime.now(UTC)
+            duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+            payload = _build_envelope(
+                report=None,
+                status="error",
+                started_at=started_at,
+                finished_at=finished_at,
+                duration_ms=duration_ms,
+                message=str(exc),
+                error_type=type(exc).__name__,
+            )
+            if output_format == "json":
+                console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1) from exc
+
+        thresholds = dict.fromkeys(current_run.metrics_evaluated, 0.7)
+        thresholds.update(current_run.thresholds or {})
+
+        rows: list[CIGateMetricRow] = []
+        threshold_failures = []
+        regressed_metrics = []
+        for result in report.results:
+            avg_score = current_run.get_avg_score(result.metric)
+            threshold = thresholds.get(result.metric, 0.7)
+            threshold_passed = avg_score is not None and avg_score >= threshold
+            if not threshold_passed:
+                threshold_failures.append(result.metric)
+            if result.regression:
+                regressed_metrics.append(result.metric)
+            if result.regression:
+                status = "⚠️"
+            elif threshold_passed:
+                status = "✅"
+            else:
+                status = "❌"
+            rows.append(
+                CIGateMetricRow(
+                    metric=result.metric,
+                    baseline_score=result.baseline_score,
+                    current_score=result.candidate_score,
+                    change_percent=result.diff_percent,
+                    status=status,
+                )
+            )
+
+        regression_rate = len(regressed_metrics) / len(report.results) if report.results else 0.0
+        all_thresholds_passed = not threshold_failures
+        gate_passed = all_thresholds_passed and regression_rate < regression_threshold
+
+        finished_at = datetime.now(UTC)
+        duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+        payload = {
+            "baseline_run_id": baseline_run_id,
+            "current_run_id": current_run_id,
+            "gate_passed": gate_passed,
+            "all_thresholds_passed": all_thresholds_passed,
+            "regression_rate": regression_rate,
+            "regression_threshold": regression_threshold,
+            "regressed_metrics": regressed_metrics,
+            "threshold_failures": threshold_failures,
+            "started_at": _format_timestamp(started_at),
+            "finished_at": _format_timestamp(finished_at),
+            "duration_ms": duration_ms,
+            "report": report.to_dict(),
+        }
+
+        if output_format == "json":
+            console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+        elif output_format == "pr-comment":
+            markdown = format_ci_gate_pr_comment(
+                rows,
+                baseline_run_id=baseline_run_id,
+                current_run_id=current_run_id,
+                regression_rate=regression_rate,
+                regression_threshold=regression_threshold,
+                gate_passed=gate_passed,
+                threshold_failures=threshold_failures,
+                regressed_metrics=regressed_metrics,
+            )
+            console.print(markdown)
+        else:
+            markdown = format_ci_regression_report(
+                rows,
+                regression_rate=regression_rate,
+                regression_threshold=regression_threshold,
+                gate_passed=gate_passed,
+            )
+            console.print(markdown)
+
+        if not all_thresholds_passed:
+            raise typer.Exit(1)
+        if not gate_passed and fail_on_regression:
             raise typer.Exit(2)
 
 
