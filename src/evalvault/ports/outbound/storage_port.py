@@ -6,6 +6,9 @@ from typing import Any, Protocol
 from evalvault.domain.entities import (
     EvaluationRun,
     FeedbackSummary,
+    MultiTurnConversationRecord,
+    MultiTurnRunRecord,
+    MultiTurnTurnResult,
     PromptSetBundle,
     RunClusterMap,
     RunClusterMapInfo,
@@ -32,11 +35,24 @@ class StoragePort(Protocol):
         """
         ...
 
+    def save_multiturn_run(
+        self,
+        run: MultiTurnRunRecord,
+        conversations: list[MultiTurnConversationRecord],
+        turn_results: list[MultiTurnTurnResult],
+        *,
+        metric_thresholds: dict[str, float] | None = None,
+    ) -> str:
+        """멀티턴 평가 실행 결과를 저장합니다."""
+        ...
+
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:
         """Persist prompt set and prompt items."""
         ...
 
     def export_run_to_excel(self, run_id: str, output_path: str | Path) -> Path: ...
+
+    def export_multiturn_run_to_excel(self, run_id: str, output_path: str | Path) -> Path: ...
 
     def link_prompt_set_to_run(self, run_id: str, prompt_set_id: str) -> None:
         """Attach a prompt set to an evaluation run."""
@@ -203,6 +219,15 @@ class StoragePort(Protocol):
         metadata: dict[str, Any] | None = None,
         created_at: str | None = None,
     ) -> str: ...
+
+    def list_analysis_reports(
+        self,
+        *,
+        run_id: str,
+        report_type: str | None = None,
+        format: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]: ...
 
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""

@@ -166,6 +166,8 @@ class WebUIPort(Protocol):
         *,
         include_nlp: bool = True,
         include_causal: bool = True,
+        use_cache: bool = True,
+        save: bool = False,
     ) -> str:
         """보고서 생성.
 
@@ -174,6 +176,8 @@ class WebUIPort(Protocol):
             output_format: 출력 포맷 (markdown, html)
             include_nlp: NLP 분석 포함 여부
             include_causal: 인과 분석 포함 여부
+            use_cache: 캐시된 보고서 사용 여부
+            save: DB 저장 여부
 
         Returns:
             생성된 보고서 문자열
