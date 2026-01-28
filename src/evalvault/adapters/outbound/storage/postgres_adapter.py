@@ -30,6 +30,31 @@ from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle,
 from evalvault.domain.entities.stage import StageEvent, StageMetric
 
 
+class PostgresQueries(SQLQueries):
+    def __init__(self) -> None:
+        super().__init__(
+            placeholder="%s",
+            metric_name_column="name",
+            test_case_returning_clause="RETURNING id",
+            feedback_returning_clause="RETURNING id",
+        )
+
+    def upsert_regression_baseline(self) -> str:
+        return """
+        INSERT INTO regression_baselines (
+            baseline_key, run_id, dataset_name, branch, commit_sha, metadata,
+            created_at, updated_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (baseline_key) DO UPDATE SET
+            run_id = EXCLUDED.run_id,
+            dataset_name = EXCLUDED.dataset_name,
+            branch = EXCLUDED.branch,
+            commit_sha = EXCLUDED.commit_sha,
+            metadata = EXCLUDED.metadata,
+            updated_at = EXCLUDED.updated_at
+        """
+
+
 class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
     """PostgreSQL 기반 평가 결과 저장 어댑터.
 
@@ -56,14 +81,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             password: Database password
             connection_string: Full connection string (overrides other params if provided)
         """
-        super().__init__(
-            SQLQueries(
-                placeholder="%s",
-                metric_name_column="name",
-                test_case_returning_clause="RETURNING id",
-                feedback_returning_clause="RETURNING id",
-            )
-        )
+        super().__init__(PostgresQueries())
         if connection_string:
             self._conn_string = connection_string
         else:
@@ -303,6 +321,29 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_multiturn_scores_metric_name ON multiturn_metric_scores(metric_name)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS regression_baselines (
+                baseline_key TEXT PRIMARY KEY,
+                run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+                dataset_name VARCHAR(255),
+                branch TEXT,
+                commit_sha VARCHAR(64),
+                metadata JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_baselines_run_id ON regression_baselines(run_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_baselines_dataset ON regression_baselines(dataset_name)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_baselines_updated_at ON regression_baselines(updated_at DESC)"
         )
 
     # Prompt set methods
@@ -815,6 +856,55 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             )
             conn.commit()
         return analysis_id
+
+    def save_dataset_feature_analysis(
+        self,
+        *,
+        run_id: str,
+        result_data: dict[str, Any],
+        analysis_id: str | None = None,
+    ) -> str:
+        """데이터셋 특성 분석 결과를 저장합니다."""
+        analysis_id = analysis_id or f"dataset-features-{run_id}-{uuid.uuid4().hex[:8]}"
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO analysis_results (
+                    analysis_id, run_id, analysis_type, result_data, created_at
+                ) VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (analysis_id) DO UPDATE SET
+                    result_data = EXCLUDED.result_data,
+                    created_at = EXCLUDED.created_at
+                """,
+                (
+                    analysis_id,
+                    run_id,
+                    AnalysisType.DATASET_FEATURES.value,
+                    json.dumps(result_data, ensure_ascii=False),
+                    datetime.now(UTC),
+                ),
+            )
+            conn.commit()
+        return analysis_id
+
+    def get_dataset_feature_analysis(self, analysis_id: str) -> dict[str, Any]:
+        """데이터셋 특성 분석 결과를 조회합니다."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT result_data
+                FROM analysis_results
+                WHERE analysis_id = %s AND analysis_type = %s
+                """,
+                (analysis_id, AnalysisType.DATASET_FEATURES.value),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                raise KeyError(f"Dataset feature analysis not found: {analysis_id}")
+
+            return self._ensure_json(row["result_data"])
 
     def get_nlp_analysis(self, analysis_id: str) -> NLPAnalysis:
         """NLP 분석 결과를 조회합니다."""

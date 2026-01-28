@@ -245,7 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_group_runs_group_id ON experiment_group_runs(grou
 CREATE TABLE IF NOT EXISTS analysis_results (
     analysis_id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
-    analysis_type TEXT NOT NULL,  -- 'statistical', 'nlp', 'causal', 'data_quality'
+    analysis_type TEXT NOT NULL,  -- 'statistical', 'nlp', 'causal', 'data_quality', 'dataset_features'
     result_data TEXT NOT NULL,  -- JSON serialized analysis result
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
@@ -360,3 +360,20 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
 CREATE INDEX IF NOT EXISTS idx_benchmark_runs_type ON benchmark_runs(benchmark_type);
 CREATE INDEX IF NOT EXISTS idx_benchmark_runs_model ON benchmark_runs(model_name);
 CREATE INDEX IF NOT EXISTS idx_benchmark_runs_created_at ON benchmark_runs(created_at DESC);
+
+-- Regression baselines table for CI/CD integration
+CREATE TABLE IF NOT EXISTS regression_baselines (
+    baseline_key TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    dataset_name TEXT,
+    branch TEXT,
+    commit_sha TEXT,
+    metadata TEXT,  -- JSON metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_baselines_run_id ON regression_baselines(run_id);
+CREATE INDEX IF NOT EXISTS idx_baselines_dataset ON regression_baselines(dataset_name);
+CREATE INDEX IF NOT EXISTS idx_baselines_updated_at ON regression_baselines(updated_at DESC);

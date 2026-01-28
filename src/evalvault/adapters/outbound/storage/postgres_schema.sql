@@ -304,3 +304,18 @@ CREATE TABLE IF NOT EXISTS stage_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_stage_metrics_run_id ON stage_metrics(run_id);
 CREATE INDEX IF NOT EXISTS idx_stage_metrics_stage_id ON stage_metrics(stage_id);
+
+CREATE TABLE IF NOT EXISTS regression_baselines (
+    baseline_key TEXT PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    dataset_name VARCHAR(255),
+    branch TEXT,
+    commit_sha VARCHAR(64),
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_baselines_run_id ON regression_baselines(run_id);
+CREATE INDEX IF NOT EXISTS idx_baselines_dataset ON regression_baselines(dataset_name);
+CREATE INDEX IF NOT EXISTS idx_baselines_updated_at ON regression_baselines(updated_at DESC);

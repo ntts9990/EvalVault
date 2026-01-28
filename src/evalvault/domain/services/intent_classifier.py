@@ -181,6 +181,19 @@ class IntentKeywordRegistry:
             "토픽",
             "topic",
         }
+        self._keywords[AnalysisIntent.ANALYZE_DATASET_FEATURES] = {
+            "데이터셋",
+            "dataset",
+            "특성",
+            "feature",
+            "features",
+            "분포",
+            "distribution",
+            "상관",
+            "correlation",
+            "중요도",
+            "importance",
+        }
         self._keywords[AnalysisIntent.ANALYZE_CAUSAL] = {
             "인과",
             "causal",

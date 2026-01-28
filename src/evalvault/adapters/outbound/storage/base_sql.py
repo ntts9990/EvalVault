@@ -249,6 +249,17 @@ class SQLQueries:
     def list_runs_ordering(self) -> str:
         return f" ORDER BY started_at DESC LIMIT {self.placeholder}"
 
+    def upsert_regression_baseline(self) -> str:
+        raise NotImplementedError("Override in subclass")
+
+    def select_regression_baseline(self) -> str:
+        return f"""
+        SELECT baseline_key, run_id, dataset_name, branch, commit_sha, metadata,
+               created_at, updated_at
+        FROM regression_baselines
+        WHERE baseline_key = {self.placeholder}
+        """
+
 
 class BaseSQLStorageAdapter(ABC):
     """Shared serialization and SQL helpers for DB-API based adapters."""
@@ -588,6 +599,54 @@ class BaseSQLStorageAdapter(ABC):
             thumb_up_rate=thumb_up_rate,
             total_feedback=len(effective),
         )
+
+    def set_regression_baseline(
+        self,
+        baseline_key: str,
+        run_id: str,
+        *,
+        dataset_name: str | None = None,
+        branch: str | None = None,
+        commit_sha: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        now = self._serialize_datetime(datetime.now())
+        with self._get_connection() as conn:
+            self._execute(
+                conn,
+                self.queries.upsert_regression_baseline(),
+                (
+                    baseline_key,
+                    run_id,
+                    dataset_name,
+                    branch,
+                    commit_sha,
+                    self._serialize_json(metadata),
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+
+    def get_regression_baseline(self, baseline_key: str) -> dict[str, Any] | None:
+        with self._get_connection() as conn:
+            row = self._execute(
+                conn,
+                self.queries.select_regression_baseline(),
+                (baseline_key,),
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "baseline_key": self._row_value(row, "baseline_key"),
+                "run_id": str(self._row_value(row, "run_id")),
+                "dataset_name": self._row_value(row, "dataset_name"),
+                "branch": self._row_value(row, "branch"),
+                "commit_sha": self._row_value(row, "commit_sha"),
+                "metadata": self._deserialize_json(self._row_value(row, "metadata")),
+                "created_at": self._row_value(row, "created_at"),
+                "updated_at": self._row_value(row, "updated_at"),
+            }
 
     # Serialization helpers --------------------------------------------
 

@@ -23,6 +23,9 @@ from evalvault.adapters.outbound.analysis.comparison_report_module import (
     ComparisonReportModule,
 )
 from evalvault.adapters.outbound.analysis.data_loader_module import DataLoaderModule
+from evalvault.adapters.outbound.analysis.dataset_feature_analyzer_module import (
+    DatasetFeatureAnalyzerModule,
+)
 from evalvault.adapters.outbound.analysis.detailed_report_module import (
     DetailedReportModule,
 )
@@ -136,6 +139,7 @@ __all__ = [
     "CausalAnalyzerModule",
     "ComparisonReportModule",
     "DataLoaderModule",
+    "DatasetFeatureAnalyzerModule",
     "DetailedReportModule",
     "DiagnosticPlaybookModule",
     "EmbeddingAnalyzerModule",

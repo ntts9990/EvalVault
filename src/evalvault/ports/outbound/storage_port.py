@@ -236,3 +236,20 @@ class StoragePort(Protocol):
     def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
         """저장된 파이프라인 분석 결과를 조회합니다."""
         ...
+
+    def set_regression_baseline(
+        self,
+        baseline_key: str,
+        run_id: str,
+        *,
+        dataset_name: str | None = None,
+        branch: str | None = None,
+        commit_sha: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """회귀 테스트 베이스라인을 설정합니다."""
+        ...
+
+    def get_regression_baseline(self, baseline_key: str) -> dict[str, Any] | None:
+        """회귀 테스트 베이스라인을 조회합니다."""
+        ...

@@ -33,6 +33,16 @@ if TYPE_CHECKING:
     from evalvault.domain.entities.benchmark_run import BenchmarkRun
 
 
+class SQLiteQueries(SQLQueries):
+    def upsert_regression_baseline(self) -> str:
+        return """
+        INSERT OR REPLACE INTO regression_baselines (
+            baseline_key, run_id, dataset_name, branch, commit_sha, metadata,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+
 class SQLiteStorageAdapter(BaseSQLStorageAdapter):
     """SQLite 기반 평가 결과 저장 어댑터.
 
@@ -45,7 +55,7 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
         Args:
             db_path: Path to SQLite database file (default: data/db/evalvault.db)
         """
-        super().__init__(SQLQueries())
+        super().__init__(SQLiteQueries())
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
@@ -244,6 +254,28 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
                 );
                 CREATE INDEX IF NOT EXISTS idx_multiturn_scores_turn_id ON multiturn_metric_scores(turn_result_id);
                 CREATE INDEX IF NOT EXISTS idx_multiturn_scores_metric_name ON multiturn_metric_scores(metric_name);
+                """
+            )
+
+        baseline_cursor = conn.execute("PRAGMA table_info(regression_baselines)")
+        baseline_columns = {row[1] for row in baseline_cursor.fetchall()}
+        if not baseline_columns:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS regression_baselines (
+                    baseline_key TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    dataset_name TEXT,
+                    branch TEXT,
+                    commit_sha TEXT,
+                    metadata TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_baselines_run_id ON regression_baselines(run_id);
+                CREATE INDEX IF NOT EXISTS idx_baselines_dataset ON regression_baselines(dataset_name);
+                CREATE INDEX IF NOT EXISTS idx_baselines_updated_at ON regression_baselines(updated_at DESC);
                 """
             )
 
@@ -841,6 +873,55 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
 
             conn.commit()
             return analysis_id
+
+    def save_dataset_feature_analysis(
+        self,
+        *,
+        run_id: str,
+        result_data: dict[str, Any],
+        analysis_id: str | None = None,
+    ) -> str:
+        """데이터셋 특성 분석 결과를 저장합니다."""
+        analysis_id = analysis_id or f"dataset-features-{run_id}-{uuid.uuid4().hex[:8]}"
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO analysis_results (
+                    analysis_id, run_id, analysis_type, result_data, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    analysis_id,
+                    run_id,
+                    AnalysisType.DATASET_FEATURES.value,
+                    json.dumps(result_data, ensure_ascii=False),
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
+            return analysis_id
+
+    def get_dataset_feature_analysis(self, analysis_id: str) -> dict[str, Any]:
+        """데이터셋 특성 분석 결과를 조회합니다."""
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT analysis_id, result_data
+                FROM analysis_results
+                WHERE analysis_id = ? AND analysis_type = ?
+                """,
+                (analysis_id, AnalysisType.DATASET_FEATURES.value),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                raise KeyError(f"Dataset feature analysis not found: {analysis_id}")
+
+            return json.loads(row[1])
 
     def get_nlp_analysis(self, analysis_id: str) -> NLPAnalysis:
         """NLP 분석 결과를 조회합니다.

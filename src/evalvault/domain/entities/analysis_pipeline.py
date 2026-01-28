@@ -41,6 +41,7 @@ class AnalysisIntent(str, Enum):
     ANALYZE_TRENDS = "analyze_trends"
     ANALYZE_STATISTICAL = "analyze_statistical"
     ANALYZE_NLP = "analyze_nlp"
+    ANALYZE_DATASET_FEATURES = "analyze_dataset_features"
     ANALYZE_CAUSAL = "analyze_causal"
     ANALYZE_NETWORK = "analyze_network"
     ANALYZE_PLAYBOOK = "analyze_playbook"

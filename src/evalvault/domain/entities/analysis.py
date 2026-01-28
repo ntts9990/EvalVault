@@ -14,6 +14,7 @@ class AnalysisType(str, Enum):
     NLP = "nlp"
     CAUSAL = "causal"
     DATA_QUALITY = "data_quality"
+    DATASET_FEATURES = "dataset_features"
 
 
 class QuestionType(str, Enum):
