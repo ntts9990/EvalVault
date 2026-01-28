@@ -158,7 +158,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from .routers import benchmark, chat, config, domain, knowledge, mcp, pipeline, runs
+    from .routers import (
+        benchmark,
+        calibration,
+        chat,
+        config,
+        domain,
+        knowledge,
+        mcp,
+        pipeline,
+        runs,
+    )
 
     auth_dependencies = [Depends(require_api_token)]
 
@@ -208,6 +218,12 @@ def create_app() -> FastAPI:
         mcp.router,
         prefix="/api/v1/mcp",
         tags=["mcp"],
+        dependencies=auth_dependencies,
+    )
+    app.include_router(
+        calibration.router,
+        prefix="/api/v1/calibration",
+        tags=["calibration"],
         dependencies=auth_dependencies,
     )
 

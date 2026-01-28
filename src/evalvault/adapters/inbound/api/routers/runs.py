@@ -6,11 +6,12 @@ import asyncio
 import csv
 import json
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
-from fastapi.responses import PlainTextResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from evalvault.adapters.inbound.api.main import AdapterDep
@@ -21,6 +22,7 @@ from evalvault.adapters.outbound.dataset.templates import (
 )
 from evalvault.adapters.outbound.debug.report_renderer import render_markdown
 from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.report import DashboardGenerator
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities import (
     CalibrationResult,
@@ -1155,6 +1157,74 @@ def get_improvement_guide(
         return report
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/analysis-report", response_model=None)
+def get_analysis_report(
+    run_id: str,
+    adapter: AdapterDep,
+    format: Literal["markdown", "html"] = Query("markdown", description="Report format"),
+    include_nlp: bool = Query(True, description="Include NLP analysis"),
+    include_causal: bool = Query(True, description="Include causal analysis"),
+    use_cache: bool = Query(True, description="Use cached report if available"),
+    save: bool = Query(False, description="Save report to database"),
+):
+    """Generate analysis report (Markdown/HTML)."""
+    try:
+        report = adapter.generate_report(
+            run_id,
+            output_format=format,
+            include_nlp=include_nlp,
+            include_causal=include_causal,
+            use_cache=use_cache,
+            save=save,
+        )
+        if format == "html":
+            return HTMLResponse(report)
+        return PlainTextResponse(report)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{run_id}/dashboard", response_model=None)
+def get_dashboard(
+    run_id: str,
+    adapter: AdapterDep,
+    format: Literal["png", "svg", "pdf"] = Query("png", description="Dashboard format"),
+    include_nlp: bool = Query(True, description="Include NLP analysis"),
+    include_causal: bool = Query(True, description="Include causal analysis"),
+):
+    """Generate dashboard image for a run."""
+    try:
+        dashboard_payload = adapter.build_dashboard_payload(
+            run_id,
+            include_nlp=include_nlp,
+            include_causal=include_causal,
+        )
+        generator = DashboardGenerator()
+        fig = generator.generate_evaluation_dashboard(
+            run_id,
+            analysis_data=dashboard_payload,
+        )
+        buffer = BytesIO()
+        fig.savefig(buffer, format=format, dpi=300, bbox_inches="tight")
+        fig.clear()
+        media_types = {
+            "png": "image/png",
+            "svg": "image/svg+xml",
+            "pdf": "application/pdf",
+        }
+        return Response(content=buffer.getvalue(), media_type=media_types[format])
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Run not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

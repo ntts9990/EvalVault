@@ -8,11 +8,20 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from urllib.request import urlopen
 
+from evalvault.adapters.outbound.analysis import (
+    CausalAnalysisAdapter,
+    NLPAnalysisAdapter,
+    StatisticalAnalysisAdapter,
+)
+from evalvault.adapters.outbound.cache import MemoryCacheAdapter
+from evalvault.adapters.outbound.judge_calibration_reporter import JudgeCalibrationReporter
+from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
 from evalvault.domain.entities import (
@@ -20,6 +29,7 @@ from evalvault.domain.entities import (
     FeedbackSummary,
     SatisfactionFeedback,
 )
+from evalvault.domain.entities.analysis import AnalysisBundle
 from evalvault.domain.entities.debug import DebugReport
 from evalvault.domain.entities.prompt import PromptSetBundle
 from evalvault.domain.metrics.registry import (
@@ -29,8 +39,10 @@ from evalvault.domain.metrics.registry import (
     list_metric_names,
     list_metric_specs,
 )
+from evalvault.domain.services.analysis_service import AnalysisService
 from evalvault.domain.services.cluster_map_builder import build_cluster_map
 from evalvault.domain.services.debug_report_service import DebugReportService
+from evalvault.domain.services.judge_calibration_service import JudgeCalibrationService
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
@@ -990,6 +1002,188 @@ class WebUIAdapter:
         service = SatisfactionCalibrationService()
         return service.build_calibration(run, feedbacks, model=model)
 
+    def run_judge_calibration(
+        self,
+        *,
+        run_id: str,
+        labels_source: str,
+        method: str,
+        metrics: list[str],
+        holdout_ratio: float,
+        seed: int,
+        parallel: bool,
+        concurrency: int,
+    ) -> dict[str, object]:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        storage = self._storage
+        if holdout_ratio <= 0 or holdout_ratio >= 1:
+            raise ValueError("holdout_ratio must be between 0 and 1")
+        if seed < 0:
+            raise ValueError("seed must be >= 0")
+        if concurrency <= 0:
+            raise ValueError("concurrency must be >= 1")
+
+        run = self.get_run_details(run_id)
+        feedbacks = storage.list_feedback(run_id)
+        if labels_source in {"feedback", "hybrid"} and not feedbacks:
+            raise ValueError("Feedback labels are required for this labels_source")
+        resolved_metrics = metrics or list(run.metrics_evaluated)
+        if not resolved_metrics:
+            raise ValueError("No metrics available for calibration")
+
+        started_at = datetime.now(UTC)
+        service = JudgeCalibrationService()
+        result = service.calibrate(
+            run,
+            feedbacks,
+            labels_source=labels_source,
+            method=method,
+            metrics=resolved_metrics,
+            holdout_ratio=holdout_ratio,
+            seed=seed,
+            parallel=parallel,
+            concurrency=concurrency,
+        )
+        finished_at = datetime.now(UTC)
+        duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+
+        reporter = JudgeCalibrationReporter()
+        timestamp = started_at.strftime("%Y%m%d_%H%M%S")
+        calibration_id = f"judge_calibration_{run_id}_{timestamp}"
+        base_dir = Path("reports/calibration")
+        output_path = base_dir / f"{calibration_id}.json"
+        artifacts_dir = base_dir / "artifacts" / calibration_id
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        artifacts_index = reporter.write_artifacts(result=result, artifacts_dir=artifacts_dir)
+
+        rendered = reporter.render_json(result)
+
+        status = "ok" if result.summary.gate_passed else "degraded"
+        summary_payload = {
+            "calibration_id": calibration_id,
+            "run_id": result.summary.run_id,
+            "labels_source": result.summary.labels_source,
+            "method": result.summary.method,
+            "metrics": list(result.summary.metrics),
+            "holdout_ratio": result.summary.holdout_ratio,
+            "seed": result.summary.seed,
+            "total_labels": result.summary.total_labels,
+            "total_samples": result.summary.total_samples,
+            "gate_passed": result.summary.gate_passed,
+            "gate_threshold": result.summary.gate_threshold,
+            "notes": list(result.summary.notes),
+            "created_at": started_at.astimezone(UTC).isoformat(),
+        }
+        payload = {
+            "calibration_id": calibration_id,
+            "status": status,
+            "started_at": started_at.astimezone(UTC).isoformat(),
+            "finished_at": finished_at.astimezone(UTC).isoformat(),
+            "duration_ms": duration_ms,
+            "artifacts": artifacts_index,
+            "summary": summary_payload,
+            "metrics": rendered["metrics"],
+            "case_results": rendered["case_results"],
+            "warnings": list(result.warnings),
+        }
+        output_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        metadata = run.tracker_metadata or {}
+        history = metadata.get("judge_calibration_history")
+        if not isinstance(history, list):
+            history = []
+        history.append(
+            {
+                "calibration_id": calibration_id,
+                "run_id": run_id,
+                "labels_source": summary_payload["labels_source"],
+                "method": summary_payload["method"],
+                "metrics": summary_payload["metrics"],
+                "holdout_ratio": summary_payload["holdout_ratio"],
+                "seed": summary_payload["seed"],
+                "total_labels": summary_payload["total_labels"],
+                "total_samples": summary_payload["total_samples"],
+                "gate_passed": summary_payload["gate_passed"],
+                "gate_threshold": summary_payload["gate_threshold"],
+                "created_at": summary_payload["created_at"],
+                "output_path": str(output_path),
+                "artifacts": artifacts_index,
+            }
+        )
+        metadata["judge_calibration_history"] = history
+        storage.update_run_metadata(run_id, metadata)
+        return payload
+
+    def get_judge_calibration(self, calibration_id: str) -> dict[str, object]:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        entry = self._find_judge_calibration_entry(calibration_id)
+        output_path = Path(str(entry.get("output_path") or ""))
+        if not output_path.exists():
+            raise KeyError(f"Calibration output not found: {calibration_id}")
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+        return payload
+
+    def list_judge_calibrations(self, *, limit: int = 20) -> list[dict[str, object]]:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        storage = self._storage
+        scan_limit = max(100, limit * 5)
+        runs = storage.list_runs(limit=scan_limit)
+        entries: list[dict[str, object]] = []
+        for run in runs:
+            metadata = getattr(run, "tracker_metadata", {}) or {}
+            history = metadata.get("judge_calibration_history")
+            if not isinstance(history, list):
+                continue
+            for item in history:
+                if isinstance(item, dict):
+                    entries.append(
+                        {
+                            "calibration_id": item.get("calibration_id"),
+                            "run_id": item.get("run_id"),
+                            "labels_source": item.get("labels_source"),
+                            "method": item.get("method"),
+                            "metrics": item.get("metrics") or [],
+                            "holdout_ratio": item.get("holdout_ratio"),
+                            "seed": item.get("seed"),
+                            "total_labels": item.get("total_labels"),
+                            "total_samples": item.get("total_samples"),
+                            "gate_passed": item.get("gate_passed"),
+                            "gate_threshold": item.get("gate_threshold"),
+                            "created_at": item.get("created_at"),
+                        }
+                    )
+
+        def _sort_key(item: dict[str, object]) -> str:
+            value = item.get("created_at")
+            return value if isinstance(value, str) else ""
+
+        entries.sort(key=_sort_key, reverse=True)
+        return entries[:limit]
+
+    def _find_judge_calibration_entry(self, calibration_id: str) -> dict[str, object]:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        storage = self._storage
+        scan_limit = 1000
+        runs = storage.list_runs(limit=scan_limit)
+        for run in runs:
+            metadata = getattr(run, "tracker_metadata", {}) or {}
+            history = metadata.get("judge_calibration_history")
+            if not isinstance(history, list):
+                continue
+            for item in history:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("calibration_id") == calibration_id:
+                    return item
+        raise KeyError(f"Calibration not found: {calibration_id}")
+
     def list_stage_events(self, run_id: str, *, stage_type: str | None = None) -> list[StageEvent]:
         """Stage 이벤트 목록 조회."""
         if self._storage is None or not hasattr(self._storage, "list_stage_events"):
@@ -1153,6 +1347,110 @@ class WebUIAdapter:
             logger.error(f"Failed to delete run {run_id}: {e}")
             return False
 
+    def _build_analysis_bundle(
+        self,
+        run_id: str,
+        *,
+        include_nlp: bool,
+        include_causal: bool,
+    ) -> AnalysisBundle:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+
+        run = self._storage.get_run(run_id)
+        if not run.results:
+            raise ValueError("Run has no results to analyze")
+
+        analysis_adapter = StatisticalAnalysisAdapter()
+        cache_adapter = MemoryCacheAdapter()
+
+        nlp_adapter = None
+        if include_nlp:
+            settings = self._settings or Settings()
+            llm_adapter = self._llm_adapter
+            if llm_adapter is None:
+                from evalvault.adapters.outbound.llm import get_llm_adapter
+
+                try:
+                    llm_adapter = get_llm_adapter(settings)
+                except Exception as exc:
+                    logger.warning("LLM adapter initialization failed for report: %s", exc)
+                    llm_adapter = None
+            if llm_adapter is not None:
+                nlp_adapter = NLPAnalysisAdapter(
+                    llm_adapter=llm_adapter,
+                    use_embeddings=True,
+                )
+
+        causal_adapter = CausalAnalysisAdapter() if include_causal else None
+
+        service = AnalysisService(
+            analysis_adapter=analysis_adapter,
+            nlp_adapter=nlp_adapter,
+            causal_adapter=causal_adapter,
+            cache_adapter=cache_adapter,
+        )
+        return service.analyze_run(run, include_nlp=include_nlp, include_causal=include_causal)
+
+    @staticmethod
+    def _build_dashboard_payload(bundle: AnalysisBundle) -> dict[str, Any]:
+        payload: dict[str, Any] = {"run_id": bundle.run_id}
+        analysis = bundle.statistical
+        if analysis is None:
+            return payload
+
+        metrics_summary: dict[str, Any] = {}
+        for metric, stats in analysis.metrics_summary.items():
+            metrics_summary[metric] = {
+                "mean": stats.mean,
+                "std": stats.std,
+                "min": stats.min,
+                "max": stats.max,
+                "median": stats.median,
+                "percentile_25": stats.percentile_25,
+                "percentile_75": stats.percentile_75,
+                "count": stats.count,
+            }
+
+        payload.update(
+            {
+                "metrics_summary": metrics_summary,
+                "correlation_matrix": analysis.correlation_matrix,
+                "correlation_metrics": analysis.correlation_metrics,
+                "metric_pass_rates": analysis.metric_pass_rates,
+                "low_performers": [asdict(item) for item in analysis.low_performers],
+            }
+        )
+        return payload
+
+    def _find_cached_report(
+        self,
+        *,
+        run_id: str,
+        output_format: str,
+        include_nlp: bool,
+        include_causal: bool,
+    ) -> str | None:
+        if self._storage is None:
+            return None
+
+        reports = self._storage.list_analysis_reports(
+            run_id=run_id,
+            report_type="analysis",
+            format=output_format,
+            limit=10,
+        )
+        for report in reports:
+            metadata = report.get("metadata") or {}
+            if metadata.get("include_nlp") != include_nlp:
+                continue
+            if metadata.get("include_causal") != include_causal:
+                continue
+            content = report.get("content")
+            if content:
+                return content
+        return None
+
     def generate_report(
         self,
         run_id: str,
@@ -1160,6 +1458,8 @@ class WebUIAdapter:
         *,
         include_nlp: bool = True,
         include_causal: bool = True,
+        use_cache: bool = True,
+        save: bool = False,
     ) -> str:
         """보고서 생성.
 
@@ -1172,8 +1472,72 @@ class WebUIAdapter:
         Returns:
             생성된 보고서
         """
-        # TODO: 실제 보고서 생성 로직 구현
-        raise NotImplementedError("Report generation not yet implemented")
+        if use_cache:
+            cached = self._find_cached_report(
+                run_id=run_id,
+                output_format=output_format,
+                include_nlp=include_nlp,
+                include_causal=include_causal,
+            )
+            if cached is not None:
+                return cached
+
+        bundle = self._build_analysis_bundle(
+            run_id,
+            include_nlp=include_nlp,
+            include_causal=include_causal,
+        )
+
+        report_generator = self._report_generator or MarkdownReportAdapter()
+        if output_format == "html":
+            if isinstance(report_generator, MarkdownReportAdapter):
+                report_content = report_generator.generate_html(
+                    bundle,
+                    include_nlp=include_nlp,
+                    include_causal=include_causal,
+                )
+            else:
+                report_content = report_generator.generate_html(bundle, include_nlp=include_nlp)
+        elif isinstance(report_generator, MarkdownReportAdapter):
+            report_content = report_generator.generate_markdown(
+                bundle,
+                include_nlp=include_nlp,
+                include_causal=include_causal,
+            )
+        else:
+            report_content = report_generator.generate_markdown(bundle, include_nlp=include_nlp)
+
+        if save and self._storage is not None:
+            metadata = {
+                "include_nlp": include_nlp,
+                "include_causal": include_causal,
+                "source": "api",
+            }
+            self._storage.save_analysis_report(
+                report_id=None,
+                run_id=run_id,
+                experiment_id=None,
+                report_type="analysis",
+                format=output_format,
+                content=report_content,
+                metadata=metadata,
+            )
+
+        return report_content
+
+    def build_dashboard_payload(
+        self,
+        run_id: str,
+        *,
+        include_nlp: bool = True,
+        include_causal: bool = True,
+    ) -> dict[str, Any]:
+        bundle = self._build_analysis_bundle(
+            run_id,
+            include_nlp=include_nlp,
+            include_causal=include_causal,
+        )
+        return self._build_dashboard_payload(bundle)
 
     def get_available_metrics(self) -> list[str]:
         """사용 가능한 메트릭 목록 반환."""
