@@ -10,7 +10,7 @@ numpy/scipy 기반 통계 분석 기능을 제공합니다.
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 from scipy import stats
@@ -206,8 +206,10 @@ class StatisticalAnalysisAdapter(BaseAnalysisAdapter):
                     row.append(0.0)
                 else:
                     try:
-                        corr, p_value = stats.pearsonr(scores_i, scores_j)
-                        row.append(float(corr))
+                        result = cast(Any, stats.pearsonr(scores_i, scores_j))
+                        corr = float(getattr(result, "statistic", result[0]))
+                        p_value = float(getattr(result, "pvalue", result[1]))
+                        row.append(corr)
 
                         # 유의미한 상관관계만 기록 (i < j로 중복 방지)
                         if i < j and p_value < 0.05 and abs(corr) >= 0.3:
@@ -338,10 +340,14 @@ class StatisticalAnalysisAdapter(BaseAnalysisAdapter):
         mean_b = float(arr_b.mean())
 
         # 통계 검정
-        if test_type == "t-test":
-            _, p_value = stats.ttest_ind(arr_a, arr_b)
+        if len(arr_a) < 2 or len(arr_b) < 2 or np.std(arr_a) == 0.0 and np.std(arr_b) == 0.0:
+            p_value = 1.0
+        elif test_type == "t-test":
+            result = cast(Any, stats.ttest_ind(arr_a, arr_b))
+            p_value = float(getattr(result, "pvalue", result[1]))
         elif test_type == "mann-whitney":
-            _, p_value = stats.mannwhitneyu(arr_a, arr_b, alternative="two-sided")
+            result = cast(Any, stats.mannwhitneyu(arr_a, arr_b, alternative="two-sided"))
+            p_value = float(getattr(result, "pvalue", result[1]))
         else:
             raise ValueError(f"Unknown test type: {test_type}")
 
