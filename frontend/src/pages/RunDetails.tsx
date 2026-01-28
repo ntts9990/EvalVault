@@ -12,6 +12,8 @@ import {
     fetchDebugReportMarkdown,
     fetchRuns,
     fetchPromptDiff,
+    fetchAnalysisReport,
+    fetchDashboard,
     type RunDetailsResponse,
     type FeedbackResponse,
     type StageEvent,
@@ -23,6 +25,7 @@ import {
 } from "../services/api";
 import { Layout } from "../components/Layout";
 import { InsightSpacePanel } from "../components/InsightSpacePanel";
+import { MarkdownContent } from "../components/MarkdownContent";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
 import {
     ArrowLeft,
@@ -45,6 +48,7 @@ import {
     Bug,
     Download,
     GitCompare,
+    PieChart,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
@@ -222,7 +226,7 @@ export function RunDetails() {
     const [error, setError] = useState<string | null>(null);
     // Tabs
     const [activeTab, setActiveTab] = useState<
-        "overview" | "performance" | "feedback" | "stages" | "prompts" | "gate" | "debug"
+        "overview" | "performance" | "feedback" | "stages" | "prompts" | "gate" | "debug" | "report" | "dashboard"
     >("overview");
     const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
     const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackResponse>>({});
@@ -248,6 +252,16 @@ export function RunDetails() {
     const [runList, setRunList] = useState<RunSummary[]>([]);
     const [runListLoaded, setRunListLoaded] = useState(false);
     const [runListError, setRunListError] = useState<string | null>(null);
+
+    const [analysisReport, setAnalysisReport] = useState<string | null>(null);
+    const [reportLoaded, setReportLoaded] = useState(false);
+    const [loadingReport, setLoadingReport] = useState(false);
+    const [reportError, setReportError] = useState<string | null>(null);
+
+    const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
+    const [dashboardLoaded, setDashboardLoaded] = useState(false);
+    const [loadingDashboard, setLoadingDashboard] = useState(false);
+    const [dashboardError, setDashboardError] = useState<string | null>(null);
 
     const [orderingWarnings, setOrderingWarnings] = useState<StageMetric[]>([]);
     const [loadingWarnings, setLoadingWarnings] = useState(false);
@@ -311,6 +325,13 @@ export function RunDetails() {
         setDiffTargetRunId("");
         setDiffData(null);
         setDiffError(null);
+        setAnalysisReport(null);
+        setReportLoaded(false);
+        setReportError(null);
+        if (dashboardUrl) URL.revokeObjectURL(dashboardUrl);
+        setDashboardUrl(null);
+        setDashboardLoaded(false);
+        setDashboardError(null);
     }, [id]);
 
     useEffect(() => {
@@ -372,6 +393,38 @@ export function RunDetails() {
                 })
                 .finally(() => setLoadingDebug(false));
         }
+
+        if (activeTab === "report" && !reportLoaded && !loadingReport) {
+            setLoadingReport(true);
+            setReportError(null);
+            fetchAnalysisReport(id)
+                .then((report) => {
+                    setAnalysisReport(report);
+                    setReportLoaded(true);
+                })
+                .catch((err) => {
+                    setReportError(err instanceof Error ? err.message : "Failed to load analysis report");
+                    setReportLoaded(true);
+                })
+                .finally(() => setLoadingReport(false));
+        }
+
+        if (activeTab === "dashboard" && !dashboardLoaded && !loadingDashboard) {
+            setLoadingDashboard(true);
+            setDashboardError(null);
+            fetchDashboard(id)
+                .then((blob) => {
+                    if (dashboardUrl) URL.revokeObjectURL(dashboardUrl);
+                    const url = URL.createObjectURL(blob);
+                    setDashboardUrl(url);
+                    setDashboardLoaded(true);
+                })
+                .catch((err) => {
+                    setDashboardError(err instanceof Error ? err.message : "Failed to load dashboard");
+                    setDashboardLoaded(true);
+                })
+                .finally(() => setLoadingDashboard(false));
+        }
     }, [
         activeTab,
         debugLoaded,
@@ -381,6 +434,11 @@ export function RunDetails() {
         loadingGate,
         loadingStages,
         stagesLoaded,
+        reportLoaded,
+        loadingReport,
+        dashboardLoaded,
+        loadingDashboard,
+        dashboardUrl,
     ]);
 
     useEffect(() => {
@@ -625,6 +683,20 @@ export function RunDetails() {
                             >
                                 <Bug className="w-3.5 h-3.5" />
                                 Debug
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("report")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "report" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <FileText className="w-3.5 h-3.5" />
+                                Report
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("dashboard")}
+                                className={`tab-pill flex items-center gap-1.5 ${activeTab === "dashboard" ? "tab-pill-active" : "tab-pill-inactive"}`}
+                            >
+                                <PieChart className="w-3.5 h-3.5" />
+                                Dashboard
                             </button>
                         </div>
 
@@ -1472,6 +1544,78 @@ export function RunDetails() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === "report" && (
+                    <div className="surface-panel p-6 animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="font-semibold flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-primary" />
+                                Analysis Report
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    if (analysisReport) {
+                                        const blob = new Blob([analysisReport], { type: "text/markdown" });
+                                        downloadBlob(`analysis_report_${summary.run_id}.md`, blob);
+                                    }
+                                }}
+                                disabled={!analysisReport}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                Download Markdown
+                            </button>
+                        </div>
+
+                        {loadingReport ? (
+                            <div className="text-center py-10 text-muted-foreground">Loading report...</div>
+                        ) : reportError ? (
+                            <div className="text-center py-10 text-destructive">{reportError}</div>
+                        ) : analysisReport ? (
+                            <MarkdownContent text={analysisReport} />
+                        ) : (
+                            <div className="text-center py-10 text-muted-foreground">No report available.</div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === "dashboard" && (
+                    <div className="surface-panel p-6 animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="font-semibold flex items-center gap-2">
+                                <PieChart className="w-4 h-4 text-primary" />
+                                Dashboard
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    if (dashboardUrl) {
+                                        const link = document.createElement("a");
+                                        link.href = dashboardUrl;
+                                        link.download = `dashboard_${summary.run_id}.png`;
+                                        link.click();
+                                    }
+                                }}
+                                disabled={!dashboardUrl}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                Download Image
+                            </button>
+                        </div>
+
+                        {loadingDashboard ? (
+                            <div className="text-center py-10 text-muted-foreground">Loading dashboard...</div>
+                        ) : dashboardError ? (
+                            <div className="text-center py-10 text-destructive">{dashboardError}</div>
+                        ) : dashboardUrl ? (
+                            <div className="flex justify-center bg-white p-4 rounded-lg border border-border">
+                                <img src={dashboardUrl} alt="Analysis Dashboard" className="max-w-full h-auto rounded shadow-sm" />
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 text-muted-foreground">No dashboard available.</div>
+                        )}
                     </div>
                 )}
 

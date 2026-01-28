@@ -10,7 +10,8 @@ import {
     Orbit,
     FlaskConical,
     FileText,
-    MessageSquare
+    MessageSquare,
+    Target
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -26,6 +27,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { icon: Brain, label: "도메인 메모리", href: "/domain" },
         { icon: Database, label: "지식 베이스", href: "/knowledge" },
         { icon: FlaskConical, label: "분석 실험실", href: "/analysis" },
+        { icon: Target, label: "Judge 보정", href: "/calibration" },
         { icon: FileText, label: "고객 리포트", href: "/reports" },
         { icon: Settings, label: "설정", href: "/settings" },
     ];

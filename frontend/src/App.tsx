@@ -13,6 +13,7 @@ import { Settings } from './pages/Settings';
 import { CustomerReport } from './pages/CustomerReport';
 import { Visualization } from './pages/Visualization';
 import { VisualizationHome } from './pages/VisualizationHome';
+import { JudgeCalibration } from './pages/JudgeCalibration';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/reports" element={<CustomerReport />} />
         <Route path="/visualization" element={<VisualizationHome />} />
         <Route path="/visualization/:id" element={<Visualization />} />
+        <Route path="/calibration" element={<JudgeCalibration />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>

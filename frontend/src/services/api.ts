@@ -259,6 +259,83 @@ export interface QualityGateReportResponse {
     regression_amount?: number | null;
 }
 
+export interface JudgeCalibrationRequest {
+    run_id: string;
+    labels_source: "feedback" | "gold" | "hybrid";
+    method: "platt" | "isotonic" | "temperature" | "none";
+    metrics?: string[] | null;
+    holdout_ratio: number;
+    seed: number;
+    parallel?: boolean;
+    concurrency?: number;
+}
+
+export interface JudgeCalibrationCase {
+    test_case_id: string;
+    raw_score: number;
+    calibrated_score: number;
+    label?: number | null;
+    label_source?: string | null;
+}
+
+export interface JudgeCalibrationMetric {
+    metric: string;
+    method: string;
+    sample_count: number;
+    label_count: number;
+    mae?: number | null;
+    pearson?: number | null;
+    spearman?: number | null;
+    temperature?: number | null;
+    parameters?: Record<string, number | null>;
+    gate_passed?: boolean | null;
+    warning?: string | null;
+}
+
+export interface JudgeCalibrationSummary {
+    calibration_id: string;
+    run_id: string;
+    labels_source: string;
+    method: string;
+    metrics: string[];
+    holdout_ratio: number;
+    seed: number;
+    total_labels: number;
+    total_samples: number;
+    gate_passed: boolean;
+    gate_threshold?: number | null;
+    notes: string[];
+    created_at: string;
+}
+
+export interface JudgeCalibrationResponse {
+    calibration_id: string;
+    status: "ok" | "degraded";
+    started_at: string;
+    finished_at: string;
+    duration_ms: number;
+    artifacts: Record<string, string>;
+    summary: JudgeCalibrationSummary;
+    metrics: JudgeCalibrationMetric[];
+    case_results: Record<string, JudgeCalibrationCase[]>;
+    warnings: string[];
+}
+
+export interface JudgeCalibrationHistoryItem {
+    calibration_id: string;
+    run_id: string;
+    labels_source: string;
+    method: string;
+    metrics: string[];
+    holdout_ratio: number;
+    seed: number;
+    total_labels: number;
+    total_samples: number;
+    gate_passed: boolean;
+    gate_threshold?: number | null;
+    created_at: string;
+}
+
 export interface DebugReport {
     run_summary: Record<string, unknown>;
     stage_summary: {
@@ -705,6 +782,40 @@ export async function fetchQualityGateReport(runId: string): Promise<QualityGate
     return response.json();
 }
 
+export async function runJudgeCalibration(
+    payload: JudgeCalibrationRequest
+): Promise<JudgeCalibrationResponse> {
+    const response = await fetch(`${API_BASE_URL}/calibration/judge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to run calibration: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchJudgeCalibration(
+    calibrationId: string
+): Promise<JudgeCalibrationResponse> {
+    const response = await fetch(`${API_BASE_URL}/calibration/judge/${calibrationId}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch calibration: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export async function fetchJudgeCalibrationHistory(
+    limit: number = 20
+): Promise<JudgeCalibrationHistoryItem[]> {
+    const response = await fetch(`${API_BASE_URL}/calibration/judge/history?limit=${limit}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch calibration history: ${response.statusText}`);
+    }
+    return response.json();
+}
+
 export async function fetchDebugReport(runId: string): Promise<DebugReport> {
     const response = await fetch(`${API_BASE_URL}/runs/${runId}/debug-report`);
     if (!response.ok) {
@@ -1107,4 +1218,27 @@ export async function fetchLLMReport(runId: string, modelId?: string): Promise<L
     const response = await fetch(url);
     if (!response.ok) throw new Error("Failed to generate report");
     return response.json();
+}
+
+export async function fetchAnalysisReport(
+    runId: string,
+    params: { format?: "markdown" | "html"; includeNlp?: boolean; includeCausal?: boolean } = {}
+): Promise<string> {
+    const query = new URLSearchParams();
+    if (params.format) query.set("format", params.format);
+    if (params.includeNlp !== undefined) query.set("include_nlp", String(params.includeNlp));
+    if (params.includeCausal !== undefined) query.set("include_causal", String(params.includeCausal));
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/analysis-report${suffix}`);
+    if (!response.ok) throw new Error("Failed to fetch analysis report");
+    return response.text();
+}
+
+export async function fetchDashboard(
+    runId: string,
+    format: "png" | "svg" | "pdf" = "png"
+): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/dashboard?format=${format}`);
+    if (!response.ok) throw new Error("Failed to fetch dashboard");
+    return response.blob();
 }
