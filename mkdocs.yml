@@ -93,6 +93,23 @@ markdown_extensions:
 
 nav:
   - Docs: INDEX.md
+  - Handbook:
+      - Index: handbook/INDEX.md
+      - Overview: handbook/CHAPTERS/00_overview.md
+      - Architecture: handbook/CHAPTERS/01_architecture.md
+      - Data & Metrics: handbook/CHAPTERS/02_data_and_metrics.md
+      - Workflows: handbook/CHAPTERS/03_workflows.md
+      - Operations: handbook/CHAPTERS/04_operations.md
+      - Security: handbook/CHAPTERS/05_security.md
+      - Quality & Testing: handbook/CHAPTERS/06_quality_and_testing.md
+      - UX & Product: handbook/CHAPTERS/07_ux_and_product.md
+      - Roadmap: handbook/CHAPTERS/08_roadmap.md
+      - Appendices:
+          - Coverage Matrix: handbook/appendix-coverage-matrix.md
+          - File Inventory: handbook/appendix-file-inventory.md
+          - Taxonomy: handbook/appendix-taxonomy.md
+          - Roadmap Appendix: handbook/appendix-roadmap.md
+      - External Summary: handbook/EXTERNAL.md
   - Project:
       - README (Korean): README.ko.md
       - Status: STATUS.md
