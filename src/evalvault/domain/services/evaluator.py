@@ -63,9 +63,12 @@ _SUMMARY_FAITHFULNESS_PROMPT_EN = (
 
 def _patch_ragas_faithfulness_output() -> None:
     try:
-        from ragas.metrics import Faithfulness
+        from ragas.metrics.collections import Faithfulness
     except Exception:
-        return
+        try:
+            from ragas.metrics import Faithfulness
+        except Exception:
+            return
 
     prompt = getattr(Faithfulness, "nli_statements_prompt", None)
     if prompt is None:

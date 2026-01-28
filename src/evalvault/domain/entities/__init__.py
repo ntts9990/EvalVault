@@ -21,6 +21,7 @@ from evalvault.domain.entities.feedback import (
     FeedbackSummary,
     SatisfactionFeedback,
 )
+from evalvault.domain.entities.graph_rag import EntityNode, KnowledgeSubgraph, RelationEdge
 from evalvault.domain.entities.improvement import (
     EffortLevel,
     EvidenceSource,
@@ -42,6 +43,15 @@ from evalvault.domain.entities.judge_calibration import (
 )
 from evalvault.domain.entities.kg import EntityModel, RelationModel
 from evalvault.domain.entities.method import MethodInput, MethodInputDataset, MethodOutput
+from evalvault.domain.entities.multiturn import (
+    ConversationTurn,
+    DriftAnalysis,
+    MultiTurnConversationRecord,
+    MultiTurnEvaluationResult,
+    MultiTurnRunRecord,
+    MultiTurnTestCase,
+    MultiTurnTurnResult,
+)
 from evalvault.domain.entities.prompt import Prompt, PromptSet, PromptSetBundle, PromptSetItem
 from evalvault.domain.entities.prompt_suggestion import (
     PromptCandidate,
@@ -114,6 +124,16 @@ __all__ = [
     "JudgeCalibrationMetric",
     "JudgeCalibrationResult",
     "JudgeCalibrationSummary",
+    "ConversationTurn",
+    "MultiTurnConversationRecord",
+    "MultiTurnTestCase",
+    "MultiTurnTurnResult",
+    "MultiTurnEvaluationResult",
+    "DriftAnalysis",
+    "MultiTurnRunRecord",
+    "EntityNode",
+    "KnowledgeSubgraph",
+    "RelationEdge",
     # KG
     "EntityModel",
     "RelationModel",
