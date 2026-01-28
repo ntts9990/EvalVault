@@ -428,6 +428,7 @@ def apply_profile(settings: Settings, profile_name: str) -> Settings:
     if not normalized:
         return settings
 
+    model_config = None
     try:
         model_config = get_model_config()
         profile = model_config.get_profile(normalized)
@@ -459,7 +460,7 @@ def apply_profile(settings: Settings, profile_name: str) -> Settings:
             f"to use profile '{normalized}'."
         ) from exc
     except KeyError as exc:
-        available = ", ".join(sorted(model_config.profiles.keys()))
+        available = ", ".join(sorted(model_config.profiles.keys())) if model_config else ""
         raise ValueError(
             f"Unknown profile '{normalized}'. Available profiles: {available}"
         ) from exc

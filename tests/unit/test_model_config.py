@@ -154,6 +154,7 @@ class TestLLMConfig:
         )
 
         assert config.model == "gpt-oss-safeguard:20b"
+        assert config.options is not None
         assert config.options["think_level"] == "medium"
 
     def test_openai_llm_config(self):
