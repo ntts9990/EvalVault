@@ -998,3 +998,84 @@ class TestPostgreSQLAnalysisStorage:
         assert cluster.keywords == ["보험료", "갱신"]
         assert cluster.avg_scores["faithfulness"] == 0.72
         assert cluster.representative_questions[0].startswith("보험료")
+
+
+class TestPostgreSQLRegressionBaseline:
+    def test_set_regression_baseline_calls_execute(self, mock_psycopg, mock_connection, sample_run):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        adapter.set_regression_baseline(
+            "default",
+            sample_run.run_id,
+            dataset_name="insurance-qa",
+            branch="main",
+            commit_sha="abc123",
+            metadata={"ci": True},
+        )
+
+        assert mock_connection.execute.called
+        assert mock_connection.commit.called
+
+    def test_get_regression_baseline_returns_data(self, mock_psycopg, mock_connection):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            "baseline_key": "default",
+            "run_id": "test-run-001",
+            "dataset_name": "insurance-qa",
+            "branch": "main",
+            "commit_sha": "abc123",
+            "metadata": '{"ci": true}',
+            "created_at": datetime(2025, 1, 1, 10, 0, 0),
+            "updated_at": datetime(2025, 1, 1, 10, 0, 0),
+        }
+        mock_connection.execute.return_value = mock_cursor
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        baseline = adapter.get_regression_baseline("default")
+
+        assert baseline is not None
+        assert baseline["baseline_key"] == "default"
+        assert baseline["run_id"] == "test-run-001"
+        assert baseline["dataset_name"] == "insurance-qa"
+        assert baseline["branch"] == "main"
+        assert baseline["commit_sha"] == "abc123"
+
+    def test_get_regression_baseline_returns_none_for_missing(self, mock_psycopg, mock_connection):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = None
+        mock_connection.execute.return_value = mock_cursor
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        baseline = adapter.get_regression_baseline("nonexistent")
+
+        assert baseline is None
+
+    def test_set_regression_baseline_minimal(self, mock_psycopg, mock_connection, sample_run):
+        from evalvault.adapters.outbound.storage.postgres_adapter import (
+            PostgreSQLStorageAdapter,
+        )
+
+        with patch("builtins.open", MagicMock()):
+            adapter = PostgreSQLStorageAdapter(connection_string="test")
+
+        adapter.set_regression_baseline("minimal", sample_run.run_id)
+
+        assert mock_connection.execute.called
+        assert mock_connection.commit.called

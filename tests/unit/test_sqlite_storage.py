@@ -732,3 +732,108 @@ class TestSQLiteStorageNLPAnalysis:
         assert summary.total_feedback == 0
         assert summary.avg_satisfaction_score is None
         assert summary.thumb_up_rate is None
+
+
+class TestSQLiteStorageRegressionBaseline:
+    def test_set_and_get_regression_baseline(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        storage_adapter.set_regression_baseline(
+            "default",
+            sample_run.run_id,
+            dataset_name="insurance-qa",
+            branch="main",
+            commit_sha="abc123",
+            metadata={"ci": True},
+        )
+
+        baseline = storage_adapter.get_regression_baseline("default")
+
+        assert baseline is not None
+        assert baseline["baseline_key"] == "default"
+        assert baseline["run_id"] == sample_run.run_id
+        assert baseline["dataset_name"] == "insurance-qa"
+        assert baseline["branch"] == "main"
+        assert baseline["commit_sha"] == "abc123"
+        assert baseline["metadata"] == {"ci": True}
+        assert baseline["created_at"] is not None
+        assert baseline["updated_at"] is not None
+
+    def test_get_regression_baseline_not_found(self, storage_adapter):
+        baseline = storage_adapter.get_regression_baseline("nonexistent")
+        assert baseline is None
+
+    def test_set_regression_baseline_updates_existing(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        storage_adapter.set_regression_baseline(
+            "default",
+            sample_run.run_id,
+            branch="feature-1",
+        )
+
+        run2 = EvaluationRun(
+            run_id="test-run-002",
+            dataset_name="insurance-qa",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 2, 10, 0, 0),
+        )
+        storage_adapter.save_run(run2)
+
+        storage_adapter.set_regression_baseline(
+            "default",
+            run2.run_id,
+            branch="main",
+        )
+
+        baseline = storage_adapter.get_regression_baseline("default")
+
+        assert baseline is not None
+        assert baseline["run_id"] == run2.run_id
+        assert baseline["branch"] == "main"
+
+    def test_multiple_baseline_keys(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        run2 = EvaluationRun(
+            run_id="test-run-002",
+            dataset_name="medical-qa",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 2, 10, 0, 0),
+        )
+        storage_adapter.save_run(run2)
+
+        storage_adapter.set_regression_baseline(
+            "insurance",
+            sample_run.run_id,
+            dataset_name="insurance-qa",
+        )
+        storage_adapter.set_regression_baseline(
+            "medical",
+            run2.run_id,
+            dataset_name="medical-qa",
+        )
+
+        baseline1 = storage_adapter.get_regression_baseline("insurance")
+        baseline2 = storage_adapter.get_regression_baseline("medical")
+
+        assert baseline1["run_id"] == sample_run.run_id
+        assert baseline1["dataset_name"] == "insurance-qa"
+        assert baseline2["run_id"] == run2.run_id
+        assert baseline2["dataset_name"] == "medical-qa"
+
+    def test_set_regression_baseline_minimal(self, storage_adapter, sample_run):
+        storage_adapter.save_run(sample_run)
+
+        storage_adapter.set_regression_baseline("minimal", sample_run.run_id)
+
+        baseline = storage_adapter.get_regression_baseline("minimal")
+
+        assert baseline is not None
+        assert baseline["run_id"] == sample_run.run_id
+        assert baseline["dataset_name"] is None
+        assert baseline["branch"] is None
+        assert baseline["commit_sha"] is None
+        assert baseline["metadata"] is None

@@ -1361,6 +1361,107 @@ class BaseSQLStorageAdapter(ABC):
         workbook.save(output)
         return output
 
+    def export_analysis_results_to_excel(self, run_id: str, output_path) -> Path:
+        from openpyxl import Workbook
+
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        placeholder = self.queries.placeholder
+
+        with self._get_connection() as conn:
+            analysis_rows = self._execute(
+                conn,
+                (
+                    "SELECT analysis_id, run_id, analysis_type, result_data, created_at "
+                    f"FROM analysis_results WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            analysis_payloads = self._normalize_rows(
+                analysis_rows,
+                json_columns={"result_data"},
+            )
+
+            report_rows = self._execute(
+                conn,
+                (
+                    "SELECT report_id, run_id, experiment_id, report_type, format, content, metadata, created_at "
+                    f"FROM analysis_reports WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            report_payloads = self._normalize_rows(report_rows, json_columns={"metadata"})
+
+            pipeline_rows = self._execute(
+                conn,
+                (
+                    "SELECT result_id, intent, query, run_id, pipeline_id, profile, tags, metadata, "
+                    "is_complete, duration_ms, final_output, node_results, started_at, finished_at, created_at "
+                    f"FROM pipeline_results WHERE run_id = {placeholder} ORDER BY created_at DESC"
+                ),
+                (run_id,),
+            ).fetchall()
+            pipeline_payloads = self._normalize_rows(
+                pipeline_rows,
+                json_columns={"tags", "metadata", "final_output", "node_results"},
+            )
+
+        sheet_order: list[tuple[str, list[dict[str, Any]], list[str]]] = [
+            (
+                "AnalysisResults",
+                analysis_payloads,
+                ["analysis_id", "run_id", "analysis_type", "result_data", "created_at"],
+            ),
+            (
+                "AnalysisReports",
+                report_payloads,
+                [
+                    "report_id",
+                    "run_id",
+                    "experiment_id",
+                    "report_type",
+                    "format",
+                    "content",
+                    "metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "PipelineResults",
+                pipeline_payloads,
+                [
+                    "result_id",
+                    "intent",
+                    "query",
+                    "run_id",
+                    "pipeline_id",
+                    "profile",
+                    "tags",
+                    "metadata",
+                    "is_complete",
+                    "duration_ms",
+                    "final_output",
+                    "node_results",
+                    "started_at",
+                    "finished_at",
+                    "created_at",
+                ],
+            ),
+        ]
+
+        workbook = Workbook()
+        default_sheet = workbook.active
+        if default_sheet is not None:
+            workbook.remove(default_sheet)
+        for sheet_name, rows, columns in sheet_order:
+            worksheet = cast(Any, workbook.create_sheet(title=sheet_name))
+            worksheet.append(columns)
+            for row in rows:
+                worksheet.append([row.get(column) for column in columns])
+
+        workbook.save(output)
+        return output
+
     def export_multiturn_run_to_excel(self, run_id: str, output_path) -> Path:
         from openpyxl import Workbook
 

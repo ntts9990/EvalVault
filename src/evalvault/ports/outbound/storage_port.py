@@ -207,6 +207,17 @@ class StoragePort(Protocol):
         """파이프라인 분석 결과 히스토리를 저장합니다."""
         ...
 
+    def save_analysis_result(
+        self,
+        *,
+        run_id: str,
+        analysis_type: str,
+        result_data: dict[str, Any],
+        analysis_id: str | None = None,
+    ) -> str:
+        """분석 결과(JSON)를 저장합니다."""
+        ...
+
     def save_analysis_report(
         self,
         *,
@@ -235,6 +246,10 @@ class StoragePort(Protocol):
 
     def get_pipeline_result(self, result_id: str) -> dict[str, Any]:
         """저장된 파이프라인 분석 결과를 조회합니다."""
+        ...
+
+    def export_analysis_results_to_excel(self, run_id: str, output_path: Path) -> Path:
+        """분석 결과를 Excel로 내보냅니다."""
         ...
 
     def set_regression_baseline(

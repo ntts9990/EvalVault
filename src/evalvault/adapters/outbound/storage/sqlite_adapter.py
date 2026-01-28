@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from evalvault.adapters.outbound.analysis.pipeline_helpers import to_serializable
 from evalvault.adapters.outbound.storage.base_sql import BaseSQLStorageAdapter, SQLQueries
 from evalvault.domain.entities.analysis import (
     AnalysisType,
@@ -682,6 +683,38 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
 
             conn.commit()
             return analysis.analysis_id
+
+    def save_analysis_result(
+        self,
+        *,
+        run_id: str,
+        analysis_type: str,
+        result_data: dict[str, Any],
+        analysis_id: str | None = None,
+    ) -> str:
+        """분석 결과(JSON)를 저장합니다."""
+        analysis_id = analysis_id or f"analysis-{analysis_type}-{run_id}-{uuid.uuid4().hex[:8]}"
+        payload = to_serializable(result_data)
+
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO analysis_results (
+                    analysis_id, run_id, analysis_type, result_data, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    analysis_id,
+                    run_id,
+                    analysis_type,
+                    json.dumps(payload, ensure_ascii=False),
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
+            return analysis_id
 
     def get_analysis(self, analysis_id: str) -> StatisticalAnalysis:
         """분석 결과를 조회합니다.
