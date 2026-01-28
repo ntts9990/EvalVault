@@ -2684,7 +2684,7 @@
 | `./prompts/system_override.txt` | Text | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: 너는 정확한 지식 기반의 도우미다. 질문에 대해 간결하고 근거 중심으로 답하라. | Text text file: system_override.txt | 내부 |
 | `./pyproject.toml` | TOML | infra | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: upload_to_vcs_release = true | TOML text file: pyproject.toml | 내부 |
 | `./reports/.gitkeep` | File | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | binary-scan | size: 86 bytes | File binary file (86 bytes) | 내부 |
-| `./reports/README.md` | Markdown | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: - \[STRUCTURE_REVIEW.md\](../STRUCTURE_REVIEW.md) - 프로젝트 구조 리뷰 | Markdown text file: Reports | 내부 |
+| `./reports/README.md` | Markdown | reports | lens:QA;type:보고서 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: - STRUCTURE_REVIEW.md - 프로젝트 구조 리뷰 | Markdown text file: Reports | 내부 |
 | `./reports/analysis/analysis_0aa9fab0-6c2c-4c1c-b228-202a38a2f00c.json` | JSON | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
 | `./reports/analysis/analysis_0aa9fab0-6c2c-4c1c-b228-202a38a2f00c.md` | Markdown | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
 | `./reports/analysis/analysis_2163f844-ee2c-4630-9ba8-35cd9954d92e.json` | JSON | reports | pending | 제외 | 실행 산출물 디렉터리 | - | - | - | - | - |
