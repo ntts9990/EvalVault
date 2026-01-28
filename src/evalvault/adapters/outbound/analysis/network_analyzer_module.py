@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
+import os
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
+from importlib import import_module
 from typing import Any
 
 import networkx as nx
@@ -12,10 +16,18 @@ from evalvault.adapters.outbound.analysis.pipeline_helpers import (
     to_serializable,
 )
 
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
+
+def _get_matplotlib_pyplot() -> Any | None:
+    try:
+        if "matplotlib.pyplot" in sys.modules:
+            return import_module("matplotlib.pyplot")
+        os.environ.setdefault("MPLBACKEND", "Agg")
+        matplotlib = import_module("matplotlib")
+        with contextlib.suppress(Exception):
+            matplotlib.use("Agg", force=True)
+        return import_module("matplotlib.pyplot")
+    except ModuleNotFoundError:
+        return None
 
 
 @dataclass
@@ -173,6 +185,7 @@ class NetworkAnalyzerModule(BaseAnalysisModule):
         output_path: str | None = None,
         figsize: tuple[int, int] = (12, 8),
     ) -> Any | None:
+        plt = _get_matplotlib_pyplot()
         if plt is None:
             return None
 

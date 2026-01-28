@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import random
+import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -9,6 +12,12 @@ from typing import Any
 
 def _import_matplotlib_pyplot() -> Any:
     try:
+        if "matplotlib.pyplot" in sys.modules:
+            return import_module("matplotlib.pyplot")
+        os.environ.setdefault("MPLBACKEND", "Agg")
+        matplotlib = import_module("matplotlib")
+        with contextlib.suppress(Exception):
+            matplotlib.use("Agg", force=True)
         return import_module("matplotlib.pyplot")
     except ModuleNotFoundError as exc:
         raise ImportError(
@@ -32,14 +41,20 @@ class DashboardGenerator:
         plt.rcParams["legend.fontsize"] = 10
 
     def generate_evaluation_dashboard(
-        self, run_id: str, analysis_json_path: str | None = None
+        self,
+        run_id: str,
+        analysis_json_path: str | None = None,
+        analysis_data: dict[str, Any] | None = None,
     ) -> Any:
         plt = _import_matplotlib_pyplot()
 
-        analysis_data: dict[str, Any] = {}
-        if analysis_json_path and Path(analysis_json_path).exists():
-            with open(analysis_json_path, encoding="utf-8") as f:
-                analysis_data = json.load(f)
+        analysis_payload: dict[str, Any] = {}
+        if analysis_data is None:
+            if analysis_json_path and Path(analysis_json_path).exists():
+                with open(analysis_json_path, encoding="utf-8") as f:
+                    analysis_payload = json.load(f)
+        elif isinstance(analysis_data, dict):
+            analysis_payload = analysis_data
 
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
         fig.suptitle(
@@ -48,10 +63,10 @@ class DashboardGenerator:
             fontweight="bold",
         )
 
-        self._plot_metric_distribution(axes[0, 0], analysis_data)
-        self._plot_correlation_heatmap(axes[0, 1], analysis_data)
-        self._plot_pass_rates(axes[1, 0], analysis_data)
-        self._plot_failure_causes(axes[1, 1], analysis_data)
+        self._plot_metric_distribution(axes[0, 0], analysis_payload)
+        self._plot_correlation_heatmap(axes[0, 1], analysis_payload)
+        self._plot_pass_rates(axes[1, 0], analysis_payload)
+        self._plot_failure_causes(axes[1, 1], analysis_payload)
 
         return fig
 
