@@ -56,6 +56,10 @@ reports/*.xml
 reports/*.json
 reports/analysis/
 reports/analysis/**
+reports/comparison/
+reports/comparison/**
+reports/presentation_materials_*.md
+reports/ralph_loop_briefing.md
 reports/assets/
 reports/api-docs/
 !reports/.gitkeep
@@ -66,6 +70,9 @@ data/e2e_results/
 
 # HuggingFace tokenizer cache (lm-eval benchmarks)
 data/tokenizers/
+
+# Local raw data (should not be versioned)
+data/raw/
 
 # Local state data (should not be versioned)
 data/cache/
