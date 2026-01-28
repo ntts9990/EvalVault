@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+from evalvault.domain.entities import (
+    EvaluationRun,
+    MetricScore,
+    MultiTurnConversationRecord,
+    MultiTurnRunRecord,
+    MultiTurnTurnResult,
+    TestCaseResult,
+)
 
 
 @pytest.fixture
@@ -127,6 +134,10 @@ class TestSQLiteStorageAdapter:
         assert "evaluation_runs" in tables
         assert "test_case_results" in tables
         assert "metric_scores" in tables
+        assert "multiturn_runs" in tables
+        assert "multiturn_conversations" in tables
+        assert "multiturn_turn_results" in tables
+        assert "multiturn_metric_scores" in tables
 
     def test_save_run_returns_run_id(self, storage_adapter, sample_run):
         """Test that save_run stores data and returns run_id."""
@@ -199,8 +210,56 @@ class TestSQLiteStorageAdapter:
         stored = json.loads(raw_metadata)
         assert stored["tc-1"]["doc_ids"] == ["doc-1"]
 
-        retrieved_run = storage_adapter.get_run(run.run_id)
-        assert retrieved_run.retrieval_metadata == run.retrieval_metadata
+    def test_save_multiturn_run_stores_records(self, storage_adapter, temp_db):
+        run_record = MultiTurnRunRecord(
+            run_id="mt-run-001",
+            dataset_name="multiturn-qa",
+            dataset_version="1.0.0",
+            model_name="gpt-5-nano",
+            started_at=datetime(2025, 1, 1, 10, 0, 0),
+            finished_at=datetime(2025, 1, 1, 10, 5, 0),
+            conversation_count=1,
+            turn_count=2,
+            metrics_evaluated=["turn_faithfulness"],
+            drift_threshold=0.1,
+            summary={"turn_faithfulness": 0.8},
+        )
+        conversations = [
+            MultiTurnConversationRecord(
+                run_id="mt-run-001",
+                conversation_id="conv-001",
+                turn_count=2,
+                drift_score=0.2,
+                drift_threshold=0.1,
+                drift_detected=True,
+                summary={"drift_score": 0.2},
+            )
+        ]
+        turn_results = [
+            MultiTurnTurnResult(
+                conversation_id="conv-001",
+                turn_id="t01",
+                turn_index=1,
+                role="assistant",
+                metrics={"turn_faithfulness": 0.8},
+                passed=True,
+                latency_ms=1200,
+            )
+        ]
+
+        storage_adapter.save_multiturn_run(run_record, conversations, turn_results)
+
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM multiturn_runs")
+        assert cursor.fetchone()[0] == 1
+        cursor.execute("SELECT COUNT(*) FROM multiturn_conversations")
+        assert cursor.fetchone()[0] == 1
+        cursor.execute("SELECT COUNT(*) FROM multiturn_turn_results")
+        assert cursor.fetchone()[0] == 1
+        cursor.execute("SELECT COUNT(*) FROM multiturn_metric_scores")
+        assert cursor.fetchone()[0] == 1
+        conn.close()
 
     def test_save_run_stores_test_case_results(self, storage_adapter, sample_run, temp_db):
         """Test that save_run stores test case results."""

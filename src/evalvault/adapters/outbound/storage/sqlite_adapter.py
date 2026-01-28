@@ -182,6 +182,71 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             if "metadata" not in pipeline_columns:
                 conn.execute("ALTER TABLE pipeline_results ADD COLUMN metadata TEXT")
 
+        multiturn_cursor = conn.execute("PRAGMA table_info(multiturn_runs)")
+        multiturn_columns = {row[1] for row in multiturn_cursor.fetchall()}
+        if not multiturn_columns:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS multiturn_runs (
+                    run_id TEXT PRIMARY KEY,
+                    dataset_name TEXT NOT NULL,
+                    dataset_version TEXT,
+                    model_name TEXT,
+                    started_at TIMESTAMP NOT NULL,
+                    finished_at TIMESTAMP,
+                    conversation_count INTEGER DEFAULT 0,
+                    turn_count INTEGER DEFAULT 0,
+                    metrics_evaluated TEXT,
+                    drift_threshold REAL,
+                    summary TEXT,
+                    metadata TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_multiturn_runs_dataset ON multiturn_runs(dataset_name);
+                CREATE INDEX IF NOT EXISTS idx_multiturn_runs_started_at ON multiturn_runs(started_at DESC);
+
+                CREATE TABLE IF NOT EXISTS multiturn_conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    turn_count INTEGER DEFAULT 0,
+                    drift_score REAL,
+                    drift_threshold REAL,
+                    drift_detected INTEGER DEFAULT 0,
+                    summary TEXT,
+                    FOREIGN KEY (run_id) REFERENCES multiturn_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_run_id ON multiturn_conversations(run_id);
+                CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_conv_id ON multiturn_conversations(conversation_id);
+
+                CREATE TABLE IF NOT EXISTS multiturn_turn_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    turn_id TEXT NOT NULL,
+                    turn_index INTEGER,
+                    role TEXT NOT NULL,
+                    passed INTEGER DEFAULT 0,
+                    latency_ms INTEGER,
+                    metadata TEXT,
+                    FOREIGN KEY (run_id) REFERENCES multiturn_runs(run_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_multiturn_turns_run_id ON multiturn_turn_results(run_id);
+                CREATE INDEX IF NOT EXISTS idx_multiturn_turns_conv_id ON multiturn_turn_results(conversation_id);
+
+                CREATE TABLE IF NOT EXISTS multiturn_metric_scores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    turn_result_id INTEGER NOT NULL,
+                    metric_name TEXT NOT NULL,
+                    score REAL NOT NULL,
+                    threshold REAL,
+                    FOREIGN KEY (turn_result_id) REFERENCES multiturn_turn_results(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_multiturn_scores_turn_id ON multiturn_metric_scores(turn_result_id);
+                CREATE INDEX IF NOT EXISTS idx_multiturn_scores_metric_name ON multiturn_metric_scores(metric_name);
+                """
+            )
+
     # Prompt set methods
 
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:
@@ -989,6 +1054,48 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             conn.commit()
 
         return report_id
+
+    def list_analysis_reports(
+        self,
+        *,
+        run_id: str,
+        report_type: str | None = None,
+        format: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        query = (
+            "SELECT report_id, run_id, experiment_id, report_type, format, content, metadata, created_at "
+            "FROM analysis_reports WHERE run_id = ?"
+        )
+        params: list[Any] = [run_id]
+        if report_type:
+            query += " AND report_type = ?"
+            params.append(report_type)
+        if format:
+            query += " AND format = ?"
+            params.append(format)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        reports: list[dict[str, Any]] = []
+        for row in rows:
+            reports.append(
+                {
+                    "report_id": row["report_id"],
+                    "run_id": row["run_id"],
+                    "experiment_id": row["experiment_id"],
+                    "report_type": row["report_type"],
+                    "format": row["format"],
+                    "content": row["content"],
+                    "metadata": self._deserialize_json(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
+        return reports
 
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""

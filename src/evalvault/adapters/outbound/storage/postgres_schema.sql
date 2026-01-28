@@ -86,6 +86,66 @@ CREATE TABLE IF NOT EXISTS metric_scores (
 CREATE INDEX IF NOT EXISTS idx_scores_result_id ON metric_scores(result_id);
 CREATE INDEX IF NOT EXISTS idx_scores_name ON metric_scores(name);
 
+-- Multiturn evaluation tables
+CREATE TABLE IF NOT EXISTS multiturn_runs (
+    run_id UUID PRIMARY KEY,
+    dataset_name VARCHAR(255) NOT NULL,
+    dataset_version VARCHAR(50),
+    model_name VARCHAR(255),
+    started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    conversation_count INTEGER DEFAULT 0,
+    turn_count INTEGER DEFAULT 0,
+    metrics_evaluated JSONB,
+    drift_threshold DOUBLE PRECISION,
+    summary JSONB,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_multiturn_runs_dataset ON multiturn_runs(dataset_name);
+CREATE INDEX IF NOT EXISTS idx_multiturn_runs_started_at ON multiturn_runs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS multiturn_conversations (
+    id SERIAL PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES multiturn_runs(run_id) ON DELETE CASCADE,
+    conversation_id VARCHAR(255) NOT NULL,
+    turn_count INTEGER DEFAULT 0,
+    drift_score DOUBLE PRECISION,
+    drift_threshold DOUBLE PRECISION,
+    drift_detected BOOLEAN DEFAULT FALSE,
+    summary JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_run_id ON multiturn_conversations(run_id);
+CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_conv_id ON multiturn_conversations(conversation_id);
+
+CREATE TABLE IF NOT EXISTS multiturn_turn_results (
+    id SERIAL PRIMARY KEY,
+    run_id UUID NOT NULL REFERENCES multiturn_runs(run_id) ON DELETE CASCADE,
+    conversation_id VARCHAR(255) NOT NULL,
+    turn_id VARCHAR(255) NOT NULL,
+    turn_index INTEGER,
+    role VARCHAR(50) NOT NULL,
+    passed BOOLEAN DEFAULT FALSE,
+    latency_ms INTEGER,
+    metadata JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_multiturn_turns_run_id ON multiturn_turn_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_multiturn_turns_conv_id ON multiturn_turn_results(conversation_id);
+
+CREATE TABLE IF NOT EXISTS multiturn_metric_scores (
+    id SERIAL PRIMARY KEY,
+    turn_result_id INTEGER NOT NULL REFERENCES multiturn_turn_results(id) ON DELETE CASCADE,
+    metric_name VARCHAR(100) NOT NULL,
+    score DECIMAL(5, 4) NOT NULL,
+    threshold DECIMAL(5, 4)
+);
+
+CREATE INDEX IF NOT EXISTS idx_multiturn_scores_turn_id ON multiturn_metric_scores(turn_result_id);
+CREATE INDEX IF NOT EXISTS idx_multiturn_scores_metric_name ON multiturn_metric_scores(metric_name);
+
 -- Prompt storage tables
 CREATE TABLE IF NOT EXISTS prompts (
     prompt_id UUID PRIMARY KEY,

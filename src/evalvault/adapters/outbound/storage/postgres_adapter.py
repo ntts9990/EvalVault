@@ -221,6 +221,90 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             "CREATE INDEX IF NOT EXISTS idx_feedback_test_case_id ON satisfaction_feedback(test_case_id)"
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS multiturn_runs (
+                run_id UUID PRIMARY KEY,
+                dataset_name VARCHAR(255) NOT NULL,
+                dataset_version VARCHAR(50),
+                model_name VARCHAR(255),
+                started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                finished_at TIMESTAMP WITH TIME ZONE,
+                conversation_count INTEGER DEFAULT 0,
+                turn_count INTEGER DEFAULT 0,
+                metrics_evaluated JSONB,
+                drift_threshold DOUBLE PRECISION,
+                summary JSONB,
+                metadata JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_runs_dataset ON multiturn_runs(dataset_name)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_runs_started_at ON multiturn_runs(started_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS multiturn_conversations (
+                id SERIAL PRIMARY KEY,
+                run_id UUID NOT NULL REFERENCES multiturn_runs(run_id) ON DELETE CASCADE,
+                conversation_id VARCHAR(255) NOT NULL,
+                turn_count INTEGER DEFAULT 0,
+                drift_score DOUBLE PRECISION,
+                drift_threshold DOUBLE PRECISION,
+                drift_detected BOOLEAN DEFAULT FALSE,
+                summary JSONB
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_run_id ON multiturn_conversations(run_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_conversations_conv_id ON multiturn_conversations(conversation_id)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS multiturn_turn_results (
+                id SERIAL PRIMARY KEY,
+                run_id UUID NOT NULL REFERENCES multiturn_runs(run_id) ON DELETE CASCADE,
+                conversation_id VARCHAR(255) NOT NULL,
+                turn_id VARCHAR(255) NOT NULL,
+                turn_index INTEGER,
+                role VARCHAR(50) NOT NULL,
+                passed BOOLEAN DEFAULT FALSE,
+                latency_ms INTEGER,
+                metadata JSONB
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_turns_run_id ON multiturn_turn_results(run_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_turns_conv_id ON multiturn_turn_results(conversation_id)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS multiturn_metric_scores (
+                id SERIAL PRIMARY KEY,
+                turn_result_id INTEGER NOT NULL REFERENCES multiturn_turn_results(id) ON DELETE CASCADE,
+                metric_name VARCHAR(100) NOT NULL,
+                score DECIMAL(5, 4) NOT NULL,
+                threshold DECIMAL(5, 4)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_scores_turn_id ON multiturn_metric_scores(turn_result_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_multiturn_scores_metric_name ON multiturn_metric_scores(metric_name)"
+        )
+
     # Prompt set methods
 
     def save_prompt_set(self, bundle: PromptSetBundle) -> None:
@@ -873,6 +957,52 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             conn.commit()
 
         return report_id
+
+    def list_analysis_reports(
+        self,
+        *,
+        run_id: str,
+        report_type: str | None = None,
+        format: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        clauses = ["run_id = %s"]
+        params: list[Any] = [run_id]
+        if report_type:
+            clauses.append("report_type = %s")
+            params.append(report_type)
+        if format:
+            clauses.append("format = %s")
+            params.append(format)
+        params.append(limit)
+
+        query = (
+            "SELECT report_id, run_id, experiment_id, report_type, format, content, metadata, created_at "
+            "FROM analysis_reports WHERE "
+            + " AND ".join(clauses)
+            + " ORDER BY created_at DESC LIMIT %s"
+        )
+
+        with self._get_connection() as conn:
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        reports: list[dict[str, Any]] = []
+        for row in rows:
+            reports.append(
+                {
+                    "report_id": row["report_id"],
+                    "run_id": row["run_id"],
+                    "experiment_id": row["experiment_id"],
+                    "report_type": row["report_type"],
+                    "format": row["format"],
+                    "content": row["content"],
+                    "metadata": self._deserialize_json(row["metadata"]),
+                    "created_at": row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else row["created_at"],
+                }
+            )
+        return reports
 
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""

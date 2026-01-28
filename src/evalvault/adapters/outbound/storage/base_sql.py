@@ -14,6 +14,9 @@ from evalvault.domain.entities import (
     EvaluationRun,
     FeedbackSummary,
     MetricScore,
+    MultiTurnConversationRecord,
+    MultiTurnRunRecord,
+    MultiTurnTurnResult,
     RunClusterMap,
     RunClusterMapInfo,
     SatisfactionFeedback,
@@ -72,6 +75,45 @@ class SQLQueries:
         ) VALUES ({values})
         """
 
+    def insert_multiturn_run(self) -> str:
+        values = self._values(12)
+        return f"""
+        INSERT INTO multiturn_runs (
+            run_id, dataset_name, dataset_version, model_name,
+            started_at, finished_at, conversation_count, turn_count,
+            metrics_evaluated, drift_threshold, summary, metadata
+        ) VALUES ({values})
+        """
+
+    def insert_multiturn_conversation(self) -> str:
+        values = self._values(7)
+        return f"""
+        INSERT INTO multiturn_conversations (
+            run_id, conversation_id, turn_count, drift_score, drift_threshold,
+            drift_detected, summary
+        ) VALUES ({values})
+        """
+
+    def insert_multiturn_turn(self) -> str:
+        values = self._values(8)
+        query = f"""
+        INSERT INTO multiturn_turn_results (
+            run_id, conversation_id, turn_id, turn_index, role,
+            passed, latency_ms, metadata
+        ) VALUES ({values})
+        """
+        if self._test_case_returning:
+            query = f"{query.strip()} {self._test_case_returning}"
+        return query
+
+    def insert_multiturn_metric_score(self) -> str:
+        values = self._values(4)
+        return f"""
+        INSERT INTO multiturn_metric_scores (
+            turn_result_id, metric_name, score, threshold
+        ) VALUES ({values})
+        """
+
     def insert_cluster_map(self) -> str:
         values = self._values(7)
         return f"""
@@ -124,6 +166,41 @@ class SQLQueries:
         SELECT {self.metric_name_column} AS metric_name, score, threshold, reason
         FROM metric_scores
         WHERE result_id = {self.placeholder}
+        ORDER BY id
+        """
+
+    def select_multiturn_run(self) -> str:
+        return f"""
+        SELECT run_id, dataset_name, dataset_version, model_name,
+               started_at, finished_at, conversation_count, turn_count,
+               metrics_evaluated, drift_threshold, summary, metadata, created_at
+        FROM multiturn_runs
+        WHERE run_id = {self.placeholder}
+        """
+
+    def select_multiturn_conversations(self) -> str:
+        return f"""
+        SELECT run_id, conversation_id, turn_count, drift_score, drift_threshold,
+               drift_detected, summary
+        FROM multiturn_conversations
+        WHERE run_id = {self.placeholder}
+        ORDER BY id
+        """
+
+    def select_multiturn_turn_results(self) -> str:
+        return f"""
+        SELECT id, run_id, conversation_id, turn_id, turn_index, role,
+               passed, latency_ms, metadata
+        FROM multiturn_turn_results
+        WHERE run_id = {self.placeholder}
+        ORDER BY id
+        """
+
+    def select_multiturn_metric_scores(self) -> str:
+        return f"""
+        SELECT turn_result_id, metric_name, score, threshold
+        FROM multiturn_metric_scores
+        WHERE turn_result_id = {self.placeholder}
         ORDER BY id
         """
 
@@ -218,6 +295,48 @@ class BaseSQLStorageAdapter(ABC):
                         conn,
                         self.queries.insert_metric_score(),
                         self._metric_params(result_id, metric),
+                    )
+
+            conn.commit()
+            return run.run_id
+
+    def save_multiturn_run(
+        self,
+        run: MultiTurnRunRecord,
+        conversations: list[MultiTurnConversationRecord],
+        turn_results: list[MultiTurnTurnResult],
+        *,
+        metric_thresholds: dict[str, float] | None = None,
+    ) -> str:
+        with self._get_connection() as conn:
+            self._execute(
+                conn, self.queries.insert_multiturn_run(), self._multiturn_run_params(run)
+            )
+
+            for conversation in conversations:
+                self._execute(
+                    conn,
+                    self.queries.insert_multiturn_conversation(),
+                    self._multiturn_conversation_params(conversation),
+                )
+
+            for turn in turn_results:
+                cursor = self._execute(
+                    conn,
+                    self.queries.insert_multiturn_turn(),
+                    self._multiturn_turn_params(run.run_id, turn),
+                )
+                turn_result_id = self._fetch_lastrowid(cursor)
+                for metric_name, score in (turn.metrics or {}).items():
+                    threshold = None
+                    if metric_thresholds and metric_name in metric_thresholds:
+                        threshold = metric_thresholds[metric_name]
+                    self._execute(
+                        conn,
+                        self.queries.insert_multiturn_metric_score(),
+                        self._multiturn_metric_params(
+                            turn_result_id, metric_name, score, threshold
+                        ),
                     )
 
             conn.commit()
@@ -514,6 +633,56 @@ class BaseSQLStorageAdapter(ABC):
             metric.threshold,
             metric.reason,
         )
+
+    def _multiturn_run_params(self, run: MultiTurnRunRecord) -> Sequence[Any]:
+        return (
+            run.run_id,
+            run.dataset_name,
+            run.dataset_version,
+            run.model_name,
+            self._serialize_datetime(run.started_at),
+            self._serialize_datetime(run.finished_at),
+            run.conversation_count,
+            run.turn_count,
+            self._serialize_json(run.metrics_evaluated),
+            run.drift_threshold,
+            self._serialize_json(run.summary),
+            self._serialize_json(run.metadata),
+        )
+
+    def _multiturn_conversation_params(
+        self, conversation: MultiTurnConversationRecord
+    ) -> Sequence[Any]:
+        return (
+            conversation.run_id,
+            conversation.conversation_id,
+            conversation.turn_count,
+            conversation.drift_score,
+            conversation.drift_threshold,
+            int(conversation.drift_detected),
+            self._serialize_json(conversation.summary),
+        )
+
+    def _multiturn_turn_params(self, run_id: str, turn: MultiTurnTurnResult) -> Sequence[Any]:
+        return (
+            run_id,
+            turn.conversation_id,
+            turn.turn_id,
+            turn.turn_index,
+            turn.role,
+            int(turn.passed),
+            turn.latency_ms,
+            self._serialize_json(turn.metadata),
+        )
+
+    def _multiturn_metric_params(
+        self,
+        turn_result_id: int,
+        metric_name: str,
+        score: float,
+        threshold: float | None,
+    ) -> Sequence[Any]:
+        return (turn_result_id, metric_name, score, threshold)
 
     def _row_to_test_case(self, conn, row) -> TestCaseResult:
         result_id = row["id"]
@@ -1129,6 +1298,128 @@ class BaseSQLStorageAdapter(ABC):
             worksheet.append(columns)
             for row in rows:
                 worksheet.append([row.get(column) for column in columns])
+
+        workbook.save(output)
+        return output
+
+    def export_multiturn_run_to_excel(self, run_id: str, output_path) -> Path:
+        from openpyxl import Workbook
+
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        placeholder = self.queries.placeholder
+
+        with self._get_connection() as conn:
+            run_row = self._execute(conn, self.queries.select_multiturn_run(), (run_id,)).fetchone()
+            if not run_row:
+                raise KeyError(f"Multiturn run not found: {run_id}")
+
+            run_rows = self._normalize_rows(
+                [run_row],
+                json_columns={"metrics_evaluated", "summary", "metadata"},
+            )
+
+            conversation_rows = self._execute(
+                conn, self.queries.select_multiturn_conversations(), (run_id,)
+            ).fetchall()
+            conversation_payloads = self._normalize_rows(
+                conversation_rows,
+                json_columns={"summary"},
+            )
+
+            turn_rows = self._execute(
+                conn, self.queries.select_multiturn_turn_results(), (run_id,)
+            ).fetchall()
+            turn_payloads = self._normalize_rows(
+                turn_rows,
+                json_columns={"metadata"},
+            )
+
+            metric_rows = self._execute(
+                conn,
+                (
+                    "SELECT m.turn_result_id, t.conversation_id, t.turn_id, t.turn_index, "
+                    "m.metric_name, m.score, m.threshold "
+                    "FROM multiturn_metric_scores m "
+                    "JOIN multiturn_turn_results t ON m.turn_result_id = t.id "
+                    f"WHERE t.run_id = {placeholder} ORDER BY m.id"
+                ),
+                (run_id,),
+            ).fetchall()
+            metric_payloads = self._normalize_rows(metric_rows)
+
+        sheet_order: list[tuple[str, list[dict[str, Any]], list[str]]] = [
+            (
+                "MultiTurnRun",
+                run_rows,
+                [
+                    "run_id",
+                    "dataset_name",
+                    "dataset_version",
+                    "model_name",
+                    "started_at",
+                    "finished_at",
+                    "conversation_count",
+                    "turn_count",
+                    "metrics_evaluated",
+                    "drift_threshold",
+                    "summary",
+                    "metadata",
+                    "created_at",
+                ],
+            ),
+            (
+                "MultiTurnConversations",
+                conversation_payloads,
+                [
+                    "run_id",
+                    "conversation_id",
+                    "turn_count",
+                    "drift_score",
+                    "drift_threshold",
+                    "drift_detected",
+                    "summary",
+                ],
+            ),
+            (
+                "MultiTurnTurns",
+                turn_payloads,
+                [
+                    "id",
+                    "run_id",
+                    "conversation_id",
+                    "turn_id",
+                    "turn_index",
+                    "role",
+                    "passed",
+                    "latency_ms",
+                    "metadata",
+                ],
+            ),
+            (
+                "MultiTurnTurnMetrics",
+                metric_payloads,
+                [
+                    "turn_result_id",
+                    "conversation_id",
+                    "turn_id",
+                    "turn_index",
+                    "metric_name",
+                    "score",
+                    "threshold",
+                ],
+            ),
+        ]
+
+        workbook = Workbook()
+        default_sheet = workbook.active
+        workbook.remove(default_sheet)
+
+        for sheet_name, rows, headers in sheet_order:
+            sheet = workbook.create_sheet(title=sheet_name)
+            sheet.append(headers)
+            for row in rows:
+                sheet.append([self._row_value(row, header) for header in headers])
 
         workbook.save(output)
         return output
