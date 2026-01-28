@@ -24,8 +24,12 @@ import {
     Eye,
     EyeOff,
     FileDiff,
+    Terminal,
+    AlertCircle
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import { buildCompareCommand } from "../utils/cliCommandBuilder";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 export function CompareRuns() {
     const [searchParams] = useSearchParams();
@@ -42,6 +46,7 @@ export function CompareRuns() {
     const [diffLoading, setDiffLoading] = useState(false);
     const [diffError, setDiffError] = useState<string | null>(null);
     const [showDiff, setShowDiff] = useState(false);
+    const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
     const [orderingWarningsBase, setOrderingWarningsBase] = useState<StageMetric[]>([]);
     const [orderingWarningsTarget, setOrderingWarningsTarget] = useState<StageMetric[]>([]);
@@ -231,23 +236,50 @@ export function CompareRuns() {
         URL.revokeObjectURL(url);
     };
 
+    const handleCopyCli = async () => {
+        if (!baseId || !targetId) return;
+        const command = buildCompareCommand({
+            base_run_id: baseId,
+            target_run_id: targetId,
+        });
+        const success = await copyTextToClipboard(command);
+        setCopyStatus(success ? "success" : "error");
+        setTimeout(() => setCopyStatus("idle"), 1500);
+    };
+
     return (
         <Layout>
             <div className="pb-20 max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-8">
-                    <Link to="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight font-display">Run Comparison</h1>
-                        <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
-                            Comparing
-                            <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs text-foreground">{baseRun.summary.run_id.slice(0, 8)}</span>
-                            <ArrowRight className="w-3 h-3" />
-                            <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs text-foreground font-bold">{targetRun.summary.run_id.slice(0, 8)}</span>
-                        </p>
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <Link to="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+                            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight font-display">Run Comparison</h1>
+                            <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
+                                Comparing
+                                <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs text-foreground">{baseRun.summary.run_id.slice(0, 8)}</span>
+                                <ArrowRight className="w-3 h-3" />
+                                <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-xs text-foreground font-bold">{targetRun.summary.run_id.slice(0, 8)}</span>
+                            </p>
+                        </div>
                     </div>
+                    <button
+                        onClick={handleCopyCli}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary transition-colors text-xs font-medium"
+                        title="Copy CLI command"
+                    >
+                        {copyStatus === "success" ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : copyStatus === "error" ? (
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                        ) : (
+                            <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+                        )}
+                        {copyStatus === "success" ? "Copied!" : "Copy CLI"}
+                    </button>
                 </div>
 
                 {/* Top Stats Cards */}

@@ -16,6 +16,7 @@ import {
 } from "../services/api";
 import { ANALYSIS_LARGE_REPORT_THRESHOLD } from "../config/ui";
 import { formatDateTime, formatDurationMs } from "../utils/format";
+import { copyTextToClipboard } from "../utils/clipboard";
 import {
     Activity,
     AlertCircle,
@@ -295,24 +296,8 @@ export function AnalysisResultView() {
     const handleCopyLink = async () => {
         if (typeof window === "undefined") return;
         const url = window.location.href;
-        try {
-            if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(url);
-            } else {
-                const textarea = document.createElement("textarea");
-                textarea.value = url;
-                textarea.style.position = "fixed";
-                textarea.style.opacity = "0";
-                document.body.appendChild(textarea);
-                textarea.focus();
-                textarea.select();
-                document.execCommand("copy");
-                document.body.removeChild(textarea);
-            }
-            setCopyStatus("success");
-        } catch {
-            setCopyStatus("error");
-        }
+        const success = await copyTextToClipboard(url);
+        setCopyStatus(success ? "success" : "error");
         setTimeout(() => setCopyStatus("idle"), 1500);
     };
 

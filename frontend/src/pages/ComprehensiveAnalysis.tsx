@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 
 import { Layout } from "../components/Layout";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 
-import { fetchRuns, runAnalysis } from "../services/api";
+import { fetchRuns, runAnalysis, fetchAnalysisIntents } from "../services/api";
 
-import type { AnalysisResult, RunSummary } from "../services/api";
+import type { AnalysisResult, RunSummary, AnalysisIntentInfo } from "../services/api";
 
 export type AnalysisCategory =
   | "statistical"
@@ -22,6 +23,7 @@ export interface MenuItem {
   intent: string;
   description: string;
   parameters: ParameterConfig[];
+  nodes?: AnalysisIntentInfo["nodes"];
 }
 
 export type ParameterValue = string | number | boolean | null;
@@ -298,6 +300,7 @@ const CATEGORY_LABELS: Record<AnalysisCategory, { label: string; icon: string }>
 
 export default function ComprehensiveAnalysis() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [intents, setIntents] = useState<AnalysisIntentInfo[]>([]);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [parameterValues, setParameterValues] = useState<Record<string, ParameterValue>>({});
   const [selectedRunId, setSelectedRunId] = useState<string>("");
@@ -311,14 +314,69 @@ export default function ComprehensiveAnalysis() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const runsData = await fetchRuns();
+        const [runsData, intentsData] = await Promise.all([
+          fetchRuns(),
+          fetchAnalysisIntents()
+        ]);
         setRuns(runsData);
+        setIntents(intentsData);
       } catch (err) {
         console.error("데이터 로드 실패:", err);
       }
     };
     loadData();
   }, []);
+
+  const dynamicMenuItems = useMemo(() => {
+    if (intents.length === 0) return ANALYSIS_MENU_ITEMS;
+
+    const mergedItems: MenuItem[] = [];
+    const existingIntents = new Set(ANALYSIS_MENU_ITEMS.map(item => item.intent));
+
+    for (const item of ANALYSIS_MENU_ITEMS) {
+      const apiIntent = intents.find(i => i.intent === item.intent);
+      if (apiIntent) {
+        mergedItems.push({
+          ...item,
+          label: apiIntent.label || item.label,
+          description: apiIntent.description || item.description,
+          nodes: apiIntent.nodes
+        });
+      } else {
+        mergedItems.push(item);
+      }
+    }
+
+    for (const intent of intents) {
+      if (!existingIntents.has(intent.intent)) {
+        let category: AnalysisCategory = "statistical";
+        if (intent.category && ["statistical", "timeseries", "network", "hypothesis"].includes(intent.category)) {
+            category = intent.category as AnalysisCategory;
+        }
+
+        mergedItems.push({
+          id: intent.intent,
+          label: intent.label,
+          icon: "",
+          category: category,
+          intent: intent.intent,
+          description: intent.description,
+          nodes: intent.nodes,
+          parameters: [
+            {
+              name: "run_id",
+              type: "run-select",
+              label: "평가 실행",
+              description: "분석할 평가 실행 선택",
+              required: true,
+            }
+          ]
+        });
+      }
+    }
+
+    return mergedItems;
+  }, [intents]);
 
   const handleMenuItemClick = useCallback((item: MenuItem) => {
     setSelectedMenuItem(item);
@@ -387,11 +445,16 @@ export default function ComprehensiveAnalysis() {
       network: [],
       hypothesis: [],
     };
-    for (const item of ANALYSIS_MENU_ITEMS) {
-      grouped[item.category].push(item);
+    for (const item of dynamicMenuItems) {
+      if (grouped[item.category]) {
+        grouped[item.category].push(item);
+      } else {
+        if (!grouped["statistical"]) grouped["statistical"] = [];
+        grouped["statistical"].push(item);
+      }
     }
     return grouped;
-  }, []);
+  }, [dynamicMenuItems]);
 
   return (
     <>
@@ -561,7 +624,10 @@ export default function ComprehensiveAnalysis() {
               {analysisResult && (
                 <div className="flex-1 bg-white rounded-lg shadow p-6 overflow-y-auto">
                   <h3 className="text-lg font-bold mb-4">분석 결과</h3>
-                  <AnalysisResultDisplay result={analysisResult} />
+                  <AnalysisResultDisplay
+                    result={analysisResult}
+                    nodeDefinitions={selectedMenuItem?.nodes}
+                  />
                 </div>
               )}
             </main>
@@ -672,9 +738,10 @@ function ParameterInput({ config, value, runs, onValueChange }: ParameterInputPr
 
 interface AnalysisResultDisplayProps {
   result: AnalysisResult;
+  nodeDefinitions?: AnalysisIntentInfo["nodes"];
 }
 
-function AnalysisResultDisplay({ result }: AnalysisResultDisplayProps) {
+function AnalysisResultDisplay({ result, nodeDefinitions }: AnalysisResultDisplayProps) {
   const finalOutput = result.final_output || {};
   const nodeResults = result.node_results || {};
   const markdown = typeof finalOutput.markdown === "string" ? finalOutput.markdown : null;
@@ -704,7 +771,7 @@ function AnalysisResultDisplay({ result }: AnalysisResultDisplayProps) {
 
       {Object.keys(finalOutput).length > 0 && (
         <div>
-          <h4 className="text-md font-bold mb-3">분석 결과</h4>
+          <h4 className="text-md font-bold mb-3">최종 결과</h4>
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <pre className="text-sm overflow-auto max-h-96">
               {JSON.stringify(finalOutput, null, 2)}
@@ -713,23 +780,13 @@ function AnalysisResultDisplay({ result }: AnalysisResultDisplayProps) {
         </div>
       )}
 
-      {Object.keys(nodeResults).length > 0 && (
-        <div>
-          <h4 className="text-md font-bold mb-3">노드별 결과</h4>
-          <div className="space-y-4">
-            {Object.entries(nodeResults).map(([nodeId, nodeResult]) => (
-              <div key={nodeId} className="bg-white border border-gray-200 rounded-lg p-4">
-                <h5 className="font-medium text-gray-800 mb-2">
-                  {nodeId}
-                </h5>
-                <pre className="text-sm overflow-auto max-h-64 text-gray-600">
-                  {JSON.stringify(nodeResult, null, 2)}
-                </pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div>
+        <AnalysisNodeOutputs
+          nodeResults={nodeResults}
+          nodeDefinitions={nodeDefinitions}
+          title="노드별 상세 결과"
+        />
+      </div>
 
       {markdown && (
         <div>

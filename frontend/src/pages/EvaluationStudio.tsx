@@ -27,11 +27,14 @@ import {
     Upload,
     FileText,
     X,
-    ExternalLink
+    ExternalLink,
+    Terminal
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
 import { getPhoenixUiUrl } from "../utils/phoenix";
+import { buildRunCommand } from "../utils/cliCommandBuilder";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
 const RETRIEVER_MODES = [
@@ -111,6 +114,7 @@ export function EvaluationStudio() {
         etaSeconds: null as number | null,
         rate: null as number | null,
     });
+    const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
     const metricSpecMap = useMemo(() => {
         return new Map(metricSpecs.map((spec) => [spec.name, spec]));
@@ -379,6 +383,32 @@ export function EvaluationStudio() {
             setError(err instanceof Error ? err.message : "Failed to start evaluation");
             setSubmitting(false);
         }
+    };
+
+    const handleCopyCli = async () => {
+        const command = buildRunCommand({
+            dataset_path: selectedDataset,
+            model: selectedModel,
+            metrics: Array.from(selectedMetrics),
+            summaryMode,
+            threshold_profile: thresholdProfile,
+            retriever_mode: retrieverMode,
+            docs_path: docsPath,
+            tracker,
+            stage_store: stageStore,
+            enable_memory: enableMemory,
+            system_prompt: systemPrompt,
+            system_prompt_name: systemPromptName,
+            prompt_set_name: promptSetName,
+            prompt_set_description: promptSetDescription,
+            batch_size: batchSize,
+            parallel: batchSize > 1,
+            ragas_prompts_yaml: ragasPromptsYaml,
+        });
+
+        const success = await copyTextToClipboard(command);
+        setCopyStatus(success ? "success" : "error");
+        setTimeout(() => setCopyStatus("idle"), 1500);
     };
 
     if (loading) return (
@@ -973,20 +1003,36 @@ export function EvaluationStudio() {
 
                     {/* Action */}
                     <div className="flex justify-end">
-                        <button
-                            onClick={handleStart}
-                            disabled={submitting || !selectedDataset || !selectedModel}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? (
-                                <>Starting...</>
-                            ) : (
-                                <>
-                                    <Play className="w-5 h-5 fill-current" />
-                                    Start Evaluation
-                                </>
-                            )}
-                        </button>
+                        <div className="flex items-center gap-3 ml-auto">
+                            <button
+                                onClick={handleCopyCli}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-secondary transition-colors text-sm font-medium"
+                                title="Copy as CLI command"
+                            >
+                                {copyStatus === "success" ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                ) : copyStatus === "error" ? (
+                                    <AlertCircle className="w-4 h-4 text-rose-500" />
+                                ) : (
+                                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                                )}
+                                {copyStatus === "success" ? "Copied!" : "Copy CLI"}
+                            </button>
+                            <button
+                                onClick={handleStart}
+                                disabled={submitting || !selectedDataset || !selectedModel}
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {submitting ? (
+                                    <>Starting...</>
+                                ) : (
+                                    <>
+                                        <Play className="w-5 h-5 fill-current" />
+                                        Start Evaluation
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

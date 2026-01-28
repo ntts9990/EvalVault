@@ -41,6 +41,7 @@ import {
     DATE_RANGE_OPTIONS,
     DEFAULT_DATE_RANGE_PRESET,
 } from "../config/ui";
+import { copyTextToClipboard } from "../utils/clipboard";
 import {
     Activity,
     AlertCircle,
@@ -270,13 +271,9 @@ export function CustomerReport() {
     };
 
     const handleCopyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch {
-            setCopied(false);
-        }
+        const success = await copyTextToClipboard(window.location.href);
+        setCopied(success);
+        setTimeout(() => setCopied(false), 1500);
     };
 
     if (loading) {

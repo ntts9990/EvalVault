@@ -49,9 +49,12 @@ import {
     Download,
     GitCompare,
     PieChart,
+    AlertCircle
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "../utils/summaryMetrics";
+import { buildRunCommand } from "../utils/cliCommandBuilder";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 
 function FeedbackItem({
@@ -265,6 +268,7 @@ export function RunDetails() {
 
     const [orderingWarnings, setOrderingWarnings] = useState<StageMetric[]>([]);
     const [loadingWarnings, setLoadingWarnings] = useState(false);
+    const [copyCliStatus, setCopyCliStatus] = useState<"idle" | "success" | "error">("idle");
 
     const summaryMetricSet = new Set<string>(SUMMARY_METRICS);
 
@@ -542,6 +546,23 @@ export function RunDetails() {
         }
     };
 
+    const handleCopyCli = async () => {
+        if (!data) return;
+        const { summary } = data;
+        const summaryMode = summary.evaluation_task === "summarization";
+        const command = buildRunCommand({
+            dataset_path: summary.dataset_name || "<DATASET_PATH>",
+            model: summary.model_name,
+            metrics: summary.metrics_evaluated,
+            summaryMode,
+            run_mode: summary.run_mode || undefined,
+            threshold_profile: summary.threshold_profile || undefined,
+        });
+        const success = await copyTextToClipboard(command);
+        setCopyCliStatus(success ? "success" : "error");
+        setTimeout(() => setCopyCliStatus("idle"), 1500);
+    };
+
     // Prepare chart data
     const metricScores = data?.summary.metrics_evaluated?.map(metric => {
         if (!data?.results) return { name: metric, score: 0 };
@@ -629,6 +650,20 @@ export function RunDetails() {
                         </p>
                     </div>
                     <div className="ml-auto flex items-center gap-6">
+                        <button
+                            onClick={handleCopyCli}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary transition-colors text-xs font-medium"
+                            title="Copy rerun command"
+                        >
+                            {copyCliStatus === "success" ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : copyCliStatus === "error" ? (
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                            ) : (
+                                <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                            {copyCliStatus === "success" ? "Copied!" : "Rerun CLI"}
+                        </button>
                         <Link
                             to={`/visualization/${summary.run_id}`}
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"

@@ -42,7 +42,10 @@ import {
     Link2,
     Play,
     Save,
+    Terminal
 } from "lucide-react";
+import { buildAnalyzeCommand } from "../utils/cliCommandBuilder";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
     verification: {
@@ -293,6 +296,7 @@ export function AnalysisLab() {
     const [showFullRaw, setShowFullRaw] = useState(false);
     const [shareCopyStatus, setShareCopyStatus] = useState<"idle" | "success" | "error">("idle");
     const [shareLinkStatus, setShareLinkStatus] = useState<"idle" | "success" | "error">("idle");
+    const [cliCopyStatus, setCliCopyStatus] = useState<"idle" | "success" | "error">("idle");
     const [showAllMetrics, setShowAllMetrics] = useState(false);
     const [benchmarkPath, setBenchmarkPath] = useState(
         "examples/benchmarks/korean_rag/retrieval_test.json"
@@ -868,29 +872,28 @@ export function AnalysisLab() {
         }
     }, [showRaw]);
 
-    const copyToClipboard = useCallback(async (text: string, mode: "summary" | "link") => {
-        if (typeof window === "undefined") return;
-        const setStatus = mode === "summary" ? setShareCopyStatus : setShareLinkStatus;
-        try {
-            if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(text);
-            } else {
-                const textarea = document.createElement("textarea");
-                textarea.value = text;
-                textarea.style.position = "fixed";
-                textarea.style.opacity = "0";
-                document.body.appendChild(textarea);
-                textarea.focus();
-                textarea.select();
-                document.execCommand("copy");
-                document.body.removeChild(textarea);
-            }
-            setStatus("success");
-        } catch {
-            setStatus("error");
-        }
-        setTimeout(() => setStatus("idle"), 1500);
-    }, []);
+    const copyToClipboard = useCallback(
+        async (text: string, mode: "summary" | "link") => {
+            if (typeof window === "undefined") return;
+            const setStatus = mode === "summary" ? setShareCopyStatus : setShareLinkStatus;
+            const success = await copyTextToClipboard(text);
+            setStatus(success ? "success" : "error");
+            setTimeout(() => setStatus("idle"), 1500);
+        },
+        [setShareCopyStatus, setShareLinkStatus]
+    );
+
+    const handleCopyCli = async () => {
+        if (!executionMeta) return;
+        const command = buildAnalyzeCommand({
+            query: executionMeta.query,
+            run_id: executionMeta.runId || undefined,
+            intent: executionMeta.intent,
+        });
+        const success = await copyTextToClipboard(command);
+        setCliCopyStatus(success ? "success" : "error");
+        setTimeout(() => setCliCopyStatus("idle"), 1500);
+    };
 
     const intentLabel = selectedIntent?.label
         || catalog.find(item => item.intent === result?.intent)?.label
@@ -1819,9 +1822,26 @@ export function AnalysisLab() {
                                         <div className="border border-border rounded-lg p-4 space-y-3">
                                             <div className="flex items-center justify-between">
                                                 <p className="text-sm font-semibold">실행 파라미터</p>
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    재현용 요약
-                                                </span>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={handleCopyCli}
+                                                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+                                                        title="Copy CLI command"
+                                                        disabled={!executionMeta}
+                                                    >
+                                                        {cliCopyStatus === "success" ? (
+                                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                        ) : cliCopyStatus === "error" ? (
+                                                            <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                                                        ) : (
+                                                            <Terminal className="w-3.5 h-3.5" />
+                                                        )}
+                                                        {cliCopyStatus === "success" ? "Copied!" : "Copy CLI"}
+                                                    </button>
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        재현용 요약
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                                                 {executionParamEntries.map((entry) => (
