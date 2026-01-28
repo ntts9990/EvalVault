@@ -1,0 +1,81 @@
+{
+  "name": "graphrag-benchmark",
+  "version": "1.0.0",
+  "description": "GraphRAG benchmark dataset for A/B comparisons",
+  "thresholds": {
+    "faithfulness": 0.7,
+    "answer_relevancy": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "graphrag-bench-001",
+      "question": "What does AlphaCorp provide?",
+      "answer": "AlphaCorp provides the BetaPlan product.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    },
+    {
+      "id": "graphrag-bench-002",
+      "question": "Which company offers BetaPlan?",
+      "answer": "AlphaCorp offers BetaPlan.",
+      "contexts": [],
+      "ground_truth": "AlphaCorp"
+    },
+    {
+      "id": "graphrag-bench-003",
+      "question": "Is BetaPlan a company or a product?",
+      "answer": "BetaPlan is a product.",
+      "contexts": [],
+      "ground_truth": "product"
+    },
+    {
+      "id": "graphrag-bench-004",
+      "question": "What does BetaPlan include?",
+      "answer": "BetaPlan includes coverage details for policy holders.",
+      "contexts": [],
+      "ground_truth": "coverage details"
+    },
+    {
+      "id": "graphrag-bench-005",
+      "question": "Describe the relationship between AlphaCorp and BetaPlan.",
+      "answer": "AlphaCorp provides BetaPlan.",
+      "contexts": [],
+      "ground_truth": "provides"
+    },
+    {
+      "id": "graphrag-bench-006",
+      "question": "What plan does AlphaCorp sell?",
+      "answer": "AlphaCorp sells the BetaPlan insurance product.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    },
+    {
+      "id": "graphrag-bench-007",
+      "question": "Which product includes coverage details for policy holders?",
+      "answer": "BetaPlan includes coverage details for policy holders.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    },
+    {
+      "id": "graphrag-bench-008",
+      "question": "What is BetaPlan associated with?",
+      "answer": "BetaPlan is associated with AlphaCorp.",
+      "contexts": [],
+      "ground_truth": "AlphaCorp"
+    },
+    {
+      "id": "graphrag-bench-009",
+      "question": "Name the provider of the product that includes coverage details.",
+      "answer": "AlphaCorp provides BetaPlan.",
+      "contexts": [],
+      "ground_truth": "AlphaCorp"
+    },
+    {
+      "id": "graphrag-bench-010",
+      "question": "What does AlphaCorp offer policy holders?",
+      "answer": "AlphaCorp offers the BetaPlan product with coverage details.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    }
+  ]
+}

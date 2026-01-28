@@ -1,0 +1,52 @@
+{
+  "name": "graphrag-multi-sample",
+  "version": "1.0.0",
+  "description": "GraphRAG multi-case dataset for stats",
+  "thresholds": {
+    "faithfulness": 0.7
+  },
+  "test_cases": [
+    {
+      "id": "graphrag-001",
+      "question": "What does AlphaCorp provide?",
+      "answer": "AlphaCorp provides BetaPlan.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    },
+    {
+      "id": "graphrag-002",
+      "question": "Which product is provided by AlphaCorp?",
+      "answer": "BetaPlan.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    },
+    {
+      "id": "graphrag-003",
+      "question": "Is BetaPlan a product or a company?",
+      "answer": "BetaPlan is a product.",
+      "contexts": [],
+      "ground_truth": "product"
+    },
+    {
+      "id": "graphrag-004",
+      "question": "What does BetaPlan include?",
+      "answer": "BetaPlan includes coverage details for policy holders.",
+      "contexts": [],
+      "ground_truth": "coverage details"
+    },
+    {
+      "id": "graphrag-005",
+      "question": "What is the relationship between AlphaCorp and BetaPlan?",
+      "answer": "AlphaCorp provides BetaPlan.",
+      "contexts": [],
+      "ground_truth": "provides"
+    },
+    {
+      "id": "graphrag-006",
+      "question": "Does AlphaCorp sell a health plan?",
+      "answer": "Yes, AlphaCorp sells a health plan called BetaPlan.",
+      "contexts": [],
+      "ground_truth": "BetaPlan"
+    }
+  ]
+}

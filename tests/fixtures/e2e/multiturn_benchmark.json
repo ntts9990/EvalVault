@@ -1,0 +1,998 @@
+{
+  "name": "multiturn_benchmark",
+  "version": "1.0.0",
+  "test_cases": [
+    {
+      "conversation_id": "conv-001",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "Is there a waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        },
+        {"turn_id": "t05", "role": "user", "content": "Does it cover outpatient visits?"},
+        {
+          "turn_id": "t06",
+          "role": "assistant",
+          "content": "Outpatient visits are covered up to 500 per year.",
+          "contexts": ["Plan A covers outpatient visits up to 500 per year."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-002",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the monthly premium for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The monthly premium for plan A is 120.",
+          "contexts": ["Plan A premium is 120 per month."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "What is the deductible?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The deductible is 1000 per year.",
+          "contexts": ["Plan A has a 1000 annual deductible."]
+        },
+        {"turn_id": "t05", "role": "user", "content": "What is the coverage limit?"},
+        {
+          "turn_id": "t06",
+          "role": "assistant",
+          "content": "The coverage limit is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t07", "role": "user", "content": "Any waiting period?"},
+        {
+          "turn_id": "t08",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-003",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the emergency room copay?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "Emergency room copay is 200 per visit.",
+          "contexts": ["Plan A has a 200 emergency room copay."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "Does it cover hospitalization?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "Hospitalization is covered up to 100000.",
+          "contexts": ["Plan A covers hospitalization up to 100000."]
+        },
+        {"turn_id": "t05", "role": "user", "content": "Is there an annual out-of-pocket max?"},
+        {
+          "turn_id": "t06",
+          "role": "assistant",
+          "content": "The annual out-of-pocket max is 5000.",
+          "contexts": ["Plan A has a 5000 out-of-pocket max."]
+        },
+        {"turn_id": "t07", "role": "user", "content": "Any exclusions I should know?"},
+        {
+          "turn_id": "t08",
+          "role": "assistant",
+          "content": "Pre-existing conditions are excluded for 12 months.",
+          "contexts": ["Plan A excludes pre-existing conditions for 12 months."]
+        },
+        {"turn_id": "t09", "role": "user", "content": "What is the waiting period?"},
+        {
+          "turn_id": "t10",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-004",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-005",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The weather is sunny today.",
+          "contexts": ["Weather reports mention sunny conditions."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-006",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-007",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-008",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-009",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-010",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The weather is sunny today.",
+          "contexts": ["Weather reports mention sunny conditions."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-011",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-012",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-013",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-014",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-015",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The weather is sunny today.",
+          "contexts": ["Weather reports mention sunny conditions."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-016",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-017",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-018",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-019",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-020",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The weather is sunny today.",
+          "contexts": ["Weather reports mention sunny conditions."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-021",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-022",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-023",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-024",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-025",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The weather is sunny today.",
+          "contexts": ["Weather reports mention sunny conditions."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-026",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-027",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-028",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-029",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-030",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-031",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-032",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-033",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-034",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-035",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-036",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-037",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-038",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-039",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-040",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-041",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-042",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-043",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-044",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-045",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-046",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-047",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-048",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-049",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    },
+    {
+      "conversation_id": "conv-050",
+      "turns": [
+        {"turn_id": "t01", "role": "user", "content": "What is the coverage limit for plan A?"},
+        {
+          "turn_id": "t02",
+          "role": "assistant",
+          "content": "The coverage limit for plan A is 100000.",
+          "contexts": ["Plan A covers up to 100000."]
+        },
+        {"turn_id": "t03", "role": "user", "content": "And the waiting period?"},
+        {
+          "turn_id": "t04",
+          "role": "assistant",
+          "content": "The waiting period is 30 days.",
+          "contexts": ["Plan A has a 30 day waiting period."]
+        }
+      ]
+    }
+  ]
+}
