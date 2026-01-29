@@ -271,6 +271,20 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
 CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
 
+-- Ops reports table
+CREATE TABLE IF NOT EXISTS ops_reports (
+    report_id TEXT PRIMARY KEY,
+    run_id TEXT,
+    report_type TEXT NOT NULL,  -- 'ops_report', 'ops_snapshot'
+    format TEXT NOT NULL,  -- 'markdown', 'json'
+    content TEXT,  -- Report content (markdown/json) or file path
+    metadata TEXT,  -- JSON metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_reports_run_id ON ops_reports(run_id);
+
 -- Analysis pipeline results table
 CREATE TABLE IF NOT EXISTS pipeline_results (
     result_id TEXT PRIMARY KEY,

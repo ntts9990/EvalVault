@@ -241,6 +241,19 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
 CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 CREATE INDEX IF NOT EXISTS idx_reports_experiment_id ON analysis_reports(experiment_id);
 
+-- Ops reports table
+CREATE TABLE IF NOT EXISTS ops_reports (
+    report_id UUID PRIMARY KEY,
+    run_id UUID REFERENCES evaluation_runs(run_id) ON DELETE SET NULL,
+    report_type VARCHAR(50) NOT NULL,
+    format VARCHAR(20) NOT NULL,
+    content TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_reports_run_id ON ops_reports(run_id);
+
 -- Analysis pipeline results table
 CREATE TABLE IF NOT EXISTS pipeline_results (
     result_id UUID PRIMARY KEY,

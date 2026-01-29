@@ -1211,6 +1211,83 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             )
         return reports
 
+    def save_ops_report(
+        self,
+        *,
+        report_id: str | None,
+        run_id: str | None,
+        report_type: str,
+        format: str,
+        content: str | None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> str:
+        report_id = report_id or str(uuid.uuid4())
+        created_at = created_at or datetime.now().isoformat()
+
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO ops_reports (
+                    report_id, run_id, report_type, format, content, metadata, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report_id,
+                    run_id,
+                    report_type,
+                    format,
+                    content,
+                    self._serialize_json(metadata),
+                    created_at,
+                ),
+            )
+            conn.commit()
+
+        return report_id
+
+    def list_ops_reports(
+        self,
+        *,
+        run_id: str,
+        report_type: str | None = None,
+        format: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        query = (
+            "SELECT report_id, run_id, report_type, format, content, metadata, created_at "
+            "FROM ops_reports WHERE run_id = ?"
+        )
+        params: list[Any] = [run_id]
+        if report_type:
+            query += " AND report_type = ?"
+            params.append(report_type)
+        if format:
+            query += " AND format = ?"
+            params.append(format)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            conn = cast(Any, conn)
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        reports: list[dict[str, Any]] = []
+        for row in rows:
+            reports.append(
+                {
+                    "report_id": row["report_id"],
+                    "run_id": row["run_id"],
+                    "report_type": row["report_type"],
+                    "format": row["format"],
+                    "content": row["content"],
+                    "metadata": self._deserialize_json(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
+        return reports
+
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """

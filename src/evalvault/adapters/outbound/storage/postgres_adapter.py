@@ -1128,6 +1128,96 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             )
         return reports
 
+    def save_ops_report(
+        self,
+        *,
+        report_id: str | None,
+        run_id: str | None,
+        report_type: str,
+        format: str,
+        content: str | None,
+        metadata: dict[str, Any] | None = None,
+        created_at: str | None = None,
+    ) -> str:
+        report_id = report_id or str(uuid.uuid4())
+        if created_at is None:
+            created_at_value = datetime.now(UTC)
+        else:
+            created_at_value = (
+                datetime.fromisoformat(created_at) if isinstance(created_at, str) else created_at
+            )
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO ops_reports (
+                    report_id, run_id, report_type, format, content, metadata, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (report_id) DO UPDATE SET
+                    run_id = EXCLUDED.run_id,
+                    report_type = EXCLUDED.report_type,
+                    format = EXCLUDED.format,
+                    content = EXCLUDED.content,
+                    metadata = EXCLUDED.metadata,
+                    created_at = EXCLUDED.created_at
+                """,
+                (
+                    report_id,
+                    run_id,
+                    report_type,
+                    format,
+                    content,
+                    self._serialize_pipeline_json(metadata),
+                    created_at_value,
+                ),
+            )
+            conn.commit()
+
+        return report_id
+
+    def list_ops_reports(
+        self,
+        *,
+        run_id: str,
+        report_type: str | None = None,
+        format: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        clauses = ["run_id = %s"]
+        params: list[Any] = [run_id]
+        if report_type:
+            clauses.append("report_type = %s")
+            params.append(report_type)
+        if format:
+            clauses.append("format = %s")
+            params.append(format)
+        params.append(limit)
+
+        query = (
+            "SELECT report_id, run_id, report_type, format, content, metadata, created_at "
+            "FROM ops_reports WHERE " + " AND ".join(clauses) + " ORDER BY created_at DESC LIMIT %s"
+        )
+
+        with self._get_connection() as conn:
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        reports: list[dict[str, Any]] = []
+        for row in rows:
+            reports.append(
+                {
+                    "report_id": row["report_id"],
+                    "run_id": row["run_id"],
+                    "report_type": row["report_type"],
+                    "format": row["format"],
+                    "content": row["content"],
+                    "metadata": self._deserialize_json(row["metadata"]),
+                    "created_at": row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else row["created_at"],
+                }
+            )
+        return reports
+
     def list_pipeline_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """파이프라인 분석 결과 목록을 조회합니다."""
         query = """
