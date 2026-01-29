@@ -56,16 +56,20 @@ def test_options_factories_and_normalize() -> None:
 
     db_option = options.db_option()
     settings = options.Settings()
-    assert db_option.default == Path(settings.evalvault_db_path)
-    assert db_option.show_default is True
+    assert db_option.default is None
+    assert db_option.show_default is False
 
     db_none = options.db_option(default=None)
     assert db_none.default is None
     assert db_none.show_default is False
 
     memory_db = options.memory_db_option()
-    assert memory_db.default == Path(settings.evalvault_memory_db_path)
-    assert memory_db.show_default is True
+    if settings.db_backend == "sqlite":
+        assert memory_db.default == Path(settings.evalvault_memory_db_path)
+        assert memory_db.show_default is True
+    else:
+        assert memory_db.default is None
+        assert memory_db.show_default is False
 
 
 def test_parse_csv_option() -> None:

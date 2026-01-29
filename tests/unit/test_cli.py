@@ -71,7 +71,7 @@ class TestCLIProfileDifficulty:
         assert result.exit_code != 0
 
     @patch(f"{PROFILE_DIFFICULTY_COMMAND_MODULE}.DifficultyProfilingService")
-    @patch(f"{PROFILE_DIFFICULTY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{PROFILE_DIFFICULTY_COMMAND_MODULE}.build_storage_adapter")
     def test_profile_difficulty_writes_output(
         self,
         mock_storage_cls,
@@ -474,7 +474,7 @@ class TestCLIRun:
 
     @patch(f"{RUN_COMMAND_MODULE}.MemoryBasedAnalysis")
     @patch(f"{RUN_COMMAND_MODULE}.MemoryAwareEvaluator")
-    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.build_domain_memory_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
@@ -1246,7 +1246,7 @@ class TestCLIRunModes:
         ],
     )
     @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
-    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.build_domain_memory_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.ensure_phoenix_instrumentation", return_value=True)
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1341,7 +1341,7 @@ class TestCLIRunModes:
         assert "Error" in result.stdout
 
     @patch("evalvault.adapters.outbound.tracker.phoenix_adapter.PhoenixAdapter")
-    @patch(f"{RUN_COMMAND_MODULE}.SQLiteDomainMemoryAdapter")
+    @patch(f"{RUN_COMMAND_MODULE}.build_domain_memory_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.ensure_phoenix_instrumentation", return_value=True)
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
@@ -1676,7 +1676,7 @@ class TestCLIRunModes:
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.Settings")
-    @patch(f"{RUN_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.run_helpers.build_storage_adapter")
     def test_run_with_db_save(
         self,
         mock_storage_cls,
@@ -1951,7 +1951,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "limit" in result.stdout.lower()
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
     @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
     def test_history_no_runs(
@@ -1976,7 +1976,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "No evaluation runs found" in result.stdout
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
     @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
     def test_history_with_runs(
@@ -2013,7 +2013,7 @@ class TestCLIHistory:
         assert "abc12345" in result.stdout  # Run ID truncated
         assert "Simple" in result.stdout
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
     @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
     def test_history_with_filters(
@@ -2052,7 +2052,7 @@ class TestCLIHistory:
         )
         assert result.exit_code == 0
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
     @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
     def test_history_with_phoenix_metrics(
@@ -2099,7 +2099,7 @@ class TestCLIHistory:
         assert result.exit_code == 0
         assert "0.82" in result.stdout
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{HISTORY_COMMAND_MODULE}.Settings")
     @patch(f"{HISTORY_COMMAND_MODULE}.PhoenixExperimentResolver")
     def test_history_filters_by_mode(
@@ -2166,7 +2166,7 @@ class TestCLICompare:
 
     @patch(f"{COMPARE_COMMAND_MODULE}.ComparisonPipelineAdapter")
     @patch(f"{COMPARE_COMMAND_MODULE}.build_analysis_pipeline_service")
-    @patch(f"{COMPARE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{COMPARE_COMMAND_MODULE}.build_storage_adapter")
     def test_compare_run_not_found(
         self,
         mock_storage_cls,
@@ -2191,7 +2191,7 @@ class TestCLICompare:
 
     @patch(f"{COMPARE_COMMAND_MODULE}.ComparisonPipelineAdapter")
     @patch(f"{COMPARE_COMMAND_MODULE}.build_analysis_pipeline_service")
-    @patch(f"{COMPARE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{COMPARE_COMMAND_MODULE}.build_storage_adapter")
     def test_compare_two_runs(
         self,
         mock_storage_cls,
@@ -2271,7 +2271,7 @@ class TestCLIExport:
         result = runner.invoke(app, ["export", "--help"])
         assert result.exit_code == 0
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     def test_export_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -2291,7 +2291,7 @@ class TestCLIExport:
         )
         assert result.exit_code == 1
 
-    @patch(f"{HISTORY_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{HISTORY_COMMAND_MODULE}.build_storage_adapter")
     def test_export_run_to_file(self, mock_storage_cls, tmp_path):
         """실행 결과 내보내기 테스트."""
         mock_run = MagicMock()
@@ -2400,7 +2400,7 @@ class TestCLIExperiment:
         result = runner.invoke(app, ["experiment-create", "--help"])
         assert result.exit_code == 0
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_create(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 생성 테스트."""
@@ -2436,7 +2436,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "Created experiment" in result.stdout
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_group(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험에 그룹 추가 테스트."""
@@ -2460,7 +2460,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.add_group_to_experiment.assert_called_once()
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_group_not_found(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """존재하지 않는 실험에 그룹 추가 테스트."""
@@ -2482,7 +2482,7 @@ class TestCLIExperiment:
         )
         assert result.exit_code == 1
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_add_run(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 그룹에 run 추가 테스트."""
@@ -2506,7 +2506,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.add_run_to_experiment_group.assert_called_once()
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_list(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 목록 조회 테스트."""
@@ -2521,7 +2521,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "No experiments found" in result.stdout
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_list_with_experiments(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 목록 조회 테스트 (실험 있음)."""
@@ -2543,7 +2543,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "Test Exp" in result.stdout
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_compare(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 그룹 비교 테스트."""
@@ -2573,7 +2573,7 @@ class TestCLIExperiment:
         )
         assert result.exit_code == 0
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_compare_no_data(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """비교 데이터 없을 때 테스트."""
@@ -2592,7 +2592,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         assert "No comparison data" in result.stdout
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_conclude(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 종료 테스트."""
@@ -2614,7 +2614,7 @@ class TestCLIExperiment:
         assert result.exit_code == 0
         mock_manager.conclude_experiment.assert_called_once()
 
-    @patch(f"{EXPERIMENT_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{EXPERIMENT_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{EXPERIMENT_COMMAND_MODULE}.ExperimentManager")
     def test_experiment_summary(self, mock_manager_cls, mock_storage_cls, tmp_path):
         """실험 요약 테스트."""
@@ -2766,7 +2766,7 @@ class TestCLIAnalyzeNLP:
         assert result.exit_code == 0
         assert "--nlp" in strip_ansi(result.stdout)
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     def test_analyze_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -2780,7 +2780,7 @@ class TestCLIAnalyzeNLP:
         assert result.exit_code == 1
         assert "찾을 수 없습니다" in result.stdout
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
@@ -2824,7 +2824,7 @@ class TestCLIAnalyzeNLP:
         call_kwargs = mock_service.analyze_run.call_args[1]
         assert call_kwargs["include_nlp"] is False
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.NLPAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.Settings")
@@ -2913,7 +2913,7 @@ class TestCLIAnalyzeNLP:
         call_kwargs = mock_service.analyze_run.call_args[1]
         assert call_kwargs["include_nlp"] is True
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.NLPAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.Settings")
@@ -2985,7 +2985,7 @@ class TestCLIGate:
         assert "baseline" in result.stdout.lower()
         assert "format" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_run_not_found(self, mock_storage_cls, tmp_path):
         """존재하지 않는 run ID 테스트."""
         mock_storage = MagicMock()
@@ -2999,7 +2999,7 @@ class TestCLIGate:
         assert result.exit_code == 3
         assert "not found" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_pass(self, mock_storage_cls, tmp_path):
         """모든 메트릭 통과 테스트."""
         mock_run = MagicMock()
@@ -3020,7 +3020,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "PASSED" in result.stdout or "passed" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_fail(self, mock_storage_cls, tmp_path):
         """메트릭 미달 테스트."""
         mock_run = MagicMock()
@@ -3041,7 +3041,7 @@ class TestCLIGate:
         assert result.exit_code == 1
         assert "FAILED" in result.stdout or "failed" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_custom_threshold(self, mock_storage_cls, tmp_path):
         """커스텀 임계값 테스트."""
         mock_run = MagicMock()
@@ -3062,7 +3062,7 @@ class TestCLIGate:
         )
         assert result.exit_code == 1
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_json_output(self, mock_storage_cls, tmp_path):
         """JSON 출력 테스트."""
         mock_run = MagicMock()
@@ -3085,7 +3085,7 @@ class TestCLIGate:
         assert data["status"] == "passed"
         assert data["all_thresholds_passed"] is True
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_github_actions_output(self, mock_storage_cls, tmp_path):
         """GitHub Actions 출력 테스트."""
         mock_run = MagicMock()
@@ -3106,7 +3106,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "::set-output" in result.stdout
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_with_baseline(self, mock_storage_cls, tmp_path):
         """베이스라인 비교 테스트."""
         mock_run = MagicMock()
@@ -3132,7 +3132,7 @@ class TestCLIGate:
         assert result.exit_code == 0
         assert "Baseline" in result.stdout or "baseline" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_regression_detected(self, mock_storage_cls, tmp_path):
         """회귀 감지 테스트."""
         mock_run = MagicMock()
@@ -3167,7 +3167,7 @@ class TestCLIGate:
         assert result.exit_code == 2  # Regression detected
         assert "regression" in result.stdout.lower()
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_baseline_not_found(self, mock_storage_cls, tmp_path):
         """베이스라인 미발견 테스트."""
         mock_run = MagicMock()
@@ -3183,7 +3183,7 @@ class TestCLIGate:
         )
         assert result.exit_code == 3
 
-    @patch(f"{GATE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{GATE_COMMAND_MODULE}.build_storage_adapter")
     def test_gate_invalid_threshold_format(self, mock_storage_cls, tmp_path):
         """잘못된 임계값 형식 테스트."""
         mock_run = MagicMock()
@@ -3214,7 +3214,7 @@ class TestCLIAnalyzePlaybook:
         assert "--playbook" in stdout
         assert "--enable-llm" in stdout
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
@@ -3270,7 +3270,7 @@ class TestCLIAnalyzePlaybook:
         assert call_args[0] == mock_run  # run
         assert call_args[1] is False  # enable_llm
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
@@ -3325,7 +3325,7 @@ class TestCLIAnalyzePlaybook:
         call_args = mock_playbook_analysis.call_args[0]
         assert call_args[1] is True  # enable_llm
 
-    @patch(f"{ANALYZE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{ANALYZE_COMMAND_MODULE}.build_storage_adapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.StatisticalAnalysisAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.MemoryCacheAdapter")
     @patch(f"{ANALYZE_COMMAND_MODULE}.AnalysisService")
@@ -3379,7 +3379,7 @@ class TestPipelineCommands:
     @patch("evalvault.adapters.outbound.analysis.SummaryReportModule")
     @patch("evalvault.adapters.outbound.analysis.StatisticalAnalyzerModule")
     @patch("evalvault.adapters.outbound.analysis.DataLoaderModule")
-    @patch(f"{PIPELINE_COMMAND_MODULE}.SQLiteStorageAdapter")
+    @patch(f"{PIPELINE_COMMAND_MODULE}.build_storage_adapter")
     @patch("evalvault.domain.services.pipeline_orchestrator.AnalysisPipelineService")
     def test_pipeline_analyze_saves_statistical_analysis(
         self,

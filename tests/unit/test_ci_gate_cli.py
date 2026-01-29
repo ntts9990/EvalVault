@@ -80,7 +80,7 @@ def test_ci_gate_help() -> None:
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_json_output_success(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.82}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.8}, {"faithfulness": 0.7})
@@ -113,7 +113,7 @@ def test_ci_gate_json_output_success(mock_storage_cls, mock_service_cls, tmp_pat
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_markdown_output(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.82}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.8}, {"faithfulness": 0.7})
@@ -143,7 +143,7 @@ def test_ci_gate_markdown_output(mock_storage_cls, mock_service_cls, tmp_path) -
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_pr_comment_output(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.82}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.8}, {"faithfulness": 0.7})
@@ -174,7 +174,7 @@ def test_ci_gate_pr_comment_output(mock_storage_cls, mock_service_cls, tmp_path)
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_gitlab_output(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.82}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.8}, {"faithfulness": 0.7})
@@ -204,7 +204,7 @@ def test_ci_gate_gitlab_output(mock_storage_cls, mock_service_cls, tmp_path) -> 
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_regression_exit_code(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.7}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.9}, {"faithfulness": 0.7})
@@ -233,7 +233,7 @@ def test_ci_gate_regression_exit_code(mock_storage_cls, mock_service_cls, tmp_pa
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_regression_no_fail_when_disabled(
     mock_storage_cls,
     mock_service_cls,
@@ -269,7 +269,7 @@ def test_ci_gate_regression_no_fail_when_disabled(
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_threshold_failure_exit_code(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     current_run = _build_run("current", {"faithfulness": 0.6}, {"faithfulness": 0.7})
     baseline_run = _build_run("baseline", {"faithfulness": 0.9}, {"faithfulness": 0.7})
@@ -312,7 +312,7 @@ def test_ci_gate_invalid_format() -> None:
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_ci_gate_regression_rate_calculation(
     mock_storage_cls,
     mock_service_cls,

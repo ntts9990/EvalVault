@@ -54,7 +54,7 @@ def test_regress_help() -> None:
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_regress_json_output(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     mock_storage_cls.return_value = MagicMock()
     mock_service = MagicMock()
@@ -82,7 +82,7 @@ def test_regress_json_output(mock_storage_cls, mock_service_cls, tmp_path) -> No
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
-@patch(f"{REGRESS_COMMAND_MODULE}.SQLiteStorageAdapter")
+@patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter")
 def test_regress_regression_detected(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     mock_storage_cls.return_value = MagicMock()
     mock_service = MagicMock()

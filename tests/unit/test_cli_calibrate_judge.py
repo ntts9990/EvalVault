@@ -80,7 +80,7 @@ def _build_result(run_id: str) -> JudgeCalibrationResult:
 
 
 @patch("evalvault.adapters.inbound.cli.commands.calibrate_judge.JudgeCalibrationService")
-@patch("evalvault.adapters.inbound.cli.commands.calibrate_judge.SQLiteStorageAdapter")
+@patch("evalvault.adapters.inbound.cli.commands.calibrate_judge.build_storage_adapter")
 def test_cli_calibrate_judge_success(mock_storage_cls, mock_service_cls, tmp_path) -> None:
     run = _build_run()
     storage = MagicMock()

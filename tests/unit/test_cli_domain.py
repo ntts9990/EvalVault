@@ -180,7 +180,7 @@ class TestDomainTerms:
 class TestDomainMemoryStats:
     """Tests for 'evalvault domain memory stats' command."""
 
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_stats_basic(self, mock_adapter_class, runner):
         """Test domain memory stats display."""
         mock_adapter = MagicMock()
@@ -201,7 +201,7 @@ class TestDomainMemoryStats:
 class TestDomainMemorySearch:
     """Tests for 'evalvault domain memory search' command."""
 
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_search_filters_by_min_score(self, mock_adapter_class, runner):
         """Test memory search filters results by min score."""
         from evalvault.domain.entities.memory import FactualFact
@@ -262,7 +262,7 @@ class TestDomainMemorySearch:
 class TestDomainMemoryBehaviors:
     """Tests for 'evalvault domain memory behaviors' command."""
 
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_behaviors_basic(self, mock_adapter_class, runner):
         """Test behaviors listing with filters."""
         from evalvault.domain.entities.memory import BehaviorEntry
@@ -309,7 +309,7 @@ class TestDomainMemoryBehaviors:
 class TestDomainMemoryLearnings:
     """Tests for 'evalvault domain memory learnings' command."""
 
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_learnings_basic(self, mock_adapter_class, runner):
         """Test learnings listing."""
         from evalvault.domain.entities.memory import LearningMemory
@@ -354,7 +354,7 @@ class TestDomainMemoryLearnings:
 class TestDomainMemoryEvolve:
     """Tests for 'evalvault domain memory evolve' command."""
 
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_evolve_dry_run(self, mock_adapter_class, runner):
         """Test memory evolve dry run."""
         mock_adapter = MagicMock()
@@ -383,7 +383,7 @@ class TestDomainMemoryEvolve:
         assert "Dry run" in result.stdout
 
     @patch("evalvault.adapters.inbound.cli.commands.domain.DomainLearningHook")
-    @patch("evalvault.adapters.inbound.cli.commands.domain.SQLiteDomainMemoryAdapter")
+    @patch("evalvault.adapters.inbound.cli.commands.domain.build_domain_memory_adapter")
     def test_memory_evolve_executes(self, mock_adapter_class, mock_hook_class, runner):
         """Test memory evolve execution path."""
         mock_adapter = MagicMock()

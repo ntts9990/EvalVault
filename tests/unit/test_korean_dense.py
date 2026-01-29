@@ -99,8 +99,8 @@ class TestKoreanDenseRetrieverInit:
         """기본 초기화."""
         retriever = KoreanDenseRetriever()
 
-        # 기본 모델: dragonkue/BGE-m3-ko (AutoRAG 벤치마크 1위)
-        assert retriever.model_name == "dragonkue/BGE-m3-ko"
+        # 기본 모델: BAAI/bge-m3 (다국어 기본 모델)
+        assert retriever.model_name == "BAAI/bge-m3"
         assert retriever.dimension == 1024
         assert retriever.max_length == 8192
         assert not retriever.is_indexed
@@ -557,7 +557,7 @@ class TestQwen3EmbeddingSupport:
 
     def test_qwen3_requires_ollama_adapter(self):
         """Ollama 어댑터 없이 Qwen3 모델 초기화 시 오류 확인."""
-        with pytest.raises(ValueError, match="ollama_adapter is required"):
+        with pytest.raises(ValueError, match="embedding adapter is required"):
             KoreanDenseRetriever(model_name="qwen3-embedding:0.6b")
 
     def test_qwen3_with_mock_adapter(self):
