@@ -9,7 +9,7 @@ EvalVault 배포 전에 필수로 확인해야 할 항목과 릴리즈 노트 �
 ## 0. 범위/전제
 
 - **배포 대상**: EvalVault API + Web UI + 평가 파이프라인
-- **기본 DB**: SQLite (`EVALVAULT_DB_PATH`로 경로 변경 가능)
+- **기본 DB**: PostgreSQL + pgvector (SQLite는 `--db` 또는 `DB_BACKEND=sqlite`로 선택)
 - **LLM 제공자**: UI에서 provider 선택 (Ollama/OpenAI/vLLM/기타)
 
 ---
@@ -28,7 +28,8 @@ EvalVault 배포 전에 필수로 확인해야 할 항목과 릴리즈 노트 �
 
 - `.env`가 최신인가?
 - `EVALVAULT_PROFILE`이 올바른가? (`config/models.yaml` 기준)
-- `EVALVAULT_DB_PATH`가 운영 환경의 SQLite 경로와 일치하는가?
+- Postgres 연결 설정(`POSTGRES_*` 또는 `POSTGRES_CONNECTION_STRING`)이 올바른가?
+- SQLite를 쓰는 경우 `EVALVAULT_DB_PATH`가 운영 환경 경로와 일치하는가?
 
 ### Ollama
 
@@ -54,8 +55,8 @@ EvalVault 배포 전에 필수로 확인해야 할 항목과 릴리즈 노트 �
 
 ## 3. 데이터/DB 체크
 
-- SQLite 파일 백업을 준비했는가? (`cp data/db/evalvault.db data/db/evalvault.db.bak`)
-- Postgres를 쓰는 경우 스키마가 최신인지 확인했는가?
+- SQLite를 쓰는 경우 파일 백업을 준비했는가? (`cp data/db/evalvault.db data/db/evalvault.db.bak`)
+- Postgres 사용 시 스키마가 최신인지 확인했는가?
 - `pipeline_results`에 `profile/tags/metadata` 컬럼이 존재하는가?
   - 기존 DB는 어댑터 초기화 시 자동 마이그레이션됨.
 

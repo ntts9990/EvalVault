@@ -43,20 +43,19 @@ Open `http://localhost:5173`, run an evaluation in Evaluation Studio (for exampl
 and insights.
 
 - LLM report language: `/api/v1/runs/{run_id}/report?language=en` (default: ko)
-  - Details: `docs/guides/USER_GUIDE.md#보고서-언어-옵션`
+  - Details: `docs/handbook/CHAPTERS/00_overview.md`
 - Feedback aggregation: latest value per `rater_id` + `test_case_id` (cancellations excluded)
-  - Details: `docs/guides/USER_GUIDE.md#피드백-집계-규칙`
+  - Details: `docs/handbook/CHAPTERS/02_data_and_metrics.md`
 
 **CLI (terminal view)**
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
-  --profile dev \
-  --db data/db/evalvault.db
-uv run evalvault history --db data/db/evalvault.db
-uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db
+  --profile dev
+uv run evalvault history
+uv run evalvault analyze <RUN_ID>
 ```
-Tip: keep the same `--db` (or `EVALVAULT_DB_PATH`) so the Web UI can read the run.
+Tip: Postgres is the default store. Use `--db` or `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH` for SQLite, and keep the same settings so the Web UI can read the run.
 
 ---
 
@@ -186,7 +185,7 @@ The core contract is **module-level spans (`rag.module`) + log events + shared a
   - Learn facts/behaviors from past runs to auto-tune thresholds and augment context
   - DAG-based analysis pipeline with statistical, NLP, and causal modules for multi-faceted interpretation
 
-See the [User Guide](docs/guides/USER_GUIDE.md) for end-to-end workflows, Phoenix/Langfuse integration, and troubleshooting.
+See the [Handbook](docs/handbook/INDEX.md) for end-to-end workflows, operations, and troubleshooting.
 
 ---
 
@@ -228,7 +227,7 @@ uv sync --extra dev
    cp .env.example .env
    # set OPENAI_API_KEY or OLLAMA settings, LANGFUSE/PHOENIX keys, etc.
    ```
-   Optional SQLite path override:
+Optional SQLite path override (when using SQLite):
    ```bash
    # .env
    EVALVAULT_DB_PATH=/path/to/data/db/evalvault.db
@@ -247,10 +246,9 @@ uv sync --extra dev
    ```bash
    cp .env.example .env
    ollama pull gemma3:1b
-   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
-     --metrics faithfulness \
-     --db data/db/evalvault.db \
-     --profile dev
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --profile dev
    ```
    Tip: embedding metrics like `answer_relevancy` also need `qwen3-embedding:0.6b`.
 
@@ -258,9 +256,9 @@ uv sync --extra dev
    ```bash
    cp .env.example .env
    printf "\nEVALVAULT_PROFILE=vllm\nVLLM_BASE_URL=http://localhost:8001/v1\nVLLM_MODEL=gpt-oss-120b\n" >> .env
-   uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
-     --metrics faithfulness \
-     --db data/db/evalvault.db
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
+  --metrics faithfulness \
+  --profile dev
    ```
    Tip: embedding metrics require `VLLM_EMBEDDING_MODEL` and a `/v1/embeddings` endpoint.
    If you use Ollama models that support tool/function calling, list them in
@@ -295,20 +293,21 @@ uv sync --extra dev
 
 3. **Run an evaluation**
    ```bash
-   uv run evalvault run tests/fixtures/sample_dataset.json \
-     --metrics faithfulness,answer_relevancy \
-     --profile dev \
-     --db data/db/evalvault.db
+uv run evalvault run tests/fixtures/sample_dataset.json \
+  --metrics faithfulness,answer_relevancy \
+  --profile dev
    ```
-   Tip: `--db` stores results for `history/export/web`. Add `--tracker phoenix` only if
-   Phoenix is configured (and `uv sync --extra phoenix` is installed).
+   Tip: For SQLite, pass `--db` (or set `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH`).
+   For Postgres, set `POSTGRES_*` or `POSTGRES_CONNECTION_STRING` so the Web UI can
+   read the same DB. Add `--tracker phoenix` only if Phoenix is configured
+   (and `uv sync --extra phoenix` is installed).
 
 4. **Inspect history**
    ```bash
-   uv run evalvault history --db data/db/evalvault.db
+    uv run evalvault history
    ```
 
-More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [User Guide](docs/guides/USER_GUIDE.md).
+More examples (parallel runs, dataset streaming, Langfuse logging, Phoenix dataset sync, prompt manifest diffs, etc.) live in the [Handbook](docs/handbook/INDEX.md) and `examples/`.
 
 ---
 
@@ -372,9 +371,8 @@ On top of these, `StageMetricService` derives **pipeline-stage metrics** such as
 
 ## Documentation
 - [Docs Index](docs/INDEX.md): documentation hub.
-- [User Guide](docs/guides/USER_GUIDE.md): installation, configuration, CLI recipes, Web UI, Phoenix, automation.
-- [Dev Guide](docs/guides/DEV_GUIDE.md): local dev/test/lint routines.
-- [Developer Whitepaper](docs/new_whitepaper/INDEX.md): architecture, operations, and engineering standards.
+- [Handbook](docs/handbook/INDEX.md): internal SSoT (architecture, workflows, ops, quality).
+- [External Summary](docs/handbook/EXTERNAL.md): shareable overview.
 - [Open RAG Trace Spec](docs/architecture/open-rag-trace-spec.md): tracing schema and integration guide.
 - [CHANGELOG](CHANGELOG.md) for release history.
 

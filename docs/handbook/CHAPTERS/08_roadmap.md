@@ -23,9 +23,12 @@
 
 로드맵은 문서가 여러 개라서, “어느 문서가 정답인가”를 먼저 고정해야 한다.
 
-- 외부 공개 로드맵(Why/What): `docs/ROADMAP.md`
-- 1페이지 상태 요약(지금 가능한 것/제약): `docs/STATUS.md`
-- 개발 백서의 로드맵/유지보수 규칙: `docs/new_whitepaper/14_roadmap.md`
+- 외부 공유용 요약(개념/방향): `docs/handbook/EXTERNAL.md`
+- 내부 운영/제약/현상태(코드 근거 포함): `docs/handbook/CHAPTERS/00_overview.md`, `docs/handbook/CHAPTERS/04_operations.md`
+
+호환성 노트:
+
+- `docs/ROADMAP.md`, `docs/STATUS.md`는 과거 링크 호환을 위한 deprecated 스텁이며, 최신 내용은 handbook을 따른다.
 
 이 챕터(`docs/handbook/CHAPTERS/08_roadmap.md`)는 내부 독자용으로,
 각 우선순위가 실제 코드/테스트/워크플로와 어떻게 연결되는지까지 포함한다.
@@ -108,11 +111,15 @@
 - GraphRAG retriever/컨텍스트 생성
 - A/B 비교 실험(동일 데이터셋, 동일 메트릭)
 - 아티팩트 저장(서브그래프, 엔티티 추출 결과)
+- 하이브리드 검색(BM25 + Dense) 기준 파라미터/평가 루틴 확정
+- 벡터 스토리지 로드맵: PostgreSQL pgvector 우선, 규모 확장 시 Milvus/Weaviate
 
 완료 정의(DoD):
 
 - 동일 데이터셋에서 top-k와 GraphRAG를 비교 실행할 수 있다.
 - 결과 차이를 근거(아티팩트)로 설명할 수 있다.
+- 하이브리드 검색과 BM25 단독의 성능 차이를 반복 측정할 수 있다.
+- pgvector 기반 임베딩 저장/검색이 실험 규모에서 재현 가능하다.
 
 근거(코드):
 

@@ -23,7 +23,7 @@
 
 Web UI는 CLI의 모든 플래그/옵션을 1:1로 노출하지 않는다.
 
-- 근거: `docs/STATUS.md` ("Web UI의 기능은 CLI의 모든 플래그/옵션을 1:1로 노출하지 않습니다")
+- 근거(구현): UI에서 CLI로 조건을 복사/이동하는 탈출구가 존재한다: `frontend/src/utils/cliCommandBuilder.ts`
 
 이 제약을 인정하지 않으면 UX가 망가진다.
 "UI에서 못 하는 것"을 숨기기보다, CLI로의 안전한 탈출구(예: Copy as CLI, run_id/DB 공유, 다운로드)를 제공하는 것이 팀 비용을 줄인다.
@@ -162,7 +162,11 @@ EvalVault에서 사용자가 “같은 결과를 보고 있다”는 의미는 D
 - UI에서 결과가 안 보이면 “기능이 없어서”가 아니라 “DB가 달라서”인 경우가 가장 많다.
 - 따라서 UI/CLI는 화면/콘솔 어디서든 DB 경로를 확인할 수 있어야 한다.
 
-근거(문서화된 사용법): `docs/guides/USER_GUIDE.md` ("CLI와 Web UI가 동일한 DB...")
+근거(코드):
+
+- Settings 기본 DB 필드: `src/evalvault/config/settings.py#Settings.evalvault_db_path`
+- API 서버가 settings를 읽어 동작: `src/evalvault/adapters/inbound/api/main.py#create_app`
+- (참고) CLI는 여러 커맨드에서 Settings를 fallback으로 사용: `src/evalvault/adapters/inbound/cli/commands/history.py`, `src/evalvault/adapters/inbound/cli/commands/compare.py`
 
 ---
 
@@ -217,12 +221,14 @@ CLI는 사용자가 잘못된 선택지를 넣으면 즉시 실패시킨다.
 
 Web UI의 범위와 설계 원칙(워크플로 중심/다운로드 중심/CLI↔UI 매핑)은 문서로 관리된다.
 
-- 근거(현재 페이지 목록, 설계 원칙, 매핑): `docs/guides/WEBUI_CLI_ROLLOUT_PLAN.md`
+근거(현재 페이지/라우팅): `frontend/src/App.tsx` (Routes)
 
 핵심 원칙 중 UX에 직접적인 것:
 
-- "워크플로 중심: 준비 → 실행 → 분석 → 비교 → 리포트" (근거: `docs/guides/WEBUI_CLI_ROLLOUT_PLAN.md`)
-- "다운로드 중심: 웹은 핵심 요약, 상세는 다운로드" (근거: `docs/guides/WEBUI_CLI_ROLLOUT_PLAN.md`)
+- "워크플로 중심": 화면이 실행/조회/분석/비교의 흐름으로 분리돼 있다.
+  - 근거: `frontend/src/App.tsx`, `frontend/src/pages/EvaluationStudio.tsx`, `frontend/src/pages/RunDetails.tsx`, `frontend/src/pages/AnalysisLab.tsx`, `frontend/src/pages/CompareRuns.tsx`
+- "다운로드 중심": UI는 요약/탐색에 강하고, 근거는 보고서/아티팩트/엔드포인트로 내려가게 설계돼 있다.
+  - 근거: `/report`, `/analysis-report`, `/dashboard` 엔드포인트: `src/evalvault/adapters/inbound/api/routers/runs.py`
 
 ### 3.2 Web API는 UI의 UX 계약이다
 
@@ -262,7 +268,6 @@ UI 관점의 의미:
 예: 보고서 언어 옵션
 
 - `GET /api/v1/runs/{run_id}/report?language=en` (기본 ko)
-  - 근거(사용자 문서): `docs/guides/USER_GUIDE.md`
   - 근거(코드): `src/evalvault/adapters/inbound/api/routers/runs.py#generate_llm_report`
 
 예: 분석 보고서/대시보드
@@ -272,7 +277,10 @@ UI 관점의 의미:
 
 ### 3.3 로컬 개발 UX: 프론트/백엔드 연결
 
-- Vite 프록시/직접 호출 환경변수: `docs/guides/DEV_GUIDE.md` (`VITE_API_PROXY_TARGET`, `VITE_API_BASE_URL`)
+- Vite 프록시/직접 호출 환경변수:
+  - `frontend/vite.config.ts` (`VITE_API_PROXY_TARGET`)
+  - `frontend/src/config.ts` (`VITE_API_BASE_URL`)
+  - `frontend/.env.example` (예시)
 
 ### 3.4 UI에서 CLI로 안전하게 “탈출”하기: Copy as CLI
 
@@ -308,8 +316,8 @@ UX 규칙(권장):
 
 온보딩 UX는 “설치했다”가 아니라 “루프가 닫혔다(run_id 생성→조회→리포트)”로 정의해야 한다.
 
-- 설치/실행: `docs/getting-started/INSTALLATION.md`
-- 사용자 여정(웹/CLI): `docs/guides/USER_GUIDE.md`
+- 설치/실행(요약): `README.md`
+- 로컬 운영 루틴(상세): `docs/handbook/CHAPTERS/04_operations.md`
 - handbook 최소 실행: `docs/handbook/CHAPTERS/00_overview.md`
 
 ---
@@ -326,5 +334,7 @@ UX 규칙(권장):
 ## 7) 향후 변경 시 업데이트 가이드
 
 - CLI 에러 UX 템플릿 변경: `src/evalvault/adapters/inbound/cli/utils/console.py`, `src/evalvault/adapters/inbound/cli/utils/errors.py`
-- Web UI 범위/매핑 변경: `docs/guides/WEBUI_CLI_ROLLOUT_PLAN.md`, `docs/STATUS.md`
+- Web UI 범위/매핑 변경(구현 근거):
+  - 페이지: `frontend/src/pages/EvaluationStudio.tsx`, `frontend/src/pages/RunDetails.tsx`, `frontend/src/pages/AnalysisLab.tsx`, `frontend/src/pages/CompareRuns.tsx`
+  - API 라우트(계약): `src/evalvault/adapters/inbound/api/routers/runs.py`, `src/evalvault/adapters/inbound/api/routers/pipeline.py`
 - Runs API(보고서/대시보드/디버그) 변경: `src/evalvault/adapters/inbound/api/routers/runs.py`, `docs/api/adapters/inbound.md`

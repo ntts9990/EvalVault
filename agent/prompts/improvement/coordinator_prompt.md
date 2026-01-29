@@ -45,7 +45,7 @@ cat agent/memory/shared/decisions.md | tail -50
 
 ## PARALLEL EXECUTION GROUPS
 
-From the current roadmap/standards (`docs/ROADMAP.md`, `docs/new_whitepaper/INDEX.md`):
+From the current roadmap/standards (`docs/handbook/CHAPTERS/08_roadmap.md`, `docs/handbook/INDEX.md`):
 
 ### Group A: Fully Independent (Can Run Together)
 - `performance`: Caching, batch processing
@@ -141,7 +141,7 @@ agent/memory/shared/
 docs/
 ├── ROADMAP.md            # Public direction
 ├── STATUS.md             # One-page snapshot
-└── new_whitepaper/       # Engineering standards
+└── handbook/             # Engineering standards (SSoT)
 
 feature_list.json         # Task tracking
 claude-progress.txt       # Session progress

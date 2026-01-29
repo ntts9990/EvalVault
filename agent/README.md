@@ -27,7 +27,7 @@ evalvault (PyPI Package)              agent/ (Development Only)
 
 ### Development Mode (This Folder)
 
-Agents for improving EvalVault codebase based on the current roadmap and engineering standards (see `docs/ROADMAP.md`, `docs/new_whitepaper/INDEX.md`):
+Agents for improving EvalVault codebase based on the current roadmap and engineering standards (see `docs/handbook/CHAPTERS/08_roadmap.md`, `docs/handbook/INDEX.md`):
 
 | Agent Type | Focus | P-Levels |
 |------------|-------|----------|
@@ -299,7 +299,7 @@ The agent system follows the project documentation and current engineering stand
 - [Claude Agent SDK Docs](https://platform.claude.com/docs/en/agent-sdk/overview)
 - [Effective Harnesses](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
 - [Docs Index](../docs/INDEX.md)
-- [Developer Whitepaper](../docs/new_whitepaper/INDEX.md)
+- [Handbook](../docs/handbook/INDEX.md)
 - [Open RAG Trace Spec](../docs/architecture/open-rag-trace-spec.md)
 - [Agent Types Configuration](../src/evalvault/config/agent_types.py)
 - [nonstop-agent](https://github.com/seolcoding/nonstop-agent)

@@ -70,7 +70,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - Stream D: 캘리브레이션/운영 가이드
   - 대상: `docs/guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - Stream E: 정책/로드맵 정합성 문서
-  - 대상: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
+- 대상: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/handbook/CHAPTERS/00_overview.md`
 
 ### 3.2 병렬 작업 규칙(합의 사항)
 - 서로 다른 파일에서 작업
@@ -184,7 +184,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
   - Stream A(데이터셋 구조)와 Stream B(평가 로직) 협업 필요
 
 ### 5.5 Observability 고도화
-- 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
+- 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/handbook/CHAPTERS/00_overview.md`
 - 계획
   - 운영 KPI(p95 latency/cost/timeout)와 품질 지표의 결합
   - run_id 기반 관측/비교 자동화
@@ -256,7 +256,7 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
   - 대화형 RAG에서 노이즈 증폭을 억제
 
 ### 6.5 Observability 고도화
-- 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
+- 근거: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/handbook/CHAPTERS/00_overview.md`
 - 계획
   - 운영 KPI(p95 latency/cost/timeout)와 품질 지표의 결합
   - run_id 기반 관측/비교 자동화
@@ -281,4 +281,4 @@ RAG 평가에서 발생하는 **데이터 노이즈**와 **모델 노이즈**를
 - Stage 메트릭: `src/evalvault/domain/services/stage_metric_service.py`
 - 캘리브레이션 가이드: `docs/guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
 - 개선 로드맵: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`
-- 시스템 개요: `docs/new_whitepaper/01_overview.md`
+- 시스템 개요: `docs/handbook/CHAPTERS/00_overview.md`

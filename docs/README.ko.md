@@ -33,13 +33,12 @@ Analysis Lab/Reports에서 점수와 분석 결과를 확인하세요. (예: `te
 ```bash
 uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
-  --profile dev \
-  --db data/db/evalvault.db
-uv run evalvault history --db data/db/evalvault.db
-uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db
+  --profile dev
+uv run evalvault history
+uv run evalvault analyze <RUN_ID>
 ```
-Tip: repo 내부에서 실행하면 기본 DB 경로는 프로젝트 루트 기준 `data/db/evalvault.db`로 해석됩니다.
-Web UI에서 보려면 `--db` 또는 `EVALVAULT_DB_PATH`를 동일하게 맞추세요.
+Tip: 기본 저장소는 Postgres입니다. SQLite를 쓰려면 `--db` 또는 `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH`를 지정하세요.
+Web UI에서 보려면 Postgres 연결 설정을 동일하게 맞추고, SQLite 사용 시 `--db` 또는 `EVALVAULT_DB_PATH`를 맞추세요.
 
 ---
 
@@ -226,7 +225,7 @@ uv sync --extra dev
    # secret:// 참조를 쓰려면 SECRET_PROVIDER 설정 및 secrets extra가 필요합니다.
    # 레이트리밋은 RATE_LIMIT_ENABLED로 활성화합니다.
    ```
-   SQLite 경로를 바꾸려면 아래 값을 추가합니다.
+SQLite 경로를 쓰려면 아래 값을 추가합니다.
    ```bash
    # .env
    EVALVAULT_DB_PATH=/path/to/data/db/evalvault.db
@@ -333,9 +332,11 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 
 ## 문서
 - [INDEX.md](INDEX.md): 전체 문서 인덱스
-- [guides/USER_GUIDE.md](guides/USER_GUIDE.md): 설치/환경설정/CLI/Web UI/Phoenix/자동화/문제 해결
-- [guides/DEV_GUIDE.md](guides/DEV_GUIDE.md): 로컬 개발/테스트/린트 루틴
-- [new_whitepaper/INDEX.md](new_whitepaper/INDEX.md): 개발 백서 (설계/운영/품질 기준)
+- [handbook/INDEX.md](handbook/INDEX.md): handbook(교과서형, 내부 SSoT)
+- [handbook/EXTERNAL.md](handbook/EXTERNAL.md): 외부 공개 요약본
+- [handbook/CHAPTERS/04_operations.md](handbook/CHAPTERS/04_operations.md): 운영(로컬/도커/오프라인/관측)
+- [handbook/CHAPTERS/06_quality_and_testing.md](handbook/CHAPTERS/06_quality_and_testing.md): 테스트/품질/CI
+- (참고) `guides/USER_GUIDE.md`, `guides/DEV_GUIDE.md`, `new_whitepaper/*`는 과거 링크 호환을 위한 deprecated 스텁/아카이브일 수 있습니다.
 - [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md): Open RAG Trace 표준 (Draft)
 - [architecture/open-rag-trace-collector.md](architecture/open-rag-trace-collector.md): Collector 구성 예시
 - [guides/OPEN_RAG_TRACE_SAMPLES.md](guides/OPEN_RAG_TRACE_SAMPLES.md): 최소 계측 샘플

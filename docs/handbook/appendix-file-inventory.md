@@ -2,6 +2,8 @@
 
 > 이 문서는 프로젝트 교과서 작성을 위한 전체 파일 인벤토리입니다.
 > Task 3(전수 정독)에서 Evidence, 요약, 외부공개 여부 등 상세 정보가 추가됩니다.
+>
+> 주의: 이 문서는 2026-01-28 스냅샷이다. 일부 `docs/*` 문서는 이후 deprecated 스텁(redirect) 또는 아카이브로 변경될 수 있으며, 최신 문서 SSoT는 `docs/handbook/**`다.
 
 ## 1. Inventory Summary
 

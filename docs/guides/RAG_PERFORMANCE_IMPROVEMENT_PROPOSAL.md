@@ -9,7 +9,7 @@
 
 - EvalVault의 미션은 RAG 개발/운영에서 가장 어려운 질문인 “**진짜 좋아졌나? 왜? 재현 가능한가?**”에 답하는 것이다.
 - 성능 관리는 “점수 1개”가 아니라 **품질(정확·근거·관련)** + **검색(리트리벌) 품질** + **운영(비용·지연·안정성)** + **인간(해석·의사결정)**의 동시 최적화다. ([R14], [R15], [R16], [R33])
-- EvalVault는 이를 `run_id`로 묶어 **DB(히스토리/비교)** + **아티팩트(원본/재현)** + **트레이싱(관측)**을 연결한다. (내부 근거: `docs/new_whitepaper/01_overview.md`, `02_architecture.md`, `03_data_flow.md`)
+- EvalVault는 이를 `run_id`로 묶어 **DB(히스토리/비교)** + **아티팩트(원본/재현)** + **트레이싱(관측)**을 연결한다. (내부 근거: `docs/handbook/CHAPTERS/00_overview.md`, `docs/handbook/CHAPTERS/01_architecture.md`, `docs/handbook/CHAPTERS/03_workflows.md`)
 
 ---
 
@@ -29,7 +29,7 @@ RAG 시스템의 개선이 “감(感)”이 아니라 **데이터·근거·재�
 
 1. **측정 가능성**: 변화(모델/프롬프트/리트리버)가 KPI로 드러난다. ([R14], [R15], [R16])
 2. **원인 규명 가능성**: 점수 하락이 “어디서/왜” 발생했는지 추적한다. ([R18], [R19], [R20], [R33])
-3. **재현 가능성**: 동일 입력/설정/산출물을 `run_id`와 아티팩트로 다시 확인한다. (내부 근거: `docs/new_whitepaper/03_data_flow.md`)
+3. **재현 가능성**: 동일 입력/설정/산출물을 `run_id`와 아티팩트로 다시 확인한다. (내부 근거: `docs/handbook/CHAPTERS/03_workflows.md`)
 4. **운영 가능성**: 비용/지연/안정성을 함께 관리해 “좋은 데모”가 “좋은 서비스”가 되게 한다. ([R17], [R33], [R34])
 
 ---
@@ -64,7 +64,7 @@ RAG 품질 저하는 대체로 4개 축에서 발생한다.
 EvalVault는 외부 의존성(LLM/DB/Tracker)을 **어댑터로 격리**하고, 도메인 규칙은 `domain`에 유지한다.
 이 구조는 “측정/비교/재현”이라는 정책이 외부 도구 변경에 흔들리지 않게 만든다.
 
-- Adapters → Ports → Domain 방향 유지 (내부 근거: `docs/new_whitepaper/02_architecture.md`)
+- Adapters → Ports → Domain 방향 유지 (내부 근거: `docs/handbook/CHAPTERS/01_architecture.md`)
 
 ### 3.2 `run_id`는 “실행 단위의 단일 진실”
 `run_id`는 다음을 하나로 묶는 키다.
@@ -80,7 +80,7 @@ EvalVault는 외부 의존성(LLM/DB/Tracker)을 **어댑터로 격리**하고, 
 점수만 저장하면 원인 분석이 불가능해진다. EvalVault는 다음 원칙을 따른다.
 
 - **요약 리포트(사람이 읽는 결과)**와 **노드별 아티팩트(원본/재현)**를 분리 저장
-- `index.json`을 중심으로 아티팩트를 탐색 (내부 근거: `docs/new_whitepaper/03_data_flow.md`)
+- `index.json`을 중심으로 아티팩트를 탐색 (내부 근거: `docs/handbook/CHAPTERS/03_workflows.md`)
 
 이 방식은 “지표가 왜 떨어졌는지”를 **구체 산출물**로 역추적 가능하게 한다.
 
@@ -114,7 +114,7 @@ EvalVault는 외부 의존성(LLM/DB/Tracker)을 **어댑터로 격리**하고, 
 1. **데이터셋 고정**: 같은 데이터셋/버전으로 비교(실험 간 데이터 드리프트 차단)
 2. **실험 단위는 `run_id`**: 모델/프롬프트/리트리버 변경마다 새로운 run 생성
 3. **Auto-analyze(권장)**: 리포트+아티팩트를 자동 생성해 원인 분석 비용을 낮춤
-4. **A/B 비교**: run 간 비교 리포트로 회귀를 명확히 표시 (내부 근거: `docs/new_whitepaper/03_data_flow.md`)
+4. **A/B 비교**: run 간 비교 리포트로 회귀를 명확히 표시 (내부 근거: `docs/handbook/CHAPTERS/03_workflows.md`)
 
 ### 5.2 프로토콜 강화: 멀티턴/고위험 도메인
 - 멀티턴 RAG는 턴 기반 평가가 필요하며, 벤치마크를 분리 설계한다. ([R3])
@@ -180,6 +180,44 @@ Artifacts-first 원칙에 맞춰, 최소한 아래 산출물이 존재해야 한
 
 **EvalVault 적용 포인트**
 - “턴”을 테스트케이스 단위의 하위 축으로 다루거나, 턴별 stage 이벤트로 관측
+
+---
+
+## 8. 챗봇 하이브리드 품질 테스트 시나리오 (실행용)
+
+### 8.1 목적
+- 하이브리드(BM25 + Dense) 리트리벌이 **실제 응답 품질**을 개선하는지 검증
+- `run_id` 기준으로 **요약/아티팩트/리포트** 컨텍스트가 제대로 활용되는지 확인
+
+### 8.2 사전 준비
+- 동일 데이터셋/프로필로 2회 실행
+  - A: `EVALVAULT_RAG_USE_HYBRID=false` (BM25 only)
+  - B: `EVALVAULT_RAG_USE_HYBRID=true` (Hybrid)
+- 동일한 질문 세트(10~30개) 사용
+
+### 8.3 CLI 실행 예시
+```bash
+# A: BM25 only
+EVALVAULT_RAG_USE_HYBRID=false \
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
+
+# B: Hybrid
+EVALVAULT_RAG_USE_HYBRID=true \
+EVALVAULT_RAG_VECTOR_STORE=pgvector \
+EVALVAULT_RAG_EMBEDDING_PROFILE=dev \
+uv run evalvault run tests/fixtures/e2e/insurance_qa_korean.json --metrics faithfulness
+```
+
+### 8.4 검증 체크리스트
+- 두 run의 `pass_rate` 차이 확인
+- `reports/analysis/artifacts/analysis_<RUN_ID>/index.json`에서
+  - `retrieval` 관련 산출물이 기록되었는지 확인
+  - 상위 컨텍스트가 질문 의도에 맞는지 샘플링 검토
+
+### 8.5 성공 기준(권장)
+- Hybrid가 BM25 대비 **pass_rate +2%p 이상** 또는
+  **retrieval 관련 메트릭(precision/recall/NDCG)** 개선
+- 동일 질문에 대한 **근거/답변 일관성**이 향상됨
 
 ---
 
@@ -278,7 +316,7 @@ Artifacts-first 원칙에 맞춰, 최소한 아래 산출물이 존재해야 한
 
 ## 9. Expert Lenses(전문가 관점)로 “문서/플랫폼/운영” 품질을 끌어올리기
 
-> 내부 백서 프레임(`docs/new_whitepaper/05_expert_lenses.md`)을 기반으로, 본 제안서는 아래 5개 관점을 반드시 포함한다.
+> 참고: 본 제안서는 handbook의 문서 운영 원칙/택소노미를 따른다. (`docs/handbook/appendix-taxonomy.md`)
 
 ### 9.1 인지심리학(Cognitive Psychology): 인지부하를 줄이는 평가/리포트 UX
 - 평가지표/리포트는 “전문가에게만 유용한 대시보드”가 되기 쉽다. 초급/중급 개발자가 빠르게 결정을 내리게 하려면 인지부하를 관리해야 한다.
@@ -325,7 +363,7 @@ Artifacts-first 원칙에 맞춰, 최소한 아래 산출물이 존재해야 한
 
 ## 10. 로드맵(단기/중기/장기): 측정과 운영을 함께 올리기
 
-> **정합성 메모**: 이 섹션의 기간/우선순위는 “실행 가능한 제안”을 위한 예시이며, 프로젝트의 공식 상태/약속은 `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/new_whitepaper/14_roadmap.md`를 기준으로 한다.
+> **정합성 메모**: 이 섹션의 기간/우선순위는 “실행 가능한 제안”을 위한 예시이며, 내부 우선순위/DoD는 handbook의 로드맵 챕터를 기준으로 한다. (`docs/handbook/CHAPTERS/08_roadmap.md`)
 
 ### 10.1 단기(0–4주): “측정 가능성” 확보
 - KPI 기준선(baseline) 확정: triad + retrieval + ops + stability
@@ -377,10 +415,10 @@ Artifacts-first 원칙에 맞춰, 최소한 아래 산출물이 존재해야 한
 ---
 
 ## 12. 내부 근거(Repo 내 문서 정렬)
-- `docs/new_whitepaper/01_overview.md`: 5대 축(평가·관측·표준·학습·분석)과 `run_id` 중심 철학
-- `docs/new_whitepaper/02_architecture.md`: Hexagonal(Ports & Adapters) 경계/규칙
-- `docs/new_whitepaper/03_data_flow.md`: 실행→저장→분석→비교, artifacts/index.json 중심 탐색 규칙
-- `docs/new_whitepaper/05_expert_lenses.md`: 인지/교육/UX/개발 운영 관점의 문서 품질 프레임
+- `docs/handbook/CHAPTERS/00_overview.md`: 5대 축(평가·관측·표준·학습·분석)과 `run_id` 중심 철학
+- `docs/handbook/CHAPTERS/01_architecture.md`: Hexagonal(Ports & Adapters) 경계/규칙
+- `docs/handbook/CHAPTERS/03_workflows.md`: 실행→저장→분석→비교, artifacts/index.json 중심 탐색 규칙
+- `docs/handbook/CHAPTERS/07_ux_and_product.md`: UX/문서/제품 일관성 원칙
 
 ---
 

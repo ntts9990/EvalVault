@@ -39,7 +39,7 @@
 - (권장) `korean`: 한국어 형태소/검색 기반(예: kiwipiepy, rank-bm25, sentence-transformers)
 
 ### 필수 입력/식별자
-- `DB 경로`: 기본 `data/db/evalvault.db` 또는 환경 변수 `EVALVAULT_DB_PATH`
+- `DB`: 기본 Postgres(`POSTGRES_*`), SQLite 사용 시 `--db` 또는 `EVALVAULT_DB_PATH`
 - `run_id`: 평가/분석/아티팩트가 묶이는 단위 식별자
 - `metrics`: 예) `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `factual_correctness`, `semantic_similarity`
 
@@ -121,7 +121,8 @@
 ## 4) 진단 결정 트리(문제 → 분석 선택)
 
 ### 4.1 0단계: “진단 가능 상태” 체크(실패 원인 제거)
-- [ ] `--db` 또는 `EVALVAULT_DB_PATH`가 올바른가
+- [ ] Postgres 연결 설정이 올바른가 (`POSTGRES_*` 또는 `POSTGRES_CONNECTION_STRING`)
+- [ ] SQLite를 쓰는 경우 `--db` 또는 `EVALVAULT_DB_PATH`가 올바른가
 - [ ] 대상 `run_id`가 DB에 존재하는가 (`evalvault history`로 확인)
 - [ ] 데이터셋에 `thresholds`가 포함되어 있는가(또는 기본 기준을 알고 있는가)
 - [ ] 메트릭 실행 조건(임베딩 필요 메트릭 등)을 충족하는가

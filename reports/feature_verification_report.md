@@ -551,9 +551,9 @@ EvalVault는 **"RAG 성능 개선을 반복 가능하게 만든다"**는 미션�
 - `src/evalvault/adapters/inbound/api/routers/` - REST API
 
 ### 설계 문서
-- `docs/new_whitepaper/01_overview.md` - 프로젝트 개요
-- `docs/new_whitepaper/02_architecture.md` - 아키텍처 설계
-- `docs/new_whitepaper/03_data_flow.md` - 데이터 흐름
+- `docs/handbook/CHAPTERS/00_overview.md` - 프로젝트 개요
+- `docs/handbook/CHAPTERS/01_architecture.md` - 아키텍처 설계
+- `docs/handbook/CHAPTERS/03_workflows.md` - 데이터 흐름
 - `docs/guides/USER_GUIDE.md` - 사용자 가이드
 
 ### 테스트

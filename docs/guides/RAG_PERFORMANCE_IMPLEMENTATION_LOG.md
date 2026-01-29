@@ -176,5 +176,5 @@
   - 테스트: 문서 변경(실행 테스트 없음)
 - 스트림 E(정책/로드맵)
   - 변경: 노이즈 저감 원칙 및 artifacts 추적 규칙 보강
-  - 파일: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/new_whitepaper/01_overview.md`
+- 파일: `docs/guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md`, `docs/handbook/CHAPTERS/00_overview.md`
   - 테스트: 문서 변경(실행 테스트 없음)

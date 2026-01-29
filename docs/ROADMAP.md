@@ -1,38 +1,6 @@
-# EvalVault 로드맵 (Roadmap)
+# ROADMAP (Deprecated)
 
-> Last Updated: 2026-01-18
+로드맵/우선순위/완료 정의는 handbook로 통합되었습니다.
 
-이 문서는 **"우리가 다음으로 무엇을, 왜 하는가"**를 외부(사용자/기여자) 관점에서 간단히 공유합니다.
-
-## 방향 (Why)
-
-- 평가 결과를 "점수"로만 끝내지 않고, **원인 분석/개선 액션/회귀 게이트**까지 자연스럽게 연결
-- CLI/자동화가 강한 프로젝트 특성을 유지하면서, Web UI는 반복 업무를 줄이는 방향으로 확장
-- 외부 RAG 시스템도 **Open RAG Trace**로 동일한 기준에서 비교/분석 가능하도록 표준화
-
-## 우선순위 (What)
-
-### P0 (안정성/운영)
-- CI/테스트 안정성 강화(플레이키 제거, Windows/macOS 차이 최소화)
-- 설정/프로필 검증 및 오류 메시지 개선(초기 온보딩 실패율 감소)
-
-### P1 (사용성)
-- Web UI에서 핵심 워크플로(Evaluation → History → Reports) 완성도 향상
-- CLI/웹 공통 DB/아티팩트 경로 규약을 문서/UX에 일관되게 노출
-- Run 상세 탭(Staging/Prompts/Gate/Debug)과 분석 실험실 연동 강화
-
-### P2 (관측성/표준)
-- Open RAG Trace 스펙/샘플을 실제 운영 요구에 맞춰 점진 확장(버전 정책 준수)
-- Collector 구성 및 데이터 보존(artifact 분리, PII 마스킹) 가이드 강화
-- Stage Events 최소 스키마 표준화 및 문서 동기화
-
-### P3 (성능 개선 로드맵)
-- RAG 성능 개선 제안서 기반으로 KPI/평가 프로토콜/로드맵 정립
-- Retrieval/리랭킹/GraphRAG 실험과 운영 지표 통합
-- 전문가 관점(인지/UX/운영) 기반 개선 루프 고도화
-- 노이즈 저감/ordering_warning 운영 기준 정착
-
-## 작업 트래킹
-
-- 구체적인 이슈/PR 단위 계획은 GitHub Issues/PR에서 관리합니다.
-- 설계/운영 원칙과 변경 시 업데이트 가이드는 `new_whitepaper/INDEX.md` 및 각 챕터의 "향후 변경 시 업데이트 가이드"를 기준으로 동기화합니다.
+- 로드맵(내부): `docs/handbook/CHAPTERS/08_roadmap.md`
+- 외부 공개 요약: `docs/handbook/EXTERNAL.md`

@@ -19,7 +19,7 @@ The CLI provides various commands for evaluation, analysis, and management:
 - **gate** - Quality gates
 - **experiment** - A/B testing
 
-For detailed CLI usage, see the [User Guide](../../guides/USER_GUIDE.md).
+For detailed CLI usage, see the [Handbook](../../handbook/INDEX.md).
 
 ## Web API Adapter + React Frontend
 
@@ -82,4 +82,4 @@ npm install
 npm run dev
 ```
 
-For detailed CLI usage, see the [User Guide](../../guides/USER_GUIDE.md).
+For detailed CLI usage, see the [Handbook](../../handbook/INDEX.md).

@@ -8,7 +8,7 @@
 | 문서 | 용도 |
 |------|------|
 | [docs/INDEX.md](../../../docs/INDEX.md) | 프로젝트 문서 허브(최신 링크) |
-| [Developer Whitepaper](../../../docs/new_whitepaper/INDEX.md) | 설계/운영/품질 기준 |
+| [Handbook](../../../docs/handbook/INDEX.md) | 설계/운영/품질 기준(SSoT) |
 | [agent/README.md](../../README.md) | 에이전트 시스템 사용법 |
 
 ---
@@ -138,7 +138,7 @@ architecture (Storage Adapter)┘
 | `src/evalvault/ports/outbound/tracker_port.py` | `observability` | `rag-data` | 스키마 변경 공유 |
 | `src/evalvault/domain/entities/result.py` | `architecture` | - | 테스트 영향 체크 |
 | `docs/INDEX.md` | `coordinator` | All | 문서 구조/링크 변경 시 동기화 |
-| `docs/new_whitepaper/INDEX.md` | `coordinator` | All | 설계/운영 기준 변경 시 동기화 |
+| `docs/handbook/INDEX.md` | `coordinator` | All | 설계/운영 기준 변경 시 동기화 |
 | `agent/memory/shared/decisions.md` | All | - | ADR 형식 준수 |
 
 ### Shared Namespaces

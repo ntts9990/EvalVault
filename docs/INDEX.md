@@ -12,29 +12,20 @@
 
 ## 빠른 링크
 
-- 설치: `getting-started/INSTALLATION.md`
-- CLI 실행 시나리오 가이드: `guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
-- 사용자 가이드(운영 포함): `guides/USER_GUIDE.md`
-- 개발/기여: `guides/DEV_GUIDE.md`
-- 다음 개발 실행 계획: `guides/NEXT_STEPS_EXECUTION_PLAN.md`
-- CLI UX 개선 설계서: `guides/CLI_UX_REDESIGN.md`
-- P0~P3 작업 보고서: `guides/P0_P3_EXECUTION_REPORT.md`
-- P1~P4 작업 계획서: `guides/P1_P4_WORK_PLAN.md`
-- 기능 종합 검증 보고서: `../reports/feature_verification_report.md`
+- 교과서형 총정리(handbook, SSoT): `handbook/INDEX.md`
+- 워크플로/명령 템플릿: `handbook/CHAPTERS/03_workflows.md`
+- 운영/런북(로컬/DB/오프라인 포함): `handbook/CHAPTERS/04_operations.md`
+- 데이터/메트릭/임계값/산출물: `handbook/CHAPTERS/02_data_and_metrics.md`
+
+참고(특수 주제):
+
 - 폐쇄망 Docker: `guides/OFFLINE_DOCKER.md`
-- 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` (문제→분석→해석→액션 흐름)
-- RAG 성능 개선 제안서: `guides/RAG_PERFORMANCE_IMPROVEMENT_PROPOSAL.md` (목적/미션·KPI·로드맵)
+- 폐쇄망 모델 캐시: `guides/OFFLINE_MODELS.md`
+- 진단 플레이북: `guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md`
 - RAGAS 인간 피드백 보정: `guides/RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md`
-- 실행 결과 엑셀 시트 요약: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
+- 실행 결과 엑셀 시트: `guides/EVALVAULT_RUN_EXCEL_SHEETS.md`
 - 평가 리포트 템플릿: `templates/eval_report_templates.md`
-- CLI→MCP 이식 계획: `guides/CLI_MCP_PLAN.md`
-- Web UI 확장 설계서: `guides/WEBUI_CLI_ROLLOUT_PLAN.md`
-- 문서 최신화 작업 계획: `guides/DOCS_REFRESH_PLAN.md`
-- 릴리즈 체크리스트: `guides/RELEASE_CHECKLIST.md`
-- 상태 요약: `STATUS.md`
-- 로드맵: `ROADMAP.md`
-- 개발 백서(설계/운영/품질 기준): `new_whitepaper/INDEX.md`
-- 교과서형 총정리(handbook): `handbook/INDEX.md`
+- Open RAG Trace 스펙: `architecture/open-rag-trace-spec.md`
 
 ---
 
@@ -43,27 +34,28 @@
 ```
 docs/
 ├── INDEX.md                     # 문서 허브 (이 문서)
-├── STATUS.md                    # 1페이지 상태 요약
-├── ROADMAP.md                   # 공개 로드맵
+├── STATUS.md                    # deprecated (handbook로 통합)
+├── ROADMAP.md                   # deprecated (handbook로 통합)
 ├── getting-started/
-│   └── INSTALLATION.md          # 설치/환경 설정
+│   └── INSTALLATION.md          # deprecated (handbook로 통합)
 ├── guides/
-│   ├── USER_GUIDE.md            # 사용/운영 종합 가이드
-│   ├── DEV_GUIDE.md             # 개발 루틴/테스트/품질
+│   ├── USER_GUIDE.md            # deprecated (handbook로 통합)
+│   ├── DEV_GUIDE.md             # deprecated (handbook로 통합)
 │   ├── EVALVAULT_RUN_EXCEL_SHEETS.md             # 실행 결과 엑셀 컬럼 설명
-│   ├── CLI_MCP_PLAN.md          # CLI→MCP 이식 계획 (Living Doc)
-│   ├── WEBUI_CLI_ROLLOUT_PLAN.md # Web UI 확장 설계서
+│   ├── CLI_MCP_PLAN.md          # deprecated (handbook로 통합)
+│   ├── WEBUI_CLI_ROLLOUT_PLAN.md # deprecated (handbook로 통합)
 │   ├── RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md  # RAGAS 보정 방법론
 │   ├── EVALVAULT_DIAGNOSTIC_PLAYBOOK.md          # 진단 플레이북
 │   ├── RELEASE_CHECKLIST.md     # 배포 체크리스트
-│   ├── P1_P4_WORK_PLAN.md       # P1-P4 작업 계획서
+│   ├── P1_P4_WORK_PLAN.md       # deprecated (handbook로 통합)
 │   ├── OPEN_RAG_TRACE_*.md      # Open RAG Trace 샘플/내부 래퍼
 │   └── OPEN_RAG_TRACE_*.md
 ├── architecture/
 │   ├── open-rag-trace-spec.md   # Open RAG Trace 스펙
 │   └── open-rag-trace-collector.md
 ├── api/                         # mkdocstrings 기반 API 레퍼런스
-├── new_whitepaper/              # 개발 백서 (챕터 단위)
+├── new_whitepaper/              # deprecated (handbook로 통합)
+├── handbook/                    # 교과서형 총정리(SSoT)
 ├── templates/                   # 데이터셋/KG/문서 템플릿
 ├── tools/                       # 문서 생성/유틸
 └── stylesheets/                 # mkdocs 테마 CSS
@@ -75,4 +67,4 @@ docs/
 
 - "무엇이 정답인가"는 문서가 아니라 **코드/테스트/CLI 도움말**이 최우선입니다.
 - 문서가 코드와 어긋나면 문서를 최신화하거나 삭제합니다.
-- 큰 변경(설계/운영/보안/품질 기준)은 `new_whitepaper/`에 먼저 반영하고, 필요한 부분만 `guides/`로 노출합니다.
+- 큰 변경(설계/운영/보안/품질 기준)은 `handbook/`에 먼저 반영하고, 필요한 부분만 `guides/`로 노출합니다.

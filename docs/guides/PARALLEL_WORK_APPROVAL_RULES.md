@@ -12,7 +12,7 @@
 - 리포트 템플릿/공통 JSON 스키마
   - `docs/guides/CLI_PARALLEL_FEATURES_SPEC.md`
   - `docs/guides/RAG_NOISE_REDUCTION_GUIDE.md`
-  - `docs/new_whitepaper/03_data_flow.md`
+- `docs/handbook/CHAPTERS/03_workflows.md`
 
 ## 2) 공유 스키마 목록
 - artifacts/index.json

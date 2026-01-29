@@ -9,18 +9,20 @@
 ### 1.1 최상위 진입점
 - `README.md`: 프로젝트 한 줄 정의 + Quickstart + 핵심 개념 + 주요 링크
 - `docs/INDEX.md`: 문서 허브(문서 운영 원칙 포함)
-- `docs/STATUS.md`: 1페이지 상태 요약(가능/제약)
-- `docs/ROADMAP.md`: 공개 로드맵(우선순위)
+- `docs/handbook/INDEX.md`: 내부 문서 SSoT(교과서형 handbook)
+- `docs/handbook/EXTERNAL.md`: 외부 공개 요약본(민감 정보 제외)
+- `docs/STATUS.md`: deprecated 스텁(과거 링크 호환)
+- `docs/ROADMAP.md`: deprecated 스텁(과거 링크 호환)
 
 ### 1.2 사용자/운영 가이드 (How to)
-- `docs/getting-started/INSTALLATION.md`: 설치/환경 구성
-- `docs/guides/USER_GUIDE.md`: 사용자/운영 종합(명령/설정/흐름)
-- `docs/guides/DEV_GUIDE.md`: 개발 루틴/테스트/품질
+- `docs/getting-started/INSTALLATION.md`: deprecated 스텁(설치/운영은 handbook로 이동)
+- `docs/guides/USER_GUIDE.md`: deprecated 스텁(사용자/운영은 handbook로 이동)
+- `docs/guides/DEV_GUIDE.md`: deprecated 스텁(개발/테스트는 handbook로 이동)
 - `docs/guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md`: 문제→분석→해석→액션 흐름
 
 ### 1.3 설계/운영/품질 기준(내부 SSoT 성격)
-- `docs/new_whitepaper/INDEX.md`: 내부 개발자용 종합 백서 인덱스(읽는 순서/작성 규칙)
-- `docs/new_whitepaper/*`: 아키텍처/데이터 흐름/구성요소/전문가 관점/구현/품질/성능/보안/운영/표준/로드맵
+- `docs/new_whitepaper/INDEX.md`: deprecated(아카이브 성격)
+- `docs/new_whitepaper/*`: deprecated(아카이브 성격; 과거 설계/운영/품질 정리)
 
 ### 1.4 아키텍처/표준 스펙
 - `docs/architecture/open-rag-trace-spec.md`: Open RAG Trace 스펙
@@ -46,12 +48,12 @@
 `docs/INDEX.md`의 핵심 원칙:
 - "정답"은 문서가 아니라 `코드/테스트/CLI 도움말`이 최우선
 - 문서가 코드와 어긋나면 문서를 최신화하거나 삭제
-- 큰 변경(설계/운영/보안/품질 기준)은 `docs/new_whitepaper/`에 먼저 반영
+- 큰 변경(설계/운영/보안/품질 기준)은 `docs/handbook/`에 먼저 반영
 
 handbook의 합의(이 프로젝트에서 추가로 고정):
-- handbook은 "새로운 진실"이 아니라, **기존 SSoT를 묶어주는 교과서형 내비게이션/해설 레이어**
+- handbook은 코드/테스트/CLI 도움말을 근거로 삼는 **문서 SSoT(교과서형 정리)**다.
 - handbook 본편은 내부 독자 기준으로 작성하되, `docs/handbook/EXTERNAL.md`에 외부 공개 요약을 분리
-- 본문 복제 금지: 이미 `docs/`/`docs/new_whitepaper/`에 있는 내용은 **링크 + 요약(필요 최소)**로 처리
+- 본문 복제 금지: 이미 `docs/`에 있는 내용은 **링크 + 요약(필요 최소)**로 처리
 
 ---
 
@@ -93,13 +95,14 @@ handbook의 합의(이 프로젝트에서 추가로 고정):
 - 동일 주제가 이미 존재하면:
   1) handbook에서 3~7줄로 요약
   2) 원문을 링크(파일 경로 기준)
-  3) 원문이 SSoT(설계 기준/규칙)라면 `docs/new_whitepaper/`를 우선 링크
+  3) 원문이 SSoT(규칙/규약)라면 handbook의 해당 섹션을 우선 링크
 
 ### 5.2 SSoT 우선순위
 1) 코드/테스트/CLI 도움말
-2) `docs/new_whitepaper/` (설계/운영/품질 기준)
-3) `docs/guides/` (실사용 가이드)
-4) handbook (교과서형 정리/내비게이션)
+2) `docs/handbook/` (내부 문서 SSoT)
+3) `docs/architecture/` (스펙/표준 문서)
+4) `docs/guides/` 및 기타 `docs/` (필요 시 참고; 일부는 deprecated 스텁/아카이브)
+5) `docs/new_whitepaper/` (deprecated 아카이브)
 
 ### 5.3 reports 취급
 - `reports/README.md`의 정책을 존중: 대부분 산출물(기본 제외)

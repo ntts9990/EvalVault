@@ -5,8 +5,8 @@
 
 ## TL;DR
 
-- 운영의 3대 불변식: (1) 프로필/시크릿 분리 (2) DB 경로 고정 (3) `run_id`로 교차 확인.
-- “결과가 보인다/공유된다”의 의미는 같은 DB를 UI/API/CLI가 함께 본다는 뜻이다. (근거: `src/evalvault/config/settings.py#Settings.evalvault_db_path`, `src/evalvault/adapters/inbound/api/main.py#create_app`)
+- 운영의 3대 불변식: (1) 프로필/시크릿 분리 (2) DB 설정 고정 (3) `run_id`로 교차 확인.
+- “결과가 보인다/공유된다”의 의미는 같은 DB 설정을 UI/API/CLI가 함께 본다는 뜻이다. (근거: `src/evalvault/config/settings.py#Settings`, `src/evalvault/adapters/inbound/api/main.py#create_app`)
 - 관측(트레이싱/트래커)은 기본 루프의 필수 전제가 아니다. 다만 디버깅 속도를 크게 올리므로, 켤 조건/꺼둘 조건을 팀 룰로 고정하는 것이 운영 비용을 줄인다.
 
 ## 목표
@@ -24,15 +24,16 @@
 
 운영에서 가장 흔한 사고는 “시크릿이 git에 남는 것”이다. EvalVault는 이를 구조적으로 분리한다.
 
-- 프로필(버전 관리 대상): `config/models.yaml` (근거: `src/evalvault/config/settings.py#apply_profile`, `docs/getting-started/INSTALLATION.md`)
+- 프로필(버전 관리 대상): `config/models.yaml` (근거: `src/evalvault/config/settings.py#apply_profile`)
 - 시크릿/인프라(커밋 금지): `.env` / 환경변수 (근거: `.env.example`, `src/evalvault/config/settings.py#Settings.model_config`)
 
-### 1.2 DB 경로를 고정한다
+### 1.2 DB 설정을 고정한다
 
 EvalVault의 실행 데이터는 DB를 중심으로 재사용된다.
 
-- 기본 DB 경로: `data/db/evalvault.db` (근거: `src/evalvault/config/settings.py#Settings.evalvault_db_path`)
-- CLI와 API/Web UI가 같은 DB를 봐야 결과가 연결된다. (근거: `src/evalvault/adapters/inbound/api/main.py#create_app`는 settings의 DB를 사용하고, CLI는 `--db` 또는 settings fallback을 사용)
+- 기본 저장소: Postgres+pgvector (근거: `src/evalvault/config/settings.py#Settings.postgres_*`)
+- SQLite를 쓰는 경우 `--db` 또는 `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH`를 지정한다. (근거: `src/evalvault/config/settings.py#Settings.evalvault_db_path`)
+- CLI와 API/Web UI가 같은 DB 설정을 봐야 결과가 연결된다. (근거: `src/evalvault/adapters/inbound/api/main.py#create_app`는 settings의 DB를 사용하고, CLI는 `--db` 또는 settings fallback을 사용)
 
 ### 1.3 `run_id`를 운영의 단일 키로 쓴다
 
@@ -54,16 +55,16 @@ uv sync --extra dev
 
 근거:
 
-- 설치: `docs/getting-started/INSTALLATION.md`
-- 개발 루틴: `docs/guides/DEV_GUIDE.md`
+- 설치/빠른 시작: `README.md`
+- 개발 환경 가이드: `AGENTS.md`
+- 환경변수 예시: `.env.example`
 
 ### 2.2 5분 스모크(기본 루프가 살아있는지)
 
 ```bash
 uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
-  --profile dev \
-  --db data/db/evalvault.db
+  --profile dev
 ```
 
 근거:
@@ -77,9 +78,10 @@ uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
 uv run evalvault run --mode simple tests/fixtures/e2e/insurance_qa_korean.json \
   --metrics faithfulness,answer_relevancy \
   --profile dev \
-  --db data/db/evalvault.db \
   --auto-analyze
 ```
+
+SQLite를 쓰는 경우 `--db` 또는 `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH`로 경로를 고정한다.
 
 기대 산출물(기본 경로 형태):
 
@@ -113,7 +115,9 @@ npm install
 npm run dev
 ```
 
-근거: `docs/guides/DEV_GUIDE.md`
+근거:
+
+- 실행 방법(요약): `README.md`
 
 ### 2.6 로컬 운영에서 자주 생기는 문제(최소 진단)
 
@@ -135,7 +139,7 @@ EvalVault는 GUI 백엔드 충돌을 줄이기 위해 matplotlib 백엔드를 `A
 
 - 근거(대시보드): `src/evalvault/adapters/outbound/report/dashboard_generator.py#_import_matplotlib_pyplot`
 - 근거(네트워크 분석 모듈): `src/evalvault/adapters/outbound/analysis/network_analyzer_module.py#_get_matplotlib_pyplot`
-- 설치: `uv sync --extra dashboard` (근거: `docs/getting-started/INSTALLATION.md`)
+- 설치: `uv sync --extra dashboard` (근거: `pyproject.toml`의 optional dependency `dashboard`)
 
 ---
 
@@ -195,6 +199,12 @@ docker compose --env-file .env.offline -f docker-compose.offline.yml up -d
 - 스모크 테스트: `scripts/offline/smoke_test.sh`
 
 근거: `docs/guides/OFFLINE_DOCKER.md`
+
+### 4.4 오프라인 모델 캐시(LLM 제외)
+
+폐쇄망에서 NLP 분석은 로컬 모델 캐시로만 동작한다. LLM 모델은 외부 인프라에서 관리한다.
+
+- 모델 캐시 가이드: `docs/guides/OFFLINE_MODELS.md`
 
 ---
 

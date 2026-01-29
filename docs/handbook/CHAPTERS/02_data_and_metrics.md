@@ -402,7 +402,7 @@ EvalVault는 결과를 "사람용"과 "근거용"으로 분리해 남기는 방�
 아티팩트는 “파일 기반 근거”이고, DB는 “조회/히스토리/연동(UI/API)”를 위한 저장소다.
 EvalVault는 run 단위로 다양한 분석 결과를 DB에 저장하며, 대표 테이블이 `analysis_results`다.
 
-- 스키마: `src/evalvault/adapters/outbound/storage/schema.sql` (SQLite), `src/evalvault/adapters/outbound/storage/postgres_schema.sql` (Postgres)
+- 스키마: `src/evalvault/adapters/outbound/storage/postgres_schema.sql` (Postgres + pgvector)
 
 `analysis_results.analysis_type`는 문자열 enum처럼 쓰이며, 대표 값은 아래와 같다.
 
@@ -416,7 +416,7 @@ EvalVault는 run 단위로 다양한 분석 결과를 DB에 저장하며, 대표
 특히 `dataset_features`(데이터셋 특성 분석)는 파이프라인 노드 `dataset_feature_analysis`의 출력(dict)을 JSON으로 저장한다.
 
 - 저장(best-effort, CLI): `src/evalvault/adapters/inbound/cli/commands/pipeline.py` (`save_dataset_feature_analysis` 호출)
-- 저장 구현(SQLite/Postgres): `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#save_dataset_feature_analysis`, `src/evalvault/adapters/outbound/storage/postgres_adapter.py#save_dataset_feature_analysis`
+- 저장 구현(Postgres): `src/evalvault/adapters/outbound/storage/postgres_adapter.py#save_dataset_feature_analysis`
 
 artifact 파일 이름 규칙(안전한 파일명으로 sanitize):
 

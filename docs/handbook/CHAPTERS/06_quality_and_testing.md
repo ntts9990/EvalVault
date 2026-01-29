@@ -40,7 +40,7 @@ uv run ruff format src/ tests/
 
 근거:
 
-- 로컬 개발 루틴: `docs/guides/DEV_GUIDE.md`
+- 개발/테스트 루틴: `AGENTS.md`
 - Ruff 설정: `pyproject.toml#[tool.ruff]`, `pyproject.toml#[tool.ruff.lint]`
 
 ### 2.2 테스트(Pytest)
@@ -184,7 +184,7 @@ CI는 문서가 깨지지 않도록 docs build/link check를 수행한다.
 - `uv run ruff check src/ tests/`부터 재현
 - 포맷 이슈는 `uv run ruff format src/ tests/`로 해결
 
-근거: `docs/guides/DEV_GUIDE.md`, `pyproject.toml#[tool.ruff]`
+근거: `AGENTS.md`, `pyproject.toml#[tool.ruff]`
 
 ### 6.2 테스트 실패
 

@@ -399,8 +399,9 @@ EvalVault는 크게 두 평면을 가진다.
 
 - 근거(엔티티): `src/evalvault/domain/entities/result.py#EvaluationRun`
   - `run_id`는 UUID로 생성된다: `src/evalvault/domain/entities/result.py` (`run_id: str = field(default_factory=lambda: str(uuid4()))`)
-- 저장소(기본): SQLite
-  - 기본 DB 경로: `src/evalvault/config/settings.py#Settings.evalvault_db_path` (default `data/db/evalvault.db`)
+- 저장소(기본): PostgreSQL + pgvector (RDB + Vector 통합)
+- Postgres 설정: `src/evalvault/config/settings.py#Settings.postgres_*`
+- 벡터 검색은 pgvector를 사용하며 별도 벡터 DB는 사용하지 않는다
 - 저장소(보조): 보고서/아티팩트 디렉터리
   - 분석 기본 디렉터리: `reports/analysis` (출력 경로 resolver의 기본값)
     - 근거: `src/evalvault/adapters/inbound/cli/utils/analysis_io.py#resolve_output_paths`
@@ -565,7 +566,7 @@ CI는 기본 테스트에서 `requires_openai`/`requires_langfuse` 마커를 제
 
 #### (A) 실행이 안 된다(환경/설정)
 
-- `docs/guides/USER_GUIDE.md` (환경 구성)
+- `docs/handbook/CHAPTERS/04_operations.md` (환경/DB/런북)
 - `src/evalvault/config/settings.py` (Settings/프로필/필수값)
 - `docs/handbook/CHAPTERS/04_operations.md` (런북)
 
@@ -577,7 +578,7 @@ CI는 기본 테스트에서 `requires_openai`/`requires_langfuse` 마커를 제
 #### (C) UI에서 안 보인다(API/DB)
 
 - `src/evalvault/adapters/inbound/api/main.py` (auth/cors)
-- `docs/guides/DEV_GUIDE.md` (로컬 API+frontend)
+- `docs/handbook/CHAPTERS/04_operations.md` (로컬 API+frontend)
 
 #### (D) 민감 데이터가 걱정된다(보안)
 
@@ -613,9 +614,7 @@ CI는 기본 테스트에서 `requires_openai`/`requires_langfuse` 마커를 제
 ### 5.4 문서 허브(최신화 기준)
 
 - docs 인덱스: `docs/INDEX.md`
-- 상태 요약: `docs/STATUS.md`
-- 공개 로드맵: `docs/ROADMAP.md`
-- 내부 백서: `docs/new_whitepaper/INDEX.md`
+- 상태/로드맵(SSoT): `docs/handbook/CHAPTERS/00_overview.md`, `docs/handbook/CHAPTERS/08_roadmap.md`
 
 ---
 
@@ -755,7 +754,7 @@ API 서버의 진실은 `create_app()`에 있다.
 
 근거:
 
-- 제한 사항 명시: `docs/STATUS.md` ("Web UI의 기능은 CLI의 모든 플래그/옵션을 1:1로 노출하지 않습니다")
+- UI↔CLI 역할 분담(구현 근거: UI가 CLI 커맨드를 생성/복사하는 탈출구 제공): `frontend/src/utils/cliCommandBuilder.ts`
 
 개발 환경 실행(기본):
 
@@ -766,7 +765,8 @@ cd frontend && npm install && npm run dev
 
 근거:
 
-- `docs/getting-started/INSTALLATION.md`
+- `README.md`
+- `docs/handbook/CHAPTERS/04_operations.md`
 - `src/evalvault/adapters/inbound/cli/commands/api.py` (serve-api 기본 host/port/reload)
 
 ### 8.3 CORS에서 가장 흔한 운영 실수

@@ -300,9 +300,9 @@ cd frontend && npm install && npm run dev
 uv sync --extra dev
 ```
 
-근거: `docs/guides/DEV_GUIDE.md`.
+근거: `AGENTS.md`.
 
-#### 8.2 .env / Settings: DB 경로와 프로필이 워크플로의 뿌리다
+#### 8.2 .env / Settings: DB 설정과 프로필이 워크플로의 뿌리다
 
 Settings는 `.env`를 읽고, profile을 적용하며, prod에서는 필수 설정을 강제한다.
 
@@ -311,18 +311,18 @@ Settings는 `.env`를 읽고, profile을 적용하며, prod에서는 필수 설�
 실무에서 핵심인 필드:
 
 - `EVALVAULT_PROFILE` (profile 적용)
-- `EVALVAULT_DB_PATH` (CLI/API 공유 DB)
+- `POSTGRES_*` / `POSTGRES_CONNECTION_STRING` (기본 DB: Postgres + pgvector)
 
-#### 8.3 DB 경로를 고정하는 이유
+#### 8.3 DB 설정을 고정하는 이유
 
 DB는 "과거 run"을 재사용하기 위한 저장소다.
-DB가 달라지면:
+DB 설정이 달라지면:
 
 - history가 달라지고
 - UI에서 보이는 run이 달라지고
 - compare/analyze가 다른 데이터를 본다
 
-따라서 팀은 최소한 개발 환경에서 DB 경로를 고정해야 한다.
+따라서 팀은 최소한 개발 환경에서 DB 설정을 고정해야 한다.
 
 ---
 
@@ -336,7 +336,7 @@ DB가 달라지면:
 - 데이터셋 경로(첫 번째 인자)
 - 메트릭(`--metrics`)
 - 프로필(`--profile` 또는 Settings profile)
-- DB(`--db`)
+- DB(Postgres 연결 설정)
 - 자동 분석(`--auto-analyze`)
 - preset(`--preset` 또는 평가 preset)
 
@@ -377,11 +377,11 @@ auto-analyze는 평가 직후 분석 파이프라인을 돌리고, 보고서/아
 #### 10.1 history: DB에서 run 목록을 보는 가장 빠른 방법
 
 ```bash
-uv run evalvault history --db data/db/evalvault.db
-uv run evalvault history --db data/db/evalvault.db --limit 20
-uv run evalvault history --db data/db/evalvault.db --dataset <DATASET_NAME>
-uv run evalvault history --db data/db/evalvault.db --model <MODEL_NAME>
-uv run evalvault history --db data/db/evalvault.db --mode simple
+uv run evalvault history
+uv run evalvault history --limit 20
+uv run evalvault history --dataset <DATASET_NAME>
+uv run evalvault history --model <MODEL_NAME>
+uv run evalvault history --mode simple
 ```
 
 근거: `src/evalvault/adapters/inbound/cli/commands/history.py#history`.
@@ -389,8 +389,10 @@ uv run evalvault history --db data/db/evalvault.db --mode simple
 #### 10.2 export: run 상세를 JSON으로 내보내기
 
 ```bash
-uv run evalvault export <RUN_ID> --db data/db/evalvault.db -o reports/run_<RUN_ID>.json
+uv run evalvault export <RUN_ID> -o reports/run_<RUN_ID>.json
 ```
+
+SQLite를 쓰는 경우 `--db` 또는 `DB_BACKEND=sqlite` + `EVALVAULT_DB_PATH`로 경로를 고정한다.
 
 근거: `src/evalvault/adapters/inbound/cli/commands/history.py#export_cmd`.
 
@@ -423,7 +425,7 @@ export가 포함하는 데이터(코드 기준):
 #### 11.2 재분석 워크플로(파일 산출물까지 남기기)
 
 ```bash
-uv run evalvault analyze <RUN_ID> --db data/db/evalvault.db \
+uv run evalvault analyze <RUN_ID> \
   --nlp --causal \
   --output reports/analysis/custom_<RUN_ID>.json \
   --report reports/analysis/custom_<RUN_ID>.md
@@ -642,7 +644,7 @@ uv run evalvault serve-api --reload
 cd frontend && npm install && npm run dev
 ```
 
-근거: `docs/guides/DEV_GUIDE.md`.
+근거: `README.md`, `AGENTS.md`.
 
 자주 나는 문제:
 
@@ -693,7 +695,7 @@ uv run evalvault artifacts lint reports/analysis/artifacts/analysis_<RUN_ID> --s
 - Settings: `src/evalvault/config/settings.py`
 - LLM 선택: `src/evalvault/adapters/outbound/llm/__init__.py#get_llm_adapter`
 
-#### 18.2 DB 경로가 설정되지 않았다
+#### 18.2 DB 설정이 누락됐다
 
 증상:
 
@@ -701,7 +703,8 @@ uv run evalvault artifacts lint reports/analysis/artifacts/analysis_<RUN_ID> --s
 
 진단:
 
-- `--db` 옵션을 명시하거나 `.env`의 `EVALVAULT_DB_PATH`를 설정
+- Postgres 설정(`POSTGRES_*` 또는 `POSTGRES_CONNECTION_STRING`)을 확인
+- SQLite를 쓰는 경우 `--db` 옵션을 명시하거나 `.env`의 `EVALVAULT_DB_PATH`를 설정
 
 근거:
 
@@ -722,7 +725,7 @@ uv run evalvault artifacts lint reports/analysis/artifacts/analysis_<RUN_ID> --s
 
 #### 19.1 실행 전 체크리스트
 
-- [ ] DB 경로가 고정돼 있는가(CLI/API/UI 동일)?
+- [ ] DB 설정이 고정돼 있는가(CLI/API/UI 동일)?
 - [ ] 프로필이 기대와 같은가(모델/임베딩)?
 - [ ] 선택한 메트릭이 데이터셋 입력을 충족하는가(02장)?
 
@@ -1207,7 +1210,8 @@ prefix는 `prompt_suggestions_<RUN_ID>`이며, 기본 base_dir는 `reports/analy
 
 원인 후보:
 
-- `--db` 미지정 + `.env`에 `EVALVAULT_DB_PATH` 미설정
+- Postgres 설정 누락
+- SQLite를 쓰는 경우 `--db` 미지정 + `.env`에 `EVALVAULT_DB_PATH` 미설정
 
 근거:
 
@@ -1813,7 +1817,8 @@ EvalVault 기반 개선 루프는 “기록이 남아야” 재현된다.
 
 이 챕터는 CLI 구현을 근거로 작성했지만, “검증된 실행 시나리오”는 별도 문서에 모여 있다.
 
-- `docs/guides/RAG_CLI_WORKFLOW_TEMPLATES.md`
+- 실행 가능한 E2E 픽스처(스모크/재현의 기준점): `tests/fixtures/e2e/`
+- 예시 워크플로 스크립트/산출물: `examples/`
 
 주의:
 

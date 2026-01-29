@@ -1,6 +1,7 @@
 # 부록: 목적/로드맵 재조정 근거 (초안)
 
-> 근거 파일: `docs/ROADMAP.md`, `docs/STATUS.md`, `README.md`, `docs/new_whitepaper/01_overview.md`
+> 근거 파일: `README.md`, `docs/handbook/CHAPTERS/00_overview.md`, `docs/handbook/CHAPTERS/08_roadmap.md`, `docs/handbook/EXTERNAL.md`
+> 호환성 노트: `docs/ROADMAP.md`, `docs/STATUS.md`는 과거 링크 호환을 위한 deprecated 스텁이다.
 > Task 4 산출물: 목적(미션/가치/대상 사용자/Non-goals) + 로드맵/우선순위 재조정 제안
 
 ---
@@ -11,10 +12,11 @@
 - `README.md`: "평가(Eval) → 분석(Analysis) → 추적(Tracing) → 개선 루프"를 CLI+Web UI로 묶는 플랫폼
 
 ### 1.2 상태/제약(문서)
-- `docs/STATUS.md`: 현재 가능한 것/제약/운영 조건(전수 정독 후 근거 링크 구체화 예정)
+- `docs/handbook/CHAPTERS/00_overview.md`: API/Web UI 실행 모델 및 제약(코드 근거 포함)
 
 ### 1.3 로드맵(문서)
-- `docs/ROADMAP.md`: P0~P3 우선순위 기반 작업 방향
+- `docs/handbook/CHAPTERS/08_roadmap.md`: 내부 우선순위/DoD/근거
+- `docs/handbook/EXTERNAL.md`: 외부 공유용 요약
 
 ---
 

@@ -53,8 +53,8 @@ EvalVault는 "평가/분석"을 반복해서 돌리며 모델/프롬프트/리�
 
 - LLM 제공자(예: openai/ollama/vllm/azure/anthropic)는 바뀔 수 있다.
   - 근거: `src/evalvault/adapters/outbound/llm/__init__.py#get_llm_adapter`가 provider별로 어댑터를 선택한다.
-- 저장소(SQLite/Postgres)도 바뀔 수 있다.
-  - 근거: `src/evalvault/ports/outbound/storage_port.py`(계약) + `src/evalvault/adapters/outbound/storage/sqlite_adapter.py`, `src/evalvault/adapters/outbound/storage/postgres_adapter.py`(구현).
+- 저장소는 PostgreSQL + pgvector로 통합한다.
+  - 근거: `src/evalvault/ports/outbound/storage_port.py`(계약) + `src/evalvault/adapters/outbound/storage/postgres_adapter.py`(구현).
 
 ### 2) 테스트 가능성: 도메인을 인프라 없이 검증할 수 있어야 한다
 
@@ -89,7 +89,7 @@ config/models.yaml  # 모델 프로필(선택적). settings가 적용한다.
 - `src/evalvault/config/settings.py#get_settings`
 - `src/evalvault/adapters/outbound/llm/__init__.py#get_llm_adapter`
 - `src/evalvault/ports/outbound/storage_port.py`
-- `src/evalvault/adapters/outbound/storage/sqlite_adapter.py`
+- `src/evalvault/adapters/outbound/storage/postgres_adapter.py`
 - `src/evalvault/ports/outbound/tracer_port.py`
 - `src/evalvault/ports/outbound/tracker_port.py`
 
@@ -151,8 +151,7 @@ config/models.yaml  # 모델 프로필(선택적). settings가 적용한다.
 Outbound 어댑터 예:
 
 - LLM provider 선택 및 구현: `src/evalvault/adapters/outbound/llm/`.
-- Storage 구현(SQLite): `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#SQLiteStorageAdapter`.
-- Storage 구현(Postgres): `src/evalvault/adapters/outbound/storage/postgres_adapter.py`.
+- Storage 구현(Postgres + pgvector): `src/evalvault/adapters/outbound/storage/postgres_adapter.py`.
 
 Inbound 어댑터 예:
 
@@ -193,7 +192,7 @@ Web UI 조립 지점은 어댑터에서 도메인 서비스/포트를 모아 구
 
 - `src/evalvault/adapters/inbound/api/adapter.py#create_adapter`
   - 설정 로딩: `from evalvault.config.settings import get_settings`
-  - Storage 구현 주입: `from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter`
+- Storage 구현 주입: `from evalvault.adapters.outbound.storage.postgres_adapter import PostgresStorageAdapter`
   - LLM 구현 선택: `from evalvault.adapters.outbound.llm import get_llm_adapter`
   - 도메인 서비스 생성: `from evalvault.domain.services.evaluator import RagasEvaluator`
 
@@ -205,7 +204,7 @@ Web UI 조립 지점은 어댑터에서 도메인 서비스/포트를 모아 구
 
 - 도메인 파일에서 `evalvault.adapters...` import가 보인다.
 - 도메인 파일에서 `fastapi`, `typer` 같은 프레임워크 import가 보인다.
-- 도메인 로직에서 `sqlite3`, `requests`, 벤더 SDK를 직접 호출한다.
+- 도메인 로직에서 DB/HTTP/벤더 SDK를 직접 호출한다.
 - 어댑터가 임계값/합격 판정 같은 정책 로직을 자체 구현한다(도메인과 중복).
 
 ### 4.5 경계 규칙을 스스로 점검하는 빠른 방법(로컬)
@@ -243,7 +242,7 @@ print('\\n'.join(bad[:50]));"
 
 ```bash
 uv run python -c "import pathlib, re; p=pathlib.Path('src/evalvault/domain');\
-pat=re.compile(r'\b(sqlite3|requests|httpx|open\(|Path\(|aiohttp)\b');\
+pat=re.compile(r'\b(psycopg|requests|httpx|open\(|Path\(|aiohttp)\b');\
 hits=[];\
 for f in p.rglob('*.py'):\
   t=f.read_text(encoding='utf-8');\
@@ -263,7 +262,7 @@ print('\\n'.join(hits[:50]));"
 ## 5. 조립 지점(composition roots): Web API, CLI
 
 "조립 지점"은 의존성 그래프를 바깥에서 안쪽으로 꽂는 곳이다.
-여기서만 "무엇을 실제로 쓸지"(SQLite vs Postgres, OpenAI vs Ollama 등)를 결정한다.
+여기서만 "무엇을 실제로 쓸지"(Postgres+pgvector, OpenAI vs Ollama 등)를 결정한다.
 
 ### 5.1 Web UI/FastAPI 조립
 
@@ -278,7 +277,7 @@ Web UI 어댑터 인스턴스는 `create_adapter()`에서 만들어진다.
 이 함수는 다음을 수행한다.
 
 - `get_settings()`로 런타임 설정 로딩
-- Storage를 기본 SQLite로 생성
+- Storage를 기본 Postgres(+pgvector)로 생성
 - 설정에 따라 LLM 어댑터를 생성(실패 시 warning 처리)
 - `RagasEvaluator` 같은 도메인 서비스를 구성
 - 위를 묶어 `WebUIAdapter`를 반환
@@ -377,23 +376,15 @@ LLMPort는 "Ragas 메트릭 실행"에 필요한 최소 기능과, "리포트/�
 따라서 도메인 서비스는 "OpenAIAdapter" 같은 구현명을 알면 안 되고,
 오직 `LLMPort`(계약)와 `LLMFactoryPort`(필요 시)만 알아야 한다.
 
-### 6.2 Storage 통합: `StoragePort` + SQLite/Postgres
+### 6.2 Storage 통합: `StoragePort` + Postgres(+pgvector)
 
 Storage 계약은 매우 넓다(평가 결과, 피드백, 실험, 파이프라인 결과 등).
 
 - 근거(계약): `src/evalvault/ports/outbound/storage_port.py#StoragePort`.
 
-SQLite 구현은 DB 파일을 만들고 스키마를 적용한다.
+이 레포의 기본 저장소는 Postgres이며, 벡터 검색도 같은 DB(pgvector)로 통합한다.
 
-- 근거(구현): `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#SQLiteStorageAdapter`.
-
-이 레포에서 SQLite는 "기본 로컬 저장소"이며, Web UI 조립 지점에서는 SQLite가 기본 주입된다.
-
-- 근거: `src/evalvault/adapters/inbound/api/adapter.py#create_adapter`.
-
-Postgres 구현도 존재한다.
-
-- 근거: `src/evalvault/adapters/outbound/storage/postgres_adapter.py`.
+- 근거(구현): `src/evalvault/adapters/outbound/storage/postgres_adapter.py`.
 
 #### 6.2.1 `StoragePort` 계약의 폭: 무엇이 저장의 "정책 경계"인가
 
@@ -418,20 +409,16 @@ Postgres 구현도 존재한다.
 - 정책: 어떤 데이터를 저장해야 "재현/비교"가 가능한가(도메인 요구)
 - 연결: 어떤 DB에 어떤 스키마로 저장하나(어댑터 구현)
 
-#### 6.2.2 SQLite 어댑터의 초기화/마이그레이션 동작(현실적인 운영 포인트)
+#### 6.2.2 Postgres(+pgvector) 운영 포인트
 
-SQLite 어댑터는 생성 시점에 DB 경로를 만들고 스키마를 적용한다.
-
-- 스키마 로드: `schema.sql`을 읽어 `executescript`로 적용
-  - 근거: `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#SQLiteStorageAdapter._init_db`.
-- 레거시 DB 마이그레이션: `PRAGMA table_info`로 컬럼 존재를 확인하고 ALTER를 수행
-  - 근거: `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#SQLiteStorageAdapter._apply_migrations`.
+- pgvector 확장이 활성화되어 있어야 한다.
+- 스키마/마이그레이션은 Postgres 기준으로 적용된다.
+  - 근거: `src/evalvault/adapters/outbound/storage/postgres_schema.sql`.
 
 이 동작을 이해해야 하는 이유:
 
-- "DB 파일만 복사"해서 환경을 바꾸는 경우, 스키마가 자동으로 올라갈 수 있다.
-- 반대로, 특정 마이그레이션이 누락되면 런타임에서 예외가 아니라 "조용한 데이터 손상"이 날 수 있다.
-  이런 경우는 StoragePort 계약/스키마/어댑터 로직을 함께 봐야 한다.
+- 운영 환경별 extension/권한 차이로 초기화 단계에서 실패할 수 있다.
+- 스키마 불일치는 분석/검색 재현성을 깨뜨린다.
 
 ### 6.3 Tracing: TracerPort vs TrackerPort
 
@@ -589,10 +576,10 @@ PipelineOrchestrator의 execute 흐름은 "아키텍처가 원하는 실패 모�
 
 금지사항:
 
-- 도메인 서비스 내부에서 sqlite/postgres를 직접 선택하지 말 것.
+- 도메인 서비스 내부에서 DB 백엔드를 직접 선택하지 말 것.
 - 스키마/마이그레이션은 어댑터 책임으로 둘 것.
-  - SQLite의 경우 `schema.sql`을 읽고 마이그레이션을 적용한다.
-    근거: `src/evalvault/adapters/outbound/storage/sqlite_adapter.py#SQLiteStorageAdapter._init_db`.
+  - Postgres 스키마는 `postgres_schema.sql`을 기준으로 유지한다.
+    근거: `src/evalvault/adapters/outbound/storage/postgres_schema.sql`.
 
 ### 9.3 새 분석 모듈(파이프라인 노드) 추가
 
@@ -629,7 +616,7 @@ PipelineOrchestrator의 execute 흐름은 "아키텍처가 원하는 실패 모�
 
 증상:
 
-- 도메인 서비스에 sqlite3/openai SDK/requests 호출이 섞임
+- 도메인 서비스에 psycopg/openai SDK/requests 호출이 섞임
 
 결과:
 
@@ -729,18 +716,16 @@ Q3. 도메인이 아웃바운드 구현을 알게 되면 어떤 문제가 생기
 이 절은 "설명을 읽고도 여전히 막히는" 상황을 줄이기 위해 만든, 구체적 워크스루다.
 아래 시나리오는 실제 레포의 경로/함수명을 근거로 삼되, 특정 구현을 단정하지 않고 "변경 설계" 관점으로만 안내한다.
 
-### 13.1 시나리오 A: Web UI에서 저장소를 SQLite -> Postgres로 바꾸고 싶다
+### 13.1 시나리오 A: 저장소 구성을 바꾸고 싶다 (Postgres+pgvector 유지)
 
 상황:
 
-- Web UI/FastAPI에서 run 이력/분석 결과를 공유 DB로 쓰고 싶다.
+- 운영 복잡도를 줄이기 위해 RDB와 벡터 스토리지를 Postgres+pgvector로 통합했다.
 
 현재 관찰(근거):
 
-- Web UI 조립 지점은 SQLite를 기본으로 주입한다.
-  - 근거: `src/evalvault/adapters/inbound/api/adapter.py#create_adapter`에서 `SQLiteStorageAdapter` 생성.
-- Postgres 구현은 존재한다.
-  - 근거: `src/evalvault/adapters/outbound/storage/postgres_adapter.py`.
+- Web UI 조립 지점은 storage factory를 사용한다.
+  - 근거: `src/evalvault/adapters/inbound/api/adapter.py#create_adapter`에서 `build_storage_adapter` 호출.
 - Postgres 연결 설정 키는 settings에 있다.
   - 근거: `src/evalvault/config/settings.py#Settings`의 `postgres_*` 필드.
 
@@ -751,47 +736,26 @@ Q3. 도메인이 아웃바운드 구현을 알게 되면 어떤 문제가 생기
 
 권장 접근(절차):
 
-1) StoragePort 구현 선택 기준을 정한다.
+1) Postgres 연결 설정을 확정한다.
 
-- 예: `postgres_connection_string`이 있으면 Postgres, 아니면 SQLite.
-- 이 기준은 "설정"에 있어야 하며, 도메인 코드에 들어가면 경계가 깨진다.
+- `POSTGRES_CONNECTION_STRING` 또는 `POSTGRES_HOST/PORT/USER/PASSWORD`를 사용한다.
 
-2) 조립 지점에서 Storage 구현을 분기한다.
+2) 조립 지점에서 Postgres 어댑터를 생성한다.
 
 - 후보 위치: `src/evalvault/adapters/inbound/api/adapter.py#create_adapter`.
 
-예시(의사 코드, 구조만):
-
-```python
-# src/evalvault/adapters/inbound/api/adapter.py
-from evalvault.config.settings import get_settings
-
-def create_adapter() -> WebUIAdapter:
-    settings = get_settings()
-
-    if settings.postgres_connection_string or settings.postgres_host:
-        # from evalvault.adapters.outbound.storage.postgres_adapter import PostgresStorageAdapter
-        storage = PostgresStorageAdapter.from_settings(settings)
-    else:
-        # from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
-        storage = SQLiteStorageAdapter(db_path=Path(settings.evalvault_db_path))
-
-    ...
-```
-
 주의:
 
-- 위 코드는 "설계 형태"만 보여준다. 실제 Postgres 어댑터의 생성 API는 `postgres_adapter.py`를 보고 맞춰야 한다.
 - prod에서 Postgres를 켤 때는 `src/evalvault/config/settings.py#_validate_production_settings`의 검증과 충돌이 없는지 확인해야 한다.
 
 실패/장애 패턴:
 
 - 잘못된 DSN/권한으로 인해 startup 시점에 앱이 뜨지 않음
-- SQLite에만 존재하던 로컬 파일 기반 동작(예: 경로 자동 생성)에 의존하던 코드가 깨짐
+- pgvector 확장이 활성화되지 않아 벡터 기능이 실패함
 
 이때의 원칙:
 
-- 도메인/포트는 고치지 않는다(저장 정책을 바꾸는 게 아니라, 저장 구현을 바꾸는 것이므로).
+- 도메인/포트는 고치지 않는다.
 - 문제가 나면 adapter/설정/DB 스키마 계층에서 해결한다.
 
 ### 13.2 시나리오 B: 새 LLM provider를 추가하고 싶다
@@ -1106,8 +1070,7 @@ LLM:
 Storage:
 
 - 계약: `src/evalvault/ports/outbound/storage_port.py`
-- SQLite 구현: `src/evalvault/adapters/outbound/storage/sqlite_adapter.py`
-- Postgres 구현: `src/evalvault/adapters/outbound/storage/postgres_adapter.py`
+- Postgres(+pgvector) 구현: `src/evalvault/adapters/outbound/storage/postgres_adapter.py`
 
 Tracing:
 

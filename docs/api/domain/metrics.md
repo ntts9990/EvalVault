@@ -22,4 +22,4 @@ EvalVault supports all standard Ragas metrics:
 - **factual_correctness**: Compares answer against ground truth for factual accuracy
 - **semantic_similarity**: Measures semantic similarity between answer and ground truth
 
-For detailed metric descriptions, see the [User Guide](../../guides/USER_GUIDE.md#metrics).
+For detailed metric descriptions, see the [Handbook](../../handbook/CHAPTERS/02_data_and_metrics.md).

@@ -43,7 +43,7 @@ EvalVault의 UX/저장/재현의 단일 중심축은 `run_id`다.
 
 Phoenix/Langfuse/MLflow는 필요할 때만 켜는 통합이다.
 
-- 상태 문서(원칙): `docs/STATUS.md`
+- 운영 원칙(옵션화 기준): `docs/handbook/CHAPTERS/04_operations.md`
 - 트래커 어댑터: `src/evalvault/adapters/outbound/tracker/__init__.py`
 - Phoenix/OpenTelemetry/OpenInference 스펙: `docs/architecture/open-rag-trace-spec.md`
 

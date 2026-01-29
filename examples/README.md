@@ -69,6 +69,5 @@ Graph Statistics:
 
 ## 관련 문서
 
-- [USER_GUIDE.md](../docs/guides/USER_GUIDE.md) - 전체 사용자 가이드
-- [INDEX.md](../docs/INDEX.md) - 문서 허브
-- [Developer Whitepaper](../docs/new_whitepaper/INDEX.md) - 설계/운영/품질 기준
+- [Docs Index](../docs/INDEX.md) - 문서 허브
+- [Handbook](../docs/handbook/INDEX.md) - 내부 문서 SSoT(아키텍처/워크플로/운영/품질)
