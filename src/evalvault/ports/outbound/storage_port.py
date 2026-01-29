@@ -83,6 +83,7 @@ class StoragePort(Protocol):
     def list_runs(
         self,
         limit: int = 100,
+        offset: int = 0,
         dataset_name: str | None = None,
         model_name: str | None = None,
     ) -> list[EvaluationRun]:
@@ -90,6 +91,7 @@ class StoragePort(Protocol):
 
         Args:
             limit: 최대 조회 개수
+            offset: 조회 시작 위치 (선택)
             dataset_name: 필터링할 데이터셋 이름 (선택)
             model_name: 필터링할 모델 이름 (선택)
 

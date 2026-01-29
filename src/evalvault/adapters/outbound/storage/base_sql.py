@@ -247,7 +247,7 @@ class SQLQueries:
         return "SELECT run_id FROM evaluation_runs WHERE 1=1"
 
     def list_runs_ordering(self) -> str:
-        return f" ORDER BY started_at DESC LIMIT {self.placeholder}"
+        return f" ORDER BY started_at DESC LIMIT {self.placeholder} OFFSET {self.placeholder}"
 
     def upsert_regression_baseline(self) -> str:
         raise NotImplementedError("Override in subclass")
@@ -394,6 +394,7 @@ class BaseSQLStorageAdapter(ABC):
     def list_runs(
         self,
         limit: int = 100,
+        offset: int = 0,
         dataset_name: str | None = None,
         model_name: str | None = None,
     ) -> list[EvaluationRun]:
@@ -410,7 +411,7 @@ class BaseSQLStorageAdapter(ABC):
                 params.append(model_name)
 
             query += self.queries.list_runs_ordering()
-            params.append(limit)
+            params.extend([limit, offset])
 
             cursor = self._execute(conn, query, params)
             run_ids = [row["run_id"] for row in cursor.fetchall()]

@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, PrivateAttr
+from pydantic import AliasChoices, Field, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from evalvault.config.secret_manager import (
@@ -179,6 +179,10 @@ class Settings(BaseSettings):
         default="data/db/evalvault.db",
         description="SQLite database path for API/CLI storage.",
     )
+    db_backend: str = Field(
+        default="postgres",
+        description="Storage backend: 'postgres' or 'sqlite'.",
+    )
     evalvault_memory_db_path: str = Field(
         default="data/db/evalvault_memory.db",
         description="SQLite database path for Domain Memory storage.",
@@ -242,7 +246,7 @@ class Settings(BaseSettings):
         description="Ollama server URL",
     )
     ollama_model: str = Field(
-        default="gpt-oss-safeguard:20b",
+        default="qwen3:14b",
         description="Ollama model name for evaluation",
     )
     ollama_embedding_model: str = Field(
@@ -395,11 +399,31 @@ class Settings(BaseSettings):
     )
 
     # PostgreSQL Configuration (optional)
-    postgres_host: str | None = Field(default=None, description="PostgreSQL server host")
-    postgres_port: int = Field(default=5432, description="PostgreSQL server port")
-    postgres_database: str = Field(default="evalvault", description="PostgreSQL database name")
-    postgres_user: str | None = Field(default=None, description="PostgreSQL user")
-    postgres_password: str | None = Field(default=None, description="PostgreSQL password")
+    postgres_host: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("POSTGRES_HOST", "EVALVAULT_DB_HOST"),
+        description="PostgreSQL server host",
+    )
+    postgres_port: int = Field(
+        default=5432,
+        validation_alias=AliasChoices("POSTGRES_PORT", "EVALVAULT_DB_PORT"),
+        description="PostgreSQL server port",
+    )
+    postgres_database: str = Field(
+        default="evalvault",
+        validation_alias=AliasChoices("POSTGRES_DATABASE", "EVALVAULT_DB_NAME"),
+        description="PostgreSQL database name",
+    )
+    postgres_user: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("POSTGRES_USER", "EVALVAULT_DB_USER"),
+        description="PostgreSQL user",
+    )
+    postgres_password: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("POSTGRES_PASSWORD", "EVALVAULT_DB_PASSWORD"),
+        description="PostgreSQL password",
+    )
     postgres_connection_string: str | None = Field(
         default=None, description="PostgreSQL connection string (overrides other postgres settings)"
     )

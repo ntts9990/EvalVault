@@ -1,6 +1,8 @@
 -- EvalVault PostgreSQL Database Schema
 -- Stores evaluation runs, test case results, and metric scores
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Main evaluation runs table
 CREATE TABLE IF NOT EXISTS evaluation_runs (
     run_id UUID PRIMARY KEY,
