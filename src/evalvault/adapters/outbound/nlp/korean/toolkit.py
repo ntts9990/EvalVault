@@ -76,10 +76,21 @@ class KoreanNLPToolkit(KoreanNLPToolkitPort):
 
         embedding_func = None
         try:
-            dense_retriever = KoreanDenseRetriever(
-                profile=embedding_profile,
-                ollama_adapter=ollama_adapter,
-            )
+            if embedding_profile == "vllm":
+                from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
+                from evalvault.config.settings import Settings
+
+                settings = Settings()
+                adapter = ollama_adapter or VLLMAdapter(settings)
+                dense_retriever = KoreanDenseRetriever(
+                    model_name=settings.vllm_embedding_model,
+                    ollama_adapter=adapter,
+                )
+            else:
+                dense_retriever = KoreanDenseRetriever(
+                    profile=embedding_profile,
+                    ollama_adapter=ollama_adapter,
+                )
             embedding_func = dense_retriever.get_embedding_func()
             if verbose:
                 logger.info(

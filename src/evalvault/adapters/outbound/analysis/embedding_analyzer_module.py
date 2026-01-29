@@ -152,6 +152,20 @@ class EmbeddingAnalyzerModule(BaseAnalysisModule):
                 errors.append(str(exc))
                 retriever = None
 
+        if retriever is None and (backend_hint == "vllm" or embedding_profile == "vllm"):
+            try:
+                from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
+
+                adapter = VLLMAdapter(settings)
+                retriever = KoreanDenseRetriever(
+                    model_name=model_name or settings.vllm_embedding_model,
+                    ollama_adapter=adapter,
+                    profile=embedding_profile,
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+                retriever = None
+
         if retriever is None and backend_hint != "ollama":
             try:
                 retriever = KoreanDenseRetriever(model_name=model_name)
@@ -166,7 +180,9 @@ class EmbeddingAnalyzerModule(BaseAnalysisModule):
                     batch_size=batch_size if isinstance(batch_size, int) else None,
                 )
                 meta = {
-                    "backend": "ollama"
+                    "backend": "vllm"
+                    if backend_hint == "vllm" or embedding_profile == "vllm"
+                    else "ollama"
                     if retriever.model_name.startswith("qwen3")
                     else "sentence-transformers",
                     "model": retriever.model_name,

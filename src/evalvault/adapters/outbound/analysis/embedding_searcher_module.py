@@ -77,6 +77,20 @@ class EmbeddingSearcherModule(BaseAnalysisModule):
                 errors.append(str(exc))
                 retriever = None
 
+        if retriever is None and embedding_profile == "vllm":
+            try:
+                from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
+
+                adapter = VLLMAdapter(settings)
+                retriever = KoreanDenseRetriever(
+                    model_name=settings.vllm_embedding_model,
+                    ollama_adapter=adapter,
+                    profile=embedding_profile,
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+                retriever = None
+
         if retriever is None:
             try:
                 retriever = KoreanDenseRetriever(model_name=model_name)

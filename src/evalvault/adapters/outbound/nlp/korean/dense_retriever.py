@@ -141,8 +141,8 @@ class KoreanDenseRetriever:
         },
     }
 
-    # 기본 모델: dragonkue/BGE-m3-ko (AutoRAG 벤치마크 1위)
-    DEFAULT_MODEL = "dragonkue/BGE-m3-ko"
+    # 기본 모델: BAAI/bge-m3 (멀티링거시 기본)
+    DEFAULT_MODEL = "BAAI/bge-m3"
 
     def __init__(
         self,
@@ -175,7 +175,7 @@ class KoreanDenseRetriever:
             device: 디바이스 (auto, cpu, cuda, mps)
             batch_size: 인코딩 배치 크기
                 - 0 이하로 설정하면 간단한 휴리스틱으로 자동 결정
-            ollama_adapter: Ollama LLM 어댑터 (Qwen3-Embedding 사용 시 필수)
+        ollama_adapter: OpenAI 호환 임베딩 어댑터 (Ollama/vLLM)
             matryoshka_dim: Matryoshka 차원 (Qwen3-Embedding 전용)
                 - None: 모델 권장 차원 사용
                 - 256: 개발용 (속도 우선)
@@ -237,12 +237,12 @@ class KoreanDenseRetriever:
         self._query_cache_size = max(query_cache_size, 0)
         self._search_cache_size = max(search_cache_size, 0)
 
-        # Validate Ollama adapter for Ollama models
+        # Validate embedding adapter for OpenAI-compatible embedding models
         model_info = self.SUPPORTED_MODELS.get(self._model_name)
         if model_info and model_info.get("type") == "ollama" and not self._ollama_adapter:
             raise ValueError(
-                f"ollama_adapter is required for Ollama model '{self._model_name}'. "
-                "Create one with: OllamaAdapter(settings)"
+                f"embedding adapter is required for model '{self._model_name}'. "
+                "Create one with: OllamaAdapter(settings) or VLLMAdapter(settings)"
             )
 
         # Auto-select matryoshka dimension if not specified
@@ -362,7 +362,10 @@ class KoreanDenseRetriever:
             return
 
         model_info = self.SUPPORTED_MODELS.get(self._model_name)
-        model_type = model_info["type"] if model_info else "sentence-transformers"
+        if model_info is None and self._ollama_adapter is not None:
+            model_type = "ollama"
+        else:
+            model_type = model_info["type"] if model_info else "sentence-transformers"
 
         # Ollama models use adapter directly - no model loading needed
         if model_type == "ollama":

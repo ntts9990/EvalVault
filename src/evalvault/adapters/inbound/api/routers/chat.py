@@ -8,6 +8,7 @@ import os
 import re
 import time
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,13 @@ _RAG_RETRIEVER = None
 _RAG_DOCS_COUNT = 0
 _RAG_TEXTS: list[str] = []
 _RAG_INITIALIZED = False
+
+
+@dataclass(frozen=True)
+class _RagHit:
+    document: str
+    score: float
+    doc_id: int
 
 
 class ChatMessage(BaseModel):
@@ -315,14 +323,121 @@ async def _get_rag_retriever() -> tuple[Any | None, int]:
     if not _RAG_TEXTS:
         return None, 0
 
-    from evalvault.adapters.outbound.nlp.korean.bm25_retriever import KoreanBM25Retriever
-    from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
+    from evalvault.adapters.outbound.nlp.korean.toolkit import KoreanNLPToolkit
 
-    tokenizer = KiwiTokenizer()
-    retriever = KoreanBM25Retriever(tokenizer=tokenizer)
-    retriever.index(list(_RAG_TEXTS))
-    if tokens and len(tokens) == len(_RAG_TEXTS):
-        retriever._tokenized_docs = tokens
+    use_hybrid = os.getenv("EVALVAULT_RAG_USE_HYBRID", "true").lower() == "true"
+    embedding_profile = os.getenv("EVALVAULT_RAG_EMBEDDING_PROFILE", "dev")
+    vector_store = os.getenv("EVALVAULT_RAG_VECTOR_STORE", "pgvector").lower()
+    pgvector_index = os.getenv("EVALVAULT_RAG_PGVECTOR_INDEX", "hnsw").lower()
+    pgvector_index_lists = int(os.getenv("EVALVAULT_RAG_PGVECTOR_INDEX_LISTS", "100"))
+    pgvector_hnsw_m = int(os.getenv("EVALVAULT_RAG_PGVECTOR_HNSW_M", "16"))
+    pgvector_hnsw_ef = int(os.getenv("EVALVAULT_RAG_PGVECTOR_HNSW_EF_CONSTRUCTION", "64"))
+
+    def _build_conn_string() -> str | None:
+        try:
+            from evalvault.config.settings import Settings
+
+            settings = Settings()
+            if settings.postgres_connection_string:
+                return settings.postgres_connection_string
+            if settings.postgres_host:
+                return "host={host} port={port} dbname={dbname} user={user} password={password}".format(
+                    host=settings.postgres_host,
+                    port=settings.postgres_port,
+                    dbname=settings.postgres_database,
+                    user=settings.postgres_user or "postgres",
+                    password=settings.postgres_password or "",
+                )
+        except Exception as exc:
+            logger.warning("Failed to build Postgres connection string: %s", exc)
+        return None
+
+    ollama_adapter = None
+    dense_retriever = None
+    embedding_func = None
+    if embedding_profile:
+        try:
+            from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
+            from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
+            from evalvault.config.settings import Settings
+
+            settings = Settings()
+            ollama_adapter = OllamaAdapter(settings)
+            dense_retriever = KoreanDenseRetriever(
+                profile=embedding_profile,
+                ollama_adapter=ollama_adapter,
+            )
+            embedding_func = dense_retriever.get_embedding_func()
+        except Exception as exc:  # pragma: no cover - runtime dependency
+            logger.warning("Failed to initialize dense retriever: %s", exc)
+
+    if vector_store == "pgvector" and embedding_func is not None:
+        conn_string = _build_conn_string()
+        if conn_string:
+            try:
+                from evalvault.adapters.outbound.nlp.korean.bm25_retriever import (
+                    KoreanBM25Retriever,
+                )
+                from evalvault.adapters.outbound.nlp.korean.kiwi_tokenizer import KiwiTokenizer
+                from evalvault.adapters.outbound.retriever.pgvector_store import PgvectorStore
+
+                store = PgvectorStore(
+                    conn_string,
+                    index_type=pgvector_index,
+                    index_lists=pgvector_index_lists,
+                    hnsw_m=pgvector_hnsw_m,
+                    hnsw_ef_construction=pgvector_hnsw_ef,
+                )
+                embedding_dim = (
+                    dense_retriever.dimension if dense_retriever else len(embedding_func(["x"])[0])
+                )
+                store.ensure_schema(dimension=embedding_dim)
+                source_hash = _hash_text(content)
+                existing_hash, existing_count = store.get_source_state(source="user_guide")
+                if existing_hash != source_hash or existing_count != len(_RAG_TEXTS):
+                    embeddings = embedding_func(list(_RAG_TEXTS))
+                    store.replace_documents(
+                        source="user_guide",
+                        source_hash=source_hash,
+                        documents=list(_RAG_TEXTS),
+                        embeddings=embeddings,
+                    )
+
+                tokenizer = KiwiTokenizer()
+                bm25_retriever = KoreanBM25Retriever(tokenizer=tokenizer)
+                bm25_retriever.index(list(_RAG_TEXTS))
+                if tokens and len(tokens) == len(_RAG_TEXTS):
+                    bm25_retriever._tokenized_docs = tokens
+
+                if use_hybrid:
+                    retriever = _PgvectorHybridRetriever(
+                        bm25_retriever=bm25_retriever,
+                        store=store,
+                        embedding_func=embedding_func,
+                        documents=list(_RAG_TEXTS),
+                    )
+                else:
+                    retriever = _PgvectorDenseRetriever(
+                        store=store,
+                        embedding_func=embedding_func,
+                        documents=list(_RAG_TEXTS),
+                    )
+
+                _RAG_RETRIEVER = retriever
+                return retriever, _RAG_DOCS_COUNT
+            except Exception as exc:
+                logger.warning("pgvector retriever setup failed: %s", exc)
+
+    toolkit = KoreanNLPToolkit()
+    retriever = toolkit.build_retriever(
+        list(_RAG_TEXTS),
+        use_hybrid=use_hybrid,
+        ollama_adapter=ollama_adapter,
+        embedding_profile=embedding_profile,
+        verbose=True,
+    )
+    if retriever is None:
+        return None, 0
 
     _RAG_RETRIEVER = retriever
     return retriever, _RAG_DOCS_COUNT
@@ -384,11 +499,153 @@ def _simple_retrieve(texts: list[str], query: str, top_k: int) -> list[str]:
     return [text for _, text in scored[:top_k]]
 
 
+def _rrf_fuse(
+    *,
+    bm25_results: list[Any],
+    dense_results: list[Any],
+    documents: list[str],
+    top_k: int,
+    bm25_weight: float = 0.4,
+    dense_weight: float = 0.6,
+    rrf_k: int = 60,
+) -> list[_RagHit]:
+    scores: dict[int, float] = {}
+
+    for rank, result in enumerate(bm25_results, 1):
+        doc_id = int(result.doc_id)
+        scores[doc_id] = scores.get(doc_id, 0.0) + (bm25_weight / (rrf_k + rank))
+
+    for rank, result in enumerate(dense_results, 1):
+        doc_id = int(result.doc_id)
+        scores[doc_id] = scores.get(doc_id, 0.0) + (dense_weight / (rrf_k + rank))
+
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    hits: list[_RagHit] = []
+    for doc_id, score in ranked[:top_k]:
+        if 0 <= doc_id < len(documents):
+            hits.append(_RagHit(document=documents[doc_id], score=score, doc_id=doc_id))
+    return hits
+
+
+class _PgvectorDenseRetriever:
+    def __init__(self, store: Any, embedding_func: Any, documents: list[str]) -> None:
+        self._store = store
+        self._embedding_func = embedding_func
+        self._documents = documents
+
+    def search(self, query: str, top_k: int = 5) -> list[_RagHit]:
+        query_embedding = self._embedding_func([query])[0]
+        results = self._store.search(
+            source="user_guide", query_embedding=query_embedding, top_k=top_k
+        )
+        hits: list[_RagHit] = []
+        for result in results:
+            if 0 <= result.doc_id < len(self._documents):
+                hits.append(
+                    _RagHit(
+                        document=self._documents[result.doc_id],
+                        score=float(result.score),
+                        doc_id=result.doc_id,
+                    )
+                )
+        return hits
+
+
+class _PgvectorHybridRetriever:
+    def __init__(
+        self,
+        *,
+        bm25_retriever: Any,
+        store: Any,
+        embedding_func: Any,
+        documents: list[str],
+    ) -> None:
+        self._bm25 = bm25_retriever
+        self._store = store
+        self._embedding_func = embedding_func
+        self._documents = documents
+
+    def search(self, query: str, top_k: int = 5) -> list[_RagHit]:
+        bm25_results = self._bm25.search(query, top_k=len(self._documents))
+        query_embedding = self._embedding_func([query])[0]
+        dense_results = self._store.search(
+            source="user_guide", query_embedding=query_embedding, top_k=len(self._documents)
+        )
+        dense_results = sorted(dense_results, key=lambda item: item.score)
+        return _rrf_fuse(
+            bm25_results=bm25_results,
+            dense_results=dense_results,
+            documents=self._documents,
+            top_k=top_k,
+        )
+
+
+def _read_text_limited(path: Path, limit: int = 4000) -> str | None:
+    try:
+        if not path.exists():
+            return None
+        content = path.read_text(encoding="utf-8", errors="ignore")
+    except Exception as exc:
+        logger.warning("Failed to read %s: %s", path, exc)
+        return None
+    content = content.strip()
+    if not content:
+        return None
+    if len(content) > limit:
+        return content[:limit] + "..."
+    return content
+
+
+async def _build_run_context(run_id: str) -> list[str]:
+    contexts: list[str] = []
+    try:
+        summary_result = await _call_mcp_tool("get_run_summary", {"run_id": run_id})
+        payload = _extract_json_content(summary_result)
+        if isinstance(payload, dict):
+            contexts.append("[RUN 요약]\n" + _summarize_run_summary(payload))
+    except Exception as exc:
+        logger.warning("Failed to fetch run summary: %s", exc)
+
+    try:
+        artifacts_result = await _call_mcp_tool(
+            "get_artifacts", {"run_id": run_id, "kind": "analysis"}
+        )
+        payload = _extract_json_content(artifacts_result)
+        if isinstance(payload, dict):
+            contexts.append("[RUN 아티팩트]\n" + _summarize_artifacts(payload))
+            artifacts = payload.get("artifacts") or {}
+            report_path = artifacts.get("report_path")
+            if isinstance(report_path, str) and report_path:
+                report_text = _read_text_limited(Path(report_path))
+                if report_text:
+                    contexts.append("[REPORT 발췌]\n" + report_text)
+    except Exception as exc:
+        logger.warning("Failed to fetch run artifacts: %s", exc)
+
+    return contexts
+
+
 async def _rag_answer(
     user_text: str, run_id: str | None = None, category: str | None = None
 ) -> str | None:
-    retriever, _ = await _get_rag_retriever()
     contexts: list[str] = []
+    rag_llm_enabled = os.getenv("EVALVAULT_RAG_LLM_ENABLED", "true").lower() == "true"
+    run_context_enabled = os.getenv("EVALVAULT_CHAT_RUN_CONTEXT_ENABLED", "true").lower() == "true"
+
+    if run_id and rag_llm_enabled and run_context_enabled:
+        contexts.extend(await _build_run_context(run_id))
+
+    if not rag_llm_enabled and contexts:
+        return "\n\n".join(contexts[:3])
+
+    if not rag_llm_enabled:
+        content = _load_user_guide_text()
+        if content:
+            chunks = [chunk.strip() for chunk in content.split("\n\n") if chunk.strip()]
+            contexts.extend(_simple_retrieve(chunks, user_text, top_k=5))
+        return "\n\n".join(contexts[:3]) if contexts else None
+
+    retriever, _ = await _get_rag_retriever()
 
     if retriever is not None:
         results = retriever.search(user_text, top_k=5)
@@ -403,7 +660,7 @@ async def _rag_answer(
     if not contexts:
         return None
 
-    if os.getenv("EVALVAULT_RAG_LLM_ENABLED", "true").lower() != "true":
+    if not rag_llm_enabled:
         return "\n\n".join(contexts[:3])
 
     prompt = (
@@ -431,15 +688,24 @@ async def _rag_answer(
     if options:
         payload["options"] = options
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            f"{os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')}/api/chat",
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
+    fallback = "\n\n".join(contexts[:3])
+    chat_timeout = int(os.getenv("OLLAMA_CHAT_TIMEOUT_SECONDS", "180"))
+    try:
+        async with httpx.AsyncClient(timeout=chat_timeout) as client:
+            response = await client.post(
+                f"{os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')}/api/chat",
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+    except httpx.ReadTimeout:
+        logger.warning("Ollama chat timed out; returning retrieved contexts")
+        return fallback or None
+    except httpx.HTTPError as exc:
+        logger.warning("Ollama chat failed: %s", exc)
+        return fallback or None
 
-    return data.get("message", {}).get("content", "").strip() or None
+    return data.get("message", {}).get("content", "").strip() or fallback or None
 
 
 async def _call_mcp_tool(tool_name: str, tool_args: dict[str, Any]) -> Any:
@@ -665,6 +931,17 @@ async def _chat_stream(
     user_text: str, run_id: str | None = None, category: str | None = None
 ) -> AsyncGenerator[str, None]:
     started_at = time.perf_counter()
+    simple_mode = os.getenv("EVALVAULT_CHAT_SIMPLE_MODE", "false").lower() == "true"
+    run_context_enabled = os.getenv("EVALVAULT_CHAT_RUN_CONTEXT_ENABLED", "true").lower() == "true"
+    if simple_mode:
+        yield _event({"type": "status", "message": "간단 채팅 처리 중..."})
+        answer = await _direct_chat_answer(user_text)
+        if answer:
+            async for item in _emit_answer(answer):
+                yield item
+        else:
+            yield _event({"type": "final", "content": "답변을 생성하지 못했습니다."})
+        return
     if category in {"result_interpretation", "improvement_direction"} and not run_id:
         yield _event(
             {
@@ -700,6 +977,7 @@ async def _chat_stream(
         _is_verb_only(user_text)
         and category in {"result_interpretation", "improvement_direction"}
         and run_id
+        and run_context_enabled
     ):
         yield _event({"type": "status", "message": "선택한 run 요약 중..."})
         try:
@@ -806,6 +1084,14 @@ async def _chat_stream(
         return
     if tool_name == "get_artifacts" and not (tool_args.get("run_id") or run_id):
         yield _event({"type": "final", "content": "아티팩트 조회를 위해 run_id가 필요합니다."})
+        return
+    if not run_context_enabled and tool_name in {"get_run_summary", "get_artifacts"}:
+        yield _event(
+            {
+                "type": "final",
+                "content": "run 요약/아티팩트 조회가 비활성화되어 있습니다.",
+            }
+        )
         return
     if tool_name == "analyze_compare" and (
         not tool_args.get("run_id_a") or not tool_args.get("run_id_b")

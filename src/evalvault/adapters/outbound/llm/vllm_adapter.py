@@ -64,6 +64,29 @@ class VLLMAdapter(BaseLLMAdapter):
         """Get the embedding model name being used."""
         return self._embedding_model_name
 
+    def embed_sync(
+        self,
+        *,
+        texts: list[str],
+        model: str | None = None,
+        dimension: int | None = None,
+    ) -> list[list[float]]:
+        """Synchronous embedding call using OpenAI-compatible API."""
+        embed_base_url = self._settings.vllm_embedding_base_url or self._settings.vllm_base_url
+        client = OpenAI(
+            base_url=embed_base_url,
+            api_key=self._settings.vllm_api_key or "local",
+            timeout=self._settings.vllm_timeout,
+        )
+        payload: dict[str, Any] = {
+            "model": model or self._embedding_model_name,
+            "input": texts,
+        }
+        if dimension is not None:
+            payload["dimensions"] = dimension
+        response = client.embeddings.create(**payload)
+        return [item.embedding for item in response.data]
+
     async def agenerate_text(
         self,
         prompt: str,
