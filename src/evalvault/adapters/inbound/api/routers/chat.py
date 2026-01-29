@@ -44,8 +44,60 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] | None = None
 
 
+class AiChatMessage(BaseModel):
+    role: str
+    content: str | None = None
+    parts: list[dict[str, Any]] | None = None
+
+
+class AiChatRequest(BaseModel):
+    messages: list[AiChatMessage] = Field(default_factory=list)
+    run_id: str | None = None
+    category: str | None = None
+
+
 def _extract_run_ids(text: str) -> list[str]:
     return re.findall(r"run_[A-Za-z0-9_-]+", text)
+
+
+def _ollama_chat_options(model_name: str) -> dict[str, Any] | None:
+    lower = model_name.lower()
+    if lower.startswith("qwen3"):
+        return {
+            "temperature": 0.6,
+            "top_p": 0.95,
+            "top_k": 20,
+            "repeat_penalty": 1,
+            "stop": ["<|im_start|>", "<|im_end|>"],
+        }
+    return None
+
+
+def _is_verb_only(text: str) -> bool:
+    if not text:
+        return False
+    compact = re.sub(r"\s+", "", text.strip())
+    if not compact:
+        return False
+    tokens = re.findall(r"[A-Za-z0-9가-힣]+", compact)
+    if len(tokens) > 2:
+        return False
+    verb_markers = ["해줘", "해주세요", "해봐", "해봐요", "해줘요", "해줘라"]
+    verb_stems = ["설명", "요약", "분석", "비교", "개선", "정리", "추천", "진단", "해석", "검증"]
+    if any(compact.endswith(marker) for marker in verb_markers):
+        return any(stem in compact for stem in verb_stems)
+    return compact in verb_stems
+
+
+def _with_context(user_text: str, run_id: str | None, category: str | None) -> str:
+    parts = []
+    if run_id:
+        parts.append(f"선택된 run_id: {run_id}")
+    if category:
+        parts.append(f"질문 분류: {category}")
+    if not parts:
+        return user_text
+    return "\n".join(parts) + f"\n사용자 요청: {user_text}"
 
 
 def _format_tool_result(result: Any) -> str:
@@ -283,15 +335,29 @@ async def warm_rag_index() -> None:
         logger.warning("RAG preload failed: %s", exc)
 
 
-async def _direct_chat_answer(user_text: str) -> str | None:
+async def _direct_chat_answer(
+    user_text: str, run_id: str | None = None, category: str | None = None
+) -> str | None:
+    user_text = _with_context(user_text, run_id, category)
+    model_name = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:14b")
+    options = _ollama_chat_options(model_name)
     payload = {
-        "model": os.getenv("OLLAMA_CHAT_MODEL", "gpt-oss-safeguard:20b"),
+        "model": model_name,
         "messages": [
-            {"role": "system", "content": "You are a helpful assistant for EvalVault."},
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant for EvalVault. "
+                    "Interpret verb-only requests as questions about the selected run/category. "
+                    "If essential details are missing, ask a concise follow-up question in Korean."
+                ),
+            },
             {"role": "user", "content": user_text},
         ],
         "stream": False,
     }
+    if options:
+        payload["options"] = options
 
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
@@ -318,7 +384,9 @@ def _simple_retrieve(texts: list[str], query: str, top_k: int) -> list[str]:
     return [text for _, text in scored[:top_k]]
 
 
-async def _rag_answer(user_text: str) -> str | None:
+async def _rag_answer(
+    user_text: str, run_id: str | None = None, category: str | None = None
+) -> str | None:
     retriever, _ = await _get_rag_retriever()
     contexts: list[str] = []
 
@@ -340,22 +408,28 @@ async def _rag_answer(user_text: str) -> str | None:
 
     prompt = (
         "다음은 EvalVault 코드/문서에서 검색된 컨텍스트입니다.\n"
-        "컨텍스트만 근거로 사용해 한국어로 답하세요.\n\n"
+        "컨텍스트만 근거로 사용해 한국어로 답하세요.\n"
+        "질문이 동사만 있는 경우에도 선택된 run_id/분류를 기준으로 해석하세요.\n"
+        "정보가 부족하면 먼저 필요한 정보를 질문하세요.\n\n"
         "[컨텍스트]\n"
         + "\n\n---\n\n".join(contexts[:3])
         + "\n\n[질문]\n"
-        + user_text
+        + _with_context(user_text, run_id, category)
         + "\n\n[답변]"
     )
 
+    model_name = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:14b")
+    options = _ollama_chat_options(model_name)
     payload = {
-        "model": os.getenv("OLLAMA_CHAT_MODEL", "gpt-oss-safeguard:20b"),
+        "model": model_name,
         "messages": [
             {"role": "system", "content": "You are a helpful assistant for EvalVault."},
             {"role": "user", "content": prompt},
         ],
         "stream": False,
     }
+    if options:
+        payload["options"] = options
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
@@ -388,7 +462,9 @@ async def _call_mcp_tool(tool_name: str, tool_args: dict[str, Any]) -> Any:
     return data
 
 
-async def _resolve_tool_with_llm(user_text: str) -> dict[str, Any] | None:
+async def _resolve_tool_with_llm(
+    user_text: str, run_id: str | None = None, category: str | None = None
+) -> dict[str, Any] | None:
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     router_model = os.getenv("OLLAMA_ROUTER_MODEL", "gemma3:1b")
 
@@ -398,6 +474,8 @@ async def _resolve_tool_with_llm(user_text: str) -> dict[str, Any] | None:
         "Action must be one of: tool, rag, direct."
         "Tools: list_runs, get_run_summary, run_evaluation, analyze_compare, get_artifacts."
         "Rules:"
+        "- Assume verb-only requests refer to the selected run_id/category when provided."
+        "- If essential info is missing (e.g., run_id), return action direct with a follow-up question."
         "- If user asks about datasets, prefer tool list_datasets."
         "- If question is about EvalVault docs/usage, prefer rag."
         "- If greeting or general chat, use direct."
@@ -413,7 +491,7 @@ async def _resolve_tool_with_llm(user_text: str) -> dict[str, Any] | None:
         "model": router_model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text},
+            {"role": "user", "content": _with_context(user_text, run_id, category)},
         ],
         "stream": False,
     }
@@ -479,6 +557,99 @@ def _chunk_text(text: str, size: int = 42) -> list[str]:
     return [text[i : i + size] for i in range(0, len(text), size)]
 
 
+def _extract_text_from_parts(parts: list[dict[str, Any]] | None) -> str | None:
+    if not parts:
+        return None
+    chunks: list[str] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == "text":
+            text = part.get("text")
+            if isinstance(text, str) and text:
+                chunks.append(text)
+    if not chunks:
+        return None
+    content = "".join(chunks).strip()
+    return content or None
+
+
+def _extract_last_user_message(messages: list[AiChatMessage]) -> str | None:
+    for message in reversed(messages):
+        if message.role != "user":
+            continue
+        if message.content and message.content.strip():
+            return message.content.strip()
+        content = _extract_text_from_parts(message.parts)
+        if content:
+            return content
+    return None
+
+
+def _ai_sse_event(payload: dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _ai_sse_done() -> str:
+    return "data: [DONE]\n\n"
+
+
+def _ai_sse_headers() -> dict[str, str]:
+    return {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "x-vercel-ai-ui-message-stream": "v1",
+    }
+
+
+async def _ai_chat_stream(
+    user_text: str, run_id: str | None = None, category: str | None = None
+) -> AsyncGenerator[str, None]:
+    message_id = f"msg_{int(time.time() * 1000)}"
+    text_id = f"text_{message_id}"
+    yield _ai_sse_event({"type": "start", "messageId": message_id})
+    yield _ai_sse_event({"type": "text-start", "id": text_id})
+
+    async for item in _chat_stream(user_text, run_id=run_id, category=category):
+        raw = item.strip()
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            continue
+
+        event_type = payload.get("type")
+        if event_type == "delta":
+            content = payload.get("content")
+            if isinstance(content, str) and content:
+                yield _ai_sse_event({"type": "text-delta", "id": text_id, "delta": content})
+            continue
+        if event_type == "status":
+            message = payload.get("message")
+            if isinstance(message, str) and message:
+                yield _ai_sse_event(
+                    {"type": "data-status", "data": {"message": message}, "transient": True}
+                )
+            continue
+        if event_type == "error":
+            message = payload.get("message")
+            if not isinstance(message, str) or not message:
+                message = "채팅 요청에 실패했습니다."
+            yield _ai_sse_event({"type": "error", "errorText": message})
+            yield _ai_sse_event({"type": "finish"})
+            yield _ai_sse_done()
+            return
+        if event_type == "final":
+            yield _ai_sse_event({"type": "text-end", "id": text_id})
+            yield _ai_sse_event({"type": "finish"})
+            yield _ai_sse_done()
+            return
+
+    yield _ai_sse_event({"type": "finish"})
+    yield _ai_sse_done()
+
+
 def _event(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
@@ -490,15 +661,34 @@ async def _emit_answer(answer: str) -> AsyncGenerator[str, None]:
     yield _event({"type": "final", "content": answer})
 
 
-async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
+async def _chat_stream(
+    user_text: str, run_id: str | None = None, category: str | None = None
+) -> AsyncGenerator[str, None]:
     started_at = time.perf_counter()
-    if len(user_text) <= 4:
-        yield _event({"type": "final", "content": "안녕하세요! EvalVault 관련 질문을 해주세요."})
+    if category in {"result_interpretation", "improvement_direction"} and not run_id:
+        yield _event(
+            {
+                "type": "final",
+                "content": "선택한 분류는 run_id가 필요합니다. run_id를 선택한 뒤 다시 질문해주세요.",
+            }
+        )
         return
 
-    if len(user_text) <= 6:
+    if len(user_text) <= 4:
+        if run_id or category:
+            user_text = f"{user_text}"
+        else:
+            yield _event(
+                {
+                    "type": "final",
+                    "content": "무엇을 설명할까요? run_id와 질문 분류를 선택한 뒤 다시 요청해주세요.",
+                }
+            )
+            return
+
+    if len(user_text) <= 6 and not _is_verb_only(user_text):
         yield _event({"type": "status", "message": "짧은 질문 처리 중..."})
-        answer = await _direct_chat_answer(user_text)
+        answer = await _direct_chat_answer(user_text, run_id=run_id, category=category)
         if answer:
             async for item in _emit_answer(answer):
                 yield item
@@ -506,9 +696,45 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
             yield _event({"type": "final", "content": "답변을 생성하지 못했습니다."})
         return
 
+    if (
+        _is_verb_only(user_text)
+        and category in {"result_interpretation", "improvement_direction"}
+        and run_id
+    ):
+        yield _event({"type": "status", "message": "선택한 run 요약 중..."})
+        try:
+            result = await asyncio.wait_for(
+                _call_mcp_tool("get_run_summary", {"run_id": run_id}), timeout=12
+            )
+        except TimeoutError:
+            yield _event(
+                {
+                    "type": "error",
+                    "message": "run 요약 응답이 지연됩니다. 잠시 후 다시 시도해주세요.",
+                }
+            )
+            return
+        except Exception as exc:
+            yield _event({"type": "error", "message": f"run 요약 실패: {exc}"})
+            return
+
+        payload = _extract_json_content(result)
+        if isinstance(payload, dict):
+            summary = _summarize_result("get_run_summary", payload)
+            if category == "improvement_direction":
+                summary += "\n\n개선 방향을 구체화하려면 목표 메트릭이나 기준을 알려주세요."
+            else:
+                summary += "\n\n특정 메트릭/케이스가 있으면 알려주세요."
+            async for item in _emit_answer(summary):
+                yield item
+            return
+
     yield _event({"type": "status", "message": "요청 분류 중..."})
     try:
-        router = await asyncio.wait_for(_resolve_tool_with_llm(user_text), timeout=20)
+        router = await asyncio.wait_for(
+            _resolve_tool_with_llm(user_text, run_id=run_id, category=category),
+            timeout=30,
+        )
     except TimeoutError:
         router = None
     except Exception:
@@ -520,7 +746,9 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
     if router is None:
         yield _event({"type": "status", "message": "문서 검색 중..."})
         try:
-            rag_answer = await asyncio.wait_for(_rag_answer(user_text), timeout=30)
+            rag_answer = await asyncio.wait_for(
+                _rag_answer(user_text, run_id=run_id, category=category), timeout=90
+            )
         except TimeoutError:
             yield _event({"type": "error", "message": "문서 검색이 지연됩니다. 다시 시도해주세요."})
             return
@@ -528,7 +756,7 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
             async for item in _emit_answer(rag_answer):
                 yield item
             return
-        answer = await _direct_chat_answer(user_text)
+        answer = await _direct_chat_answer(user_text, run_id=run_id, category=category)
         if answer:
             async for item in _emit_answer(answer):
                 yield item
@@ -541,7 +769,7 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
     tool_args = router.get("arguments", {})
 
     if action == "direct":
-        answer = await _direct_chat_answer(user_text)
+        answer = await _direct_chat_answer(user_text, run_id=run_id, category=category)
         if answer:
             async for item in _emit_answer(answer):
                 yield item
@@ -552,7 +780,9 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
     if action == "rag":
         yield _event({"type": "status", "message": "문서 검색 중..."})
         try:
-            rag_answer = await asyncio.wait_for(_rag_answer(user_text), timeout=30)
+            rag_answer = await asyncio.wait_for(
+                _rag_answer(user_text, run_id=run_id, category=category), timeout=90
+            )
         except TimeoutError:
             yield _event({"type": "error", "message": "문서 검색이 지연됩니다. 다시 시도해주세요."})
             return
@@ -571,9 +801,31 @@ async def _chat_stream(user_text: str) -> AsyncGenerator[str, None]:
         yield _event({"type": "final", "content": "도구 이름을 찾지 못했습니다."})
         return
 
+    if tool_name == "get_run_summary" and not (tool_args.get("run_id") or run_id):
+        yield _event({"type": "final", "content": "run_id를 선택하거나 입력해주세요."})
+        return
+    if tool_name == "get_artifacts" and not (tool_args.get("run_id") or run_id):
+        yield _event({"type": "final", "content": "아티팩트 조회를 위해 run_id가 필요합니다."})
+        return
+    if tool_name == "analyze_compare" and (
+        not tool_args.get("run_id_a") or not tool_args.get("run_id_b")
+    ):
+        yield _event(
+            {
+                "type": "final",
+                "content": "비교 분석에는 run_id 두 개가 필요합니다. 비교할 run을 알려주세요.",
+            }
+        )
+        return
+
     yield _event({"type": "status", "message": "도구 실행 중..."})
     try:
-        result = await asyncio.wait_for(_call_mcp_tool(tool_name, tool_args), timeout=12)
+        enhanced_tool_args = dict(tool_args)
+        if run_id:
+            enhanced_tool_args["run_id"] = run_id
+        if category:
+            enhanced_tool_args["category"] = category
+        result = await asyncio.wait_for(_call_mcp_tool(tool_name, enhanced_tool_args), timeout=12)
     except TimeoutError:
         yield _event(
             {"type": "error", "message": "응답 지연(12s 초과). MCP 서버 상태를 확인해주세요."}
@@ -615,3 +867,32 @@ async def chat_stream(request: ChatRequest):
             yield item
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+
+@router.post("/ai-stream")
+async def ai_chat_stream(request: AiChatRequest):
+    user_text = _extract_last_user_message(request.messages)
+    run_id = request.run_id
+    category = request.category
+    if not user_text:
+
+        async def error_generator():
+            yield _ai_sse_event({"type": "error", "errorText": "질문을 입력해주세요."})
+            yield _ai_sse_event({"type": "finish"})
+            yield _ai_sse_done()
+
+        return StreamingResponse(
+            error_generator(),
+            media_type="text/event-stream",
+            headers=_ai_sse_headers(),
+        )
+
+    async def event_generator():
+        async for item in _ai_chat_stream(user_text, run_id=run_id, category=category):
+            yield item
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers=_ai_sse_headers(),
+    )

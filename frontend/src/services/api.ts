@@ -352,6 +352,25 @@ export interface DebugReport {
     langfuse_trace_url?: string | null;
 }
 
+export interface OpsReportResponse {
+    run_summary: Record<string, unknown>;
+    ops_kpis: {
+        total_test_cases?: number | null;
+        pass_rate?: number | null;
+        failure_rate?: number | null;
+        stage_error_rate?: number | null;
+        stage_error_severity?: "ok" | "warning" | "critical" | string | null;
+        duration_seconds?: number | null;
+        total_tokens?: number | null;
+        total_cost_usd?: number | null;
+        avg_latency_ms?: number | null;
+        p95_latency_ms?: number | null;
+        avg_tokens_per_case?: number | null;
+        avg_cost_per_case_usd?: number | null;
+    };
+    metadata?: Record<string, unknown>;
+}
+
 export interface PromptDiffSummaryItem {
     role: string;
     base_checksum?: string | null;
@@ -830,6 +849,14 @@ export async function fetchDebugReportMarkdown(runId: string): Promise<Blob> {
         throw new Error(`Failed to fetch debug report: ${response.statusText}`);
     }
     return response.blob();
+}
+
+export async function fetchOpsReport(runId: string): Promise<OpsReportResponse> {
+    const response = await fetch(`${API_BASE_URL}/runs/${runId}/ops-report?format=json&save=false`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ops report: ${response.statusText}`);
+    }
+    return response.json();
 }
 
 export async function fetchPromptDiff(

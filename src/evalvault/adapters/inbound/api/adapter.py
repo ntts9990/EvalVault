@@ -21,6 +21,7 @@ from evalvault.adapters.outbound.analysis import (
 )
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.judge_calibration_reporter import JudgeCalibrationReporter
+from evalvault.adapters.outbound.ops.report_renderer import render_json, render_markdown
 from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
@@ -43,6 +44,7 @@ from evalvault.domain.services.analysis_service import AnalysisService
 from evalvault.domain.services.cluster_map_builder import build_cluster_map
 from evalvault.domain.services.debug_report_service import DebugReportService
 from evalvault.domain.services.judge_calibration_service import JudgeCalibrationService
+from evalvault.domain.services.ops_report_service import OpsReportService
 from evalvault.domain.services.prompt_registry import (
     PromptInput,
     build_prompt_bundle,
@@ -1328,6 +1330,42 @@ class WebUIAdapter:
             storage=self._storage,
             stage_storage=stage_storage,
         )
+
+    def generate_ops_report(
+        self,
+        run_id: str,
+        *,
+        output_format: str,
+        save: bool,
+    ) -> dict[str, Any] | str:
+        if self._storage is None:
+            raise RuntimeError("Storage not configured")
+        if not hasattr(self._storage, "list_stage_events"):
+            raise RuntimeError("Stage storage not configured")
+
+        service = OpsReportService()
+        stage_storage = cast(StageStoragePort, self._storage)
+        report = service.build_report(
+            run_id,
+            storage=self._storage,
+            stage_storage=stage_storage,
+        )
+
+        content = render_markdown(report) if output_format == "markdown" else render_json(report)
+
+        if save:
+            self._storage.save_ops_report(
+                report_id=None,
+                run_id=run_id,
+                report_type="ops_report",
+                format=output_format,
+                content=content,
+                metadata={"source": "api"},
+            )
+
+        if output_format == "markdown":
+            return content
+        return report.to_dict()
 
     def delete_run(self, run_id: str) -> bool:
         """평가 삭제.
