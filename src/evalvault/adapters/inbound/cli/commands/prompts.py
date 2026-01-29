@@ -13,7 +13,7 @@ from rich.table import Table
 
 from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
 from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities import Dataset, EvaluationRun, PromptSetBundle, TestCase
 from evalvault.domain.services.evaluator import RagasEvaluator
@@ -40,17 +40,6 @@ def _bundle_to_role_map(bundle: PromptSetBundle) -> dict[str, dict[str, str]]:
             "kind": prompt.kind,
         }
     return roles
-
-
-def _require_db_path(console: Console, db_path: Path | None) -> Path:
-    if db_path is None:
-        print_cli_error(
-            console,
-            "DB 경로가 필요합니다.",
-            fixes=["--db 옵션으로 SQLite DB 경로를 지정하세요."],
-        )
-        raise typer.Exit(1)
-    return db_path
 
 
 def _default_role(bundle: PromptSetBundle) -> str | None:
@@ -229,8 +218,7 @@ def create_prompts_app(console: Console) -> typer.Typer:
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Show prompt snapshots attached to a run."""
-        resolved_db = _require_db_path(console, db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         bundle = storage.get_prompt_set_for_run(run_id)
         if not bundle:
             console.print("[yellow]No prompt set found for this run.[/yellow]")
@@ -273,8 +261,7 @@ def create_prompts_app(console: Console) -> typer.Typer:
         ),
     ) -> None:
         """Compare prompt snapshots between two runs."""
-        resolved_db = _require_db_path(console, db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         bundle_a = storage.get_prompt_set_for_run(run_id_a)
         bundle_b = storage.get_prompt_set_for_run(run_id_b)
 
@@ -462,8 +449,7 @@ def create_prompts_app(console: Console) -> typer.Typer:
     ) -> None:
         """Suggest prompt improvements by scoring candidate prompts."""
 
-        resolved_db = _require_db_path(console, db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         try:
             run = storage.get_run(run_id)

@@ -8,7 +8,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+from evalvault.config.settings import Settings
 from evalvault.domain.services.experiment_manager import ExperimentManager
 
 from ..utils.options import db_option
@@ -48,7 +49,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
                 validate_choice(retriever_name, ["bm25", "dense", "hybrid", "graphrag"], console)
 
         console.print("\n[bold]Creating Experiment[/bold]\n")
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         metric_list = parse_csv_option(metrics)
         metric_list = metric_list or None
@@ -88,7 +89,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Add a group to an experiment."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         try:
             manager.add_group_to_experiment(experiment_id, group_name, description)
@@ -108,7 +109,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Add an evaluation run to an experiment group."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         try:
             manager.add_run_to_experiment_group(experiment_id, group_name, run_id)
@@ -132,7 +133,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
         """List experiments."""
 
         console.print("\n[bold]Experiments[/bold]\n")
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         experiments = manager.list_experiments(status=status)
         if not experiments:
@@ -172,7 +173,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
         """Compare groups inside an experiment."""
 
         console.print("\n[bold]Experiment Comparison[/bold]\n")
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         try:
             experiment = manager.get_experiment(experiment_id)
@@ -222,7 +223,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Conclude an experiment and record findings."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         try:
             manager.conclude_experiment(experiment_id, conclusion)
@@ -239,7 +240,7 @@ def register_experiment_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Show experiment summary."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         manager = ExperimentManager(storage)
         try:
             summary = manager.get_summary(experiment_id)

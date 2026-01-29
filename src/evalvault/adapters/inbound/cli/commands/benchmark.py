@@ -385,7 +385,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         """
         try:
             from evalvault.adapters.outbound.benchmark import LMEvalAdapter
-            from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+            from evalvault.adapters.outbound.storage.factory import build_storage_adapter
             from evalvault.config.settings import get_settings
             from evalvault.domain.services.benchmark_service import BenchmarkService
             from evalvault.ports.outbound.benchmark_port import BenchmarkBackend
@@ -426,7 +426,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
             ensure_phoenix_instrumentation(settings, console=console, force=True)
 
         benchmark_adapter = LMEvalAdapter(settings=settings)
-        storage_adapter = SQLiteStorageAdapter(db_path=db)
+        storage_adapter = build_storage_adapter(settings=settings, db_path=db)
         tracer_adapter = _create_tracer_adapter(phoenix)
         service = BenchmarkService(
             benchmark_adapter=benchmark_adapter,
@@ -556,9 +556,11 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         ),
     ) -> None:
         """View past benchmark runs."""
-        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+        from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+        from evalvault.config.settings import get_settings
 
-        storage = SQLiteStorageAdapter(db_path=db)
+        settings = get_settings()
+        storage = build_storage_adapter(settings=settings, db_path=db)
         runs = storage.list_benchmark_runs(
             benchmark_type=benchmark_type,
             model_name=model_name,
@@ -629,7 +631,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
           evalvault benchmark report abc123
           evalvault benchmark report abc123 -o report.md -p dev
         """
-        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+        from evalvault.adapters.outbound.storage.factory import build_storage_adapter
         from evalvault.config.settings import get_settings
         from evalvault.domain.services.benchmark_report_service import (
             BenchmarkReportService,
@@ -639,7 +641,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         if profile:
             settings.profile = profile
 
-        storage = SQLiteStorageAdapter(db_path=db)
+        storage = build_storage_adapter(settings=settings, db_path=db)
         benchmark_run = storage.get_benchmark_run(run_id)
 
         if not benchmark_run:
@@ -717,7 +719,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
           evalvault benchmark compare abc123 def456
           evalvault benchmark compare abc123 def456 -o comparison.md
         """
-        from evalvault.adapters.outbound.storage import SQLiteStorageAdapter
+        from evalvault.adapters.outbound.storage.factory import build_storage_adapter
         from evalvault.config.settings import get_settings
         from evalvault.domain.services.benchmark_report_service import (
             BenchmarkReportService,
@@ -727,7 +729,7 @@ def create_benchmark_app(console: Console) -> typer.Typer:
         if profile:
             settings.profile = profile
 
-        storage = SQLiteStorageAdapter(db_path=db)
+        storage = build_storage_adapter(settings=settings, db_path=db)
         baseline = storage.get_benchmark_run(baseline_id)
         target = storage.get_benchmark_run(target_id)
 

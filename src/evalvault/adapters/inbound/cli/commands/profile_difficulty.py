@@ -10,7 +10,7 @@ import typer
 from rich.console import Console
 
 from evalvault.adapters.outbound.filesystem.difficulty_profile_writer import DifficultyProfileWriter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
 from evalvault.domain.services.difficulty_profile_reporter import DifficultyProfileReporter
 from evalvault.domain.services.difficulty_profiling_service import (
@@ -58,7 +58,7 @@ def register_profile_difficulty_commands(
         concurrency: int | None = typer.Option(
             None, "--concurrency", help="Max concurrency when parallel is enabled.", min=1
         ),
-        db_path: Path | None = db_option(help_text="SQLite DB path."),
+        db_path: Path | None = db_option(help_text="DB path."),
     ) -> None:
         if not dataset_name and not run_id:
             print_cli_error(
@@ -75,15 +75,6 @@ def register_profile_difficulty_commands(
             )
             raise typer.Exit(1)
 
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            print_cli_error(
-                console,
-                "DB 경로가 필요합니다.",
-                fixes=["--db 옵션으로 SQLite DB 경로를 지정하세요."],
-            )
-            raise typer.Exit(1)
-
         metric_list = parse_csv_option(metrics)
         if metric_list:
             validate_choices(metric_list, available_metrics, console, value_label="metric")
@@ -94,7 +85,7 @@ def register_profile_difficulty_commands(
         resolved_output = output_path or Path("reports") / "difficulty" / f"{prefix}.json"
         resolved_artifacts_dir = artifacts_dir or resolved_output.parent / "artifacts" / prefix
 
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         writer = DifficultyProfileWriter()
         reporter = DifficultyProfileReporter(writer)
         service = DifficultyProfilingService(storage=storage, reporter=reporter)

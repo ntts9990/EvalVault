@@ -5,17 +5,22 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
 from evalvault.config.settings import get_settings
+from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
 
 router = APIRouter()
-DEFAULT_MEMORY_DB_PATH = get_settings().evalvault_memory_db_path
+_settings = get_settings()
+DEFAULT_MEMORY_DB_PATH = (
+    _settings.evalvault_memory_db_path if _settings.db_backend == "sqlite" else None
+)
 
 
-# --- Dependencies ---
-def get_memory_adapter(db_path: str = DEFAULT_MEMORY_DB_PATH) -> SQLiteDomainMemoryAdapter:
+def get_memory_adapter(db_path: str | None = DEFAULT_MEMORY_DB_PATH) -> DomainMemoryPort:
     """Get memory adapter instance."""
-    return SQLiteDomainMemoryAdapter(db_path)
+    from pathlib import Path
+
+    return build_domain_memory_adapter(db_path=Path(db_path) if db_path else None)
 
 
 # --- Pydantic Models ---

@@ -21,7 +21,7 @@ from evalvault.adapters.outbound.dataset import get_loader, load_multiturn_datas
 from evalvault.adapters.outbound.documents.versioned_loader import (
     load_versioned_chunks_from_pdf_dir,
 )
-from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
 from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
 from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.adapters.outbound.phoenix.sync_service import (
@@ -30,7 +30,7 @@ from evalvault.adapters.outbound.phoenix.sync_service import (
     PhoenixSyncService,
     build_experiment_metadata,
 )
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTracerAdapter
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings, apply_profile
@@ -57,6 +57,7 @@ from evalvault.domain.services.ragas_prompt_overrides import (
 )
 from evalvault.domain.services.retriever_context import apply_versioned_retriever_to_dataset
 from evalvault.domain.services.stage_event_builder import StageEventBuilder
+from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
 from evalvault.ports.outbound.korean_nlp_port import RetrieverPort
 
 from ..utils.analysis_io import (
@@ -111,7 +112,7 @@ def _build_dense_retriever(
     settings: Settings,
     profile_name: str | None,
 ) -> Any:
-    """Build and index a dense retriever, preferring Ollama embeddings when available."""
+    """Build and index a dense retriever, preferring OpenAI-compatible embeddings when available."""
 
     from evalvault.adapters.outbound.nlp.korean.dense_retriever import KoreanDenseRetriever
 
@@ -135,6 +136,17 @@ def _build_dense_retriever(
             dense_retriever.index(documents)
             return dense_retriever
 
+    if settings.llm_provider == "vllm":
+        from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
+
+        adapter = VLLMAdapter(settings)
+        dense_retriever = KoreanDenseRetriever(
+            model_name=settings.vllm_embedding_model,
+            ollama_adapter=adapter,
+        )
+        dense_retriever.index(documents)
+        return dense_retriever
+
     try:
         dense_retriever = KoreanDenseRetriever()
         dense_retriever.index(documents)
@@ -142,7 +154,8 @@ def _build_dense_retriever(
     except Exception as exc:
         raise RuntimeError(
             "Dense retriever initialization failed. "
-            "Use --profile dev/prod (Ollama embedding), or install/prepare a local embedding model."
+            "Use --profile dev/prod (Ollama embedding), --profile vllm (vLLM embedding), "
+            "or install/prepare a local embedding model."
         ) from exc
 
 
@@ -1729,7 +1742,7 @@ def register_run_commands(
 
         assert llm_adapter is not None
 
-        memory_adapter: SQLiteDomainMemoryAdapter | None = None
+        memory_adapter: DomainMemoryPort | None = None
         memory_evaluator: MemoryAwareEvaluator | None = None
         memory_domain_name = memory_domain or ds.metadata.get("domain") or "default"
         memory_required = domain_memory_requested
@@ -1751,8 +1764,15 @@ def register_run_commands(
                 f"Domain Memory 초기화 시작 (domain={memory_domain_name}, lang={memory_language})",
             )
             try:
-                memory_db_path = memory_db or settings.evalvault_memory_db_path
-                memory_adapter = SQLiteDomainMemoryAdapter(memory_db_path)
+                if memory_db:
+                    memory_db_path = memory_db
+                elif settings.db_backend == "sqlite":
+                    memory_db_path = settings.evalvault_memory_db_path
+                else:
+                    memory_db_path = None
+                memory_adapter = build_domain_memory_adapter(
+                    settings=settings, db_path=Path(memory_db_path) if memory_db_path else None
+                )
                 memory_evaluator = MemoryAwareEvaluator(
                     evaluator=evaluator,
                     memory_port=memory_adapter,
@@ -2161,16 +2181,9 @@ def register_run_commands(
                 stored = _write_stage_events_jsonl(stage_events, stage_event_payload)
                 console.print(f"[green]Saved {stored} stage event(s).[/green]")
             if stage_store:
-                if db_path:
-                    storage = SQLiteStorageAdapter(db_path=db_path)
-                    stored = storage.save_stage_events(stage_event_payload)
-                    console.print(f"[green]Stored {stored} stage event(s).[/green]")
-                else:
-                    print_cli_warning(
-                        console,
-                        "Stage 이벤트를 저장하려면 --db 경로가 필요합니다.",
-                        tips=["--db <sqlite_path> 옵션을 함께 지정하세요."],
-                    )
+                storage = build_storage_adapter(settings=settings, db_path=db_path)
+                stored = storage.save_stage_events(stage_event_payload)
+                console.print(f"[green]Stored {stored} stage event(s).[/green]")
 
         if effective_tracker != "none":
             phoenix_opts = None
@@ -2194,23 +2207,21 @@ def register_run_commands(
                 log_phoenix_traces_fn=log_phoenix_traces,
             )
             _log_duration(console, verbose, "Tracker 로깅 완료", tracker_started_at)
-        if db_path:
-            db_started_at = datetime.now()
-            _log_timestamp(console, verbose, f"DB 저장 시작 ({db_path})")
-            _save_to_db(
-                db_path,
-                result,
-                console,
-                storage_cls=SQLiteStorageAdapter,
-                prompt_bundle=prompt_bundle,
-                export_excel=excel_output is None,
-            )
-            _log_duration(console, verbose, "DB 저장 완료", db_started_at)
+        db_started_at = datetime.now()
+        _log_timestamp(console, verbose, "DB 저장 시작")
+        _save_to_db(
+            db_path,
+            result,
+            console,
+            prompt_bundle=prompt_bundle,
+            export_excel=excel_output is None,
+        )
+        _log_duration(console, verbose, "DB 저장 완료", db_started_at)
         if excel_output:
             excel_started_at = datetime.now()
             _log_timestamp(console, verbose, f"엑셀 저장 시작 ({excel_output})")
             try:
-                storage = SQLiteStorageAdapter(db_path=db_path)
+                storage = build_storage_adapter(settings=settings, db_path=db_path)
                 storage.export_run_to_excel(result.run_id, excel_output)
                 console.print(f"[green]Excel export saved: {excel_output}[/green]")
             except Exception as exc:
@@ -2242,7 +2253,7 @@ def register_run_commands(
                     prefix=analysis_prefix,
                 )
                 console.print("\n[bold]자동 분석 실행[/bold]")
-                storage = SQLiteStorageAdapter(db_path=db_path) if db_path else None
+                storage = build_storage_adapter(settings=settings, db_path=db_path)
                 pipeline_service = build_analysis_pipeline_service(
                     storage=storage,
                     llm_adapter=llm_adapter,

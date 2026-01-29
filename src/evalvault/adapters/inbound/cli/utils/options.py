@@ -31,11 +31,11 @@ def profile_option(
 def db_option(
     *,
     default: str | Path | None = _UNSET,
-    help_text: str = "Path to SQLite database file.",
+    help_text: str = "SQLite DB path (PostgreSQL is default when omitted).",
 ) -> Path | None:
     """Shared --db / -D option definition."""
 
-    resolved_default = Settings().evalvault_db_path if default is _UNSET else default
+    resolved_default = None if default is _UNSET else default
     normalized_default = _normalize_path(resolved_default)
     return typer.Option(
         normalized_default,
@@ -49,11 +49,17 @@ def db_option(
 def memory_db_option(
     *,
     default: str | Path | None = _UNSET,
-    help_text: str = "Path to Domain Memory SQLite database.",
+    help_text: str = "Domain Memory SQLite path (Postgres is default when omitted).",
 ) -> Path | None:
     """Shared option factory for the domain memory database path."""
 
-    resolved_default = Settings().evalvault_memory_db_path if default is _UNSET else default
+    if default is _UNSET:
+        settings = Settings()
+        resolved_default = (
+            settings.evalvault_memory_db_path if settings.db_backend == "sqlite" else None
+        )
+    else:
+        resolved_default = default
     normalized_default = _normalize_path(resolved_default)
     return typer.Option(
         normalized_default,

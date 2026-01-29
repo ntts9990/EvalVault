@@ -8,7 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from evalvault.adapters.outbound.llm import get_llm_adapter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.metrics.analysis_registry import list_analysis_metric_specs
@@ -264,9 +264,9 @@ def _intent_label(intent_value: str) -> str:
     return meta["label"] if meta else intent.value
 
 
-def _build_pipeline_service() -> tuple[AnalysisPipelineService, SQLiteStorageAdapter]:
+def _build_pipeline_service() -> tuple[AnalysisPipelineService, Any]:
     settings = get_settings()
-    storage = SQLiteStorageAdapter(db_path=settings.evalvault_db_path)
+    storage = build_storage_adapter(settings=settings)
     llm_adapter = None
     try:
         llm_adapter = get_llm_adapter(settings)

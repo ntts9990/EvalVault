@@ -20,7 +20,8 @@ from evalvault.adapters.outbound.report.ci_report_formatter import (
 from evalvault.adapters.outbound.report.pr_comment_formatter import (
     format_ci_gate_pr_comment,
 )
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+from evalvault.config.settings import Settings
 from evalvault.domain.services.regression_gate_service import (
     RegressionGateReport,
     RegressionGateService,
@@ -133,7 +134,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
         validate_choice(test, ["t-test", "mann-whitney"], console, value_label="test")
         metric_list = parse_csv_option(metrics)
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         analysis_adapter = StatisticalAnalysisAdapter()
         service = RegressionGateService(storage=storage, analysis_adapter=analysis_adapter)
 
@@ -243,7 +244,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
             value_label="format",
         )
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         analysis_adapter = StatisticalAnalysisAdapter()
         service = RegressionGateService(storage=storage, analysis_adapter=analysis_adapter)
 
@@ -414,7 +415,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
             console.print("[red]Error:[/red] Database path is not configured.")
             raise typer.Exit(1)
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         if action == "set":
             if not run_id:

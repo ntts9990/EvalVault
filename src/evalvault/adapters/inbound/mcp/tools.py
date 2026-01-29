@@ -20,12 +20,13 @@ from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis
 from evalvault.adapters.outbound.analysis.statistical_adapter import StatisticalAnalysisAdapter
 from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
 from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.services.analysis_service import AnalysisService
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.inbound.web_port import EvalRequest, RunFilters, RunSummary
+from evalvault.ports.outbound.storage_port import StoragePort
 
 from .schemas import (
     AnalyzeCompareRequest,
@@ -82,7 +83,7 @@ def list_runs(payload: dict[str, Any] | ListRunsRequest) -> ListRunsResponse:
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)]
         )
 
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     adapter = WebUIAdapter(storage=storage, settings=Settings())
 
     filters = RunFilters(
@@ -123,7 +124,7 @@ def get_run_summary(payload: dict[str, Any] | GetRunSummaryRequest) -> GetRunSum
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)]
         )
 
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     try:
         run = storage.get_run(request.run_id)
     except KeyError as exc:
@@ -175,7 +176,7 @@ def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluat
             errors=[_error("EVAL_LLM_INIT_FAILED", str(exc), stage=ErrorStage.evaluate)],
         )
 
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     llm_factory = SettingsLLMFactory(settings)
     korean_toolkit = try_create_korean_toolkit()
     evaluator = RagasEvaluator(korean_toolkit=korean_toolkit, llm_factory=llm_factory)
@@ -266,7 +267,7 @@ def analyze_compare(payload: dict[str, Any] | AnalyzeCompareRequest) -> AnalyzeC
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)],
         )
 
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     try:
         run_a = storage.get_run(request.run_id_a)
         run_b = storage.get_run(request.run_id_b)
@@ -503,9 +504,11 @@ def _serialize_run_summary(summary: RunSummary) -> RunSummaryPayload:
     return RunSummaryPayload.model_validate(payload)
 
 
-def _resolve_db_path(db_path: Path | None) -> Path:
+def _resolve_db_path(db_path: Path | None) -> Path | None:
+    settings = Settings()
     if db_path is None:
-        settings = Settings()
+        if getattr(settings, "db_backend", "postgres") != "sqlite":
+            return None
         db_path = Path(settings.evalvault_db_path)
     resolved = db_path.expanduser().resolve()
     _ensure_allowed_path(resolved)
@@ -547,7 +550,7 @@ def _run_auto_analysis(
     *,
     run_id: str,
     run: Any,
-    storage: SQLiteStorageAdapter,
+    storage: StoragePort,
     llm_adapter: Any,
     analysis_output: Path | None,
     analysis_report: Path | None,

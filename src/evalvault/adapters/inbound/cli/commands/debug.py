@@ -9,7 +9,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from evalvault.adapters.outbound.debug.report_renderer import render_json, render_markdown
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+from evalvault.config.settings import Settings
 from evalvault.domain.services.debug_report_service import DebugReportService
 
 from ..utils.options import db_option
@@ -42,7 +43,7 @@ def create_debug_app(console: Console) -> typer.Typer:
 
         validate_choice(format, ["markdown", "json"], console, value_label="format")
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         service = DebugReportService()
 
         try:

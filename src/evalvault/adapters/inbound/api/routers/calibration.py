@@ -113,6 +113,15 @@ def run_judge_calibration(
     return JudgeCalibrationResponse.model_validate(payload)
 
 
+@router.get("/judge/history", response_model=list[JudgeCalibrationHistoryItem])
+def list_calibrations(
+    adapter: AdapterDep,
+    limit: int = Query(20, ge=1, le=200),
+) -> list[JudgeCalibrationHistoryItem]:
+    entries = adapter.list_judge_calibrations(limit=limit)
+    return [JudgeCalibrationHistoryItem.model_validate(entry) for entry in entries]
+
+
 @router.get("/judge/{calibration_id}", response_model=JudgeCalibrationResponse)
 def get_calibration_result(calibration_id: str, adapter: AdapterDep) -> JudgeCalibrationResponse:
     try:
@@ -122,12 +131,3 @@ def get_calibration_result(calibration_id: str, adapter: AdapterDep) -> JudgeCal
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return JudgeCalibrationResponse.model_validate(payload)
-
-
-@router.get("/judge/history", response_model=list[JudgeCalibrationHistoryItem])
-def list_calibrations(
-    adapter: AdapterDep,
-    limit: int = Query(20, ge=1, le=200),
-) -> list[JudgeCalibrationHistoryItem]:
-    entries = adapter.list_judge_calibrations(limit=limit)
-    return [JudgeCalibrationHistoryItem.model_validate(entry) for entry in entries]

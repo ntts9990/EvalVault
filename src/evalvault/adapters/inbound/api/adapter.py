@@ -127,14 +127,15 @@ class WebUIAdapter:
             llm_adapter: LLM 어댑터 (선택적)
             data_loader: 데이터 로더 (선택적)
         """
-        resolved_settings = settings
+        resolved_settings = settings or Settings()
         if storage is None:
-            resolved_settings = settings or Settings()
-            db_path = getattr(resolved_settings, "evalvault_db_path", None)
-            if db_path:
-                from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+            from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 
-                storage = SQLiteStorageAdapter(db_path=db_path)
+            try:
+                storage = build_storage_adapter(settings=resolved_settings)
+            except Exception as exc:
+                logger.warning("Storage initialization failed: %s", exc)
+                storage = None
 
         self._storage = storage
         self._evaluator = evaluator
@@ -450,7 +451,12 @@ class WebUIAdapter:
         memory_domain = memory_config.get("domain") or dataset.metadata.get("domain") or "default"
         memory_language = memory_config.get("language") or "ko"
         memory_augment = bool(memory_config.get("augment_context"))
-        memory_db_path = memory_config.get("db_path") or settings.evalvault_memory_db_path
+        if memory_config.get("db_path"):
+            memory_db_path = memory_config.get("db_path")
+        elif settings.db_backend == "sqlite":
+            memory_db_path = settings.evalvault_memory_db_path
+        else:
+            memory_db_path = None
         memory_evaluator = None
         requested_thresholds = request.thresholds or {}
         if request.threshold_profile or requested_thresholds:
@@ -472,16 +478,17 @@ class WebUIAdapter:
         memory_active = False
         if memory_enabled:
             try:
-                from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
-                    SQLiteDomainMemoryAdapter,
-                )
+                from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
                 from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import (
                     PhoenixTracerAdapter,
                 )
                 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 
                 tracer = PhoenixTracerAdapter() if tracker_provider == "phoenix" else None
-                memory_adapter = SQLiteDomainMemoryAdapter(memory_db_path)
+                memory_adapter = build_domain_memory_adapter(
+                    settings=self._settings,
+                    db_path=Path(memory_db_path) if memory_db_path else None,
+                )
                 memory_evaluator = MemoryAwareEvaluator(
                     evaluator=self._evaluator,
                     memory_port=memory_adapter,
@@ -814,6 +821,7 @@ class WebUIAdapter:
     def list_runs(
         self,
         limit: int = 50,
+        offset: int = 0,
         filters: RunFilters | None = None,
     ) -> list[RunSummary]:
         """평가 목록 조회.
@@ -833,7 +841,7 @@ class WebUIAdapter:
 
         try:
             # 저장소에서 평가 목록 조회
-            runs = self._storage.list_runs(limit=limit)
+            runs = self._storage.list_runs(limit=limit, offset=offset)
 
             # RunSummary로 변환
             summaries = []
@@ -1029,7 +1037,11 @@ class WebUIAdapter:
         run = self.get_run_details(run_id)
         feedbacks = storage.list_feedback(run_id)
         if labels_source in {"feedback", "hybrid"} and not feedbacks:
-            raise ValueError("Feedback labels are required for this labels_source")
+            raise ValueError(
+                f"No feedback labels found for run '{run_id}'. "
+                f"Calibration with labels_source='{labels_source}' requires at least one feedback label. "
+                "Please add feedback labels via the UI or API, or use labels_source='gold' if gold labels are available."
+            )
         resolved_metrics = metrics or list(run.metrics_evaluated)
         if not resolved_metrics:
             raise ValueError("No metrics available for calibration")
@@ -2198,16 +2210,15 @@ def create_adapter() -> WebUIAdapter:
     """
     from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
     from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
-    from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+    from evalvault.adapters.outbound.storage.factory import build_storage_adapter
     from evalvault.config.settings import get_settings
     from evalvault.domain.services.evaluator import RagasEvaluator
 
     # 설정 로드
     settings = get_settings()
 
-    # Storage 생성 (기본 SQLite)
-    db_path = Path(settings.evalvault_db_path)
-    storage = SQLiteStorageAdapter(db_path=db_path)
+    # Storage 생성
+    storage = build_storage_adapter(settings=settings)
 
     # LLM adapter 생성 (API 키 없으면 None)
     llm_adapter = None

@@ -11,9 +11,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from evalvault.adapters.outbound.domain_memory.sqlite_adapter import (
-    SQLiteDomainMemoryAdapter,
-)
+from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
 from evalvault.config.domain_config import (
     generate_domain_template,
     list_domains,
@@ -23,6 +21,7 @@ from evalvault.config.domain_config import (
 from evalvault.domain.entities.memory import FactType
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.domain.services.embedding_overlay import build_cluster_facts
+from evalvault.ports.outbound.domain_memory_port import DomainMemoryPort
 
 from ..utils.options import memory_db_option
 from ..utils.validators import parse_csv_option, validate_choices
@@ -117,8 +116,8 @@ def create_domain_app(console: Console) -> typer.Typer:
     memory_app = typer.Typer(name="memory", help="Domain memory utilities.")
     domain_app.add_typer(memory_app, name="memory")
 
-    def _load_memory_adapter(db_path: Path) -> SQLiteDomainMemoryAdapter:
-        return SQLiteDomainMemoryAdapter(db_path)
+    def _load_memory_adapter(db_path: Path | None) -> DomainMemoryPort:
+        return build_domain_memory_adapter(db_path=db_path)
 
     def _truncate(text: str, max_length: int = 40) -> str:
         if len(text) <= max_length:
@@ -160,7 +159,7 @@ def create_domain_app(console: Console) -> typer.Typer:
             "-d",
             help="Filter by domain (leave empty for global stats).",
         ),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """Show aggregated domain memory statistics."""
 
@@ -175,8 +174,9 @@ def create_domain_app(console: Console) -> typer.Typer:
         table.add_row("Behaviors", str(stats.get("behaviors", 0)))
         table.add_row("Contexts", str(stats.get("contexts", 0)))
         console.print(table)
+        database_label = "postgres (default)" if memory_db is None else str(memory_db)
         console.print(
-            f"[dim]Database:[/dim] {memory_db}  |  [dim]Domain:[/dim] {domain or 'all'}\n"
+            f"[dim]Database:[/dim] {database_label}  |  [dim]Domain:[/dim] {domain or 'all'}\n"
         )
 
     @memory_app.command("ingest-embeddings")
@@ -212,7 +212,7 @@ def create_domain_app(console: Console) -> typer.Typer:
         dry_run: bool = typer.Option(
             False, "--dry-run", help="Print summary without writing to the database."
         ),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """Convert Phoenix embedding exports into Domain Memory facts."""
 
@@ -292,7 +292,7 @@ def create_domain_app(console: Console) -> typer.Typer:
             "--min-score",
             help="최소 검증 점수 필터 (0.0~1.0).",
         ),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """Search factual facts stored in domain memory."""
 
@@ -350,7 +350,7 @@ def create_domain_app(console: Console) -> typer.Typer:
             "--min-success",
             help="최소 성공률 필터 (0.0~1.0).",
         ),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """List reusable behaviors from domain memory."""
 
@@ -401,7 +401,7 @@ def create_domain_app(console: Console) -> typer.Typer:
         domain: str = typer.Option("insurance", "--domain", "-d", help="도메인 이름."),
         language: str = typer.Option("ko", "--language", "-l", help="언어 코드."),
         limit: int = typer.Option(5, "--limit", "-n", help="최대 결과 수."),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """Display experiential learning entries stored in memory."""
 
@@ -444,7 +444,7 @@ def create_domain_app(console: Console) -> typer.Typer:
             "-y",
             help="확인 프롬프트를 건너뜁니다.",
         ),
-        memory_db: Path = memory_db_option(),
+        memory_db: Path | None = memory_db_option(),
     ) -> None:
         """Run consolidation/cleanup on stored memories."""
 

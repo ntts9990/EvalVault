@@ -26,7 +26,8 @@ from evalvault.adapters.outbound.analysis.pipeline_helpers import to_serializabl
 from evalvault.adapters.outbound.cache import MemoryCacheAdapter
 from evalvault.adapters.outbound.llm import get_llm_adapter
 from evalvault.adapters.outbound.report import DashboardGenerator, MarkdownReportAdapter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+from evalvault.adapters.outbound.storage.postgres_adapter import PostgreSQLStorageAdapter
 from evalvault.config.phoenix_support import get_phoenix_trace_url
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities import EvaluationRun
@@ -115,11 +116,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """평가 실행 결과를 분석하고 통계 인사이트를 표시합니다."""
 
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            _console.print("[red]오류: DB 경로가 설정되지 않았습니다.[/red]")
-            raise typer.Exit(1)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         try:
             run = storage.get_run(run_id)
@@ -217,7 +214,12 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                 _save_analysis_payload(bundle.causal, "causal")
             if improvement_report is not None:
                 _save_analysis_payload(improvement_report, "playbook")
-            _console.print(f"\n[green]분석 결과 DB 저장: {resolved_db_path}[/green]")
+            storage_label = (
+                "PostgreSQL"
+                if isinstance(storage, PostgreSQLStorageAdapter)
+                else f"SQLite ({db_path})"
+            )
+            _console.print(f"\n[green]분석 결과 DB 저장: {storage_label}[/green]")
 
         if dashboard:
             dashboard_gen = DashboardGenerator()
@@ -359,11 +361,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """두 실행을 통계적으로 비교합니다."""
 
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            _console.print("[red]오류: DB 경로가 설정되지 않았습니다.[/red]")
-            raise typer.Exit(1)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         try:
             run_a = storage.get_run(run_id1)

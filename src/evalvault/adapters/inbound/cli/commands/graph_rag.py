@@ -17,7 +17,7 @@ from evalvault.adapters.outbound.dataset import get_loader
 from evalvault.adapters.outbound.llm import SettingsLLMFactory, get_llm_adapter
 from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_korean_toolkit
 from evalvault.adapters.outbound.retriever.graph_rag_adapter import GraphRAGAdapter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.analysis_service import AnalysisService
 from evalvault.domain.services.evaluator import RagasEvaluator
@@ -185,7 +185,7 @@ def create_graph_rag_app(console: Console) -> typer.Typer:
         console.print(f"[green]Saved GraphRAG artifacts:[/green] {artifacts_path}")
 
         if db_path is not None:
-            storage = SQLiteStorageAdapter(db_path=db_path)
+            storage = build_storage_adapter(settings=Settings(), db_path=db_path)
             storage.save_run(result.baseline_run)
             storage.save_run(result.graph_run)
             console.print(f"[green]Saved baseline run:[/green] {result.baseline_run.run_id}")

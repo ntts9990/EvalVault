@@ -12,7 +12,7 @@ from evalvault.adapters.inbound.cli.utils.console import print_cli_error, progre
 from evalvault.adapters.inbound.cli.utils.options import db_option
 from evalvault.adapters.inbound.cli.utils.validators import parse_csv_option, validate_choice
 from evalvault.adapters.outbound.judge_calibration_reporter import JudgeCalibrationReporter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
 from evalvault.domain.services.judge_calibration_service import JudgeCalibrationService
 
@@ -75,11 +75,6 @@ def register_calibrate_judge_commands(app: typer.Typer, console: Console) -> Non
         concurrency: int = typer.Option(8, "--concurrency", help="동시성 수준"),
         db_path: Path | None = db_option(help_text="DB 경로"),
     ) -> None:
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            print_cli_error(_console, "DB 경로가 설정되지 않았습니다.")
-            raise typer.Exit(1)
-
         labels_source = labels_source.strip().lower()
         method = method.strip().lower()
         validate_choice(labels_source, _ALLOWED_LABELS, _console, value_label="labels-source")
@@ -96,7 +91,7 @@ def register_calibrate_judge_commands(app: typer.Typer, console: Console) -> Non
             print_cli_error(_console, "--concurrency 값은 1 이상이어야 합니다.")
             raise typer.Exit(1)
 
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         try:
             run = storage.get_run(run_id)
         except KeyError:

@@ -12,7 +12,7 @@ from evalvault.adapters.outbound.analysis.comparison_pipeline_adapter import (
 )
 from evalvault.adapters.outbound.analysis.pipeline_factory import build_analysis_pipeline_service
 from evalvault.adapters.outbound.analysis.statistical_adapter import StatisticalAnalysisAdapter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.run_comparison_service import (
     RunComparisonError,
@@ -91,15 +91,10 @@ def register_compare_commands(app: typer.Typer, console: Console) -> None:
         validate_choice(test, ["t-test", "mann-whitney"], console, value_label="test")
         validate_choice(output_format, ["table", "json"], console, value_label="format")
 
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            print_cli_error(console, "DB 경로가 설정되지 않았습니다.")
-            raise typer.Exit(1)
-
         metric_list = parse_csv_option(metrics)
         metric_list = metric_list or None
 
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         analysis_adapter = StatisticalAnalysisAdapter()
 
         settings = Settings()

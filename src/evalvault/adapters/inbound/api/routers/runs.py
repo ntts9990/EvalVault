@@ -21,7 +21,7 @@ from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_xlsx,
 )
 from evalvault.adapters.outbound.debug.report_renderer import render_markdown
-from evalvault.adapters.outbound.domain_memory.sqlite_adapter import SQLiteDomainMemoryAdapter
+from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
 from evalvault.adapters.outbound.report import DashboardGenerator
 from evalvault.config.settings import get_settings
 from evalvault.domain.entities import (
@@ -64,6 +64,7 @@ class RunSummaryResponse(BaseModel):
     phoenix_precision: float | None = None
     phoenix_drift: float | None = None
     phoenix_experiment_url: str | None = None
+    feedback_count: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -908,11 +909,20 @@ async def start_evaluation_endpoint(
                 )
 
                 try:
+                    from pathlib import Path
+
                     settings = get_settings()
-                    memory_db = memory_config.get("db_path") or settings.evalvault_memory_db_path
+                    if memory_config.get("db_path"):
+                        memory_db = memory_config.get("db_path")
+                    elif settings.db_backend == "sqlite":
+                        memory_db = settings.evalvault_memory_db_path
+                    else:
+                        memory_db = None
                     domain = memory_config.get("domain") or "default"
                     language = memory_config.get("language") or "ko"
-                    memory_adapter = SQLiteDomainMemoryAdapter(memory_db)
+                    memory_adapter = build_domain_memory_adapter(
+                        settings=settings, db_path=Path(memory_db) if memory_db else None
+                    )
                     hook = DomainLearningHook(memory_adapter)
                     await hook.on_evaluation_complete(
                         evaluation_run=result,
@@ -944,14 +954,22 @@ async def start_evaluation_endpoint(
 def list_runs(
     adapter: AdapterDep,
     limit: int = 50,
+    offset: int = Query(0, ge=0, description="Pagination offset"),
     dataset_name: str | None = Query(None, description="Filter by dataset name"),
     model_name: str | None = Query(None, description="Filter by model name"),
+    include_feedback: bool = Query(False, description="Include feedback count"),
 ) -> list[Any]:
     """List evaluation runs."""
     from evalvault.ports.inbound.web_port import RunFilters
 
     filters = RunFilters(dataset_name=dataset_name, model_name=model_name)
-    summaries = adapter.list_runs(limit=limit, filters=filters)
+    summaries = adapter.list_runs(limit=limit, offset=offset, filters=filters)
+    feedback_counts: dict[str, int] = {}
+    if include_feedback:
+        feedback_counts = {
+            summary.run_id: adapter.get_feedback_summary(summary.run_id).total_feedback
+            for summary in summaries
+        }
 
     # Convert RunSummary dataclass to dict/Pydantic compatible format
     # The adapter returns RunSummary objects which matches our response model mostly
@@ -975,6 +993,7 @@ def list_runs(
             "phoenix_precision": s.phoenix_precision,
             "phoenix_drift": s.phoenix_drift,
             "phoenix_experiment_url": s.phoenix_experiment_url,
+            "feedback_count": feedback_counts.get(s.run_id) if include_feedback else None,
         }
         for s in summaries
     ]

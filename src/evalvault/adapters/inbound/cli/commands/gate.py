@@ -9,8 +9,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.phoenix_support import get_phoenix_trace_url
+from evalvault.config.settings import Settings
 
 from ..utils.formatters import format_diff, format_score, format_status
 from ..utils.options import db_option
@@ -50,7 +51,7 @@ def register_gate_commands(app: typer.Typer, console: Console) -> None:
     ) -> None:
         """Quality gate check for CI/CD pipelines."""
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         try:
             run = storage.get_run(run_id)

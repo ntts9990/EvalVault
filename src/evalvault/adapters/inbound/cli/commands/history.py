@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
 from evalvault.config.settings import Settings
 
@@ -88,11 +87,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
                     "[red]Error:[/red] --mode must be one of: " + ", ".join(RUN_MODE_CHOICES)
                 )
                 raise typer.Exit(2)
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            console.print("[red]Error:[/red] Database path is not configured.")
-            raise typer.Exit(1)
-        storage = SQLiteStorageAdapter(db_path=cast(Path, resolved_db_path))
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         runs = storage.list_runs(limit=limit, dataset_name=dataset, model_name=model)
         if normalized_mode:
             runs = [
@@ -199,11 +194,7 @@ def register_history_commands(app: typer.Typer, console: Console) -> None:
         """
         console.print(f"\n[bold]Exporting Run {run_id}[/bold]\n")
 
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            console.print("[red]Error:[/red] Database path is not configured.")
-            raise typer.Exit(1)
-        storage = SQLiteStorageAdapter(db_path=cast(Path, resolved_db_path))
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
 
         try:
             run = storage.get_run(run_id)

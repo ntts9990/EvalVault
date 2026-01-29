@@ -11,7 +11,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 from evalvault.config.settings import Settings
 
@@ -64,7 +64,7 @@ def register_pipeline_commands(app: typer.Typer, console) -> None:
             console.print("[red]Error: Database path is not configured.[/red]")
             raise typer.Exit(1)
 
-        storage = SQLiteStorageAdapter(db_path=db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         llm_adapter = None
         try:
             llm_adapter = get_llm_adapter(settings)

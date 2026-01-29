@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from evalvault.adapters.outbound.filesystem.ops_snapshot_writer import OpsSnapshotWriter
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.services.ops_snapshot_service import (
     OpsSnapshotRequest,
@@ -57,7 +57,7 @@ def create_ops_app(console: Console) -> typer.Typer:
             settings = apply_profile(settings, resolved_profile)
 
         resolved_db_path = _resolve_storage_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         writer = OpsSnapshotWriter()
         service = OpsSnapshotService(
             storage=storage,

@@ -18,7 +18,7 @@ class EvalRequest:
 
     dataset_path: str
     metrics: list[str]
-    model_name: str = "ollama/gpt-oss-safeguard:20b"
+    model_name: str = "ollama/qwen3:14b"
     evaluation_task: str = "qa"
     langfuse_enabled: bool = False
     thresholds: dict[str, float] = field(default_factory=dict)
@@ -121,12 +121,14 @@ class WebUIPort(Protocol):
     def list_runs(
         self,
         limit: int = 50,
+        offset: int = 0,
         filters: RunFilters | None = None,
     ) -> list[RunSummary]:
         """평가 목록 조회.
 
         Args:
             limit: 최대 조회 개수
+            offset: 조회 시작 위치
             filters: 필터 조건
 
         Returns:

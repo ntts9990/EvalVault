@@ -18,7 +18,8 @@ from rich.table import Table
 from evalvault.adapters.outbound.dataset import StreamingConfig, StreamingDatasetLoader
 from evalvault.adapters.outbound.dataset.thresholds import extract_thresholds_from_rows
 from evalvault.adapters.outbound.kg.networkx_adapter import NetworkXKnowledgeGraph
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
+from evalvault.adapters.outbound.storage.postgres_adapter import PostgreSQLStorageAdapter
 from evalvault.config.phoenix_support import (
     get_phoenix_trace_url,
     instrumentation_span,
@@ -454,18 +455,21 @@ def _log_to_tracker(
 
 
 def _save_to_db(
-    db_path: Path,
+    db_path: Path | None,
     result,
     console: Console,
     *,
-    storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
     prompt_bundle: PromptSetBundle | None = None,
     export_excel: bool = True,
 ) -> None:
-    """Persist evaluation run (and optional prompt set) to SQLite database."""
-    with console.status(f"[bold green]Saving to database {db_path}..."):
+    """Persist evaluation run (and optional prompt set) to database."""
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+    storage_label = (
+        "PostgreSQL" if isinstance(storage, PostgreSQLStorageAdapter) else f"SQLite ({db_path})"
+    )
+    export_base = db_path.parent if db_path else Path("data/exports")
+    with console.status(f"[bold green]Saving to database {storage_label}..."):
         try:
-            storage = storage_cls(db_path=db_path)
             if prompt_bundle:
                 storage.save_prompt_set(prompt_bundle)
             storage.save_run(result)
@@ -475,7 +479,8 @@ def _save_to_db(
                     prompt_bundle.prompt_set.prompt_set_id,
                 )
             if export_excel:
-                excel_path = db_path.parent / f"evalvault_run_{result.run_id}.xlsx"
+                export_base.mkdir(parents=True, exist_ok=True)
+                excel_path = export_base / f"evalvault_run_{result.run_id}.xlsx"
                 try:
                     storage.export_run_to_excel(result.run_id, excel_path)
                     console.print(f"[green]Excel export saved: {excel_path}[/green]")
@@ -485,7 +490,7 @@ def _save_to_db(
                         "엑셀 내보내기에 실패했습니다.",
                         tips=[str(exc)],
                     )
-            console.print(f"[green]Results saved to database: {db_path}[/green]")
+            console.print(f"[green]Results saved to database: {storage_label}[/green]")
             console.print(f"[dim]Run ID: {result.run_id}[/dim]")
             if prompt_bundle:
                 console.print(
@@ -502,21 +507,24 @@ def _save_to_db(
 
 
 def _save_multiturn_to_db(
-    db_path: Path,
+    db_path: Path | None,
     run_record: MultiTurnRunRecord,
     conversations: list[MultiTurnConversationRecord],
     turn_results: list[MultiTurnTurnResult],
     console: Console,
     *,
-    storage_cls: type[SQLiteStorageAdapter] = SQLiteStorageAdapter,
     export_excel: bool = True,
     excel_output_path: Path | None = None,
     metric_thresholds: dict[str, float] | None = None,
 ) -> None:
-    """Persist multiturn evaluation run to SQLite database."""
-    with console.status(f"[bold green]Saving multiturn run to {db_path}..."):
+    """Persist multiturn evaluation run to database."""
+    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+    storage_label = (
+        "PostgreSQL" if isinstance(storage, PostgreSQLStorageAdapter) else f"SQLite ({db_path})"
+    )
+    export_base = db_path.parent if db_path else Path("data/exports")
+    with console.status(f"[bold green]Saving multiturn run to {storage_label}..."):
         try:
-            storage = storage_cls(db_path=db_path)
             storage.save_multiturn_run(
                 run_record,
                 conversations,
@@ -524,8 +532,9 @@ def _save_multiturn_to_db(
                 metric_thresholds=metric_thresholds,
             )
             if export_excel:
+                export_base.mkdir(parents=True, exist_ok=True)
                 excel_path = excel_output_path or (
-                    db_path.parent / f"evalvault_multiturn_{run_record.run_id}.xlsx"
+                    export_base / f"evalvault_multiturn_{run_record.run_id}.xlsx"
                 )
                 try:
                     storage.export_multiturn_run_to_excel(run_record.run_id, excel_path)
@@ -536,7 +545,7 @@ def _save_multiturn_to_db(
                         "멀티턴 엑셀 내보내기에 실패했습니다.",
                         tips=[str(exc)],
                     )
-            console.print(f"[green]Multiturn results saved to database: {db_path}[/green]")
+            console.print(f"[green]Multiturn results saved to database: {storage_label}[/green]")
             console.print(f"[dim]Run ID: {run_record.run_id}[/dim]")
         except Exception as exc:  # pragma: no cover - persistence errors
             print_cli_error(

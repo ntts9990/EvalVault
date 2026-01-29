@@ -16,7 +16,7 @@ from rich.table import Table
 from evalvault.adapters.outbound.improvement.stage_metric_playbook_loader import (
     StageMetricPlaybookLoader,
 )
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
 from evalvault.domain.entities.stage import REQUIRED_STAGE_TYPES, StageEvent, StageMetric
 from evalvault.domain.services.stage_metric_guide_service import StageMetricGuideService
@@ -26,13 +26,6 @@ from evalvault.domain.services.stage_summary_service import StageSummaryService
 from ..utils.options import db_option
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_db_path(db_path: Path | None) -> Path:
-    resolved = db_path or Settings().evalvault_db_path
-    if resolved is None:
-        raise typer.BadParameter("Database path is not configured.")
-    return resolved
 
 
 @dataclass
@@ -122,8 +115,7 @@ def create_stage_app(console: Console) -> typer.Typer:
             console.print("[yellow]No valid stage events found in the input file.[/yellow]")
             raise typer.Exit(1)
 
-        resolved_db_path = _resolve_db_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         stored = storage.save_stage_events(events)
 
         console.print(f"[green]Stored {stored} stage event(s).[/green]")
@@ -147,8 +139,7 @@ def create_stage_app(console: Console) -> typer.Typer:
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """List stage events for a run."""
-        resolved_db_path = _resolve_db_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         events = storage.list_stage_events(run_id, stage_type=stage_type)
 
         if not events:
@@ -184,8 +175,7 @@ def create_stage_app(console: Console) -> typer.Typer:
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Show summary stats for stage events."""
-        resolved_db_path = _resolve_db_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -218,8 +208,7 @@ def create_stage_app(console: Console) -> typer.Typer:
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Compute stage metrics from stored events."""
-        resolved_db_path = _resolve_db_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -276,8 +265,7 @@ def create_stage_app(console: Console) -> typer.Typer:
         db_path: Path | None = db_option(help_text="Path to database file."),
     ) -> None:
         """Report stage summary, metrics, and improvement guides."""
-        resolved_db_path = _resolve_db_path(db_path)
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         events = storage.list_stage_events(run_id)
         if not events:
             console.print("[yellow]No stage events found.[/yellow]")
@@ -545,13 +533,6 @@ def _load_default_profile() -> str | None:
         return Settings().evalvault_profile
     except Exception:
         return None
-
-
-def _resolve_db_path(db_path: Path | None) -> Path:
-    resolved = db_path or Settings().evalvault_db_path
-    if resolved is None:
-        raise typer.BadParameter("Database path is not configured.")
-    return resolved
 
 
 def _print_stage_summary(console: Console, summary_data) -> None:

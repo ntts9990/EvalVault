@@ -20,7 +20,8 @@ class DomainLearningHook:
     Formation dynamics를 구현합니다.
 
     사용 예시:
-        memory_adapter = SQLiteDomainMemoryAdapter()
+        from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
+        memory_adapter = build_domain_memory_adapter()
         hook = DomainLearningHook(memory_adapter)
 
         # 평가 후 메모리 형성

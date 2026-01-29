@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
 from evalvault.domain.services.satisfaction_calibration_service import (
     SatisfactionCalibrationService,
@@ -36,12 +36,7 @@ def register_calibrate_commands(app: typer.Typer, console: Console) -> None:
         ),
         db_path: Path | None = db_option(help_text="DB 경로"),
     ) -> None:
-        resolved_db_path = db_path or Settings().evalvault_db_path
-        if resolved_db_path is None:
-            _console.print("[red]오류: DB 경로가 설정되지 않았습니다.[/red]")
-            raise typer.Exit(1)
-
-        storage = SQLiteStorageAdapter(db_path=resolved_db_path)
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
         try:
             run = storage.get_run(run_id)
         except KeyError:
