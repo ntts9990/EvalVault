@@ -16,6 +16,7 @@ EvalVault를 외부망 없이 운영하기 위한 **오프라인 Docker 패키�
 - `frontend/Dockerfile`: Web UI 정적 서빙 이미지
 - `frontend/nginx.conf`: `/api/*` 프록시 + SPA 라우팅
 - `scripts/offline/*.sh`: 이미지 export/import/smoke-test
+ - `.env.offline.example`: 오프라인 빌드용 베이스 이미지 고정
 
 ## 1) 환경 파일 준비
 
@@ -93,8 +94,22 @@ chmod +x scripts/offline/*.sh
 ./scripts/offline/export_images.sh
 ```
 
-- 산출물: `dist/evalvault_offline.tar`
-- 체크섬: `dist/evalvault_offline.tar.sha256`
+- 산출물: `dist/evalvault_offline_<timestamp>.tar`
+- 체크섬: `dist/evalvault_offline_<timestamp>.tar.sha256`
+
+파일명을 고정하려면 `OUTPUT_TAR`를 지정하세요.
+
+```bash
+OUTPUT_TAR=dist/evalvault_offline_legacy.tar ./scripts/offline/export_images.sh
+```
+
+이미지 태그를 고정하려면 `.env.offline` 또는 환경 변수로 다음을 지정합니다.
+
+- `EVALVAULT_PYTHON_IMAGE`
+- `EVALVAULT_UV_IMAGE`
+- `EVALVAULT_NODE_IMAGE`
+- `EVALVAULT_NGINX_IMAGE`
+- `POSTGRES_IMAGE` (옵션)
 
 Postgres 이미지를 함께 포함하려면:
 
@@ -113,6 +128,8 @@ INCLUDE_POSTGRES=1 ./scripts/offline/export_images.sh
 ```bash
 docker compose --env-file .env.offline -f docker-compose.offline.yml up -d
 ```
+
+주의: 폐쇄망에서는 외부 레지스트리 접근이 불가하므로, 반드시 `import_images.sh`로 이미지를 로드한 뒤 실행해야 합니다.
 
 - API: `http://localhost:8000`
 - Web UI: `http://localhost:8080`
