@@ -17,8 +17,9 @@
 services:
   # PostgreSQL database for evaluation storage
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16.4-alpine}
     container_name: evalvault-postgres
+    pull_policy: never
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-evalvault}
@@ -40,8 +41,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${EVALVAULT_PYTHON_IMAGE:-python:3.12.6-slim}
+        UV_IMAGE: ${EVALVAULT_UV_IMAGE:-ghcr.io/astral-sh/uv:0.4.28}
     container_name: evalvault-api
     restart: unless-stopped
+    pull_policy: never
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,8 +101,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NODE_IMAGE: ${EVALVAULT_NODE_IMAGE:-node:20.19-alpine}
+        NGINX_IMAGE: ${EVALVAULT_NGINX_IMAGE:-nginx:1.27.3-alpine}
     container_name: evalvault-web
     restart: unless-stopped
+    pull_policy: never
     depends_on:
       evalvault-api:
         condition: service_healthy

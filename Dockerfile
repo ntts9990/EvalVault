@@ -1,11 +1,16 @@
 # EvalVault Dockerfile
 # Multi-stage build for optimized production image
 
+# Stage 0: uv binary
+ARG PYTHON_IMAGE=python:3.12.6-slim
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.4.28
+FROM ${UV_IMAGE} AS uv
+
 # Stage 1: Build stage
-FROM python:3.12-slim AS builder
+FROM ${PYTHON_IMAGE} AS builder
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv /uv /usr/local/bin/uv
 
 # Set working directory
 WORKDIR /app
@@ -25,7 +30,8 @@ RUN uv sync --frozen --no-dev
 
 
 # Stage 2: Runtime stage
-FROM python:3.12-slim AS runtime
+ARG PYTHON_IMAGE=python:3.12.6-slim
+FROM ${PYTHON_IMAGE} AS runtime
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash evalvault
