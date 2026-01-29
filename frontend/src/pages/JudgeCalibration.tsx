@@ -44,6 +44,8 @@ const METHOD_OPTIONS = [
     { value: "none", label: "None" },
 ];
 
+const RUN_PAGE_SIZE = 50;
+
 interface CalibrationBin {
     prob: number;
     trueProb: number;
@@ -122,6 +124,8 @@ export function JudgeCalibration() {
     const [result, setResult] = useState<JudgeCalibrationResponse | null>(null);
     const [selectedMetricKey, setSelectedMetricKey] = useState<string>("");
     const [loading, setLoading] = useState(true);
+    const [loadingMoreRuns, setLoadingMoreRuns] = useState(false);
+    const [hasMoreRuns, setHasMoreRuns] = useState(false);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
@@ -129,16 +133,20 @@ export function JudgeCalibration() {
 
     useEffect(() => {
         let active = true;
+        async function loadRunsPage(offset: number) {
+            return fetchRuns({ includeFeedback: true, limit: RUN_PAGE_SIZE, offset });
+        }
         async function load() {
             setLoading(true);
             setError(null);
             try {
                 const [runList, historyList] = await Promise.all([
-                    fetchRuns(),
+                    loadRunsPage(0),
                     fetchJudgeCalibrationHistory(20),
                 ]);
                 if (!active) return;
                 setRuns(runList);
+                setHasMoreRuns(runList.length === RUN_PAGE_SIZE);
                 setHistory(historyList);
             } catch (err) {
                 if (!active) return;
@@ -152,6 +160,24 @@ export function JudgeCalibration() {
             active = false;
         };
     }, []);
+
+    const handleLoadMoreRuns = async () => {
+        if (loadingMoreRuns || !hasMoreRuns) return;
+        setLoadingMoreRuns(true);
+        try {
+            const nextRuns = await fetchRuns({
+                includeFeedback: true,
+                limit: RUN_PAGE_SIZE,
+                offset: runs.length,
+            });
+            setRuns((prev) => [...prev, ...nextRuns]);
+            setHasMoreRuns(nextRuns.length === RUN_PAGE_SIZE);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load runs");
+        } finally {
+            setLoadingMoreRuns(false);
+        }
+    };
 
     useEffect(() => {
         if (!selectedRunId) {
@@ -176,6 +202,21 @@ export function JudgeCalibration() {
         const run = runs.find((item) => item.run_id === selectedRunId);
         return run?.metrics_evaluated || [];
     }, [runs, selectedRunId]);
+
+    const requiresFeedback = labelsSource === "feedback" || labelsSource === "hybrid";
+    const labelsSupported = labelsSource !== "gold";
+    const eligibleRuns = useMemo(() => {
+        if (!labelsSupported) return [];
+        if (!requiresFeedback) return runs;
+        return runs.filter((run) => (run.feedback_count ?? 0) > 0);
+    }, [runs, requiresFeedback, labelsSupported]);
+
+    useEffect(() => {
+        if (!selectedRunId) return;
+        if (!eligibleRuns.some((run) => run.run_id === selectedRunId)) {
+            setSelectedRunId("");
+        }
+    }, [eligibleRuns, selectedRunId]);
 
     const caseRows = useMemo(() => {
         if (!result || !selectedMetricKey) return [];
@@ -264,22 +305,6 @@ export function JudgeCalibration() {
                             <div className="flex items-center justify-between">
                                 <h2 className="section-title">설정</h2>
                             </div>
-                            <div className="space-y-3">
-                                <label className="text-xs font-semibold uppercase text-muted-foreground">Run 선택</label>
-                                <select
-                                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                                    value={selectedRunId}
-                                    onChange={(event) => setSelectedRunId(event.target.value)}
-                                >
-                                    <option value="">Run을 선택하세요</option>
-                                    {runs.map((run) => (
-                                        <option key={run.run_id} value={run.run_id}>
-                                            {run.dataset_name} · {run.run_id.slice(0, 8)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-semibold uppercase text-muted-foreground">Labels</label>
@@ -308,6 +333,49 @@ export function JudgeCalibration() {
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+                            </div>
+                            {!labelsSupported && (
+                                <p className="text-xs text-amber-600">
+                                    Gold 라벨 보정은 아직 지원되지 않습니다.
+                                </p>
+                            )}
+                            {labelsSupported && requiresFeedback && eligibleRuns.length === 0 && (
+                                <p className="text-xs text-amber-600">
+                                    {hasMoreRuns
+                                        ? "피드백 라벨이 있는 run이 없습니다. 더 보기로 확인하거나 피드백을 남겨주세요."
+                                        : "피드백 라벨이 있는 run이 없습니다. 먼저 피드백을 남겨주세요."}
+                                </p>
+                            )}
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">Run 선택</label>
+                                <select
+                                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                                    value={selectedRunId}
+                                    onChange={(event) => setSelectedRunId(event.target.value)}
+                                    disabled={!labelsSupported || (requiresFeedback && eligibleRuns.length === 0)}
+                                >
+                                    <option value="">Run을 선택하세요</option>
+                                    {eligibleRuns.map((run) => (
+                                        <option key={run.run_id} value={run.run_id}>
+                                            {run.dataset_name} · {run.run_id.slice(0, 8)}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>
+                                        {requiresFeedback
+                                            ? `피드백 있는 run ${eligibleRuns.length}건 표시 중`
+                                            : `전체 run ${eligibleRuns.length}건 표시 중`}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleLoadMoreRuns}
+                                        disabled={loadingMoreRuns || !hasMoreRuns}
+                                        className="text-primary disabled:text-muted-foreground"
+                                    >
+                                        {loadingMoreRuns ? "불러오는 중..." : hasMoreRuns ? "더 보기" : "마지막"}
+                                    </button>
                                 </div>
                             </div>
 
@@ -382,7 +450,12 @@ export function JudgeCalibration() {
                             <button
                                 className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-60"
                                 onClick={handleRunCalibration}
-                                disabled={running}
+                                disabled={
+                                    running ||
+                                    !selectedRunId ||
+                                    !labelsSupported ||
+                                    (requiresFeedback && eligibleRuns.length === 0)
+                                }
                             >
                                 {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                                 Judge 보정 실행

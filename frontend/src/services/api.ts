@@ -24,6 +24,7 @@ export interface RunSummary {
     phoenix_drift: number | null;
     phoenix_experiment_url: string | null;
     phoenix_trace_url?: string | null;
+    feedback_count?: number | null;
 }
 
 export interface TestCase {
@@ -593,8 +594,23 @@ export interface LLMReport {
     created_at: string;
 }
 
-export async function fetchRuns(): Promise<RunSummary[]> {
-    const response = await fetch(`${API_BASE_URL}/runs/`);
+export async function fetchRuns(options?: {
+    includeFeedback?: boolean;
+    limit?: number;
+    offset?: number;
+}): Promise<RunSummary[]> {
+    const params = new URLSearchParams();
+    if (options?.includeFeedback) {
+        params.set("include_feedback", "true");
+    }
+    if (options?.limit !== undefined) {
+        params.set("limit", String(options.limit));
+    }
+    if (options?.offset !== undefined) {
+        params.set("offset", String(options.offset));
+    }
+    const query = params.toString();
+    const response = await fetch(`${API_BASE_URL}/runs/${query ? `?${query}` : ""}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch runs: ${response.statusText}`);
     }

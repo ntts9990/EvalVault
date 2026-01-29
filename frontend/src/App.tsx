@@ -5,7 +5,7 @@ import { EvaluationStudio } from './pages/EvaluationStudio';
 import { DomainMemory } from './pages/DomainMemory';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { AnalysisLab } from './pages/AnalysisLab';
-import { Chat } from './pages/Chat';
+import { AiSdkChat } from './pages/AiSdkChat';
 import { AnalysisCompareView } from './pages/AnalysisCompareView';
 import { AnalysisResultView } from './pages/AnalysisResultView';
 import { CompareRuns } from './pages/CompareRuns';
@@ -27,7 +27,7 @@ function App() {
         <Route path="/knowledge" element={<KnowledgeBase />} />
         <Route path="/analysis" element={<AnalysisLab />} />
         <Route path="/analysis/compare" element={<AnalysisCompareView />} />
-        <Route path="/chat" element={<Chat />} />
+        <Route path="/chat" element={<AiSdkChat />} />
         <Route path="/analysis/results/:id" element={<AnalysisResultView />} />
         <Route path="/reports" element={<CustomerReport />} />
         <Route path="/visualization" element={<VisualizationHome />} />
