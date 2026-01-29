@@ -54,6 +54,7 @@ coverage.xml
 reports/*.html
 reports/*.xml
 reports/*.json
+reports/*.csv
 reports/analysis/
 reports/analysis/**
 reports/comparison/
@@ -129,6 +130,7 @@ celerybeat-schedule
 
 # Environments
 .env
+.env.offline
 .venv
 env/
 venv/
@@ -160,3 +162,6 @@ dmypy.json
 .LSOverride
 scratch/
 .sisyphus/
+
+# Local artifacts
+MagicMock/
