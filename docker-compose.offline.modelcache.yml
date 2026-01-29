@@ -1,0 +1,11 @@
+services:
+  evalvault-api:
+    environment:
+      HF_HOME: /app/model_cache/hf
+      HF_HUB_CACHE: /app/model_cache/hf/hub
+      TRANSFORMERS_CACHE: /app/model_cache/hf/hub
+      SENTENCE_TRANSFORMERS_HOME: /app/model_cache/sentence-transformers
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    volumes:
+      - ./model_cache:/app/model_cache

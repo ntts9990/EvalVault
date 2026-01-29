@@ -89,6 +89,7 @@ dev = [
     "anthropic",
     "langchain-anthropic",
     "psycopg[binary]>=3.0.0",
+    "pgvector>=0.2.5",
     "mlflow>=2.0.0",
     "arize-phoenix>=8.0.0",
     "openinference-instrumentation-langchain>=0.1.0",
@@ -133,6 +134,7 @@ timeseries = [
 ]
 postgres = [
     "psycopg[binary]>=3.0.0",
+    "pgvector>=0.2.5",
 ]
 mlflow = [
     "mlflow>=2.0.0",

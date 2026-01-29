@@ -17,7 +17,7 @@
 services:
   # PostgreSQL database for evaluation storage
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16.4-alpine}
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:0.8.0-pg16}
     container_name: evalvault-postgres
     pull_policy: never
     restart: unless-stopped
