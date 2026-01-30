@@ -104,6 +104,22 @@ class PhoenixSyncService:
                 dataset_description=description,
             )
         except Exception as exc:  # pragma: no cover - HTTP/serialization errors
+            message = str(exc)
+            if "already exists" in message:
+                existing = self._find_dataset_by_name(dataset_name)
+                if existing:
+                    dataset_obj = self._client.datasets.get_dataset(dataset=existing["id"])
+                    dataset_url = self._client.experiments.get_dataset_experiments_url(
+                        dataset_obj.id
+                    )
+                    return PhoenixDatasetInfo(
+                        dataset_id=dataset_obj.id,
+                        dataset_name=dataset_obj.name,
+                        dataset_version_id=dataset_obj.version_id,
+                        url=dataset_url,
+                        description=description,
+                        example_count=getattr(dataset_obj, "examples", None),
+                    )
             raise PhoenixSyncError(f"Dataset upload failed: {exc}") from exc
 
         dataset_url = self._client.experiments.get_dataset_experiments_url(phoenix_dataset.id)
@@ -172,6 +188,74 @@ class PhoenixSyncService:
                 }
             )
         return examples
+
+    def _find_dataset_by_name(self, dataset_name: str) -> dict[str, Any] | None:
+        try:
+            datasets = self._client.datasets.list()
+        except Exception:
+            return None
+        for entry in datasets:
+            if entry.get("name") == dataset_name:
+                return entry
+        return None
+
+    def sync_prompts(
+        self,
+        *,
+        prompt_entries: list[dict[str, Any]],
+        model_name: str,
+        model_provider: str,
+        prompt_set_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Create prompt versions in Phoenix Prompt Management."""
+
+        if not prompt_entries:
+            return []
+
+        try:
+            from phoenix.client.resources.prompts import PromptVersion
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise PhoenixSyncError("Phoenix prompt client unavailable") from exc
+
+        synced: list[dict[str, Any]] = []
+        for index, entry in enumerate(prompt_entries, start=1):
+            name = entry.get("name") or entry.get("role") or f"prompt_{index}"
+            content = entry.get("content") or entry.get("content_preview") or ""
+            if not content:
+                continue
+            prompt_version = PromptVersion(
+                [{"role": "system", "content": content}],
+                model_name=model_name,
+                model_provider=model_provider,
+                template_format="NONE",
+            )
+            prompt_metadata = {
+                "kind": entry.get("kind"),
+                "role": entry.get("role"),
+                "checksum": entry.get("checksum"),
+                "status": entry.get("status"),
+                "source": entry.get("source") or entry.get("path"),
+                "order": index,
+            }
+            if prompt_set_name:
+                prompt_metadata["prompt_set"] = prompt_set_name
+            try:
+                version = self._client.prompts.create(
+                    version=prompt_version,
+                    name=name,
+                    prompt_description=entry.get("notes"),
+                    prompt_metadata=_as_serializable(prompt_metadata),
+                )
+                synced.append(
+                    {
+                        **entry,
+                        "phoenix_prompt_version_id": getattr(version, "id", None),
+                    }
+                )
+            except Exception as exc:  # pragma: no cover - HTTP errors
+                raise PhoenixSyncError(f"Prompt sync failed: {exc}") from exc
+
+        return synced
 
     def _build_input_payload(self, test_case: TestCase) -> dict[str, Any]:
         return {
@@ -258,6 +342,21 @@ def build_experiment_metadata(
         "total_test_cases": run.total_test_cases,
         "metrics": metrics,
     }
+    if run.results:
+        latencies = [r.latency_ms for r in run.results if r.latency_ms]
+        tokens = [r.tokens_used for r in run.results if r.tokens_used]
+        costs = [r.cost_usd for r in run.results if r.cost_usd is not None]
+        if latencies:
+            payload["avg_latency_ms"] = round(sum(latencies) / len(latencies), 2)
+        if tokens:
+            payload["avg_tokens"] = round(sum(tokens) / len(tokens), 2)
+        if costs:
+            payload["avg_cost_usd"] = round(sum(costs) / len(costs), 6)
+    if run.total_tokens:
+        payload["total_tokens"] = run.total_tokens
+    if run.total_cost_usd is not None:
+        payload["total_cost_usd"] = run.total_cost_usd
+    payload["error_rate"] = round(1 - run.pass_rate, 4)
     if reliability_snapshot:
         payload["reliability_snapshot"] = reliability_snapshot
     if dataset.metadata:
