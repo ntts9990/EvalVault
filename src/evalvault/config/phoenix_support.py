@@ -59,10 +59,15 @@ def ensure_phoenix_instrumentation(
     if api_token:
         headers = {"api-key": api_token}
 
+    project_name = getattr(settings, "phoenix_project_name", None)
+    if project_name is not None and not isinstance(project_name, str):
+        project_name = None
+
     try:
         setup_phoenix_instrumentation(
             endpoint=endpoint,
             service_name="evalvault",
+            project_name=project_name,
             sample_rate=sample_rate,
             headers=headers,
         )

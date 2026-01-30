@@ -26,6 +26,7 @@ _tracer_provider: TracerProvider | None = None
 def setup_phoenix_instrumentation(
     endpoint: str = "http://localhost:6006/v1/traces",
     service_name: str = "evalvault",
+    project_name: str | None = None,
     enable_langchain: bool = True,
     enable_openai: bool = True,
     sample_rate: float = 1.0,
@@ -73,12 +74,13 @@ def setup_phoenix_instrumentation(
         return None
 
     # Create resource with service name
-    resource = Resource.create(
-        {
-            "service.name": service_name,
-            "service.version": "0.1.0",
-        }
-    )
+    resource_attributes = {
+        "service.name": service_name,
+        "service.version": "0.1.0",
+    }
+    if project_name:
+        resource_attributes["project.name"] = project_name
+    resource = Resource.create(resource_attributes)
 
     # Clamp sample rate between 0 and 1
     ratio = max(0.0, min(sample_rate, 1.0))

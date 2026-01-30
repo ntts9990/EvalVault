@@ -55,6 +55,33 @@ def _parse_cors_origins(cors_origins: str | None) -> list[str]:
     return [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 
 
+def resolve_tracker_providers(provider: str | None) -> list[str]:
+    if not provider:
+        return []
+    normalized = provider.strip().lower()
+    if normalized in {"none", "off", "disabled"}:
+        return ["none"]
+    aliases = {
+        "all": ["mlflow", "phoenix"],
+        "default": ["mlflow", "phoenix"],
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    separators = [",", "+", "/", "|"]
+    for sep in separators:
+        normalized = normalized.replace(sep, ",")
+    providers = [p.strip() for p in normalized.split(",") if p.strip()]
+    if not providers:
+        return []
+    if "none" in providers and len(providers) > 1:
+        raise ValueError("tracker_provider cannot combine 'none' with other providers")
+    deduped: list[str] = []
+    for entry in providers:
+        if entry not in deduped:
+            deduped.append(entry)
+    return deduped
+
+
 SECRET_REFERENCE_FIELDS = (
     "api_auth_tokens",
     "knowledge_read_tokens",
@@ -83,13 +110,14 @@ def _validate_production_settings(settings: "Settings") -> None:
     if settings.llm_provider == "openai" and not settings.openai_api_key:
         missing.append("OPENAI_API_KEY")
 
-    if settings.tracker_provider == "langfuse":
+    providers = resolve_tracker_providers(settings.tracker_provider)
+    if "langfuse" in providers:
         if not settings.langfuse_public_key:
             missing.append("LANGFUSE_PUBLIC_KEY")
         if not settings.langfuse_secret_key:
             missing.append("LANGFUSE_SECRET_KEY")
 
-    if settings.tracker_provider == "mlflow" and not settings.mlflow_tracking_uri:
+    if "mlflow" in providers and not settings.mlflow_tracking_uri:
         missing.append("MLFLOW_TRACKING_URI")
 
     if (
@@ -355,6 +383,14 @@ class Settings(BaseSettings):
         default="http://localhost:6006/v1/traces",
         description="Phoenix OTLP endpoint for traces",
     )
+    phoenix_project_name: str = Field(
+        default="evalvault",
+        description="Phoenix project name for grouping traces",
+    )
+    phoenix_annotations_enabled: bool = Field(
+        default=True,
+        description="Enable automatic Phoenix span annotations",
+    )
     phoenix_api_token: str | None = Field(
         default=None,
         description="Phoenix API token for cloud deployments (optional)",
@@ -372,8 +408,8 @@ class Settings(BaseSettings):
 
     # Tracker Provider Selection
     tracker_provider: str = Field(
-        default="langfuse",
-        description="Tracker provider: 'langfuse', 'mlflow', or 'phoenix'",
+        default="mlflow+phoenix",
+        description="Tracker provider: 'langfuse', 'mlflow', 'phoenix', 'none', or combinations",
     )
 
     # Cluster map configuration
