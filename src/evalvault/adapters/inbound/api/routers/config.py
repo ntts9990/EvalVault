@@ -71,7 +71,9 @@ class ConfigUpdateRequest(BaseModel):
     phoenix_endpoint: str | None = None
     phoenix_enabled: bool | None = None
     phoenix_sample_rate: float | None = None
-    tracker_provider: Literal["langfuse", "mlflow", "phoenix", "none"] | None = None
+    phoenix_project_name: str | None = None
+    phoenix_annotations_enabled: bool | None = None
+    tracker_provider: str | None = None
     postgres_host: str | None = None
     postgres_port: int | None = None
     postgres_database: str | None = None

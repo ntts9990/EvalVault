@@ -24,7 +24,7 @@ from evalvault.adapters.outbound.judge_calibration_reporter import JudgeCalibrat
 from evalvault.adapters.outbound.ops.report_renderer import render_json, render_markdown
 from evalvault.adapters.outbound.report import MarkdownReportAdapter
 from evalvault.config.phoenix_support import PhoenixExperimentResolver
-from evalvault.config.settings import Settings
+from evalvault.config.settings import Settings, resolve_tracker_providers
 from evalvault.domain.entities import (
     CalibrationResult,
     FeedbackSummary,
@@ -217,56 +217,83 @@ class WebUIAdapter:
             logger.warning(f"Failed to create LLM adapter for {model_id}: {e}, using default")
             return self._llm_adapter
 
-    def _get_tracker(
+    def _get_trackers(
         self,
         settings: Settings,
         tracker_config: dict[str, Any] | None,
-    ) -> tuple[str | None, Any | None]:
-        provider = (tracker_config or {}).get("provider") or "none"
-        provider = provider.lower()
+    ) -> list[tuple[str, Any]]:
+        provider = (tracker_config or {}).get("provider") or settings.tracker_provider or "none"
+        providers = resolve_tracker_providers(provider)
+        if not providers or providers == ["none"]:
+            return []
+        required = {"mlflow", "phoenix"}
+        if not required.issubset(set(providers)):
+            raise RuntimeError("Tracker must include both mlflow and phoenix")
 
-        if provider in {"none", ""}:
-            return None, None
+        trackers: list[tuple[str, Any]] = []
+        for entry in providers:
+            if entry == "langfuse":
+                if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+                    raise RuntimeError("Langfuse credentials missing")
+                from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 
-        if provider == "langfuse":
-            if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-                logger.warning("Langfuse credentials missing; skipping tracker logging.")
-                return None, None
-            from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
+                trackers.append(
+                    (
+                        entry,
+                        LangfuseAdapter(
+                            public_key=settings.langfuse_public_key,
+                            secret_key=settings.langfuse_secret_key,
+                            host=settings.langfuse_host,
+                        ),
+                    )
+                )
+                continue
 
-            return provider, LangfuseAdapter(
-                public_key=settings.langfuse_public_key,
-                secret_key=settings.langfuse_secret_key,
-                host=settings.langfuse_host,
-            )
+            if entry == "phoenix":
+                from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
 
-        if provider == "phoenix":
-            from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
+                ensure_phoenix_instrumentation(settings, force=True)
+                try:
+                    from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
+                except ImportError as exc:
+                    raise RuntimeError("Phoenix extras not installed") from exc
+                trackers.append(
+                    (
+                        entry,
+                        PhoenixAdapter(
+                            endpoint=settings.phoenix_endpoint,
+                            project_name=getattr(settings, "phoenix_project_name", None),
+                            annotations_enabled=getattr(
+                                settings,
+                                "phoenix_annotations_enabled",
+                                True,
+                            ),
+                        ),
+                    )
+                )
+                continue
 
-            ensure_phoenix_instrumentation(settings, force=True)
-            try:
-                from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
-            except ImportError as exc:
-                logger.warning("Phoenix extras not installed: %s", exc)
-                return None, None
-            return provider, PhoenixAdapter(endpoint=settings.phoenix_endpoint)
+            if entry == "mlflow":
+                if not settings.mlflow_tracking_uri:
+                    raise RuntimeError("MLflow tracking URI missing")
+                try:
+                    from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
+                except ImportError as exc:
+                    raise RuntimeError("MLflow adapter unavailable") from exc
+                trackers.append(
+                    (
+                        entry,
+                        MLflowAdapter(
+                            tracking_uri=settings.mlflow_tracking_uri,
+                            experiment_name=settings.mlflow_experiment_name,
+                        ),
+                    )
+                )
+                continue
 
-        if provider == "mlflow":
-            if not settings.mlflow_tracking_uri:
-                logger.warning("MLflow tracking URI missing; skipping tracker logging.")
-                return None, None
-            try:
-                from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
-            except ImportError as exc:
-                logger.warning("MLflow adapter unavailable: %s", exc)
-                return None, None
-            return provider, MLflowAdapter(
-                tracking_uri=settings.mlflow_tracking_uri,
-                experiment_name=settings.mlflow_experiment_name,
-            )
+            raise RuntimeError(f"Unknown tracker provider: {entry}")
 
-        logger.warning("Unknown tracker provider: %s", provider)
-        return None, None
+        return trackers
 
     @staticmethod
     def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
@@ -425,7 +452,11 @@ class WebUIAdapter:
             dataset.metadata["domain"] = requested_domain
 
         settings = self._settings or Settings()
-        tracker_provider, tracker = self._get_tracker(settings, request.tracker_config)
+        try:
+            trackers = self._get_trackers(settings, request.tracker_config)
+        except RuntimeError as exc:
+            raise RuntimeError(f"Tracker configuration error: {exc}") from exc
+        tracker_providers = [provider for provider, _ in trackers]
         stage_store = bool(request.stage_store)
 
         retriever_instance = None
@@ -484,7 +515,7 @@ class WebUIAdapter:
                 )
                 from evalvault.domain.services.memory_aware_evaluator import MemoryAwareEvaluator
 
-                tracer = PhoenixTracerAdapter() if tracker_provider == "phoenix" else None
+                tracer = PhoenixTracerAdapter() if "phoenix" in tracker_providers else None
                 memory_adapter = build_domain_memory_adapter(
                     settings=self._settings,
                     db_path=Path(memory_db_path) if memory_db_path else None,
@@ -696,22 +727,27 @@ class WebUIAdapter:
                 str(request.threshold_profile).strip().lower()
             )
 
-        if tracker and tracker_provider:
-            try:
-                trace_id = tracker.log_evaluation_run(result)
-                if tracker_provider == "phoenix":
-                    endpoint = settings.phoenix_endpoint or "http://localhost:6006/v1/traces"
-                    phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-                    phoenix_meta.update(
-                        {
-                            "trace_id": trace_id,
-                            "endpoint": endpoint,
-                            "trace_url": self._build_phoenix_trace_url(endpoint, trace_id),
-                            "schema_version": 2,
-                        }
-                    )
-            except Exception as exc:
-                logger.warning("Tracker logging failed: %s", exc)
+        if trackers:
+            result.tracker_metadata.setdefault("tracker_providers", tracker_providers)
+            for provider, tracker in trackers:
+                try:
+                    trace_id = tracker.log_evaluation_run(result)
+                    provider_meta = result.tracker_metadata.setdefault(provider, {})
+                    if isinstance(provider_meta, dict):
+                        provider_meta.setdefault("trace_id", trace_id)
+                    if provider == "phoenix":
+                        endpoint = settings.phoenix_endpoint or "http://localhost:6006/v1/traces"
+                        phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+                        phoenix_meta.update(
+                            {
+                                "trace_id": trace_id,
+                                "endpoint": endpoint,
+                                "trace_url": self._build_phoenix_trace_url(endpoint, trace_id),
+                                "schema_version": 2,
+                            }
+                        )
+                except Exception as exc:
+                    raise RuntimeError(f"Tracker logging failed for {provider}: {exc}") from exc
 
         if stage_store and self._storage and hasattr(self._storage, "save_stage_events"):
             try:
