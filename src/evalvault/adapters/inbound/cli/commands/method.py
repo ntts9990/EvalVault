@@ -31,7 +31,7 @@ from ..utils.validators import parse_csv_option, validate_choices
 from .run_helpers import (
     _display_results,
     _is_oss_open_model,
-    _log_to_tracker,
+    _log_to_trackers,
     _resolve_thresholds,
     _save_results,
     _save_to_db,
@@ -419,7 +419,7 @@ def create_method_app(console: Console) -> typer.Typer:
         _display_results(result, console)
 
         if tracker and tracker != "none":
-            _log_to_tracker(settings, result, console, tracker_type=tracker)
+            _log_to_trackers(settings, result, console, tracker_type=tracker)
 
         if eval_output:
             _save_results(eval_output, result, console)

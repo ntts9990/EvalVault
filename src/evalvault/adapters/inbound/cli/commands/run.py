@@ -33,7 +33,7 @@ from evalvault.adapters.outbound.phoenix.sync_service import (
 from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.adapters.outbound.tracer.phoenix_tracer_adapter import PhoenixTracerAdapter
 from evalvault.config.phoenix_support import ensure_phoenix_instrumentation
-from evalvault.config.settings import Settings, apply_profile
+from evalvault.config.settings import Settings, apply_profile, resolve_tracker_providers
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
 from evalvault.domain.entities.multiturn import (
     MultiTurnConversationRecord,
@@ -86,7 +86,8 @@ from .run_helpers import (
     _display_results,
     _evaluate_streaming_run,
     _is_oss_open_model,
-    _log_to_tracker,
+    _log_analysis_artifacts,
+    _log_to_trackers,
     _option_was_provided,
     _print_run_mode_banner,
     _resolve_thresholds,
@@ -176,6 +177,14 @@ def _log_duration(
         return
     elapsed = (datetime.now() - started_at).total_seconds()
     _log_timestamp(console, verbose, f"{message} ({elapsed:.2f}s)")
+
+
+def _infer_phoenix_model_provider(model_name: str) -> str:
+    if not model_name:
+        return "OPENAI"
+    provider = model_name.split("/")[0].upper() if "/" in model_name else "OPENAI"
+    allowed = {"OPENAI", "AZURE_OPENAI", "ANTHROPIC", "GOOGLE", "DEEPSEEK", "XAI", "AWS", "OLLAMA"}
+    return provider if provider in allowed else "OPENAI"
 
 
 def register_run_commands(
@@ -358,10 +367,13 @@ def register_run_commands(
             help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
-            "none",
+            "mlflow+phoenix",
             "--tracker",
             "-t",
-            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+            help=(
+                "Tracker to log results: 'langfuse', 'mlflow', 'phoenix', 'none', "
+                "or combinations like 'mlflow+phoenix'."
+            ),
             rich_help_panel="Simple mode preset",
         ),
         langfuse: bool = typer.Option(
@@ -667,13 +679,24 @@ def register_run_commands(
         tracker_override = _option_was_provided(ctx, "tracker") or langfuse
         selected_tracker = tracker
         if preset.default_tracker:
-            if tracker_override and tracker != preset.default_tracker:
-                print_cli_warning(
-                    console,
-                    f"Simple 모드는 tracker={preset.default_tracker}로 고정됩니다.",
-                    tips=["다른 Tracker를 사용하려면 --mode full을 사용하세요."],
-                )
-            selected_tracker = preset.default_tracker
+            if tracker_override:
+                try:
+                    providers = resolve_tracker_providers(tracker)
+                except ValueError as exc:
+                    print_cli_error(console, "Tracker 설정이 올바르지 않습니다.", details=str(exc))
+                    raise typer.Exit(2) from exc
+                if providers == ["none"]:
+                    selected_tracker = preset.default_tracker
+                elif preset.default_tracker not in providers:
+                    print_cli_warning(
+                        console,
+                        f"Simple 모드는 tracker에 {preset.default_tracker}가 포함되어야 합니다.",
+                        tips=["다른 Tracker를 사용하려면 --mode full을 사용하세요."],
+                    )
+                    providers.append(preset.default_tracker)
+                    selected_tracker = "+".join(providers)
+            else:
+                selected_tracker = preset.default_tracker
         tracker = selected_tracker
 
         prompt_manifest_value = prompt_manifest
@@ -1646,8 +1669,27 @@ def register_run_commands(
             )
             raise typer.Exit(2) from exc
 
+        effective_tracker = tracker
+        if langfuse and tracker == "none" and not preset.default_tracker:
+            effective_tracker = "langfuse"
+            print_cli_warning(
+                console,
+                "--langfuse 플래그는 곧 제거됩니다.",
+                tips=["대신 --tracker langfuse를 사용하세요."],
+            )
+
+        try:
+            effective_providers = resolve_tracker_providers(effective_tracker)
+        except ValueError as exc:
+            print_cli_error(console, "Tracker 설정이 올바르지 않습니다.", details=str(exc))
+            raise typer.Exit(2) from exc
+
         phoenix_dataset_name = phoenix_dataset
         if phoenix_experiment and not phoenix_dataset_name:
+            phoenix_dataset_name = f"{ds.name}:{ds.version}"
+
+        auto_phoenix_sync = "phoenix" in effective_providers
+        if auto_phoenix_sync and not phoenix_dataset_name:
             phoenix_dataset_name = f"{ds.name}:{ds.version}"
 
         phoenix_dataset_description_value = phoenix_dataset_description
@@ -1659,13 +1701,20 @@ def register_run_commands(
         phoenix_dataset_result: dict[str, Any] | None = None
         phoenix_experiment_result: dict[str, Any] | None = None
 
-        if phoenix_dataset_name or phoenix_experiment:
+        if phoenix_dataset_name or phoenix_experiment or auto_phoenix_sync:
             try:
                 phoenix_sync_service = PhoenixSyncService(
                     endpoint=settings.phoenix_endpoint,
                     api_token=getattr(settings, "phoenix_api_token", None),
                 )
             except PhoenixSyncError as exc:
+                if auto_phoenix_sync:
+                    print_cli_error(
+                        console,
+                        "Phoenix Sync 서비스를 초기화할 수 없습니다.",
+                        details=str(exc),
+                    )
+                    raise typer.Exit(2) from exc
                 print_cli_warning(
                     console,
                     "Phoenix Sync 서비스를 초기화할 수 없습니다.",
@@ -1673,19 +1722,10 @@ def register_run_commands(
                 )
                 phoenix_sync_service = None
 
-        effective_tracker = tracker
-        if langfuse and tracker == "none" and not preset.default_tracker:
-            effective_tracker = "langfuse"
-            print_cli_warning(
-                console,
-                "--langfuse 플래그는 곧 제거됩니다.",
-                tips=["대신 --tracker langfuse를 사용하세요."],
-            )
-
         config_wants_phoenix = getattr(settings, "phoenix_enabled", False)
         if not isinstance(config_wants_phoenix, bool):
             config_wants_phoenix = False
-        should_enable_phoenix = effective_tracker == "phoenix" or config_wants_phoenix
+        should_enable_phoenix = "phoenix" in effective_providers or config_wants_phoenix
         if should_enable_phoenix:
             ensure_phoenix_instrumentation(settings, console=console, force=True)
 
@@ -2032,6 +2072,9 @@ def register_run_commands(
             )
             if prompt_bundle:
                 result.tracker_metadata["prompt_set"] = build_prompt_summary(prompt_bundle)
+                result.tracker_metadata["prompt_set_detail"] = prompt_bundle.to_dict(
+                    include_content=True
+                )
 
         if retriever_instance or used_versioned_prefill:
             retriever_tracker_meta: dict[str, Any] = {
@@ -2105,13 +2148,29 @@ def register_run_commands(
                     )
                     console.print(f"[dim]View datasets: {dataset_info.url}[/dim]")
                 except PhoenixSyncError as exc:
+                    if auto_phoenix_sync:
+                        print_cli_error(
+                            console,
+                            "Phoenix Dataset 업로드에 실패했습니다.",
+                            details=str(exc),
+                        )
+                        raise typer.Exit(2) from exc
                     print_cli_warning(
                         console,
                         "Phoenix Dataset 업로드에 실패했습니다.",
                         tips=[str(exc)],
                     )
+            if auto_phoenix_sync and not phoenix_experiment:
+                phoenix_experiment = f"{result.model_name}-{result.run_id[:8]}"
             if phoenix_experiment:
                 if not phoenix_dataset_result:
+                    if auto_phoenix_sync:
+                        print_cli_error(
+                            console,
+                            "Dataset 업로드에 실패해 Phoenix Experiment 생성을 진행할 수 없습니다.",
+                            details="Phoenix dataset 업로드가 필요합니다.",
+                        )
+                        raise typer.Exit(2)
                     print_cli_warning(
                         console,
                         "Dataset 업로드에 실패해 Phoenix Experiment 생성을 건너뜁니다.",
@@ -2169,6 +2228,41 @@ def register_run_commands(
             phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
             phoenix_meta.setdefault("schema_version", 2)
             phoenix_meta["prompts"] = prompt_metadata_entries
+            if phoenix_sync_service and "phoenix" in effective_providers:
+                try:
+                    prompt_set_summary = result.tracker_metadata.get("prompt_set") or {}
+                    prompt_set_name = prompt_set_summary.get("prompt_set_name")
+                    prompt_entries = list(prompt_metadata_entries)
+                    prompt_set_detail = result.tracker_metadata.get("prompt_set_detail")
+                    if isinstance(prompt_set_detail, dict):
+                        for item in prompt_set_detail.get("items", []):
+                            prompt = item.get("prompt") or {}
+                            if not isinstance(prompt, dict):
+                                continue
+                            prompt_entries.append(
+                                {
+                                    "name": prompt.get("name"),
+                                    "role": item.get("role"),
+                                    "kind": prompt.get("kind"),
+                                    "checksum": prompt.get("checksum"),
+                                    "content": prompt.get("content"),
+                                    "source": prompt.get("source"),
+                                }
+                            )
+                    synced = phoenix_sync_service.sync_prompts(
+                        prompt_entries=prompt_entries,
+                        model_name=result.model_name,
+                        model_provider=_infer_phoenix_model_provider(result.model_name),
+                        prompt_set_name=prompt_set_name,
+                    )
+                    if synced:
+                        phoenix_meta["prompts"] = synced
+                except PhoenixSyncError as exc:
+                    print_cli_warning(
+                        console,
+                        "Phoenix Prompt 동기화에 실패했습니다.",
+                        tips=[str(exc)],
+                    )
 
         if stage_events or stage_store:
             stage_event_builder = StageEventBuilder()
@@ -2187,7 +2281,7 @@ def register_run_commands(
 
         if effective_tracker != "none":
             phoenix_opts = None
-            if effective_tracker == "phoenix":
+            if "phoenix" in effective_providers:
                 phoenix_opts = {
                     "max_traces": phoenix_max_traces,
                     "metadata": phoenix_trace_metadata or None,
@@ -2198,7 +2292,7 @@ def register_run_commands(
                 verbose,
                 f"Tracker 로깅 시작 ({effective_tracker})",
             )
-            _log_to_tracker(
+            _log_to_trackers(
                 settings,
                 result,
                 console,
@@ -2276,6 +2370,12 @@ def register_run_commands(
                     pipeline_result,
                     artifacts_dir=artifacts_dir,
                 )
+                result.tracker_metadata["analysis_artifacts"] = {
+                    "dir": artifact_index.get("dir"),
+                    "index": artifact_index.get("index"),
+                    "output": str(analysis_output_path),
+                    "report": str(analysis_report_path),
+                }
                 payload = serialize_pipeline_result(pipeline_result)
                 payload["run_id"] = result.run_id
                 payload["artifacts"] = artifact_index
@@ -2292,6 +2392,18 @@ def register_run_commands(
                     "[green]자동 분석 상세 결과 저장:[/green] "
                     f"{artifact_index['dir']} (index: {artifact_index['index']})\n"
                 )
+                if effective_tracker != "none":
+                    _log_analysis_artifacts(
+                        settings,
+                        result,
+                        console,
+                        effective_tracker,
+                        analysis_payload=payload,
+                        artifact_index=artifact_index,
+                        report_text=report_text,
+                        output_path=analysis_output_path,
+                        report_path=analysis_report_path,
+                    )
 
     @app.command(
         name="run-simple",
@@ -2395,10 +2507,13 @@ def register_run_commands(
             help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
-            "none",
+            "mlflow+phoenix",
             "--tracker",
             "-t",
-            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+            help=(
+                "Tracker to log results: 'langfuse', 'mlflow', 'phoenix', 'none', "
+                "or combinations like 'mlflow+phoenix'."
+            ),
         ),
         langfuse: bool = typer.Option(
             False,
@@ -2687,10 +2802,13 @@ def register_run_commands(
             help="Store stage events in the SQLite database (requires --db).",
         ),
         tracker: str = typer.Option(
-            "none",
+            "mlflow+phoenix",
             "--tracker",
             "-t",
-            help="Tracker to log results: 'langfuse', 'mlflow', 'phoenix', or 'none'.",
+            help=(
+                "Tracker to log results: 'langfuse', 'mlflow', 'phoenix', 'none', "
+                "or combinations like 'mlflow+phoenix'."
+            ),
         ),
         langfuse: bool = typer.Option(
             False,

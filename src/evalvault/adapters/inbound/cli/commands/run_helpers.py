@@ -6,7 +6,7 @@ import json
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import click
 import typer
@@ -25,7 +25,7 @@ from evalvault.config.phoenix_support import (
     instrumentation_span,
     set_span_attributes,
 )
-from evalvault.config.settings import Settings
+from evalvault.config.settings import Settings, resolve_tracker_providers
 from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
@@ -58,7 +58,7 @@ from evalvault.ports.outbound.tracker_port import TrackerPort
 from ..utils.console import print_cli_error, print_cli_warning
 from ..utils.formatters import format_score, format_status
 
-TrackerType = Literal["langfuse", "mlflow", "phoenix", "none"]
+TrackerType = str
 apply_retriever_to_dataset = retriever_context.apply_retriever_to_dataset
 
 
@@ -319,15 +319,22 @@ def _display_memory_insights(insights: dict[str, Any], console: Console) -> None
     console.print(Panel(panel_body, title="Domain Memory Insights", border_style="magenta"))
 
 
-def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> TrackerPort | None:
+def _get_tracker(
+    settings: Settings,
+    tracker_type: str,
+    console: Console,
+    *,
+    required: bool = False,
+) -> TrackerPort | None:
     """Get the appropriate tracker adapter based on type."""
     if tracker_type == "langfuse":
         if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-            print_cli_warning(
-                console,
-                "Langfuse 자격 증명이 설정되지 않아 로깅을 건너뜁니다.",
-                tips=["LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY를 .env에 추가하세요."],
-            )
+            message = "Langfuse 자격 증명이 설정되지 않았습니다."
+            tips = ["LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY를 .env에 추가하세요."]
+            if required:
+                print_cli_error(console, message, fixes=tips)
+                raise typer.Exit(2)
+            print_cli_warning(console, message + " 로깅을 건너뜁니다.", tips=tips)
             return None
         from evalvault.adapters.outbound.tracker.langfuse_adapter import LangfuseAdapter
 
@@ -339,11 +346,12 @@ def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> Tra
 
     elif tracker_type == "mlflow":
         if not settings.mlflow_tracking_uri:
-            print_cli_warning(
-                console,
-                "MLflow tracking URI가 설정되지 않아 로깅을 건너뜁니다.",
-                tips=["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."],
-            )
+            message = "MLflow tracking URI가 설정되지 않았습니다."
+            tips = ["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."]
+            if required:
+                print_cli_error(console, message, fixes=tips)
+                raise typer.Exit(2)
+            print_cli_warning(console, message + " 로깅을 건너뜁니다.", tips=tips)
             return None
         try:
             from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
@@ -353,11 +361,12 @@ def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> Tra
                 experiment_name=settings.mlflow_experiment_name,
             )
         except ImportError:
-            print_cli_warning(
-                console,
-                "MLflow extra가 설치되지 않았습니다.",
-                tips=["uv sync --extra mlflow 명령으로 구성요소를 설치하세요."],
-            )
+            message = "MLflow extra가 설치되지 않았습니다."
+            tips = ["uv sync --extra mlflow 명령으로 구성요소를 설치하세요."]
+            if required:
+                print_cli_error(console, message, fixes=tips)
+                raise typer.Exit(2)
+            print_cli_warning(console, message, tips=tips)
             return None
 
     elif tracker_type == "phoenix":
@@ -367,13 +376,16 @@ def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> Tra
             return PhoenixAdapter(
                 endpoint=settings.phoenix_endpoint,
                 service_name="evalvault",
+                project_name=getattr(settings, "phoenix_project_name", None),
+                annotations_enabled=getattr(settings, "phoenix_annotations_enabled", True),
             )
         except ImportError:
-            print_cli_warning(
-                console,
-                "Phoenix extra가 설치되지 않았습니다.",
-                tips=["uv sync --extra phoenix 명령으로 의존성을 추가하세요."],
-            )
+            message = "Phoenix extra가 설치되지 않았습니다."
+            tips = ["uv sync --extra phoenix 명령으로 의존성을 추가하세요."]
+            if required:
+                print_cli_error(console, message, fixes=tips)
+                raise typer.Exit(2)
+            print_cli_warning(console, message, tips=tips)
             return None
 
     else:
@@ -383,6 +395,22 @@ def _get_tracker(settings: Settings, tracker_type: str, console: Console) -> Tra
             tips=["langfuse/mlflow/phoenix/none 중 하나를 지정하세요."],
         )
         return None
+
+
+def _resolve_tracker_list(tracker_type: str) -> list[str]:
+    providers = resolve_tracker_providers(tracker_type)
+    if not providers:
+        return []
+    if providers == ["none"]:
+        return ["none"]
+    supported = {"langfuse", "mlflow", "phoenix"}
+    unknown = [entry for entry in providers if entry not in supported]
+    if unknown:
+        raise ValueError(f"Unknown tracker provider(s): {', '.join(unknown)}")
+    required = {"mlflow", "phoenix"}
+    if not required.issubset(set(providers)):
+        raise ValueError("tracker must include both 'mlflow' and 'phoenix'")
+    return providers
 
 
 def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
@@ -395,7 +423,7 @@ def _build_phoenix_trace_url(endpoint: str, trace_id: str) -> str:
     return f"{base.rstrip('/')}/#/traces/{trace_id}"
 
 
-def _log_to_tracker(
+def _log_to_trackers(
     settings: Settings,
     result,
     console: Console,
@@ -404,18 +432,39 @@ def _log_to_tracker(
     phoenix_options: dict[str, Any] | None = None,
     log_phoenix_traces_fn: Callable[..., int] | None = None,
 ) -> None:
-    """Log evaluation results to the specified tracker."""
-    tracker = _get_tracker(settings, tracker_type, console)
-    if tracker is None:
+    """Log evaluation results to the specified tracker(s)."""
+    try:
+        tracker_types = _resolve_tracker_list(tracker_type)
+    except ValueError as exc:
+        print_cli_error(console, "Tracker 설정이 올바르지 않습니다.", details=str(exc))
+        raise typer.Exit(2) from exc
+    if not tracker_types or tracker_types == ["none"]:
         return
 
-    tracker_name = tracker_type.capitalize()
-    trace_id: str | None = None
-    with console.status(f"[bold green]Logging to {tracker_name}..."):
-        try:
-            trace_id = tracker.log_evaluation_run(result)
-            console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
-            if trace_id and tracker_type == "phoenix":
+    result.tracker_metadata.setdefault("tracker_providers", tracker_types)
+    for provider in tracker_types:
+        tracker = _get_tracker(settings, provider, console, required=True)
+        if tracker is None:
+            raise typer.Exit(2)
+        tracker_name = provider.capitalize()
+        trace_id: str | None = None
+        with console.status(f"[bold green]Logging to {tracker_name}..."):
+            try:
+                trace_id = tracker.log_evaluation_run(result)
+                console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
+            except Exception as exc:
+                print_cli_error(
+                    console,
+                    f"{tracker_name} 로깅에 실패했습니다.",
+                    details=str(exc),
+                )
+                raise typer.Exit(2) from exc
+
+        if trace_id:
+            provider_meta = result.tracker_metadata.setdefault(provider, {})
+            if isinstance(provider_meta, dict):
+                provider_meta.setdefault("trace_id", trace_id)
+            if provider == "phoenix":
                 endpoint = getattr(settings, "phoenix_endpoint", "http://localhost:6006/v1/traces")
                 if not isinstance(endpoint, str) or not endpoint:
                     endpoint = "http://localhost:6006/v1/traces"
@@ -431,27 +480,78 @@ def _log_to_tracker(
                 trace_url = get_phoenix_trace_url(result.tracker_metadata)
                 if trace_url:
                     console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
-        except Exception as exc:  # pragma: no cover - telemetry best-effort
-            print_cli_warning(
-                console,
-                f"{tracker_name} 로깅에 실패했습니다.",
-                tips=[str(exc)],
-            )
-            return
 
-    if tracker_type == "phoenix":
-        options = phoenix_options or {}
-        log_traces = log_phoenix_traces_fn or log_phoenix_traces
-        extra = log_traces(
-            tracker,
-            result,
-            max_traces=options.get("max_traces"),
-            metadata=options.get("metadata"),
-        )
-        if extra:
-            console.print(
-                f"[dim]Recorded {extra} Phoenix RAG trace(s) for detailed observability.[/dim]"
+                options = phoenix_options or {}
+                log_traces = log_phoenix_traces_fn or log_phoenix_traces
+                extra = log_traces(
+                    tracker,
+                    result,
+                    max_traces=options.get("max_traces"),
+                    metadata=options.get("metadata"),
+                )
+                if extra:
+                    console.print(
+                        f"[dim]Recorded {extra} Phoenix RAG trace(s) for detailed observability.[/dim]"
+                    )
+
+
+def _log_analysis_artifacts(
+    settings: Settings,
+    result: EvaluationRun,
+    console: Console,
+    tracker_type: str,
+    *,
+    analysis_payload: dict[str, Any],
+    artifact_index: dict[str, Any],
+    report_text: str,
+    output_path: Path,
+    report_path: Path,
+) -> None:
+    """Log analysis artifacts to tracker(s) as a separate trace/run."""
+    try:
+        tracker_types = _resolve_tracker_list(tracker_type)
+    except ValueError as exc:
+        print_cli_error(console, "Tracker 설정이 올바르지 않습니다.", details=str(exc))
+        raise typer.Exit(2) from exc
+    if not tracker_types or tracker_types == ["none"]:
+        return
+
+    metadata = {
+        "run_id": result.run_id,
+        "dataset_name": result.dataset_name,
+        "dataset_version": result.dataset_version,
+        "analysis_output": str(output_path),
+        "analysis_report": str(report_path),
+        "analysis_artifacts_dir": artifact_index.get("dir"),
+        "event_type": "analysis",
+    }
+
+    for provider in tracker_types:
+        tracker = _get_tracker(settings, provider, console, required=True)
+        if tracker is None:
+            raise typer.Exit(2)
+        trace_name = f"analysis-{result.run_id[:8]}"
+        try:
+            trace_id = tracker.start_trace(trace_name, metadata=metadata)
+            tracker.save_artifact(
+                trace_id, "analysis_payload", analysis_payload, artifact_type="json"
             )
+            tracker.save_artifact(
+                trace_id, "analysis_artifacts", artifact_index, artifact_type="json"
+            )
+            tracker.save_artifact(trace_id, "analysis_report", report_text, artifact_type="text")
+            tracker.end_trace(trace_id)
+            console.print(
+                f"[green]Logged analysis artifacts to {provider.capitalize()}[/green] "
+                f"(trace_id: {trace_id})"
+            )
+        except Exception as exc:
+            print_cli_error(
+                console,
+                f"{provider.capitalize()} 분석 로깅에 실패했습니다.",
+                details=str(exc),
+            )
+            raise typer.Exit(2) from exc
 
 
 def _save_to_db(
@@ -1173,8 +1273,10 @@ def _collect_prompt_metadata(
             prompt_path=target,
             content=content,
         )
-        summary.content_preview = _build_content_preview(content)
-        summaries.append(asdict(summary))
+        summary_dict = asdict(summary)
+        summary_dict["content_preview"] = _build_content_preview(content)
+        summary_dict["content"] = content
+        summaries.append(summary_dict)
 
     return summaries
 
