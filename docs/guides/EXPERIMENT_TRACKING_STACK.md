@@ -14,6 +14,11 @@
 - MLflow: 실험/버전/아티팩트 저장
 - Phoenix: LLM 트레이싱/관찰/디버깅
 
+### 운영 규칙 (필수)
+- 모든 평가 run은 **MLflow + Phoenix에 동시에 로깅**된다.
+- tracker 옵션에서 둘 중 하나라도 누락되면 실행이 실패한다.
+- 기본 tracker: `mlflow+phoenix`
+
 ### 라이선스/자가호스팅 참고
 - MLflow: Apache 2.0 (상업 사용 가능) https://raw.githubusercontent.com/mlflow/mlflow/master/LICENSE.txt
 - Phoenix: Elastic License 2.0 (자가호스팅 허용, 제3자에게 SaaS 제공 금지) https://raw.githubusercontent.com/Arize-ai/phoenix/main/LICENSE
@@ -111,3 +116,14 @@ metrics.json 구조 예시:
 ## EvalVault 연동 참고
 - MLflow 어댑터: src/evalvault/adapters/outbound/tracker/mlflow_adapter.py
 - Phoenix 어댑터: src/evalvault/adapters/outbound/tracker/phoenix_adapter.py
+
+## 설정 값
+- `MLFLOW_TRACKING_URI`: MLflow tracking server URI
+- `MLFLOW_EXPERIMENT_NAME`: 실험 이름 (기본: evalvault)
+- `PHOENIX_ENDPOINT`: Phoenix OTLP endpoint (예: http://localhost:6006/v1/traces)
+- `PHOENIX_API_TOKEN`: Phoenix API 토큰 (옵션)
+
+## CLI 기본 사용
+```bash
+uv run evalvault run <DATASET> --tracker mlflow+phoenix
+```
