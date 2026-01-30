@@ -97,7 +97,7 @@ def _resolve_faithfulness_fallback_config(
 
 def _default_faithfulness_fallback_model(provider: str) -> str | None:
     if provider == "ollama":
-        return "gpt-oss-safeguard:20b"
+        return "qwen3:8b"
     if provider == "vllm":
         return "gpt-oss-120b"
     return None

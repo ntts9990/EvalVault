@@ -1934,6 +1934,8 @@ class RagasEvaluator:
 
     def _calculate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
         """Calculate estimated cost in USD based on model pricing."""
+        if "ollama" in model_name:
+            return 0.0
         # Find matching model key (exact or substring match)
         price_key = "openai/gpt-4o"  # Default fallback
         for key in self.MODEL_PRICING:
