@@ -52,6 +52,8 @@ class PhoenixAdapter(TrackerPort):
         self,
         endpoint: str = "http://localhost:6006/v1/traces",
         service_name: str = "evalvault",
+        project_name: str | None = None,
+        annotations_enabled: bool = True,
     ):
         """Initialize Phoenix adapter with OpenTelemetry.
 
@@ -61,11 +63,14 @@ class PhoenixAdapter(TrackerPort):
         """
         self._endpoint = endpoint
         self._service_name = service_name
+        self._project_name = project_name
+        self._annotations_enabled = annotations_enabled
         self._tracer: Any | None = None
         self._tracer_provider: TracerProvider | None = None
         self._active_spans: dict[str, Any] = {}
         self._tracer_any: Any | None = None
         self._initialized = False
+        self._annotations_client: Any | None = None
 
     def _ensure_initialized(self) -> None:
         """Lazy initialization of OpenTelemetry tracer."""
@@ -96,7 +101,10 @@ class PhoenixAdapter(TrackerPort):
                     return
 
             # Create resource with service name
-            resource = Resource.create({"service.name": self._service_name})
+            resource_attributes = {"service.name": self._service_name}
+            if self._project_name:
+                resource_attributes["project.name"] = self._project_name
+            resource = Resource.create(resource_attributes)
 
             # Create tracer provider
             self._tracer_provider = TracerProvider(resource=resource)
@@ -122,6 +130,50 @@ class PhoenixAdapter(TrackerPort):
             raise RuntimeError(
                 "Failed to initialize Phoenix tracer. Check endpoint configuration and dependencies."
             ) from e
+
+    def _phoenix_base_url(self) -> str:
+        if "/v1/traces" in self._endpoint:
+            return self._endpoint.split("/v1/traces")[0]
+        return self._endpoint.rstrip("/")
+
+    def _get_annotations_client(self) -> Any | None:
+        if not self._annotations_enabled:
+            return None
+        if self._annotations_client is not None:
+            return self._annotations_client
+        try:
+            from phoenix.client import Client
+        except Exception:
+            return None
+        self._annotations_client = Client(base_url=self._phoenix_base_url())
+        return self._annotations_client
+
+    def _annotate_span(
+        self,
+        *,
+        span: Any,
+        name: str,
+        label: str,
+        score: float | None = None,
+        explanation: str | None = None,
+    ) -> None:
+        client = self._get_annotations_client()
+        if client is None or span is None:
+            return
+        try:
+            from opentelemetry.trace import format_span_id
+
+            span_id = format_span_id(span.get_span_context().span_id)
+            client.annotations.add_span_annotation(
+                annotation_name=name,
+                annotator_kind="CODE",
+                span_id=span_id,
+                label=label,
+                score=score,
+                explanation=explanation,
+            )
+        except Exception:
+            return
 
     def start_trace(self, name: str, metadata: dict[str, Any] | None = None) -> str:
         """Start a new trace.
@@ -328,8 +380,17 @@ class PhoenixAdapter(TrackerPort):
 
         # Set evaluation-specific attributes
         span = self._active_spans[trace_id]
+        span.set_attribute("openinference.span.kind", "EVALUATOR")
         span.set_attribute("evaluation.metrics", json.dumps(run.metrics_evaluated))
         span.set_attribute("evaluation.thresholds", json.dumps(run.thresholds))
+        span.set_attribute("evaluation.status", "pass" if run.pass_rate >= 1.0 else "fail")
+        if run.tracker_metadata:
+            project_name = run.tracker_metadata.get("project_name")
+            if project_name:
+                span.set_attribute("project.name", project_name)
+            project_kind = run.tracker_metadata.get("evaluation_task") or "evaluation"
+            span.set_attribute("project.kind", project_kind)
+            span.set_attribute("project.status", "pass" if run.pass_rate >= 1.0 else "fail")
 
         # Log average scores for each metric
         for metric_name, summary in metric_summary.items():
@@ -369,6 +430,8 @@ class PhoenixAdapter(TrackerPort):
             },
             "metrics": metric_summary,
             "custom_metrics": (run.tracker_metadata or {}).get("custom_metric_snapshot"),
+            "prompt_metadata": (run.tracker_metadata or {}).get("phoenix", {}).get("prompts"),
+            "tracker_metadata": run.tracker_metadata,
             "test_cases": [
                 {
                     "test_case_id": result.test_case_id,
@@ -420,6 +483,23 @@ class PhoenixAdapter(TrackerPort):
             f"test-case-{result.test_case_id}",
             context=context,
         ) as span:
+            try:
+                from opentelemetry.trace import Status, StatusCode
+
+                span.set_status(Status(StatusCode.OK if result.all_passed else StatusCode.ERROR))
+            except Exception:
+                pass
+            span.set_attribute("openinference.span.kind", "EVALUATOR")
+            span.set_attribute("evaluation.status", "pass" if result.all_passed else "fail")
+            self._annotate_span(
+                span=span,
+                name="evaluation_result",
+                label="pass" if result.all_passed else "fail",
+                score=1.0 if result.all_passed else 0.0,
+                explanation="All metrics passed"
+                if result.all_passed
+                else "One or more metrics failed",
+            )
             # Input data
             safe_question = sanitize_text(result.question, max_chars=MAX_LOG_CHARS) or ""
             safe_answer = sanitize_text(result.answer, max_chars=MAX_LOG_CHARS) or ""
@@ -439,6 +519,10 @@ class PhoenixAdapter(TrackerPort):
             # Metrics
             span.set_attribute("output.all_passed", result.all_passed)
             span.set_attribute("output.tokens_used", result.tokens_used)
+            if result.tokens_used:
+                span.set_attribute("llm.token_count.total", result.tokens_used)
+            if result.cost_usd is not None:
+                span.set_attribute("llm.cost.total", result.cost_usd)
 
             for metric in result.metrics:
                 span.set_attribute(f"metric.{metric.name}.score", metric.score)
@@ -486,6 +570,7 @@ class PhoenixAdapter(TrackerPort):
                 )
             if result.latency_ms:
                 span.set_attribute("timing.latency_ms", result.latency_ms)
+                span.set_attribute("evaluation.latency_ms", result.latency_ms)
 
     def log_retrieval(
         self,
@@ -528,6 +613,13 @@ class PhoenixAdapter(TrackerPort):
         if tracer is None:
             raise RuntimeError("Phoenix tracer is not initialized")
         with tracer.start_span("retrieval", context=context) as span:
+            try:
+                from opentelemetry.trace import Status, StatusCode
+
+                span.set_status(Status(StatusCode.OK))
+            except Exception:
+                pass
+            span.set_attribute("openinference.span.kind", "RETRIEVER")
             # Set retrieval attributes
             for key, value in data.to_span_attributes().items():
                 span.set_attribute(key, value)
@@ -541,14 +633,24 @@ class PhoenixAdapter(TrackerPort):
 
             span.set_attribute("spec.version", "0.1")
             span.set_attribute("rag.module", "retrieve")
+            if data.retrieval_time_ms:
+                span.set_attribute("retrieval.latency_ms", data.retrieval_time_ms)
 
             documents_payload = _build_retrieval_payload(data.candidates)
             span.set_attribute("custom.retrieval.doc_count", len(documents_payload))
             if documents_payload:
                 span.set_attribute("retrieval.documents_json", serialize_json(documents_payload))
-                doc_ids = _extract_doc_ids(documents_payload)
-                if doc_ids:
-                    span.set_attribute("output.value", doc_ids)
+                previews = [
+                    item.get("content_preview")
+                    for item in documents_payload
+                    if item.get("content_preview")
+                ]
+                if previews:
+                    span.set_attribute("output.value", previews)
+                else:
+                    doc_ids = _extract_doc_ids(documents_payload)
+                    if doc_ids:
+                        span.set_attribute("output.value", doc_ids)
 
             # Log each retrieved document as an event
             for i, doc in enumerate(data.candidates):
@@ -615,9 +717,30 @@ class PhoenixAdapter(TrackerPort):
         if tracer is None:
             raise RuntimeError("Phoenix tracer is not initialized")
         with tracer.start_span("generation", context=context) as span:
+            try:
+                from opentelemetry.trace import Status, StatusCode
+
+                span.set_status(Status(StatusCode.OK))
+            except Exception:
+                pass
+            span.set_attribute("openinference.span.kind", "LLM")
             # Set generation attributes
             for key, value in data.to_span_attributes().items():
                 span.set_attribute(key, value)
+
+            if data.model:
+                span.set_attribute("llm.model_name", data.model)
+                provider = data.model.split("/")[0] if "/" in data.model else ""
+                if provider:
+                    span.set_attribute("llm.provider", provider)
+            if data.input_tokens:
+                span.set_attribute("llm.token_count.prompt", data.input_tokens)
+            if data.output_tokens:
+                span.set_attribute("llm.token_count.completion", data.output_tokens)
+            if data.total_tokens:
+                span.set_attribute("llm.token_count.total", data.total_tokens)
+            if data.cost_usd is not None:
+                span.set_attribute("llm.cost.total", data.cost_usd)
 
             # Set prompt/response (truncate if too long)
             prompt = sanitize_text(data.prompt, max_chars=MAX_LOG_CHARS) or ""
@@ -637,6 +760,13 @@ class PhoenixAdapter(TrackerPort):
                 safe_template = sanitize_text(data.prompt_template, max_chars=MAX_LOG_CHARS)
                 if safe_template:
                     span.set_attribute("generation.prompt_template", safe_template)
+                    span.set_attribute("llm.prompt_template.template", safe_template)
+                    span.set_attribute("llm.prompt_template.version", "v1")
+            prompt_vars = data.metadata.get("prompt_variables") if data.metadata else None
+            if prompt_vars:
+                span.set_attribute(
+                    "llm.prompt_template.variables", json.dumps(prompt_vars, default=str)
+                )
 
     def log_rag_trace(self, data: RAGTraceData) -> str:
         """Log a full RAG trace (retrieval + generation) to Phoenix."""
@@ -660,6 +790,8 @@ class PhoenixAdapter(TrackerPort):
             span = self._active_spans[trace_id]
             should_end = True
 
+        span.set_attribute("openinference.span.kind", "CHAIN")
+
         for key, value in data.to_span_attributes().items():
             span.set_attribute(key, value)
 
@@ -667,11 +799,21 @@ class PhoenixAdapter(TrackerPort):
             self.log_retrieval(trace_id, data.retrieval)
         if data.generation:
             self.log_generation(trace_id, data.generation)
+        output_preview = ""
         if data.final_answer:
-            preview = sanitize_text(data.final_answer, max_chars=MAX_LOG_CHARS)
-            if preview:
-                span.set_attribute("rag.final_answer", preview)
-                span.set_attribute("output.value", preview)
+            output_preview = sanitize_text(data.final_answer, max_chars=MAX_LOG_CHARS)
+        if not output_preview and data.generation and data.generation.response:
+            output_preview = sanitize_text(data.generation.response, max_chars=MAX_LOG_CHARS)
+        if not output_preview and data.retrieval:
+            previews = [
+                sanitize_text(doc.content, max_chars=MAX_CONTEXT_CHARS)
+                for doc in data.retrieval.candidates
+                if doc.content
+            ]
+            output_preview = "\n".join(previews[:3])
+        if output_preview:
+            span.set_attribute("rag.final_answer", output_preview)
+            span.set_attribute("output.value", output_preview)
 
         if safe_query:
             span.set_attribute("input.value", safe_query)
@@ -697,7 +839,14 @@ def _build_retrieval_payload(
     payload: list[dict[str, Any]] = []
     for index, doc in enumerate(documents, start=1):
         doc_id = doc.chunk_id or doc.source or doc.metadata.get("doc_id") or f"doc_{index}"
-        item: dict[str, Any] = {"doc_id": doc_id, "score": doc.score}
+        preview = ""
+        if doc.content:
+            preview = sanitize_text(doc.content, max_chars=MAX_CONTEXT_CHARS)
+        item: dict[str, Any] = {
+            "doc_id": doc_id,
+            "score": doc.score,
+            "content_preview": preview,
+        }
         if doc.source:
             item["source"] = doc.source
         if doc.rerank_score is not None:
