@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "../components/Layout";
 import {
     type DatasetItem,
@@ -55,6 +55,7 @@ const formatEta = (seconds: number | null) => {
 };
 
 export function EvaluationStudio() {
+    const lastLogRef = useRef<string>("");
     const navigate = useNavigate();
 
     // Options
@@ -81,7 +82,7 @@ export function EvaluationStudio() {
     const [retrieverUploading, setRetrieverUploading] = useState(false);
     const [enableMemory, setEnableMemory] = useState<boolean>(false);
     const [stageStore, setStageStore] = useState<boolean>(true);
-    const [tracker, setTracker] = useState<"none" | "phoenix" | "langfuse" | "mlflow">("phoenix");
+    const [tracker, setTracker] = useState<"none" | "phoenix" | "mlflow" | "mlflow+phoenix">("phoenix");
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [batchSize, setBatchSize] = useState<number>(1);
     const [thresholdProfile, setThresholdProfile] = useState<"none" | "summary" | "qa">("none");
@@ -233,8 +234,15 @@ export function EvaluationStudio() {
                     setSelectedModel(matched?.id || modelList[0].id);
                 }
 
-                const trackerCandidate = cfg?.tracker_provider;
-                if (trackerCandidate === "phoenix" || trackerCandidate === "langfuse" || trackerCandidate === "mlflow" || trackerCandidate === "none") {
+                const trackerCandidate = String(cfg?.tracker_provider ?? "").toLowerCase();
+                if (trackerCandidate === "default" || trackerCandidate === "all") {
+                    setTracker("mlflow+phoenix");
+                } else if (
+                    trackerCandidate === "phoenix"
+                    || trackerCandidate === "mlflow"
+                    || trackerCandidate === "mlflow+phoenix"
+                    || trackerCandidate === "none"
+                ) {
                     setTracker(trackerCandidate);
                 }
             } catch (err) {
@@ -332,6 +340,14 @@ export function EvaluationStudio() {
         try {
             const systemPromptValue = systemPrompt.trim();
             const ragasPromptValue = ragasPromptsYaml.trim();
+            const appendLog = (value: string) => {
+                const msg = value.trim();
+                if (!msg) return;
+                if (lastLogRef.current === msg) return;
+                lastLogRef.current = msg;
+                setLogs(prev => [...prev, msg]);
+            };
+
             const result = await startEvaluation({
                 dataset_path: selectedDataset,
                 model: selectedModel,
@@ -368,9 +384,10 @@ export function EvaluationStudio() {
                     setProgress(percent);
                     setProgressMessage(message);
                     setProgressStats({ current, total, etaSeconds, rate });
+                    appendLog(message);
                 } else if (event.type === "info" || event.type === "warning" || event.type === "step") {
                     const msg = event.message || "";
-                    setLogs(prev => [...prev, msg]);
+                    appendLog(msg);
                     setProgressMessage(msg);
                 }
             });
@@ -958,21 +975,21 @@ export function EvaluationStudio() {
                                 <div>
                                     <h3 className="text-sm font-medium mb-3">Observability Tracker</h3>
                                     <p className="text-xs text-muted-foreground mb-3">
-                                        Phoenix는 로컬 UI에서 trace/metrics를 확인합니다. Langfuse/MLflow는 별도 설정이 필요합니다.
+                                        Phoenix는 로컬 UI에서 trace/metrics를 확인합니다. MLflow는 별도 설정이 필요합니다.
                                     </p>
                                     <div className="tab-shell">
-                                        {(["none", "phoenix", "langfuse", "mlflow"] as const).map(t => (
-                                            <button
-                                                key={t}
-                                                onClick={() => setTracker(t)}
-                                                className={`tab-pill capitalize ${tracker === t
-                                                    ? "tab-pill-active"
-                                                    : "tab-pill-inactive"}`}
-                                            >
-                                                {t}
-                                            </button>
-                                        ))}
-                                    </div>
+                                        {(["none", "phoenix", "mlflow", "mlflow+phoenix"] as const).map(t => (
+                                             <button
+                                                 key={t}
+                                                 onClick={() => setTracker(t)}
+                                                 className={`tab-pill capitalize ${tracker === t
+                                                     ? "tab-pill-active"
+                                                     : "tab-pill-inactive"}`}
+                                             >
+                                                 {t}
+                                             </button>
+                                         ))}
+                                     </div>
                                     {tracker === "phoenix" && (
                                         <div className="mt-3 space-y-2 text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1">
                                             {phoenixUiUrl && (

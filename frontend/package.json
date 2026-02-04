@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-sdk/react": "^3.0.71",
     "@radix-ui/react-slot": "^1.2.4",
+    "ai": "^6.0.69",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "plotly.js-dist-min": "^2.30.0",

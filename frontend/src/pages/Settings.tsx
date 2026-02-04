@@ -72,9 +72,9 @@ const FALLBACK_PROVIDER_OPTIONS: FieldOption[] = [
 
 const TRACKER_OPTIONS: FieldOption[] = [
     { label: "사용 안 함", value: "none" },
-    { label: "Langfuse", value: "langfuse" },
     { label: "Phoenix", value: "phoenix" },
     { label: "MLflow", value: "mlflow" },
+    { label: "MLflow + Phoenix", value: "mlflow+phoenix" },
 ];
 
 const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
@@ -219,12 +219,6 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
         max: 1,
         step: 0.1,
     },
-    langfuse_host: {
-        key: "langfuse_host",
-        label: "Langfuse Host",
-        type: "text",
-        placeholder: "https://cloud.langfuse.com",
-    },
     mlflow_tracking_uri: {
         key: "mlflow_tracking_uri",
         label: "MLflow Tracking URI",
@@ -348,7 +342,6 @@ const SECTION_FIELDS = {
         "phoenix_enabled",
         "phoenix_endpoint",
         "phoenix_sample_rate",
-        "langfuse_host",
         "mlflow_tracking_uri",
         "mlflow_experiment_name",
     ],
@@ -387,6 +380,10 @@ const buildDraftFromConfig = (config: SystemConfig): DraftState => {
     const next: DraftState = {};
     FIELD_META.forEach((field) => {
         const value = config[field.key];
+        if (field.key === "mlflow_tracking_uri" && (value === null || value === undefined || value === "")) {
+            next[field.key] = "http://localhost:5000";
+            return;
+        }
         if (field.type === "toggle") {
             next[field.key] = Boolean(value);
             return;
@@ -506,7 +503,7 @@ export function Settings() {
             {
                 id: "tracking",
                 title: "Tracing / Tracking",
-                note: "Langfuse/Phoenix 키는 환경변수에서 설정합니다.",
+                note: "Phoenix 키는 환경변수에서 설정합니다.",
                 icon: Shield,
                 fields: resolveFields(SECTION_FIELDS.tracking),
             },
