@@ -19,12 +19,9 @@ def build_storage_adapter(
 ) -> StoragePort:
     resolved_settings = settings or Settings()
 
-    if db_path is not None:
-        return SQLiteStorageAdapter(db_path=db_path)
-
     backend = getattr(resolved_settings, "db_backend", "postgres")
     if backend == "sqlite":
-        resolved_db_path = resolved_settings.evalvault_db_path
+        resolved_db_path = db_path or resolved_settings.evalvault_db_path
         if resolved_db_path is None:
             raise RuntimeError("SQLite backend selected but evalvault_db_path is not set.")
         return SQLiteStorageAdapter(db_path=resolved_db_path)
