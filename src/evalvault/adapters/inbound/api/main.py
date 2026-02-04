@@ -15,6 +15,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.responses import JSONResponse
 
 from evalvault.adapters.inbound.api.adapter import WebUIAdapter, create_adapter
+from evalvault.config.runtime_services import ensure_local_observability
 from evalvault.config.settings import Settings, get_settings, is_production_profile
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize adapter
     adapter = create_adapter()
     app.state.adapter = adapter
+    ensure_local_observability(get_settings())
     try:
         from evalvault.adapters.inbound.api.routers.chat import warm_rag_index
 

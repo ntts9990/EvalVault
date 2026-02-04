@@ -424,7 +424,7 @@ def create_method_app(console: Console) -> typer.Typer:
         if eval_output:
             _save_results(eval_output, result, console)
 
-        _save_to_db(db_path, result, console)
+        _save_to_db(settings, db_path, result, console)
 
     return method_app
 

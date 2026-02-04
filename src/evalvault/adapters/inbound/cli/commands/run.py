@@ -875,7 +875,7 @@ def register_run_commands(
         if profile_name:
             settings = apply_profile(settings, profile_name)
 
-        if db_path is None:
+        if db_path is None and settings.db_backend == "sqlite":
             db_path = Path(settings.evalvault_db_path)
 
         excel_output: Path | None = None
@@ -1221,6 +1221,7 @@ def register_run_commands(
                     for turn in conversation.turn_results:
                         turn_results.append(turn)
                 _save_multiturn_to_db(
+                    settings,
                     db_path,
                     run_record,
                     conversation_records,
@@ -1670,7 +1671,7 @@ def register_run_commands(
             raise typer.Exit(2) from exc
 
         effective_tracker = tracker
-        if langfuse and tracker == "none" and not preset.default_tracker:
+        if langfuse:
             effective_tracker = "langfuse"
             print_cli_warning(
                 console,
@@ -1688,7 +1689,7 @@ def register_run_commands(
         if phoenix_experiment and not phoenix_dataset_name:
             phoenix_dataset_name = f"{ds.name}:{ds.version}"
 
-        auto_phoenix_sync = "phoenix" in effective_providers
+        auto_phoenix_sync = "phoenix" in effective_providers and not stream
         if auto_phoenix_sync and not phoenix_dataset_name:
             phoenix_dataset_name = f"{ds.name}:{ds.version}"
 
@@ -1703,8 +1704,11 @@ def register_run_commands(
 
         if phoenix_dataset_name or phoenix_experiment or auto_phoenix_sync:
             try:
+                phoenix_endpoint = getattr(settings, "phoenix_endpoint", None)
+                if not isinstance(phoenix_endpoint, str) or not phoenix_endpoint.strip():
+                    phoenix_endpoint = "http://localhost:6006/v1/traces"
                 phoenix_sync_service = PhoenixSyncService(
-                    endpoint=settings.phoenix_endpoint,
+                    endpoint=phoenix_endpoint,
                     api_token=getattr(settings, "phoenix_api_token", None),
                 )
             except PhoenixSyncError as exc:
@@ -2304,6 +2308,7 @@ def register_run_commands(
         db_started_at = datetime.now()
         _log_timestamp(console, verbose, "DB 저장 시작")
         _save_to_db(
+            settings,
             db_path,
             result,
             console,

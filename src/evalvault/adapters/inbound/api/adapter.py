@@ -567,11 +567,31 @@ class WebUIAdapter:
 
         # 2. 진행률 초기화
         start_time = time.monotonic()
+        total_cases = len(dataset.test_cases)
+
+        def emit_progress(message: str, *, status: str = "running") -> None:
+            if not on_progress:
+                return
+            elapsed = time.monotonic() - start_time
+            rate = (total_cases / elapsed) if total_cases > 0 and elapsed > 0 else None
+            on_progress(
+                EvalProgress(
+                    current=total_cases,
+                    total=total_cases,
+                    current_metric=message,
+                    percent=100.0 if total_cases > 0 else 0.0,
+                    status=status,
+                    elapsed_seconds=elapsed,
+                    eta_seconds=0.0,
+                    rate=rate,
+                )
+            )
+
         if on_progress:
             on_progress(
                 EvalProgress(
                     current=0,
-                    total=len(dataset.test_cases),
+                    total=total_cases,
                     current_metric="",
                     percent=0.0,
                     status="running",
@@ -728,6 +748,7 @@ class WebUIAdapter:
             )
 
         if trackers:
+            emit_progress("Logging trackers...", status="finalizing")
             result.tracker_metadata.setdefault("tracker_providers", tracker_providers)
             for provider, tracker in trackers:
                 try:
@@ -750,6 +771,7 @@ class WebUIAdapter:
                     raise RuntimeError(f"Tracker logging failed for {provider}: {exc}") from exc
 
         if stage_store and self._storage and hasattr(self._storage, "save_stage_events"):
+            emit_progress("Storing stage events...", status="finalizing")
             try:
                 prompt_metadata_entries = self._build_prompt_metadata_entries(prompt_bundle)
                 stage_event_builder = StageEventBuilder()
@@ -791,6 +813,7 @@ class WebUIAdapter:
 
         # 5. 결과 저장
         if self._storage:
+            emit_progress("Saving evaluation run...", status="finalizing")
             logger.info(f"Saving evaluation run: {result.run_id}")
             if prompt_bundle:
                 self._storage.save_prompt_set(prompt_bundle)

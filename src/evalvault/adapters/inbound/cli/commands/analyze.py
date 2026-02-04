@@ -358,6 +358,11 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
         profile: str | None = profile_option(
             help_text="비교 리포트용 LLM 프로필 (dev, prod, openai)",
         ),
+        use_llm_report: bool = typer.Option(
+            True,
+            "--use-llm-report/--no-llm-report",
+            help="LLM 보고서 사용 여부",
+        ),
     ) -> None:
         """두 실행을 통계적으로 비교합니다."""
 
@@ -461,7 +466,7 @@ def register_analyze_commands(app: typer.Typer, console: Console) -> None:
                 compare_metrics=metric_list,
                 test_type=test,
                 report_type="comparison",
-                use_llm_report=True,
+                use_llm_report=use_llm_report,
             )
 
         artifacts_dir = resolve_artifact_dir(

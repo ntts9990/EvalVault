@@ -14,6 +14,8 @@ import typer
 from rich import print as rprint
 from rich.console import Console
 
+from evalvault.config.runtime_services import ensure_local_observability
+from evalvault.config.settings import get_settings
 from evalvault.domain.metrics.registry import list_metric_names
 
 from .commands import attach_sub_apps, register_all_commands
@@ -61,6 +63,7 @@ def main(
     ),
 ) -> None:
     """EvalVault - RAG evaluation system."""
+    ensure_local_observability(get_settings())
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -345,20 +345,18 @@ def _get_tracker(
         )
 
     elif tracker_type == "mlflow":
-        if not settings.mlflow_tracking_uri:
-            message = "MLflow tracking URI가 설정되지 않았습니다."
-            tips = ["MLFLOW_TRACKING_URI 환경 변수를 설정하세요."]
-            if required:
-                print_cli_error(console, message, fixes=tips)
-                raise typer.Exit(2)
-            print_cli_warning(console, message + " 로깅을 건너뜁니다.", tips=tips)
-            return None
+        tracking_uri = getattr(settings, "mlflow_tracking_uri", None)
+        if not isinstance(tracking_uri, str) or not tracking_uri.strip():
+            tracking_uri = f"sqlite:///{Path.cwd() / 'mlruns.db'}"
+        experiment_name = getattr(settings, "mlflow_experiment_name", None)
+        if not isinstance(experiment_name, str) or not experiment_name.strip():
+            experiment_name = "evalvault"
         try:
             from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
 
             return MLflowAdapter(
-                tracking_uri=settings.mlflow_tracking_uri,
-                experiment_name=settings.mlflow_experiment_name,
+                tracking_uri=tracking_uri,
+                experiment_name=experiment_name,
             )
         except ImportError:
             message = "MLflow extra가 설치되지 않았습니다."
@@ -373,8 +371,11 @@ def _get_tracker(
         try:
             from evalvault.adapters.outbound.tracker.phoenix_adapter import PhoenixAdapter
 
+            endpoint = getattr(settings, "phoenix_endpoint", None)
+            if not isinstance(endpoint, str) or not endpoint.strip():
+                endpoint = "http://localhost:6006/v1/traces"
             return PhoenixAdapter(
-                endpoint=settings.phoenix_endpoint,
+                endpoint=endpoint,
                 service_name="evalvault",
                 project_name=getattr(settings, "phoenix_project_name", None),
                 annotations_enabled=getattr(settings, "phoenix_annotations_enabled", True),
@@ -407,9 +408,6 @@ def _resolve_tracker_list(tracker_type: str) -> list[str]:
     unknown = [entry for entry in providers if entry not in supported]
     if unknown:
         raise ValueError(f"Unknown tracker provider(s): {', '.join(unknown)}")
-    required = {"mlflow", "phoenix"}
-    if not required.issubset(set(providers)):
-        raise ValueError("tracker must include both 'mlflow' and 'phoenix'")
     return providers
 
 
@@ -555,6 +553,7 @@ def _log_analysis_artifacts(
 
 
 def _save_to_db(
+    settings: Settings,
     db_path: Path | None,
     result,
     console: Console,
@@ -563,7 +562,7 @@ def _save_to_db(
     export_excel: bool = True,
 ) -> None:
     """Persist evaluation run (and optional prompt set) to database."""
-    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+    storage = build_storage_adapter(settings=settings, db_path=db_path)
     storage_label = (
         "PostgreSQL" if isinstance(storage, PostgreSQLStorageAdapter) else f"SQLite ({db_path})"
     )
@@ -607,6 +606,7 @@ def _save_to_db(
 
 
 def _save_multiturn_to_db(
+    settings: Settings,
     db_path: Path | None,
     run_record: MultiTurnRunRecord,
     conversations: list[MultiTurnConversationRecord],
@@ -618,7 +618,7 @@ def _save_multiturn_to_db(
     metric_thresholds: dict[str, float] | None = None,
 ) -> None:
     """Persist multiturn evaluation run to database."""
-    storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+    storage = build_storage_adapter(settings=settings, db_path=db_path)
     storage_label = (
         "PostgreSQL" if isinstance(storage, PostgreSQLStorageAdapter) else f"SQLite ({db_path})"
     )
@@ -840,6 +840,8 @@ def log_phoenix_traces(
         return 0
 
     limit = max_traces if max_traces is not None else run.total_test_cases
+    if not isinstance(limit, int):
+        limit = None
 
     count = 0
     for result in run.results:
