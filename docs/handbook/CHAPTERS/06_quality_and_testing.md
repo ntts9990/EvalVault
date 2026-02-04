@@ -171,9 +171,14 @@ CI는 문서가 깨지지 않도록 docs build/link check를 수행한다.
 
 ### 5.5 GitHub Actions 회귀 게이트 워크플로
 
-레포에는 “main에서 baseline DB artifact를 저장”하고 “PR에서 baseline을 가져와 비교/코멘트”하는 워크플로가 있다.
+레포에는 "main에서 baseline DB artifact를 저장"하고 "PR에서 baseline을 가져와 비교/코멘트"하는 워크플로가 있다.
 
 - 워크플로: `.github/workflows/regression-gate.yml`
+
+#### 최근 진행(워크로그 기준)
+
+[2026-01-27] CI regression gate runner 추가, ci suite config 설정, CI job 통합, PR 코멘트 포맷터 확장(pr-comment format), 단위 테스트 10+ 추가.
+자세한 내용: `.sisyphus/notepads/p7-regression/worklog.md`
 
 ---
 

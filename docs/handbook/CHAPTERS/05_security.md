@@ -24,6 +24,15 @@ EvalVault는 일반적인 웹 서비스와 달리 아래가 동시에 존재한�
 - 트래커(Langfuse/Phoenix/MLflow)는 payload를 그대로 보내지 않고 sanitize(PII 마스킹/길이 제한)를 적용한다. (근거: `src/evalvault/adapters/outbound/tracker/log_sanitizer.py`, 각 tracker adapter)
 - MCP는 “도구 allowlist + 파일 경로 allowlist”로 임의 파일 접근을 막는다. (근거: `src/evalvault/adapters/inbound/api/routers/mcp.py`, `src/evalvault/adapters/inbound/mcp/tools.py`)
 
+## 현재 보안 작업 상태(SSoT)
+
+보안 작업의 최신 상태는 `docs/security_audit_worklog.md`가 단일 근거다.
+
+- P0/P1/P2 보안 하드닝 항목은 DONE으로 정리됨.
+- P3-01 SSO(OIDC/SAML) 로드맵은 IN-PROGRESS.
+- POST-01 `.env` 정리 및 키 회전은 TODO(모든 작업 이후).
+- 다음 작업 후보: 프로바이더 필수값 검증 보강, CORS 형식/런타임 반영, 저장소 암호화/Export 민감정보 보호, 감사 로그/권한 정책 포트 설계, SSO 상세 설계.
+
 ## 목표
 
 - 팀의 보안 기본 규칙(what/where/how)을 합의된 형태로 고정한다.

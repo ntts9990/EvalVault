@@ -182,7 +182,7 @@ Settings는 특정 필드에서 `secret://...`을 감지하면 provider를 통�
 
 ```bash
 cp .env.offline.example .env.offline
-docker compose --env-file .env.offline -f docker-compose.offline.yml up -d
+docker compose --env-file .env.offline -f docker-compose.offline.yml up -d --no-build --pull never
 ```
 
 근거: `docs/guides/OFFLINE_DOCKER.md`
@@ -309,6 +309,21 @@ uv run evalvault stage summary <RUN_ID> --db data/db/evalvault.db
 - history/export: `src/evalvault/adapters/inbound/cli/commands/history.py`
 - 아티팩트 작성/목차: `src/evalvault/adapters/inbound/cli/utils/analysis_io.py`
 - Phoenix/Langfuse 링크 추출 유틸: `src/evalvault/config/phoenix_support.py`, `src/evalvault/config/langfuse_support.py`
+
+---
+
+## 9) 운영 작업 로그(최근)
+
+운영 관련 변경은 아래 worklog에 append-only로 기록한다.
+
+- P0 설정/프로필 검증: `.sisyphus/notepads/p0-settings/worklog.md`
+- P1 Web UI 운영 항목: `.sisyphus/notepads/p1-webui/worklog.md`
+- P2 관측/멀티턴 평가: `.sisyphus/notepads/p2-observability/worklog.md`
+- P3 성능/데이터 로더: `.sisyphus/notepads/p3-performance/worklog.md`
+- P7 회귀 게이트: `.sisyphus/notepads/p7-regression/worklog.md`
+- P9 오프라인 운영: `.sisyphus/notepads/p9-offline/worklog.md`
+
+최근 항목은 00_overview의 “최근 작업 로그(SSoT 요약)”과 동일 근거를 공유한다.
 
 ---
 

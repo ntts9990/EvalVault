@@ -209,6 +209,28 @@ git ls-files docs | wc -l
 
 ---
 
+## 최근 작업 로그(SSoT 요약)
+
+아래는 최신 작업 현황의 요약이며, 단일 근거는 `.sisyphus/notepads/*/worklog.md`다.
+
+- [2026-01-26 19:45] P0 설정 검증 강화: `apply_profile` 누락/오류 프로필 에러 처리 + 단위 테스트 추가.
+- [2026-01-26 21:05] 데이터 로더 개선: CSV/Excel에서 `summary_tags/summary_intent/metadata` 컬럼 파싱 + 테스트 추가.
+- [2026-01-27 10:28] 오프라인 개선: 벤치마크 CLI 로컬 임베딩 프로필 옵션, 데이터셋 번들/복원 스크립트, 오프라인 문서 보강.
+- [2026-01-27 14:30] 회귀 게이트: PR 코멘트 포맷터 테스트 및 ci-gate 출력 테스트 추가.
+- [2026-01-27 15:25] JudgeCalibration Web UI: 페이지/라우팅/클라이언트 + Playwright e2e 테스트 추가.
+- [2026-01-27 18:05] 멀티턴 평가: DB 스키마/저장/내보내기/Excel 스펙 추가, SQLite 저장 테스트 추가.
+
+근거 파일:
+
+- `.sisyphus/notepads/p0-settings/worklog.md`
+- `.sisyphus/notepads/p3-performance/worklog.md`
+- `.sisyphus/notepads/p9-offline/worklog.md`
+- `.sisyphus/notepads/p7-regression/worklog.md`
+- `.sisyphus/notepads/p1-webui/worklog.md`
+- `.sisyphus/notepads/p2-observability/worklog.md`
+
+---
+
 ## 핸드북 작성 철학(거짓 정보 방지 규칙)
 
 ### 1) ‘정답’ 우선순위
