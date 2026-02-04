@@ -164,6 +164,20 @@ class PhoenixAdapter(TrackerPort):
             from opentelemetry.trace import format_span_id
 
             span_id = format_span_id(span.get_span_context().span_id)
+            spans_client = getattr(client, "spans", None)
+            add_span_annotation = (
+                getattr(spans_client, "add_span_annotation", None) if spans_client else None
+            )
+            if callable(add_span_annotation):
+                add_span_annotation(
+                    annotation_name=name,
+                    annotator_kind="CODE",
+                    span_id=span_id,
+                    label=label,
+                    score=score,
+                    explanation=explanation,
+                )
+                return
             client.annotations.add_span_annotation(
                 annotation_name=name,
                 annotator_kind="CODE",
@@ -339,6 +353,7 @@ class PhoenixAdapter(TrackerPort):
 
         # Calculate per-metric summary
         metric_summary = {}
+        total_count = len(run.results) if run.results else 0
         for metric_name in run.metrics_evaluated:
             passed_count = sum(
                 1
@@ -351,9 +366,9 @@ class PhoenixAdapter(TrackerPort):
                 "average_score": round(avg_score, 4) if avg_score else 0.0,
                 "threshold": threshold,
                 "passed": passed_count,
-                "failed": len(run.results) - passed_count,
-                "total": len(run.results),
-                "pass_rate": round(passed_count / len(run.results), 4) if run.results else 0.0,
+                "failed": total_count - passed_count,
+                "total": total_count,
+                "pass_rate": round(passed_count / total_count, 4) if total_count else 0.0,
             }
 
         # Start root trace
@@ -805,11 +820,13 @@ class PhoenixAdapter(TrackerPort):
         if not output_preview and data.generation and data.generation.response:
             output_preview = sanitize_text(data.generation.response, max_chars=MAX_LOG_CHARS)
         if not output_preview and data.retrieval:
-            previews = [
-                sanitize_text(doc.content, max_chars=MAX_CONTEXT_CHARS)
-                for doc in data.retrieval.candidates
-                if doc.content
-            ]
+            previews: list[str] = []
+            for doc in data.retrieval.candidates:
+                if not doc.content:
+                    continue
+                preview = sanitize_text(doc.content, max_chars=MAX_CONTEXT_CHARS)
+                if preview:
+                    previews.append(preview)
             output_preview = "\n".join(previews[:3])
         if output_preview:
             span.set_attribute("rag.final_answer", output_preview)

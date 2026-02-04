@@ -21,6 +21,7 @@ def mock_mlflow_module():
     mock_mlflow.log_param = MagicMock()
     mock_mlflow.log_metric = MagicMock()
     mock_mlflow.log_artifact = MagicMock()
+    mock_mlflow.trace = None
 
     # Add mlflow to sys.modules to make import work
     sys.modules["mlflow"] = mock_mlflow
@@ -80,7 +81,10 @@ class TestMLflowAdapterTraceManagement:
         trace_id = adapter.start_trace("test-run")
 
         assert trace_id == "mlflow-run-123"
-        mock_mlflow_module.start_run.assert_called_with(run_name="test-run")
+        mock_mlflow_module.start_run.assert_called_with(
+            run_name="test-run",
+            log_system_metrics=True,
+        )
         assert trace_id in adapter._active_runs
 
     def test_start_trace_with_metadata(self, mock_mlflow_module):
@@ -184,16 +188,14 @@ class TestMLflowAdapterSpanManagement:
         mock_mlflow_module.start_run.return_value = mock_run
         return MLflowAdapter()
 
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.tempfile.NamedTemporaryFile")
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.MLflowAdapter._write_temp_file")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json.dumps")
     def test_add_span_with_input_and_output(
-        self, mock_json, mock_tempfile, adapter, mock_mlflow_module
+        self, mock_json_dumps, mock_write_temp, adapter, mock_mlflow_module
     ):
         """Test adding a span with input and output data."""
-        # Setup temp file mock
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/test.json"
-        mock_tempfile.return_value.__enter__.return_value = mock_file
+        mock_write_temp.return_value = "/tmp/test.json"
+        mock_json_dumps.return_value = '{"ok": true}'
 
         trace_id = adapter.start_trace("test-run")
 
@@ -202,9 +204,9 @@ class TestMLflowAdapterSpanManagement:
 
         adapter.add_span(trace_id, "test-span", input_data, output_data)
 
-        # Verify JSON was dumped with correct data
-        mock_json.dump.assert_called_once()
-        span_data = mock_json.dump.call_args[0][0]
+        # Verify JSON payload was created with correct data
+        mock_json_dumps.assert_called_once()
+        span_data = mock_json_dumps.call_args[0][0]
         assert span_data["name"] == "test-span"
         assert span_data["input"] == input_data
         assert span_data["output"] == output_data
@@ -212,19 +214,20 @@ class TestMLflowAdapterSpanManagement:
         # Verify artifact was logged
         mock_mlflow_module.log_artifact.assert_called_once_with("/tmp/test.json", "spans/test-span")
 
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.tempfile.NamedTemporaryFile")
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json")
-    def test_add_span_without_data(self, mock_json, mock_tempfile, adapter, mock_mlflow_module):
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.MLflowAdapter._write_temp_file")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json.dumps")
+    def test_add_span_without_data(
+        self, mock_json_dumps, mock_write_temp, adapter, mock_mlflow_module
+    ):
         """Test adding a span without input/output data."""
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/test.json"
-        mock_tempfile.return_value.__enter__.return_value = mock_file
+        mock_write_temp.return_value = "/tmp/test.json"
+        mock_json_dumps.return_value = '{"ok": true}'
 
         trace_id = adapter.start_trace("test-run")
 
         adapter.add_span(trace_id, "empty-span")
 
-        span_data = mock_json.dump.call_args[0][0]
+        span_data = mock_json_dumps.call_args[0][0]
         assert span_data["name"] == "empty-span"
         assert span_data["input"] is None
         assert span_data["output"] is None
@@ -326,22 +329,22 @@ class TestMLflowAdapterArtifactSaving:
         mock_mlflow_module.start_run.return_value = mock_run
         return MLflowAdapter()
 
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.tempfile.NamedTemporaryFile")
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json")
-    def test_save_json_artifact(self, mock_json, mock_tempfile, adapter, mock_mlflow_module):
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.MLflowAdapter._write_temp_file")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json.dumps")
+    def test_save_json_artifact(
+        self, mock_json_dumps, mock_write_temp, adapter, mock_mlflow_module
+    ):
         """Test saving a JSON artifact."""
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/artifact.json"
-        mock_tempfile.return_value.__enter__.return_value = mock_file
+        mock_write_temp.return_value = "/tmp/artifact.json"
+        mock_json_dumps.return_value = '{"ok": true}'
 
         trace_id = adapter.start_trace("test-run")
 
         artifact_data = {"results": [1, 2, 3], "summary": "test"}
         adapter.save_artifact(trace_id, "results", artifact_data, "json")
 
-        # Verify JSON dump was called with correct data
-        mock_json.dump.assert_called_once()
-        assert mock_json.dump.call_args[0][0] == artifact_data
+        # Verify JSON payload was created with correct data
+        mock_json_dumps.assert_called_once_with(artifact_data, default=str)
 
         # Verify artifact was logged to correct path
         mock_mlflow_module.log_artifact.assert_called_with(
@@ -401,17 +404,16 @@ class TestMLflowAdapterEvaluationRun:
             total_tokens=220,
         )
 
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.tempfile.NamedTemporaryFile")
-    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.MLflowAdapter._write_temp_file")
+    @patch("evalvault.adapters.outbound.tracker.mlflow_adapter.json.dumps")
     def test_log_evaluation_run_success(
-        self, mock_json, mock_tempfile, mock_mlflow_module, sample_run
+        self, mock_json_dumps, mock_write_temp, mock_mlflow_module, sample_run
     ):
         """Test logging a complete evaluation run."""
         from evalvault.adapters.outbound.tracker.mlflow_adapter import MLflowAdapter
 
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/results.json"
-        mock_tempfile.return_value.__enter__.return_value = mock_file
+        mock_write_temp.return_value = "/tmp/results.json"
+        mock_json_dumps.return_value = '{"ok": true}'
 
         mock_run = MagicMock()
         mock_run.info.run_id = "mlflow-run-456"
@@ -444,9 +446,9 @@ class TestMLflowAdapterEvaluationRun:
         assert "duration_seconds" in metric_calls
 
         # Verify test results artifact was saved
-        assert mock_json.dump.called
-        # Get the first json.dump call (test_results), not the last (custom_metric_snapshot)
-        results_data = mock_json.dump.call_args_list[0][0][0]
+        assert mock_json_dumps.called
+        # Get the first json.dumps call (test_results)
+        results_data = mock_json_dumps.call_args_list[0][0][0]
         assert len(results_data) == 2
         assert results_data[0]["test_case_id"] == "tc-001"
         assert results_data[0]["all_passed"] is True

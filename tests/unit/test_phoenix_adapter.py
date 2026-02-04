@@ -276,7 +276,7 @@ class TestPhoenixSettings:
         # Check default values from field definitions
         assert fields["phoenix_endpoint"].default == "http://localhost:6006/v1/traces"
         assert fields["phoenix_enabled"].default is False
-        assert fields["tracker_provider"].default == "langfuse"
+        assert fields["tracker_provider"].default == "mlflow+phoenix"
 
 
 class TestTrackerModuleExports:

@@ -15,7 +15,7 @@ class PhoenixSyncError(RuntimeError):
 def _normalize_base_url(endpoint: str) -> str:
     """Convert OTLP endpoint (…/v1/traces) to Phoenix REST base URL."""
 
-    if not endpoint:
+    if not isinstance(endpoint, str) or not endpoint:
         return "http://localhost:6006"
     base = endpoint.strip()
     suffix = "/v1/traces"
