@@ -165,3 +165,9 @@ scratch/
 
 # Local artifacts
 MagicMock/
+
+# Manim renders
+media/
+
+# Local presentation workspace
+presentation_work/
