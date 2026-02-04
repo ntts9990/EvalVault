@@ -50,6 +50,15 @@ class MarkdownReportAdapter:
         # 통계 분석
         if bundle.statistical:
             sections.append(self._generate_statistical_section(bundle.statistical))
+            sections.append(self._generate_reason_section(bundle.statistical))
+            sections.append(self._generate_meaning_section(bundle.statistical))
+            sections.append(self._generate_dataset_delta_section(bundle.statistical))
+            sections.append(self._generate_improvement_plan_section(bundle.statistical))
+        else:
+            sections.append(self._generate_reason_section(None))
+            sections.append(self._generate_meaning_section(None))
+            sections.append(self._generate_dataset_delta_section(None))
+            sections.append(self._generate_improvement_plan_section(None))
 
         # NLP 분석
         if include_nlp and bundle.has_nlp and bundle.nlp:
@@ -206,6 +215,89 @@ class MarkdownReportAdapter:
             for insight in stat.insights:
                 lines.append(f"- {insight}")
 
+        return "\n".join(lines)
+
+    def _generate_reason_section(self, stat: StatisticalAnalysis | None) -> str:
+        lines = ["## 원인/근거"]
+        if stat is None:
+            lines.append(
+                "- 통계 분석 결과가 없어 원인/근거를 도출할 수 없습니다. (추가 데이터 필요)"
+            )
+            return "\n".join(lines)
+
+        if stat.low_performers:
+            for lp in stat.low_performers[:5]:
+                lines.append(
+                    f"- {lp.test_case_id}: {lp.metric_name} {lp.score:.2f} < {lp.threshold:.2f}"
+                )
+        elif stat.insights:
+            for insight in stat.insights[:5]:
+                lines.append(f"- {insight}")
+        else:
+            lines.append("- 추가 데이터 필요")
+        return "\n".join(lines)
+
+    def _generate_meaning_section(self, stat: StatisticalAnalysis | None) -> str:
+        lines = ["## 결과 의미"]
+        if stat is None:
+            lines.append("- 통계 분석 결과가 없어 의미를 해석할 수 없습니다. (추가 데이터 필요)")
+            return "\n".join(lines)
+
+        if stat.overall_pass_rate < 0.7:
+            lines.append("- 전체 통과율이 낮아 사용자 신뢰/정확성 리스크가 큽니다.")
+        else:
+            lines.append("- 전체 통과율이 기준 이상으로 기본 품질은 유지됩니다.")
+
+        low_metrics = [
+            metric for metric, rate in (stat.metric_pass_rates or {}).items() if rate < 0.7
+        ]
+        if low_metrics:
+            metrics_str = ", ".join(sorted(low_metrics)[:6])
+            lines.append(f"- 기준 미달 메트릭: {metrics_str}")
+        return "\n".join(lines)
+
+    def _generate_dataset_delta_section(self, stat: StatisticalAnalysis | None) -> str:
+        lines = ["## 데이터셋 차이"]
+        if stat is None:
+            lines.append("- 데이터셋 기준 차이를 판단할 수 없습니다. (추가 데이터 필요)")
+            return "\n".join(lines)
+
+        low_metrics = [
+            metric for metric, rate in (stat.metric_pass_rates or {}).items() if rate < 0.7
+        ]
+        if low_metrics:
+            lines.append("- 데이터셋 기준 미달 지표: " + ", ".join(sorted(low_metrics)[:6]))
+        else:
+            lines.append("- 데이터셋 기준 미달 지표가 없습니다.")
+        return "\n".join(lines)
+
+    def _generate_improvement_plan_section(self, stat: StatisticalAnalysis | None) -> str:
+        lines = ["## 개선 방향"]
+        if stat is None:
+            lines.append("- 개선 방향 도출을 위한 분석 결과가 부족합니다. (추가 데이터 필요)")
+            return "\n".join(lines)
+
+        action_map = {
+            "context_precision": "랭커/리랭커 도입 및 상위 문서 필터링 강화",
+            "context_recall": "검색 범위 확장 또는 하드 네거티브 추가",
+            "mrr": "상위 K 재정렬 및 쿼리 재작성 적용",
+            "ndcg": "랭킹 품질 지표 최적화(리랭킹/하이브리드 검색)",
+            "hit_rate": "검색 후보군 확대 또는 인덱싱 개선",
+            "answer_relevancy": "답변 포맷/질문 의도 정렬 프롬프트 강화",
+            "faithfulness": "근거 인용/검증 단계 추가",
+            "factual_correctness": "정답 검증 규칙 강화 및 근거 필터링",
+            "semantic_similarity": "정답 기준 문장 재정의 및 평가셋 보강",
+        }
+
+        low_metrics = [
+            metric for metric, rate in (stat.metric_pass_rates or {}).items() if rate < 0.7
+        ]
+        if low_metrics:
+            for metric in sorted(low_metrics)[:5]:
+                action = action_map.get(metric, "실험을 통해 개선 방향을 재검증")
+                lines.append(f"- {metric}: {action}")
+        else:
+            lines.append("- 개선 대상 지표가 명확하지 않습니다. (추가 데이터 필요)")
         return "\n".join(lines)
 
     def _generate_nlp_section(self, nlp: NLPAnalysis) -> str:

@@ -172,11 +172,11 @@ class LLMReportModule(BaseAnalysisModule):
         additional = context.get("additional_params", {}) or {}
         value = params.get("evidence_limit")
         if value is None:
-            value = additional.get("evidence_limit", 6)
+            value = additional.get("evidence_limit", 12)
         try:
             return max(1, int(value))
         except (TypeError, ValueError):
-            return 6
+            return 12
 
     def _build_context(self, inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         context = inputs.get("__context__", {})
@@ -393,34 +393,27 @@ class LLMReportModule(BaseAnalysisModule):
             threshold = self._resolve_threshold(run, metric)
             pass_rate = pass_rates.get(metric) if isinstance(pass_rates, dict) else None
             status = "unknown"
-            if isinstance(mean, int | float):
+            if isinstance(mean, (int, float)):
                 status = "pass" if float(mean) >= threshold else "risk"
-            elif isinstance(pass_rate, int | float):
+            elif isinstance(pass_rate, (int, float)):
                 status = "pass" if float(pass_rate) >= 0.7 else "risk"
+
+            mean_value = float(mean) if isinstance(mean, (int, float)) else None
+            pass_rate_value = float(pass_rate) if isinstance(pass_rate, (int, float)) else None
 
             scorecard.append(
                 {
                     "metric": metric,
-                    "mean": round(float(mean), 4) if isinstance(mean, int | float) else None,
-                    "std": round(float(stats.get("std")), 4)
-                    if isinstance(stats.get("std"), int | float)
-                    else None,
-                    "min": round(float(stats.get("min")), 4)
-                    if isinstance(stats.get("min"), int | float)
-                    else None,
-                    "max": round(float(stats.get("max")), 4)
-                    if isinstance(stats.get("max"), int | float)
-                    else None,
-                    "median": round(float(stats.get("median")), 4)
-                    if isinstance(stats.get("median"), int | float)
-                    else None,
+                    "mean": self._round_if_number(mean_value),
+                    "std": self._round_if_number(stats.get("std")),
+                    "min": self._round_if_number(stats.get("min")),
+                    "max": self._round_if_number(stats.get("max")),
+                    "median": self._round_if_number(stats.get("median")),
                     "count": stats.get("count") if isinstance(stats.get("count"), int) else None,
-                    "pass_rate": (
-                        round(float(pass_rate), 4) if isinstance(pass_rate, int | float) else None
-                    ),
+                    "pass_rate": self._round_if_number(pass_rate_value),
                     "threshold": threshold,
-                    "gap": round(threshold - float(mean), 4)
-                    if isinstance(mean, int | float)
+                    "gap": self._round_if_number(threshold - mean_value)
+                    if isinstance(mean_value, float)
                     else None,
                     "status": status,
                 }
@@ -596,9 +589,82 @@ class LLMReportModule(BaseAnalysisModule):
             "comparison_scorecard": comparison_scorecard,
             "quality_summary": quality_summary,
             "artifact_manifest": artifact_manifest,
+            "artifact_highlights": self._build_artifact_highlights(context),
             "evidence_index": evidence_index,
+            "signal_group_summary": self._build_signal_group_summary(scorecard),
             "risk_metrics": risk_metrics,
         }
+
+    def _build_artifact_highlights(self, context: dict[str, Any]) -> list[str]:
+        highlights: list[str] = []
+
+        def add_items(items: list[Any], prefix: str | None = None, limit: int = 3) -> None:
+            count = 0
+            for item in items:
+                if count >= limit:
+                    break
+                text = self._stringify_artifact_item(item)
+                if not text:
+                    continue
+                highlights.append(f"{prefix}: {text}" if prefix else text)
+                count += 1
+
+        root_causes = context.get("root_causes") or []
+        if isinstance(root_causes, list):
+            add_items(root_causes, prefix="원인")
+
+        recommendations = context.get("recommendations") or []
+        if isinstance(recommendations, list):
+            add_items(recommendations, prefix="권장")
+
+        patterns = context.get("patterns") or []
+        if isinstance(patterns, list):
+            add_items(patterns, prefix="패턴")
+
+        trends = context.get("trends") or []
+        if isinstance(trends, list):
+            add_items(trends, prefix="추세")
+
+        diagnostics = context.get("diagnostics") or []
+        if isinstance(diagnostics, list):
+            add_items(diagnostics, prefix="진단", limit=2)
+
+        nlp_keywords = context.get("nlp_keywords") or []
+        if isinstance(nlp_keywords, list) and nlp_keywords:
+            keywords = ", ".join([str(item) for item in nlp_keywords[:6]])
+            highlights.append(f"키워드: {keywords}")
+
+        nlp_summary = context.get("nlp_summary") or {}
+        if isinstance(nlp_summary, dict) and nlp_summary:
+            summary_text = self._stringify_artifact_item(nlp_summary)
+            if summary_text:
+                highlights.append(f"NLP 요약: {summary_text}")
+
+        priority_summary = context.get("priority_summary") or {}
+        if isinstance(priority_summary, dict) and priority_summary:
+            summary_text = self._stringify_artifact_item(priority_summary)
+            if summary_text:
+                highlights.append(f"우선순위: {summary_text}")
+
+        quality_checks = context.get("quality_checks") or []
+        if isinstance(quality_checks, list) and quality_checks:
+            add_items(quality_checks, prefix="품질 체크", limit=2)
+
+        return highlights[:10]
+
+    @staticmethod
+    def _stringify_artifact_item(item: Any) -> str:
+        if item is None:
+            return ""
+        if isinstance(item, str):
+            return truncate_text(item, 200)
+        if isinstance(item, dict):
+            for key in ("description", "cause", "summary", "label", "pattern", "title"):
+                value = item.get(key)
+                if isinstance(value, str) and value.strip():
+                    return truncate_text(value.strip(), 200)
+            return truncate_text(json.dumps(item, ensure_ascii=False), 200)
+        return truncate_text(str(item), 200)
 
     @staticmethod
     def _coerce_str(value: Any) -> str:
@@ -737,6 +803,172 @@ class LLMReportModule(BaseAnalysisModule):
             lines.append(f"{metric}: {hypothesis}{suffix}")
         return lines
 
+    def _build_result_meaning(
+        self,
+        scorecard: list[dict[str, Any]],
+        signal_group_summary: dict[str, dict[str, Any]] | None,
+        evidence: list[dict[str, Any]],
+    ) -> list[str]:
+        signal_group_summary = signal_group_summary or {}
+        evidence_index = self._index_evidence_by_metric(evidence)
+        risk_metrics = self._build_risk_metrics(scorecard, limit=4)
+        lines: list[str] = []
+
+        group_meaning = {
+            "groundedness": "근거성 저하로 사실 오류/환각 위험 증가",
+            "intent_alignment": "질문 의도와 답변 정렬이 약해 사용자 만족도 하락",
+            "retrieval_effectiveness": "검색/랭킹 품질 저하로 정답 근거 누락",
+            "summary_fidelity": "요약 충실도 저하로 핵심 정보 손실",
+            "embedding_quality": "임베딩 품질 저하로 유사도 기반 성능 하락",
+            "efficiency": "응답 지연/비용 증가 가능성",
+            "unknown": "지표 해석을 위해 추가 분석 필요",
+        }
+
+        for group, bucket in signal_group_summary.items():
+            risk_count = bucket.get("risk_count", 0)
+            total = bucket.get("total", 0)
+            if not risk_count:
+                continue
+            meaning = group_meaning.get(group, group_meaning["unknown"])
+            lines.append(f"{group}: {risk_count}/{total} 지표 위험 → {meaning}")
+
+        if not lines:
+            for row in risk_metrics:
+                metric = row.get("metric")
+                if not metric:
+                    continue
+                refs = self._format_evidence_refs(evidence_index.get(metric, []))
+                suffix = f" {refs}" if refs else " (추가 데이터 필요)"
+                lines.append(f"{metric} 저하로 사용자 신뢰/정확성 이슈 가능{suffix}")
+
+        return lines
+
+    def _build_dataset_deltas(
+        self,
+        report_type: str,
+        run_summary: dict[str, Any] | None,
+        comparison_runs: list[dict[str, Any]] | None,
+        change_summary: dict[str, Any] | None,
+        scorecard: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+    ) -> list[str]:
+        report_type = report_type or "analysis"
+        change_summary = change_summary or {}
+        evidence_index = self._index_evidence_by_metric(evidence)
+        lines: list[str] = []
+
+        if report_type == "comparison":
+            dataset_changes = change_summary.get("dataset_changes", [])
+            if isinstance(dataset_changes, list) and dataset_changes:
+                for item in dataset_changes[:3]:
+                    lines.append(f"데이터셋 변경: {self._format_dataset_change(item)}")
+            else:
+                run_a = comparison_runs[0] if comparison_runs else {}
+                run_b = comparison_runs[1] if comparison_runs and len(comparison_runs) > 1 else {}
+                if run_a.get("dataset_name") and run_b.get("dataset_name"):
+                    if run_a.get("dataset_name") != run_b.get("dataset_name"):
+                        lines.append(
+                            f"데이터셋 이름 변경: {run_a.get('dataset_name')} → {run_b.get('dataset_name')}"
+                        )
+                    elif run_a.get("dataset_version") != run_b.get("dataset_version"):
+                        lines.append(
+                            f"데이터셋 버전 변경: {run_a.get('dataset_version')} → {run_b.get('dataset_version')}"
+                        )
+            if not lines:
+                lines.append("데이터셋 변경 근거가 부족합니다. (추가 데이터 필요)")
+            return lines
+
+        if run_summary:
+            lines.append(
+                f"데이터셋: {run_summary.get('dataset_name', '-')} v{run_summary.get('dataset_version', '-')}"
+            )
+        risk_rows = self._build_risk_metrics(scorecard, limit=4)
+        for row in risk_rows:
+            metric = row.get("metric")
+            if not metric:
+                continue
+            mean = self._format_float(row.get("mean"))
+            threshold = self._format_float(row.get("threshold"))
+            refs = self._format_evidence_refs(evidence_index.get(metric, []))
+            suffix = f" {refs}" if refs else " (추가 데이터 필요)"
+            lines.append(f"{metric}: 평균 {mean} < 기준 {threshold} (데이터셋 기준 미달){suffix}")
+        if len(lines) <= 1:
+            lines.append("데이터셋 기준 차이를 설명할 근거가 부족합니다. (추가 데이터 필요)")
+        return lines
+
+    def _build_improvement_plan(
+        self,
+        scorecard: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+        recommendations: list[str],
+    ) -> list[str]:
+        if recommendations:
+            return recommendations[:6]
+
+        action_map = {
+            "context_precision": "랭커/리랭커 도입 및 상위 문서 필터링 강화",
+            "context_recall": "검색 범위 확장 또는 하드 네거티브 추가",
+            "mrr": "상위 K 재정렬 및 쿼리 재작성 적용",
+            "ndcg": "랭킹 품질 지표 최적화(리랭킹/하이브리드 검색)",
+            "hit_rate": "검색 후보군 확대 또는 인덱싱 개선",
+            "answer_relevancy": "답변 포맷/질문 의도 정렬 프롬프트 강화",
+            "faithfulness": "근거 인용/검증 단계 추가",
+            "factual_correctness": "정답 검증 규칙 강화 및 근거 필터링",
+            "semantic_similarity": "정답 기준 문장 재정의 및 평가셋 보강",
+        }
+
+        evidence_index = self._index_evidence_by_metric(evidence)
+        risk_rows = self._build_risk_metrics(scorecard, limit=4)
+        lines: list[str] = []
+        for row in risk_rows:
+            metric = row.get("metric")
+            if not metric:
+                continue
+            action = action_map.get(metric, "실험을 통해 개선 방향을 재검증")
+            refs = self._format_evidence_refs(evidence_index.get(metric, []))
+            suffix = f" {refs}" if refs else " (추가 데이터 필요)"
+            lines.append(f"{metric}: {action} → 영향 지표 {metric}, 검증: analyze-compare{suffix}")
+        if not lines:
+            lines.append("개선 방향 도출을 위한 근거가 부족합니다. (추가 데이터 필요)")
+        return lines
+
+    @staticmethod
+    def _is_generic_entry(text: str) -> bool:
+        if not text:
+            return True
+        if re.search(r"\[(A|B|E)\d+\]", text):
+            return False
+        lowered = text.replace(" ", "").strip()
+        generic_phrases = (
+            "추가데이터필요",
+            "개선필요",
+            "점검필요",
+            "확인필요",
+            "재검증",
+            "보완필요",
+            "데이터부족",
+            "근거부족",
+            "점검하세요",
+            "재점검",
+            "확인하세요",
+            "추가하세요",
+            "강화하세요",
+            "필요합니다",
+        )
+        return not lowered or any(phrase in lowered for phrase in generic_phrases)
+
+    def _select_section_or_fallback(
+        self,
+        items: list[str],
+        fallback: list[str],
+        *,
+        min_items: int = 2,
+    ) -> list[str]:
+        cleaned = [item.strip() for item in items if item and item.strip()]
+        if len(cleaned) >= min_items and not all(self._is_generic_entry(item) for item in cleaned):
+            return cleaned
+        return fallback
+
     def _build_comparison_stat_notes(
         self,
         comparison_scorecard: list[dict[str, Any]],
@@ -762,19 +994,60 @@ class LLMReportModule(BaseAnalysisModule):
         dataset_changes = change_summary.get("dataset_changes", [])
         config_changes = change_summary.get("config_changes", [])
         prompt_changes = change_summary.get("prompt_changes", {})
-        evidence_ids = [item.get("evidence_id") for item in evidence if item.get("evidence_id")]
+        evidence_ids: list[str] = []
+        for item in evidence:
+            evidence_id = item.get("evidence_id")
+            if evidence_id is None:
+                continue
+            evidence_ids.append(str(evidence_id))
         refs = self._format_evidence_refs(evidence_ids, max_items=2)
         refs_text = f" {refs}" if refs else ""
         lines: list[str] = []
         if isinstance(dataset_changes, list) and dataset_changes:
-            lines.append(f"데이터셋 변경이 성능 차이에 영향 가능{refs_text}")
+            for item in dataset_changes[:3]:
+                lines.append(f"데이터셋 변경: {self._format_dataset_change(item)}{refs_text}")
         if isinstance(config_changes, list) and config_changes:
             lines.append(f"설정 변경이 지표 변동에 영향 가능{refs_text}")
         if isinstance(prompt_changes, dict) and prompt_changes.get("status"):
             status = prompt_changes.get("status")
             lines.append(f"프롬프트 변경 상태: {status}{refs_text}")
+        lines.extend(self._summarize_comparison_evidence(evidence))
         if not lines:
             lines.append("원인 분석 근거가 부족합니다. (추가 데이터 필요)")
+        return lines
+
+    @staticmethod
+    def _format_dataset_change(item: Any) -> str:
+        if isinstance(item, dict):
+            field = item.get("field") or "field"
+            before = item.get("before")
+            after = item.get("after")
+            if before is not None or after is not None:
+                return f"{field}: {before} → {after}"
+        return str(item)
+
+    def _summarize_comparison_evidence(self, evidence: list[dict[str, Any]]) -> list[str]:
+        summary: dict[str, dict[str, int]] = {"A": {}, "B": {}}
+        refs: dict[str, list[str]] = {"A": [], "B": []}
+        for item in evidence:
+            run_label = item.get("run_label") or "A"
+            if run_label not in summary:
+                continue
+            for metric in item.get("failed_metrics") or []:
+                summary[run_label][metric] = summary[run_label].get(metric, 0) + 1
+            evidence_id = item.get("evidence_id")
+            if evidence_id:
+                refs[run_label].append(str(evidence_id))
+
+        lines: list[str] = []
+        for label in ("A", "B"):
+            if not summary[label]:
+                continue
+            top = sorted(summary[label].items(), key=lambda x: x[1], reverse=True)[:3]
+            metrics_text = ", ".join([f"{metric}({count}건)" for metric, count in top])
+            refs_text = self._format_evidence_refs(refs[label], max_items=2)
+            suffix = f" {refs_text}" if refs_text else ""
+            lines.append(f"실행 {label} 실패 지표 상위: {metrics_text}{suffix}")
         return lines
 
     def _merge_recommendations(self, context: dict[str, Any]) -> list[str]:
@@ -794,8 +1067,12 @@ class LLMReportModule(BaseAnalysisModule):
                 "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
                 "change_summary": ["<변경 사항 1>", "<변경 사항 2>"],
                 "statistical_notes": ["<통계적 신뢰도 1>"],
+                "reasons": ["<변화 원인/근거 1>"],
+                "meaning": ["<결과 의미 1>"],
+                "dataset_deltas": ["<데이터셋 차이 1>"],
                 "root_causes": ["<원인 분석 1>"],
                 "recommendations": ["<개선 제안 1>"],
+                "improvement_plan": ["<개선 방향 1>", "<검증 방법 1>", "<리스크 1>"],
                 "next_steps": ["<다음 단계 1>"],
                 "appendix": ["<부록 항목 1>"],
             }
@@ -803,7 +1080,11 @@ class LLMReportModule(BaseAnalysisModule):
             template = {
                 "summary_sentence": "<한 문장 결론>",
                 "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
+                "reasons": ["<원인/근거 1>"],
+                "meaning": ["<결과 의미 1>"],
+                "dataset_deltas": ["<데이터셋 차이 1>"],
                 "recommendations": ["<개선 제안 1>"],
+                "improvement_plan": ["<개선 방향 1>", "<검증 방법 1>", "<리스크 1>"],
                 "next_steps": ["<다음 단계 1>"],
                 "appendix": ["<부록 항목 1>"],
             }
@@ -812,8 +1093,12 @@ class LLMReportModule(BaseAnalysisModule):
                 "summary_sentence": "<한 문장 결론>",
                 "summary_bullets": ["<요약 bullet 1>", "<요약 bullet 2>", "<요약 bullet 3>"],
                 "insights": ["<증거 기반 인사이트 1>"],
+                "reasons": ["<원인/근거 1>"],
+                "meaning": ["<결과 의미 1>"],
+                "dataset_deltas": ["<데이터셋 차이 1>"],
                 "root_causes": ["<원인 가설 1>"],
                 "recommendations": ["<개선 제안 1>"],
+                "improvement_plan": ["<개선 방향 1>", "<검증 방법 1>", "<리스크 1>"],
                 "next_steps": ["<다음 단계 1>"],
                 "appendix": ["<부록 항목 1>"],
             }
@@ -852,8 +1137,12 @@ class LLMReportModule(BaseAnalysisModule):
             "summary_sentence": self._coerce_str(payload.get("summary_sentence")),
             "summary_bullets": self._coerce_list(payload.get("summary_bullets")),
             "insights": self._coerce_list(payload.get("insights")),
+            "reasons": self._coerce_list(payload.get("reasons")),
+            "meaning": self._coerce_list(payload.get("meaning")),
+            "dataset_deltas": self._coerce_list(payload.get("dataset_deltas")),
             "root_causes": self._coerce_list(payload.get("root_causes")),
             "recommendations": self._coerce_list(payload.get("recommendations")),
+            "improvement_plan": self._coerce_list(payload.get("improvement_plan")),
             "next_steps": self._coerce_list(payload.get("next_steps")),
             "change_summary": self._coerce_list(payload.get("change_summary")),
             "statistical_notes": self._coerce_list(payload.get("statistical_notes")),
@@ -865,18 +1154,35 @@ class LLMReportModule(BaseAnalysisModule):
                 "summary_sentence",
                 "summary_bullets",
                 "insights",
+                "reasons",
+                "meaning",
+                "dataset_deltas",
                 "root_causes",
                 "recommendations",
+                "improvement_plan",
                 "next_steps",
             ],
-            "summary": ["summary_sentence", "summary_bullets", "recommendations", "next_steps"],
+            "summary": [
+                "summary_sentence",
+                "summary_bullets",
+                "reasons",
+                "meaning",
+                "dataset_deltas",
+                "recommendations",
+                "improvement_plan",
+                "next_steps",
+            ],
             "comparison": [
                 "summary_sentence",
                 "summary_bullets",
                 "change_summary",
                 "statistical_notes",
+                "reasons",
+                "meaning",
+                "dataset_deltas",
                 "root_causes",
                 "recommendations",
+                "improvement_plan",
                 "next_steps",
             ],
         }
@@ -917,6 +1223,8 @@ class LLMReportModule(BaseAnalysisModule):
         comparison_scorecard = assets.get("comparison_scorecard", [])
         quality_summary = assets.get("quality_summary", {})
         artifact_manifest = assets.get("artifact_manifest", [])
+        artifact_highlights = assets.get("artifact_highlights", [])
+        artifact_hint_lines = [f"아티팩트 근거: {item}" for item in artifact_highlights[:4]]
 
         lines = [title, "", "## 요약"]
         summary_sentence = payload.get("summary_sentence")
@@ -950,6 +1258,47 @@ class LLMReportModule(BaseAnalysisModule):
                 lines.append(f"- {note}")
             lines.append("")
 
+            lines.append("## 원인/근거")
+            reasons = self._select_section_or_fallback(
+                payload.get("reasons") or [],
+                self._build_comparison_root_causes(context.get("change_summary"), evidence)
+                + artifact_hint_lines,
+            )
+            for item in reasons:
+                lines.append(f"- {item}")
+            lines.append("")
+
+            lines.append("## 결과 의미")
+            meanings = self._select_section_or_fallback(
+                payload.get("meaning") or [],
+                self._build_result_meaning(
+                    scorecard,
+                    assets.get("signal_group_summary") or {},
+                    evidence,
+                )
+                + artifact_hint_lines,
+            )
+            for item in meanings:
+                lines.append(f"- {item}")
+            lines.append("")
+
+            lines.append("## 데이터셋 차이")
+            dataset_deltas = self._select_section_or_fallback(
+                payload.get("dataset_deltas") or [],
+                self._build_dataset_deltas(
+                    report_type,
+                    self._build_run_summary(context.get("run")),
+                    [self._build_run_summary(run) for run in (context.get("runs") or [])[:2]],
+                    context.get("change_summary"),
+                    scorecard,
+                    evidence,
+                )
+                + artifact_hint_lines,
+            )
+            for item in dataset_deltas:
+                lines.append(f"- {item}")
+            lines.append("")
+
             lines.append("## 원인 분석")
             root_causes = payload.get("root_causes") or self._build_comparison_root_causes(
                 context.get("change_summary"),
@@ -961,6 +1310,46 @@ class LLMReportModule(BaseAnalysisModule):
         else:
             lines.append("## 지표 스코어카드")
             lines.extend(self._render_scorecard_table(scorecard))
+            lines.append("")
+
+            lines.append("## 원인/근거")
+            reasons = self._select_section_or_fallback(
+                payload.get("reasons") or [],
+                self._build_fallback_insights(scorecard, evidence) + artifact_hint_lines,
+            )
+            for item in reasons:
+                lines.append(f"- {item}")
+            lines.append("")
+
+            lines.append("## 결과 의미")
+            meanings = self._select_section_or_fallback(
+                payload.get("meaning") or [],
+                self._build_result_meaning(
+                    scorecard,
+                    assets.get("signal_group_summary") or {},
+                    evidence,
+                )
+                + artifact_hint_lines,
+            )
+            for item in meanings:
+                lines.append(f"- {item}")
+            lines.append("")
+
+            lines.append("## 데이터셋 차이")
+            dataset_deltas = self._select_section_or_fallback(
+                payload.get("dataset_deltas") or [],
+                self._build_dataset_deltas(
+                    report_type,
+                    self._build_run_summary(context.get("run")),
+                    [self._build_run_summary(run) for run in (context.get("runs") or [])[:2]],
+                    context.get("change_summary"),
+                    scorecard,
+                    evidence,
+                )
+                + artifact_hint_lines,
+            )
+            for item in dataset_deltas:
+                lines.append(f"- {item}")
             lines.append("")
 
             if report_type != "summary":
@@ -1009,6 +1398,16 @@ class LLMReportModule(BaseAnalysisModule):
             lines.append("- 추가 데이터 및 LLM 분석을 통해 상세 원인을 도출하세요.")
 
         lines.append("")
+        lines.append("## 개선 방향")
+        improvement_plan = self._select_section_or_fallback(
+            payload.get("improvement_plan") or [],
+            self._build_improvement_plan(scorecard, evidence, recommendations)
+            + artifact_hint_lines,
+        )
+        for item in improvement_plan:
+            lines.append(f"- {item}")
+
+        lines.append("")
         lines.append("## 다음 단계")
         next_steps = payload.get("next_steps") or [
             "우선순위 케이스를 대상으로 실험/재평가를 진행하세요."
@@ -1033,12 +1432,16 @@ class LLMReportModule(BaseAnalysisModule):
             "변경 사항 요약": ["변경 사항 요약", "변경사항 요약", "변경 요약"],
             "지표 비교 스코어카드": ["지표 비교 스코어카드", "비교 스코어카드", "지표 비교표"],
             "통계적 신뢰도": ["통계적 신뢰도", "통계 신뢰도", "통계적 검증"],
+            "원인/근거": ["원인/근거", "원인 및 근거", "근거"],
+            "결과 의미": ["결과 의미", "의미", "영향"],
+            "데이터셋 차이": ["데이터셋 차이", "데이터셋 변경", "데이터셋 기준"],
             "원인 분석": ["원인 분석", "원인", "원인 가설"],
             "지표 스코어카드": ["지표 스코어카드", "스코어카드", "지표 요약"],
             "데이터 품질/신뢰도": ["데이터 품질/신뢰도", "데이터 품질", "신뢰도"],
             "증거 기반 인사이트": ["증거 기반 인사이트", "증거 인사이트", "증거 기반", "증거"],
             "원인 가설": ["원인 가설", "원인 분석", "원인"],
             "개선 제안": ["개선 제안", "개선안", "개선 사항"],
+            "개선 방향": ["개선 방향", "개선 계획", "개선 로드맵"],
             "다음 단계": ["다음 단계", "후속 단계", "다음 액션"],
             "부록(산출물)": ["부록(산출물)", "부록", "산출물"],
         }
@@ -1048,25 +1451,37 @@ class LLMReportModule(BaseAnalysisModule):
                 "변경 사항 요약",
                 "지표 비교 스코어카드",
                 "통계적 신뢰도",
+                "원인/근거",
+                "결과 의미",
+                "데이터셋 차이",
                 "원인 분석",
                 "개선 제안",
+                "개선 방향",
                 "다음 단계",
                 "부록(산출물)",
             ],
             "summary": [
                 "요약",
                 "지표 스코어카드",
+                "원인/근거",
+                "결과 의미",
+                "데이터셋 차이",
                 "개선 제안",
+                "개선 방향",
                 "다음 단계",
                 "부록(산출물)",
             ],
             "analysis": [
                 "요약",
                 "지표 스코어카드",
+                "원인/근거",
+                "결과 의미",
+                "데이터셋 차이",
                 "데이터 품질/신뢰도",
                 "증거 기반 인사이트",
                 "원인 가설",
                 "개선 제안",
+                "개선 방향",
                 "다음 단계",
                 "부록(산출물)",
             ],
@@ -1230,6 +1645,12 @@ class LLMReportModule(BaseAnalysisModule):
         except (TypeError, ValueError):
             return "-"
 
+    @staticmethod
+    def _round_if_number(value: Any, precision: int = 4) -> float | None:
+        if isinstance(value, (int, float)):
+            return round(float(value), precision)
+        return None
+
     def _render_scorecard_table(self, scorecard: list[dict[str, Any]]) -> list[str]:
         if not scorecard:
             return ["- 스코어카드 데이터가 없습니다."]
@@ -1313,6 +1734,7 @@ class LLMReportModule(BaseAnalysisModule):
         priority_highlights = self._build_priority_highlights(context.get("priority_summary"))
         prompt_change_summary = self._summarize_prompt_changes(context.get("change_summary"))
         artifact_manifest = self._build_artifact_manifest(context.get("artifact_nodes") or [])
+        artifact_highlights = self._build_artifact_highlights(context)
         signal_group_summary = self._build_signal_group_summary(scorecard)
         risk_metrics = self._build_risk_metrics(scorecard)
         significant_changes = self._build_significant_changes(comparison_scorecard)
@@ -1363,6 +1785,7 @@ class LLMReportModule(BaseAnalysisModule):
             "signal_group_summary": signal_group_summary,
             "risk_metrics": risk_metrics,
             "artifact_manifest": artifact_manifest,
+            "artifact_highlights": artifact_highlights,
         }
 
         summary_json = json.dumps(summary_payload, ensure_ascii=False, indent=2)
@@ -1384,6 +1807,9 @@ class LLMReportModule(BaseAnalysisModule):
             "6) 개선안마다 기대되는 영향 지표, 검증 방법(실험/재평가), 리스크를 함께 서술\n"
             "7) 신뢰도/타당성 제약(표본 수, 커버리지, 유의성, 데이터 변경)을 명시\n"
             "8) appendix는 선택이며 비어 있으면 산출물 목록을 자동 추가\n"
+            "9) 금지: 모호한 조언(예: '개선 필요', '점검하세요')만 반복\n"
+            "10) 각 항목은 반드시 '지표명 + 근거 + 영향/개선 방향'을 포함\n"
+            "11) artifact_highlights에서 최소 2개 이상을 인용해 근거를 강화\n"
         )
         if report_type == "comparison":
             requirements = (
@@ -1391,35 +1817,42 @@ class LLMReportModule(BaseAnalysisModule):
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/원인/개선안에는 evidence_id를 [A1]/[B1] 형식으로 인용\n"
                 "3) JSON 필수 키: summary_sentence, summary_bullets, change_summary, "
-                "statistical_notes, root_causes, recommendations, next_steps\n"
+                "statistical_notes, reasons, meaning, dataset_deltas, root_causes, "
+                "recommendations, improvement_plan, next_steps\n"
                 "4) summary_bullets는 3개 권장(지표/변경 사항/사용자 영향)\n"
                 "5) change_summary에는 데이터셋/설정/프롬프트 변경을 명시\n"
                 "6) statistical_notes에는 유의한 변화 및 한계(표본/유의성) 포함\n"
-                "7) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "7) meaning은 결과가 사용자/업무에 주는 의미를 서술\n"
+                "8) dataset_deltas는 데이터셋 기준 차이를 명확히 기재\n"
+                "9) improvement_plan은 개선 방향+기대 지표+검증 방법+리스크 포함\n"
+                "10) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
         elif report_type == "summary":
             requirements = (
                 "요구사항:\n"
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/개선안에는 evidence_id를 [E1] 형식으로 인용\n"
-                "3) JSON 필수 키: summary_sentence, summary_bullets, "
-                "recommendations, next_steps\n"
+                "3) JSON 필수 키: summary_sentence, summary_bullets, reasons, meaning, "
+                "dataset_deltas, recommendations, improvement_plan, next_steps\n"
                 "4) summary_bullets는 3개 권장\n"
                 "5) risk_metrics를 활용해 상위 위험 지표 3개를 명확히 언급\n"
-                "6) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "6) meaning과 dataset_deltas는 간단히라도 포함\n"
+                "7) improvement_plan은 개선 방향+검증 방법을 포함\n"
+                "8) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
         else:
             requirements = (
                 "요구사항:\n"
                 "1) 출력 언어: 한국어\n"
                 "2) 핵심 주장/원인/개선안에는 evidence_id를 [E1] 형식으로 인용\n"
-                "3) JSON 필수 키: summary_sentence, summary_bullets, insights, "
-                "root_causes, recommendations, next_steps\n"
+                "3) JSON 필수 키: summary_sentence, summary_bullets, insights, reasons, meaning, "
+                "dataset_deltas, root_causes, recommendations, improvement_plan, next_steps\n"
                 "4) insights/root_causes에는 evidence_id를 포함\n"
                 "5) summary_bullets는 3개 권장(지표/원인/사용자 영향)\n"
                 "6) signal_group_summary로 축별 약점/강점을 분해\n"
                 "7) 사용자 영향은 신뢰/이해/인지부하 관점으로 1~2문장\n"
-                "8) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
+                "8) meaning/dataset_deltas/improvement_plan은 반드시 포함\n"
+                "9) 근거가 부족하면 '추가 데이터 필요'라고 명시\n"
             )
 
         return (
@@ -1568,6 +2001,28 @@ class LLMReportModule(BaseAnalysisModule):
                 report_lines.append(f"- {note}")
             report_lines.append("")
 
+            report_lines.append("## 원인/근거")
+            for item in self._build_comparison_root_causes(change_summary, evidence):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
+            report_lines.append("## 결과 의미")
+            for item in self._build_result_meaning(scorecard, {}, evidence):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
+            report_lines.append("## 데이터셋 차이")
+            for item in self._build_dataset_deltas(
+                report_type,
+                run_summary,
+                comparison_runs,
+                change_summary,
+                scorecard,
+                evidence,
+            ):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
             report_lines.append("## 원인 분석")
             for cause in self._build_comparison_root_causes(change_summary, evidence):
                 report_lines.append(f"- {cause}")
@@ -1599,6 +2054,28 @@ class LLMReportModule(BaseAnalysisModule):
                 report_lines.append("- 증거 기반 인사이트가 없습니다. (추가 데이터 필요)")
             report_lines.append("")
 
+            report_lines.append("## 원인/근거")
+            for item in self._build_fallback_insights(scorecard, evidence):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
+            report_lines.append("## 결과 의미")
+            for item in self._build_result_meaning(scorecard, {}, evidence):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
+            report_lines.append("## 데이터셋 차이")
+            for item in self._build_dataset_deltas(
+                report_type,
+                run_summary,
+                comparison_runs,
+                context.get("change_summary"),
+                scorecard,
+                evidence,
+            ):
+                report_lines.append(f"- {item}")
+            report_lines.append("")
+
             report_lines.append("## 원인 가설")
             root_causes = self._build_root_cause_hypotheses(scorecard, evidence)
             if root_causes:
@@ -1616,6 +2093,11 @@ class LLMReportModule(BaseAnalysisModule):
                 report_lines.append(f"- {rec}")
         else:
             report_lines.append("- 추가 데이터 및 LLM 분석을 통해 상세 원인을 도출하세요.")
+
+        report_lines.append("")
+        report_lines.append("## 개선 방향")
+        for item in self._build_improvement_plan(scorecard, evidence, recommendations):
+            report_lines.append(f"- {item}")
 
         report_lines.append("")
         report_lines.append("## 다음 단계")
