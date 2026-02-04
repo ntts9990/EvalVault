@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EvalVault is a RAG (Retrieval-Augmented Generation) evaluation system for Korean/English insurance documents. Built on Ragas + Langfuse for evaluation and tracking.
+EvalVault is a RAG (Retrieval-Augmented Generation) evaluation system for Korean/English insurance documents. Built on Ragas with dual-tracker support (MLflow + Phoenix) for experiment tracking and observability.
 
 **Core Flow:**
 ```
-Input (CSV/Excel/JSON) → Ragas Evaluation → Langfuse Trace/Score → Analysis
+Input (CSV/Excel/JSON) → Ragas Evaluation → MLflow + Phoenix (dual logging) → Analysis
 ```
 
 **Supported Metrics:**
@@ -53,6 +53,8 @@ src/evalvault/
 | DatasetPort | CSV/Excel/JSON Loaders | ✅ Complete |
 | TrackerPort | LangfuseAdapter | ✅ Complete |
 | TrackerPort | MLflowAdapter | ✅ Complete |
+| TrackerPort | PhoenixAdapter | ✅ Complete |
+| TrackerPort | MultiTrackerAdapter | ✅ Complete (dual-logging: MLflow + Phoenix) |
 | StoragePort | SQLiteAdapter | ✅ Complete |
 | StoragePort | PostgreSQLAdapter | ✅ Complete |
 | EvaluatorPort | RagasEvaluator | ✅ Complete |
@@ -68,6 +70,25 @@ src/evalvault/
 - **Host**: Configure via `LANGFUSE_HOST`
 - **Purpose**: Trace logging, score tracking, evaluation history
 - **Credentials**: Inject via `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`
+
+### Experiment Tracking (MLflow + Phoenix)
+
+EvalVault uses dual-tracker logging by default:
+- **MLflow**: Experiment management, metric comparison, model versioning
+- **Phoenix**: Real-time observability, trace visualization, prompt debugging
+
+```bash
+# MLflow (required)
+MLFLOW_TRACKING_URI=http://localhost:5000
+MLFLOW_EXPERIMENT_NAME=evalvault-experiments
+
+# Phoenix (required)
+PHOENIX_ENDPOINT=http://localhost:6006
+PHOENIX_PROJECT_NAME=evalvault
+
+# Tracker selection (default: mlflow+phoenix)
+TRACKER_PROVIDER=mlflow+phoenix  # Options: mlflow, phoenix, langfuse, mlflow+phoenix
+```
 
 ## Development Commands
 
@@ -188,13 +209,39 @@ OPENAI_MODEL=gpt-5-nano
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # OPENAI_BASE_URL=https://api.openai.com/v1  # optional
 
-# Langfuse (self-hosted)
+# Langfuse (optional, if using langfuse tracker)
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=http://your-langfuse-host:port
+
+# MLflow + Phoenix (default dual-tracker)
+MLFLOW_TRACKING_URI=http://localhost:5000
+PHOENIX_ENDPOINT=http://localhost:6006
+TRACKER_PROVIDER=mlflow+phoenix
 ```
 
 **Note:** 메트릭 임계값(thresholds)은 환경변수가 아닌 **데이터셋 JSON 파일**에 정의합니다.
+
+## Offline Deployment
+
+EvalVault supports air-gapped (오프라인) deployment with bundled models.
+
+### Supported Configurations
+- **Ollama**: Lightweight local inference (`llama3.2`, `llama3.1`, etc.)
+- **vLLM**: High-performance GPU inference (recommended for production)
+
+### Quick Start
+```bash
+# Build offline bundle
+./scripts/offline/build_full_offline_bundle.sh
+
+# Restore on target machine
+./scripts/offline/import_images.sh
+./scripts/offline/restore_model_cache.sh
+docker compose -f docker-compose.offline.yml up -d
+```
+
+See [docs/guides/OFFLINE_DOCKER.md](docs/guides/OFFLINE_DOCKER.md) for detailed instructions.
 
 ## Data Format
 
@@ -241,7 +288,8 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | RagasEvaluator | ✅ Complete | 6 metrics (Ragas v1.0) |
 | LLM Adapters | ✅ Complete | OpenAI, Ollama, Azure, Anthropic |
 | Storage Adapters | ✅ Complete | SQLite, PostgreSQL |
-| Tracker Adapters | ✅ Complete | Langfuse, MLflow |
+| Tracker Adapters | ✅ Complete | Langfuse, MLflow, Phoenix (dual-tracker) |
+| Offline Bundle | ✅ Complete | Ollama/vLLM, Docker images, model cache |
 | CLI | ✅ Complete | run, metrics, config, history, compare, export, generate, pipeline, benchmark |
 | Testset Generation | ✅ Complete | Basic + Knowledge Graph |
 | Experiment Management | ✅ Complete | A/B testing, comparison |
@@ -265,6 +313,8 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-2027 개발 로드맵 (Phase 15-19+) |
 | [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 (P1-P7 우선순위, 병렬 에이전트 워크플로우) |
 | [docs/KG_IMPROVEMENT_PLAN.md](docs/KG_IMPROVEMENT_PLAN.md) | Knowledge Graph 개선 계획 |
+| [docs/guides/OFFLINE_DOCKER.md](docs/guides/OFFLINE_DOCKER.md) | 오프라인 Docker 배포 가이드 |
+| [docs/guides/OFFLINE_MODELS.md](docs/guides/OFFLINE_MODELS.md) | 오프라인 모델 번들링 가이드 |
 | [agent/README.md](agent/README.md) | 자율 에이전트 시스템 사용 가이드 |
 
 ## Autonomous Agent System
