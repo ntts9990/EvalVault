@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -29,9 +30,16 @@ if [ -d "$HOME/.kiwipiepy" ]; then
   cp -R "$HOME/.kiwipiepy" "$CACHE_ROOT/kiwipiepy"
 fi
 
+#!/usr/bin/env bash
 mkdir -p "$(dirname "$OUTPUT_TAR")"
 tar -cf "$OUTPUT_TAR" "$CACHE_ROOT"
-sha256sum "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+
+# Checksum (cross-platform)
+if command -v sha256sum &>/dev/null; then
+  sha256sum "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+elif command -v shasum &>/dev/null; then
+  shasum -a 256 "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+fi
 
 echo "Saved: $OUTPUT_TAR"
 echo "SHA256: ${OUTPUT_TAR}.sha256"

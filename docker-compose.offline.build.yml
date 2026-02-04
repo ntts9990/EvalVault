@@ -1,0 +1,28 @@
+# EvalVault Offline Build Overrides
+# Online build only. Do not use in air-gapped runtime.
+#
+# IMPORTANT: Builds linux/amd64 images for cross-platform compatibility.
+# Apple Silicon Macs will build amd64 images that run on Ubuntu/Intel.
+
+services:
+  evalvault-api:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+      args:
+        PYTHON_IMAGE: ${EVALVAULT_PYTHON_IMAGE:-python:3.12.6-slim}
+        UV_IMAGE: ${EVALVAULT_UV_IMAGE:-ghcr.io/astral-sh/uv:0.4.28}
+
+  evalvault-web:
+    platform: linux/amd64
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+      args:
+        NODE_IMAGE: ${EVALVAULT_NODE_IMAGE:-node:20.19-alpine}
+        NGINX_IMAGE: ${EVALVAULT_NGINX_IMAGE:-nginx:1.27.3-alpine}

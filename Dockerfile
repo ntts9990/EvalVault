@@ -18,15 +18,15 @@ WORKDIR /app
 # Copy dependency files and README (required by pyproject.toml)
 COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies
-RUN uv sync --frozen --no-dev --no-install-project
+# Install dependencies (include postgres for PostgreSQL support)
+RUN uv sync --frozen --no-dev --no-install-project --extra postgres
 
 # Copy source code
 COPY src/ ./src/
 COPY config/ ./config/
 
 # Install the project
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra postgres
 
 
 # Stage 2: Runtime stage

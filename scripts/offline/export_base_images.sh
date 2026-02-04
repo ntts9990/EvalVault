@@ -18,7 +18,7 @@ fi
 BASE_IMAGES=(
   "${EVALVAULT_PYTHON_IMAGE:-python:3.12.6-slim}"
   "${EVALVAULT_UV_IMAGE:-ghcr.io/astral-sh/uv:0.4.28}"
-  "${EVALVAULT_NODE_IMAGE:-node:20.11-alpine}"
+  "${EVALVAULT_NODE_IMAGE:-node:20.19-alpine}"
   "${EVALVAULT_NGINX_IMAGE:-nginx:1.27.3-alpine}"
 )
 

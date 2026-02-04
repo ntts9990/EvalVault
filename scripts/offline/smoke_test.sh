@@ -8,9 +8,9 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-docker compose --env-file "$ENV_FILE" -f docker-compose.offline.yml up -d
+docker compose --env-file "$ENV_FILE" -f docker-compose.offline.yml up -d --no-build --pull never
 
 curl -fsS http://localhost:8000/health >/dev/null
-curl -fsS http://localhost:8080/ >/dev/null
+curl -fsS http://localhost:5173/ >/dev/null
 
 echo "Smoke test passed"

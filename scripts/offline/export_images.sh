@@ -24,8 +24,12 @@ IMAGES=(
 )
 
 if [ "$INCLUDE_POSTGRES" = "1" ]; then
-  IMAGES+=("${POSTGRES_IMAGE:-postgres:16.4-alpine}")
-  echo "📦 Postgres 이미지 포함: ${POSTGRES_IMAGE:-postgres:16.4-alpine}"
+  PG_IMG="${POSTGRES_IMAGE:-pgvector/pgvector:0.8.0-pg16}"
+  # Pull postgres image with explicit platform for cross-platform compatibility
+  echo "📥 Postgres 이미지 pull (linux/amd64): $PG_IMG"
+  docker pull --platform linux/amd64 "$PG_IMG"
+  IMAGES+=("$PG_IMG")
+  echo "📦 Postgres 이미지 포함: $PG_IMG"
 fi
 
 echo "🔨 빌드할 이미지:"
@@ -36,7 +40,8 @@ echo ""
 
 # 빌드 (베이스 이미지 포함 모든 레이어가 포함됨)
 echo "🔨 Docker 이미지 빌드 중..."
-docker compose -f docker-compose.offline.yml --env-file .env.offline build --pull
+docker compose -f docker-compose.offline.yml -f docker-compose.offline.build.yml \
+  --env-file .env.offline build --pull
 
 # tar 파일로 저장
 mkdir -p "$(dirname "$OUTPUT_TAR")"
@@ -44,8 +49,12 @@ echo ""
 echo "💾 이미지를 tar 파일로 저장 중: $OUTPUT_TAR"
 docker save -o "$OUTPUT_TAR" "${IMAGES[@]}"
 
-# 체크섬 생성
-sha256sum "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+# 체크섬 생성 (cross-platform)
+if command -v sha256sum &>/dev/null; then
+  sha256sum "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+elif command -v shasum &>/dev/null; then
+  shasum -a 256 "$OUTPUT_TAR" > "${OUTPUT_TAR}.sha256"
+fi
 
 echo ""
 echo "✅ 완료!"
@@ -55,4 +64,4 @@ echo ""
 echo "📋 폐쇄망에서 사용 방법:"
 echo "  1. tar 파일을 폐쇄망으로 복사"
 echo "  2. docker load -i $OUTPUT_TAR"
-echo "  3. docker compose --env-file .env.offline -f docker-compose.offline.yml up -d"
+echo "  3. docker compose --env-file .env.offline -f docker-compose.offline.yml up -d --no-build"
