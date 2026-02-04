@@ -19,6 +19,8 @@ tests/fixtures/
     ├── evaluation_test_sample.json
     ├── comprehensive_dataset.json  # 종합 E2E 테스트
     ├── summary_eval_minimal.json   # 요약 평가 최소 케이스
+    ├── ab_test_baseline_korean.json # A/B 테스트 베이스라인(비교 데모용)
+    ├── ab_test_candidate_korean.json # A/B 테스트 후보(회귀 포함 데모용)
     └── insurance_document.txt      # 테스트용 보험 문서
 ```
 
