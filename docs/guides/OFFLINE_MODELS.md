@@ -83,3 +83,8 @@ uv run evalvault analyze <RUN_ID> --nlp
 ```
 
 NLP 분석이 인터넷 없이 동작하면 정상입니다.
+
+## 참고 (vLLM 환경)
+
+- vLLM 사용 시에도 **NLP 분석을 한다면** 모델 캐시는 필요합니다.
+- vLLM 환경에서는 Ollama 모델을 포함하지 않습니다.
