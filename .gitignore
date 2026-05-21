@@ -162,6 +162,7 @@ dmypy.json
 .LSOverride
 scratch/
 .sisyphus/
+.omc/
 
 # Local artifacts
 MagicMock/
