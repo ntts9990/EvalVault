@@ -82,6 +82,7 @@ class TestHybridCacheBasic:
 class TestHybridCacheTTL:
     """TTL (Time-To-Live) 관련 테스트."""
 
+    @pytest.mark.slow
     def test_ttl_expiration(self):
         """TTL 만료 테스트."""
         cache = HybridCache(ttl_seconds=1)
@@ -94,6 +95,7 @@ class TestHybridCacheTTL:
         time.sleep(1.1)
         assert cache.get("key1") is None
 
+    @pytest.mark.slow
     def test_custom_ttl(self):
         """사용자 정의 TTL 테스트."""
         cache = HybridCache(ttl_seconds=60)
@@ -103,6 +105,7 @@ class TestHybridCacheTTL:
         time.sleep(1.1)
         assert cache.get("key1") is None
 
+    @pytest.mark.slow
     def test_cleanup_expired(self):
         """만료된 항목 정리 테스트."""
         cache = HybridCache(ttl_seconds=1)

@@ -279,6 +279,7 @@ class TestAsyncBatchExecutorConcurrency:
 class TestAsyncBatchExecutorTimeout:
     """타임아웃 테스트."""
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_timeout_on_slow_batch(self):
         """느린 배치 타임아웃."""
