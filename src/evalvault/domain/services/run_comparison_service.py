@@ -1,11 +1,29 @@
+"""Run-comparison service.
+
+D-S3b rewiring
+--------------
+The legacy :class:`RunComparisonService` returning :class:`RunComparisonOutcome`
+remains the canonical CLI/Web path. This module additionally exposes
+:class:`RunComparisonBuilder` and :class:`RunComparisonRenderer` conforming
+to the ``ReportBuilder`` / ``Renderer`` Protocols. The Renderer returns the
+report text already produced by the analysis pipeline, so CLI output is
+byte-identical.
+"""
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from evalvault.domain.entities.analysis import ComparisonResult
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent, PipelineResult
+from evalvault.domain.services.reporting import (
+    MetricTable,
+    ReportData,
+    ReportSection,
+)
 from evalvault.ports.outbound.analysis_port import AnalysisPort
 from evalvault.ports.outbound.comparison_pipeline_port import ComparisonPipelinePort
 from evalvault.ports.outbound.storage_port import StoragePort
@@ -151,9 +169,108 @@ class RunComparisonService:
         return None
 
 
+# ---------------------------------------------------------------------------
+# D-S3b: Builder / Renderer adapters
+# ---------------------------------------------------------------------------
+
+
+def _run_comparison_outcome_to_report_data(
+    outcome: RunComparisonOutcome,
+) -> ReportData:
+    """Project :class:`RunComparisonOutcome` onto :class:`ReportData`."""
+
+    run_a, run_b = outcome.run_ids
+
+    comparison_rows: list[tuple[Any, ...]] = []
+    for comp in outcome.comparisons:
+        comparison_rows.append(
+            (
+                getattr(comp, "metric_name", ""),
+                getattr(comp, "mean_a", None),
+                getattr(comp, "mean_b", None),
+                getattr(comp, "p_value", None),
+                getattr(comp, "is_significant", None),
+            )
+        )
+    comparison_table = MetricTable(
+        name="metric_comparisons",
+        columns=("metric_name", "mean_a", "mean_b", "p_value", "is_significant"),
+        rows=tuple(comparison_rows),
+    )
+
+    sections: list[ReportSection] = []
+    if outcome.degraded_reasons:
+        sections.append(
+            ReportSection(
+                title="Degraded Reasons",
+                body=", ".join(outcome.degraded_reasons),
+                section_type="warning",
+                metadata={"reasons": list(outcome.degraded_reasons)},
+            )
+        )
+
+    # T2 authority discipline: only "ok"/"degraded" (no T3 promote/rollback).
+    status = outcome.status if outcome.status in {"ok", "degraded"} else None
+
+    metadata: dict[str, Any] = {
+        "run_id_a": run_a,
+        "run_id_b": run_b,
+        "duration_ms": outcome.duration_ms,
+        "started_at": outcome.started_at.isoformat(),
+        "finished_at": outcome.finished_at.isoformat(),
+        "pipeline_id": outcome.pipeline_result.pipeline_id,
+    }
+
+    return ReportData(
+        report_id=f"compare-{run_a}-{run_b}",
+        title="비교 분석 보고서",
+        sections=tuple(sections),
+        tables=(comparison_table,),
+        narratives={"report": outcome.report_text},
+        status=status,
+        metadata=metadata,
+        generated_at=outcome.finished_at,
+    )
+
+
+class RunComparisonBuilder:
+    """:class:`ReportBuilder` adapter over :class:`RunComparisonService`."""
+
+    def __init__(self, service: RunComparisonService) -> None:
+        self._service = service
+
+    def build(self, *args: Any, **kwargs: Any) -> ReportData:
+        request = kwargs.pop("request", None)
+        if request is None:
+            if not args:
+                raise ValueError(
+                    "RunComparisonBuilder.build requires a RunComparisonRequest"
+                )
+            request = args[0]
+        outcome = self._service.compare_runs(request)
+        return _run_comparison_outcome_to_report_data(outcome)
+
+
+class RunComparisonRenderer:
+    """:class:`Renderer` Protocol adapter for run comparison reports.
+
+    The pipeline already produced the canonical markdown body; the renderer
+    simply returns it verbatim via ``data.narratives['report']`` to preserve
+    byte equality with the legacy ``RunComparisonOutcome.report_text``.
+    """
+
+    def render(self, data: ReportData) -> str:
+        report = data.narratives.get("report")
+        if isinstance(report, str):
+            return report
+        return ""
+
+
 __all__ = [
-    "RunComparisonService",
-    "RunComparisonRequest",
-    "RunComparisonOutcome",
+    "RunComparisonBuilder",
     "RunComparisonError",
+    "RunComparisonOutcome",
+    "RunComparisonRenderer",
+    "RunComparisonRequest",
+    "RunComparisonService",
 ]

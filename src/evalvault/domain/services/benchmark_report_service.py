@@ -2,6 +2,15 @@
 
 LLM을 활용하여 KMMLU 등 벤치마크 결과에 대한 전문가 수준의 분석 보고서를 생성합니다.
 RAG 성능 개선에 초점을 맞추어 현황 파악, 문제점 정의, 원인 분석, 해결 방안을 제시합니다.
+
+D-S3b rewiring
+--------------
+This module exposes the legacy :class:`BenchmarkReportService` *and* the new
+:class:`BenchmarkReportBuilder` / :class:`BenchmarkRenderer` pair that conform
+to the ``ReportBuilder`` / ``Renderer`` Protocols from
+:mod:`evalvault.domain.services.reporting`. The legacy public surface
+(``BenchmarkReport``, ``BenchmarkReportService``) remains byte-identical so
+CLI output and regression baselines do not change.
 """
 
 from __future__ import annotations
@@ -11,6 +20,12 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from evalvault.domain.services.reporting import (
+    MetricTable,
+    ReportData,
+    ReportSection,
+)
 
 if TYPE_CHECKING:
     from evalvault.domain.entities.benchmark_run import BenchmarkRun
@@ -434,3 +449,165 @@ class BenchmarkReportService:
         benchmark_runs: list[BenchmarkRun],
     ) -> BenchmarkReport:
         return asyncio.run(self.generate_trend_report(benchmark_runs))
+
+
+# ---------------------------------------------------------------------------
+# D-S3b: Builder / Renderer (ReportBuilder + Renderer Protocol conformers)
+# ---------------------------------------------------------------------------
+
+
+def _benchmark_report_to_report_data(report: BenchmarkReport) -> ReportData:
+    """Project a legacy :class:`BenchmarkReport` onto :class:`ReportData`.
+
+    The legacy dataclass is preserved as the canonical persistence shape; the
+    projection here is used by the new ``ReportBuilder`` / ``Renderer``
+    pipeline. The status field is intentionally left ``None`` to honour the
+    T2 authority discipline (reports must not emit T3 verdicts).
+    """
+
+    sections = tuple(
+        ReportSection(
+            title=section.title,
+            body=section.content,
+            section_type=section.section_type,
+            metadata=dict(section.metadata),
+        )
+        for section in report.sections
+    )
+
+    rows: list[tuple[object, ...]] = []
+    for subject, result in report.subject_results.items():
+        accuracy = float(result.get("accuracy", 0.0))
+        samples = int(result.get("num_samples", 0))
+        rows.append((subject, accuracy, samples))
+    subject_table = MetricTable(
+        name="subject_results",
+        columns=("subject", "accuracy", "num_samples"),
+        rows=tuple(rows),
+    )
+
+    metadata: dict[str, object] = {
+        "benchmark_name": report.benchmark_name,
+        "model_name": report.model_name,
+        "backend": report.backend,
+        "overall_accuracy": report.overall_accuracy,
+        "num_samples": report.num_samples,
+        **dict(report.metadata),
+    }
+
+    return ReportData(
+        report_id=report.run_id,
+        title=f"벤치마크 분석 보고서: {report.benchmark_name}",
+        sections=sections,
+        tables=(subject_table,),
+        metadata=metadata,
+        generated_at=report.generated_at,
+    )
+
+
+class BenchmarkReportBuilder:
+    """:class:`ReportBuilder` adapter over :class:`BenchmarkReportService`.
+
+    Modes:
+
+    * ``"report"``   – :meth:`BenchmarkReportService.generate_report`
+    * ``"compare"``  – :meth:`BenchmarkReportService.generate_comparison_report`
+    * ``"trend"``    – :meth:`BenchmarkReportService.generate_trend_report`
+
+    Builders forward to the existing service, then project the resulting
+    :class:`BenchmarkReport` onto :class:`ReportData`. Existing CLI output
+    bytes (which still go through ``BenchmarkReport.to_markdown``) are not
+    affected.
+    """
+
+    def __init__(self, service: BenchmarkReportService) -> None:
+        self._service = service
+
+    def build(self, *args: object, **kwargs: object) -> ReportData:
+        mode = str(kwargs.pop("mode", "report"))
+        if mode == "report":
+            (benchmark_run,) = args  # type: ignore[assignment]
+            report = self._service.generate_report_sync(benchmark_run)  # type: ignore[arg-type]
+        elif mode == "compare":
+            baseline, target = args  # type: ignore[assignment]
+            report = self._service.generate_comparison_report_sync(
+                baseline,  # type: ignore[arg-type]
+                target,  # type: ignore[arg-type]
+            )
+        elif mode == "trend":
+            (benchmark_runs,) = args  # type: ignore[assignment]
+            report = self._service.generate_trend_report_sync(
+                benchmark_runs,  # type: ignore[arg-type]
+            )
+        else:
+            raise ValueError(f"Unknown BenchmarkReportBuilder mode: {mode!r}")
+        return _benchmark_report_to_report_data(report)
+
+
+class BenchmarkRenderer:
+    """:class:`Renderer` Protocol adapter for benchmark reports.
+
+    Renders a :class:`ReportData` projected from :class:`BenchmarkReport`
+    back into the legacy markdown layout. The output is intentionally aligned
+    with ``BenchmarkReport.to_markdown`` for the projected shape; consumers
+    who require byte-identical CLI output should keep using
+    ``BenchmarkReport.to_markdown`` directly.
+    """
+
+    def render(self, data: ReportData) -> str:
+        metadata = dict(data.metadata)
+        benchmark_name = str(metadata.get("benchmark_name", ""))
+        model_name = str(metadata.get("model_name", ""))
+        backend = str(metadata.get("backend", ""))
+        overall_accuracy = float(metadata.get("overall_accuracy", 0.0))
+        num_samples = int(metadata.get("num_samples", 0))
+
+        lines = [
+            f"# 벤치마크 분석 보고서: {benchmark_name}",
+            "",
+            f"> 생성일시: {data.generated_at.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"> 모델: {model_name} ({backend})",
+            f"> 전체 정확도: {overall_accuracy:.1%}",
+            f"> 평가 샘플: {num_samples}개",
+            "",
+            "---",
+            "",
+            "## 도메인별 결과",
+            "",
+            "| 도메인 | 정확도 | 샘플 수 | 상태 |",
+            "|--------|--------|---------|------|",
+        ]
+        for table in data.tables:
+            if table.name != "subject_results":
+                continue
+            for subject, accuracy, samples in table.rows:
+                acc = float(accuracy)
+                status = "✅" if acc >= 0.7 else "⚠️" if acc >= 0.5 else "❌"
+                lines.append(f"| {subject} | {acc:.1%} | {samples} | {status} |")
+
+        lines.extend(["", "---", ""])
+
+        for section in data.sections:
+            lines.extend([f"## {section.title}", "", section.body, "", "---", ""])
+
+        lines.extend(
+            [
+                "",
+                "*본 보고서는 AI가 생성한 분석입니다. 전문가 검토를 권장합니다.*",
+                "*EvalVault Benchmark Report | Powered by LLM Analysis*",
+            ]
+        )
+
+        return "\n".join(lines)
+
+
+__all__ = [
+    "BENCHMARK_ANALYSIS_PROMPT",
+    "BENCHMARK_COMPARISON_PROMPT",
+    "MULTI_BENCHMARK_TREND_PROMPT",
+    "BenchmarkRenderer",
+    "BenchmarkReport",
+    "BenchmarkReportBuilder",
+    "BenchmarkReportSection",
+    "BenchmarkReportService",
+]
