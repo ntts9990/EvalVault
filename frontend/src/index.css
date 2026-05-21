@@ -2,6 +2,9 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Phase 4 W-S1 — Claude design tokens (additive on top of legacy palette) */
+@import "./design/tokens.css";
+
 @layer base {
   :root {
     --background: 0 0% 100%;
