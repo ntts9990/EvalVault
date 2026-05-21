@@ -42,12 +42,9 @@ docs/
 │   ├── USER_GUIDE.md            # deprecated (handbook로 통합)
 │   ├── DEV_GUIDE.md             # deprecated (handbook로 통합)
 │   ├── EVALVAULT_RUN_EXCEL_SHEETS.md             # 실행 결과 엑셀 컬럼 설명
-│   ├── CLI_MCP_PLAN.md          # deprecated (handbook로 통합)
-│   ├── WEBUI_CLI_ROLLOUT_PLAN.md # deprecated (handbook로 통합)
 │   ├── RAGAS_HUMAN_FEEDBACK_CALIBRATION_GUIDE.md  # RAGAS 보정 방법론
 │   ├── EVALVAULT_DIAGNOSTIC_PLAYBOOK.md          # 진단 플레이북
 │   ├── RELEASE_CHECKLIST.md     # 배포 체크리스트
-│   ├── P1_P4_WORK_PLAN.md       # deprecated (handbook로 통합)
 │   ├── OPEN_RAG_TRACE_*.md      # Open RAG Trace 샘플/내부 래퍼
 │   └── OPEN_RAG_TRACE_*.md
 ├── architecture/
