@@ -19,9 +19,17 @@ def build_storage_adapter(
 ) -> StoragePort:
     resolved_settings = settings or Settings()
 
+    # Explicit db_path always forces SQLite backend — caller-provided path
+    # takes precedence over settings-driven backend selection. Without this,
+    # `evalvault stage ingest --db tmp.db` ignored --db when the default
+    # backend was postgres, silently fell back to a different SQLite path,
+    # and tests that depended on --db saw zero rows.
+    if db_path is not None:
+        return SQLiteStorageAdapter(db_path=db_path)
+
     backend = getattr(resolved_settings, "db_backend", "postgres")
     if backend == "sqlite":
-        resolved_db_path = db_path or resolved_settings.evalvault_db_path
+        resolved_db_path = resolved_settings.evalvault_db_path
         if resolved_db_path is None:
             raise RuntimeError("SQLite backend selected but evalvault_db_path is not set.")
         return SQLiteStorageAdapter(db_path=resolved_db_path)

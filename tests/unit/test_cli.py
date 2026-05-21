@@ -417,6 +417,7 @@ class TestCLIRun:
         reason="CI 환경에서는 Ollama 서버가 없습니다.",
     )
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @pytest.mark.requires_ollama
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.Settings")
@@ -1498,6 +1499,7 @@ class TestCLIRunModes:
         reason="CI 환경에서는 Ollama 서버가 없습니다.",
     )
     @patch(f"{RUN_COMMAND_MODULE}.get_loader")
+    @pytest.mark.requires_ollama
     @patch(f"{RUN_COMMAND_MODULE}.RagasEvaluator")
     @patch(f"{RUN_COMMAND_MODULE}.get_llm_adapter")
     @patch(f"{RUN_COMMAND_MODULE}.Settings")
