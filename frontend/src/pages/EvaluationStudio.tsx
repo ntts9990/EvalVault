@@ -35,6 +35,10 @@ import { SUMMARY_METRICS, SUMMARY_METRIC_THRESHOLDS, type SummaryMetric } from "
 import { getPhoenixUiUrl } from "../utils/phoenix";
 import { buildRunCommand } from "../utils/cliCommandBuilder";
 import { copyTextToClipboard } from "../utils/clipboard";
+// Phase 4 W-S2c — incremental migration onto W-S1 primitives. Imports placed
+// here so follow-up slices can add Card/EmptyState/MetricChip without touching
+// the import block again.
+import { Button } from "../design";
 
 const DEFAULT_METRICS = ["faithfulness", "answer_relevancy"];
 const RETRIEVER_MODES = [
@@ -445,9 +449,12 @@ export function EvaluationStudio() {
                 </div>
 
                 {error && (
-                    <div className="bg-destructive/10 text-destructive p-4 rounded-lg mb-6 flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5" />
-                        {error}
+                    <div
+                        role="alert"
+                        className="mb-6 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{error}</span>
                     </div>
                 )}
 
@@ -1035,20 +1042,17 @@ export function EvaluationStudio() {
                                 )}
                                 {copyStatus === "success" ? "Copied!" : "Copy CLI"}
                             </button>
-                            <button
+                            <Button
+                                variant="primary"
+                                size="lg"
                                 onClick={handleStart}
-                                disabled={submitting || !selectedDataset || !selectedModel}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!selectedDataset || !selectedModel}
+                                loading={submitting}
+                                leading={!submitting ? <Play className="w-5 h-5 fill-current" /> : undefined}
+                                className="font-semibold"
                             >
-                                {submitting ? (
-                                    <>Starting...</>
-                                ) : (
-                                    <>
-                                        <Play className="w-5 h-5 fill-current" />
-                                        Start Evaluation
-                                    </>
-                                )}
-                            </button>
+                                {submitting ? "Starting..." : "Start Evaluation"}
+                            </Button>
                         </div>
                     </div>
                 </div>
