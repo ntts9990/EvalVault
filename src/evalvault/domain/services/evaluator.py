@@ -40,6 +40,7 @@ from evalvault.domain.services import ragas_korean_prompts as _korean_prompts
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
+from evalvault.domain.services.faithfulness_fallback import FaithfulnessFallback
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
 from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort, RetrieverPort
 from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
@@ -291,14 +292,17 @@ class RagasEvaluator:
         self._korean_toolkit = korean_toolkit
         self._llm_factory = llm_factory
         self._faithfulness_ragas_failed = False
-        self._faithfulness_fallback_llm = None
-        self._faithfulness_fallback_metric = None
-        self._faithfulness_fallback_failed = False
-        self._faithfulness_fallback_logged = False
         self._active_llm_provider = None
         self._active_llm_model = None
         self._active_llm = None
         self._prompt_language = None
+        self._faithfulness_fallback = FaithfulnessFallback(
+            llm_factory=self._llm_factory,
+            metric_map=self.METRIC_MAP,
+            metric_args=self.METRIC_ARGS,
+            summarize_error=self._summarize_ragas_error,
+            korean_fallback=lambda s: self._fallback_korean_faithfulness(s, return_details=False),
+        )
 
     async def evaluate(
         self,
@@ -1509,112 +1513,17 @@ class RagasEvaluator:
         self,
         sample: SingleTurnSample,
     ) -> float | None:
-        metric = self._get_faithfulness_fallback_metric()
-        if metric is None:
-            return self._fallback_korean_faithfulness(sample, return_details=False)
+        """Delegate fallback scoring to :class:`FaithfulnessFallback` (D-S5b).
 
-        try:
-            if hasattr(metric, "ascore"):
-                all_args = {
-                    "user_input": sample.user_input,
-                    "response": sample.response,
-                    "retrieved_contexts": sample.retrieved_contexts,
-                    "reference": sample.reference,
-                }
-                required_args = self.METRIC_ARGS.get(
-                    metric.name,
-                    ["user_input", "response", "retrieved_contexts"],
-                )
-                kwargs = {k: v for k, v in all_args.items() if k in required_args and v is not None}
-                result = await metric.ascore(**kwargs)
-            elif hasattr(metric, "single_turn_ascore"):
-                result = await metric.single_turn_ascore(sample)
-            else:
-                raise AttributeError(f"{metric.__class__.__name__} does not support scoring API.")
-
-            if hasattr(result, "value"):
-                score_value = result.value
-            elif hasattr(result, "score"):
-                score_value = result.score
-            else:
-                score_value = result
-
-            if score_value is None:
-                raise ValueError("Metric returned None")
-            score_value = float(score_value)
-            if math.isnan(score_value):
-                raise ValueError("Metric returned NaN")
-            return score_value
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback LLM failed (%s). Using Korean fallback.",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return self._fallback_korean_faithfulness(sample, return_details=False)
-
-    def _get_faithfulness_fallback_metric(self):
-        if self._faithfulness_fallback_failed:
-            return None
-        if self._faithfulness_fallback_metric is not None:
-            return self._faithfulness_fallback_metric
-
-        llm = self._get_faithfulness_fallback_llm()
-        if llm is None:
-            return None
-
-        metric_class = self.METRIC_MAP.get("faithfulness")
-        if not metric_class:
-            return None
-        try:
-            self._faithfulness_fallback_metric = metric_class(llm=llm.as_ragas_llm())
-            return self._faithfulness_fallback_metric
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback metric init failed (%s).",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return None
-
-    def _get_faithfulness_fallback_llm(self) -> LLMPort | None:
-        if self._faithfulness_fallback_failed:
-            return None
-        if self._faithfulness_fallback_llm is not None:
-            return self._faithfulness_fallback_llm
-        if self._llm_factory is None:
-            return None
-
-        try:
-            llm = self._llm_factory.create_faithfulness_fallback(
-                self._active_llm_provider,
-                self._active_llm_model,
-            )
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback LLM init failed (%s).",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return None
-
-        if llm is None:
-            return None
-
-        self._faithfulness_fallback_llm = llm
-        if not self._faithfulness_fallback_logged:
-            provider = getattr(llm, "provider_name", None)
-            model = llm.get_model_name()
-            logger.warning(
-                "Faithfulness fallback LLM enabled: %s/%s",
-                provider,
-                model,
-            )
-            self._faithfulness_fallback_logged = True
-        return llm
+        Behaviour is preserved exactly; the helper owns the cached LLM,
+        cached metric, and one-shot warning state that used to live on
+        ``self``.
+        """
+        return await self._faithfulness_fallback.score(
+            sample,
+            self._active_llm_provider,
+            self._active_llm_model,
+        )
 
     @staticmethod
     def _contains_korean(text: str) -> bool:
