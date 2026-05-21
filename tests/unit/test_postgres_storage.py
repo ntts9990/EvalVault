@@ -338,7 +338,7 @@ class TestPostgreSQLStorageAdapter:
                 "pass_rate": None,
                 "metrics_evaluated": '["faithfulness"]',
                 "thresholds": '{"faithfulness": 0.7}',
-                "langfuse_trace_id": "trace-123",
+                "tracker_trace_ids": '{"langfuse": "trace-123"}',
                 "metadata": '{"phoenix":{"prompts":[{"path":"agent/prompts/baseline.txt","status":"missing_file"}]}}',
                 "retrieval_metadata": None,
             },
@@ -397,7 +397,7 @@ class TestPostgreSQLStorageAdapter:
             "pass_rate": None,
             "metrics_evaluated": '["faithfulness"]',
             "thresholds": '{"faithfulness": 0.7}',
-            "langfuse_trace_id": "trace-123",
+            "tracker_trace_ids": '{"langfuse": "trace-123"}',
             "metadata": None,
             "retrieval_metadata": None,
         }
