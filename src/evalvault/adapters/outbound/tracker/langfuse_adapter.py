@@ -4,6 +4,7 @@ from typing import Any
 
 from langfuse import Langfuse
 
+from evalvault.adapters.outbound.tracker.base import BaseTrackerAdapter
 from evalvault.adapters.outbound.tracker.log_sanitizer import (
     MAX_CONTEXT_CHARS,
     MAX_LOG_CHARS,
@@ -16,8 +17,14 @@ from evalvault.domain.entities import EvaluationRun
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 
-class LangfuseAdapter(TrackerPort):
-    """Langfuse implementation of TrackerPort."""
+class LangfuseAdapter(BaseTrackerAdapter, TrackerPort):
+    """Langfuse implementation of TrackerPort.
+
+    Inherits :class:`BaseTrackerAdapter` for the shared error policy:
+    ``ValueError`` for caller-side bugs (unknown ``trace_id``), other
+    exceptions for tracker-internal failures (swallowed by
+    :meth:`BaseTrackerAdapter.safe_emit` when composed in dual-logging).
+    """
 
     def __init__(
         self,
@@ -93,10 +100,7 @@ class LangfuseAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._traces:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        trace_or_span = self._traces[trace_id]
+        trace_or_span = self._require_trace(self._traces, trace_id)
         safe_input = (
             sanitize_payload(input_data, max_chars=MAX_LOG_CHARS)
             if input_data is not None
@@ -143,10 +147,7 @@ class LangfuseAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._traces:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        trace_or_span = self._traces[trace_id]
+        trace_or_span = self._require_trace(self._traces, trace_id)
         # Support both old and new Langfuse API
         if hasattr(trace_or_span, "score_trace"):
             # Langfuse 3.x: use score_trace on span
@@ -184,10 +185,7 @@ class LangfuseAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._traces:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        trace_or_span = self._traces[trace_id]
+        trace_or_span = self._require_trace(self._traces, trace_id)
         artifact_metadata = {
             f"artifact_{name}": data,
             f"artifact_{name}_type": artifact_type,
@@ -210,10 +208,7 @@ class LangfuseAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._traces:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        trace_or_span = self._traces[trace_id]
+        trace_or_span = self._require_trace(self._traces, trace_id)
         # Support both old and new Langfuse API
         if hasattr(trace_or_span, "end"):
             # Langfuse 3.x: end the span

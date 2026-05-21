@@ -4,18 +4,29 @@ import json
 import tempfile
 from typing import Any
 
+from evalvault.adapters.outbound.tracker.base import BaseTrackerAdapter
 from evalvault.adapters.outbound.tracker.log_sanitizer import MAX_LOG_CHARS, sanitize_payload
 from evalvault.domain.entities import EvaluationRun, TestCaseResult
 from evalvault.ports.outbound.tracker_port import TrackerPort
 
 
-class MLflowAdapter(TrackerPort):
+class MLflowAdapter(BaseTrackerAdapter, TrackerPort):
     """MLflow implementation of TrackerPort.
 
     MLflow는 ML 실험 추적 플랫폼으로, run/experiment 개념을 사용합니다.
     TrackerPort의 trace는 MLflow run으로 매핑됩니다.
     Span은 MLflow에 네이티브 개념이 아니므로 artifact로 저장합니다.
+
+    Inherits :class:`BaseTrackerAdapter` for the shared error policy:
+    ``ValueError`` for caller-side bugs (unknown ``trace_id``),
+    ``RuntimeError`` (or backend-native exceptions) for tracker-internal
+    failures, swallowed by :meth:`BaseTrackerAdapter.safe_emit` when
+    composed in dual-logging.
     """
+
+    # MLflow's domain term for a trace is "Run"; surfaced in error
+    # messages produced by ``_require_trace``.
+    _lookup_label = "Run"
 
     def __init__(
         self,
@@ -112,8 +123,7 @@ class MLflowAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_runs:
-            raise ValueError(f"Run not found: {trace_id}")
+        self._require_trace(self._active_runs, trace_id)
 
         # Store span data as JSON artifact
         span_data = {
@@ -144,8 +154,7 @@ class MLflowAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_runs:
-            raise ValueError(f"Run not found: {trace_id}")
+        self._require_trace(self._active_runs, trace_id)
 
         self._mlflow.log_metric(name, value)
 
@@ -172,8 +181,7 @@ class MLflowAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_runs:
-            raise ValueError(f"Run not found: {trace_id}")
+        self._require_trace(self._active_runs, trace_id)
 
         if artifact_type == "json":
             payload = json.dumps(data, default=str)
@@ -196,8 +204,7 @@ class MLflowAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_runs:
-            raise ValueError(f"Run not found: {trace_id}")
+        self._require_trace(self._active_runs, trace_id)
 
         self._mlflow.end_run()
         del self._active_runs[trace_id]

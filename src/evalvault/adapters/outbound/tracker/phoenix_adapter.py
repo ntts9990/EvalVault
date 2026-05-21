@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from evalvault.adapters.outbound.tracer.open_rag_trace_helpers import serialize_json
+from evalvault.adapters.outbound.tracker.base import BaseTrackerAdapter
 from evalvault.adapters.outbound.tracker.log_sanitizer import (
     MAX_CONTEXT_CHARS,
     MAX_LOG_CHARS,
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider
 
 
-class PhoenixAdapter(TrackerPort):
+class PhoenixAdapter(BaseTrackerAdapter, TrackerPort):
     """Phoenix implementation of TrackerPort using OpenTelemetry.
 
     Phoenix는 OpenTelemetry 기반 LLM 옵저버빌리티 플랫폼입니다.
@@ -239,8 +240,7 @@ class PhoenixAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
+        parent_span = self._require_trace(self._active_spans, trace_id)
 
         self._ensure_initialized()
 
@@ -251,7 +251,6 @@ class PhoenixAdapter(TrackerPort):
             tracer = self._tracer
         if tracer is None:
             raise RuntimeError("Phoenix tracer is not initialized")
-        parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
         with tracer.start_span(name, context=context) as span:
@@ -280,10 +279,7 @@ class PhoenixAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        span = self._active_spans[trace_id]
+        span = self._require_trace(self._active_spans, trace_id)
         span.set_attribute(f"score.{name}", value)
         if comment:
             span.set_attribute(f"score.{name}.comment", comment)
@@ -309,10 +305,7 @@ class PhoenixAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        span = self._active_spans[trace_id]
+        span = self._require_trace(self._active_spans, trace_id)
 
         if artifact_type == "json":
             span.set_attribute(f"artifact.{name}", json.dumps(data, default=str))
@@ -328,10 +321,7 @@ class PhoenixAdapter(TrackerPort):
         Raises:
             ValueError: If trace_id is not found
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
-
-        span = self._active_spans[trace_id]
+        span = self._require_trace(self._active_spans, trace_id)
         span.end()
 
         # Force flush to ensure data is sent
@@ -612,14 +602,12 @@ class PhoenixAdapter(TrackerPort):
             ...     candidates=[...],
             ... ))
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
+        parent_span = self._require_trace(self._active_spans, trace_id)
 
         self._ensure_initialized()
 
         from opentelemetry import trace
 
-        parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
         tracer = self._tracer_any
@@ -716,14 +704,12 @@ class PhoenixAdapter(TrackerPort):
             ...     output_tokens=50,
             ... ))
         """
-        if trace_id not in self._active_spans:
-            raise ValueError(f"Trace not found: {trace_id}")
+        parent_span = self._require_trace(self._active_spans, trace_id)
 
         self._ensure_initialized()
 
         from opentelemetry import trace
 
-        parent_span = self._active_spans[trace_id]
         context = trace.set_span_in_context(parent_span)
 
         tracer = self._tracer_any
