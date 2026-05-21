@@ -189,6 +189,32 @@
 | **A-S4** | `langfuse_trace_id` → `tracker_trace_ids: dict[str,str]` (도메인의 벤더 누수 제거) | adapter | H | 1d | `domain/entities/result.py`, `base_sql.py:52,148,667,1177` + DB 마이그레이션 1회 | A-S3 |
 | **D-S5** | `RagasEvaluator` 핵심 좁히기 (cost/fallback/custom-metric scoring 분리) | domain | H | 1주 | `evaluator.py`, `multiturn_evaluator.py`, `memory_aware_evaluator.py`, `prompt_scoring_service.py`, `graph_rag_experiment.py`, 2개 신규 서비스 | D-S2 |
 
+### Phase 3.5 — 외부 라이브러리 일제 업데이트 (Phase 3 완료 직후, Phase 4 이전)
+
+> 2026-05-21 사용자 지침으로 신설. Phase 3로 도메인 구조가 안정된 직후, **모든 외부 의존성의 최신 버전 가용성을 확인하고 안전한 범위에서 업데이트**한다. 동시에 업데이트된 라이브러리의 신 기능 중 EvalVault에 도움이 되는 것은 적극 채택. 라이브러리 안정화 후 Phase 4(웹 개편)로 진입해야 redesign이 stale 의존성 위에서 진행되는 일을 막을 수 있다.
+>
+> **두 단계로 진행**:
+> 1. **버전 audit + 안전 업데이트** — pyproject.toml + frontend/package.json + uv.lock 전체 점검. 각 의존성을 (a) 안전한 minor/patch 업데이트, (b) breaking change 동반 major 업데이트(별도 audit 필요), (c) 의도된 핀(이유 문서화)로 분류. (a)는 일괄 적용, (b)는 슬라이스 단위 audit 후 적용, (c)는 핀 이유와 함께 명시.
+> 2. **신 기능 채택** — CHANGELOG / release notes에서 EvalVault에 가치 있는 것만 골라 적용. 새로움 그 자체를 위한 채택은 금지.
+>
+> **메모리 적용**: `project-phase35-library-update` (마스터 지침), `llm-prompt-discipline` (LLM 관련 라이브러리 업데이트 시 프롬프트 byte-identical 유지), `project-decision-authority-t2` (새 결정 emit 기능은 T2 cap 존중).
+
+| ID | 슬라이스 | 영역 | Risk | Wall | 영향 파일 | 비고 |
+|---|---|---|---|---|---|---|
+| **L-S0** | 전체 의존성 인벤토리 + (a)(b)(c) 분류 + 핀 이유 문서화 | discovery | L | 1d | `pyproject.toml`, `frontend/package.json`, `uv.lock`, `docs/dependency-audit-2026-05.md`(신규) | 사용자 결정이 필요한 핀들 명시 (예: `ragas==0.4.2`, `matplotlib<3.9.0`) |
+| **L-S1** | 안전 minor/patch 일괄 업데이트 (분류 (a)) | dependency | L-M | 4h | `pyproject.toml`, `uv.lock` | `uv sync` + 전체 unit 테스트 회귀 검증 |
+| **L-S2** | ragas major 업데이트 (0.4.2 → 1.x) — 별도 슬라이스 | dependency | H | 1주 | `evaluator.py`, `metric_scoring.py`, `faithfulness_fallback.py`, `ragas_korean_prompts.py`, `domain/metrics/*` | regression-gate baseline 영향 大. 별도 sprint. ragas v1 metric API 변경 흡수. |
+| **L-S3** | pydantic v2 / pydantic-settings 최신화 + 신 기능 (model_validator, computed_field 등) 적용 | dependency | M | 2~3d | `domain/entities/*`, `config/settings.py`, 모든 BaseModel | A-S5(model_copy) + A-S1(RetryPolicy)이 이미 v2 기반이라 호환 |
+| **L-S4** | FastAPI / typer / instructor 최신화 + 신 기능 채택 | dependency | M | 2d | `adapters/inbound/{api,cli}`, `prompt_registry.py` (D-S5d 산물) | typer 자동완성, instructor 새 schema 기능, fastapi async 패턴 |
+| **L-S5** | mkdocs + mkdocs-material + mkdocstrings 업데이트 + 신 테마 기능 | dependency | L | 4h | `mkdocs.yml`, `docs/stylesheets/` | mkdocs Material 최신 features (i18n, search.boost 등) |
+| **L-S6** | frontend dependency 업데이트 (React 19 patch, Vite 7 patch, Tailwind 4 patch, AI SDK 등) | dependency | M | 1d | `frontend/package.json`, `frontend/package-lock.json` | Phase 4 시작 전에 안정화. major React/Vite 변경은 Phase 4 redesign과 같이 진행 가능 |
+
+**의존 그래프**: L-S0 → L-S1 → (L-S2, L-S3, L-S4, L-S5, L-S6 병렬 가능). L-S2는 가장 위험 — 단독 sprint.
+
+**선행 조건**: Phase 3 D-S5 완료 (regression-gate baseline 안정). **후행**: L-S6 완료 후 Phase 4(웹 개편) 진입.
+
+---
+
 ### Phase 4 — 웹 프론트엔드 전면 개선 (별도 sprint, CLI 안정 후)
 
 > 2026-05-21 사용자 지침으로 신설. CLI는 큰 문제 없으나 웹페이지 쪽이 심각하다는 판단. 다음 액션 계획 라운드에서 본격 슬라이스 분해.
