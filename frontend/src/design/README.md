@@ -64,7 +64,7 @@ All HSL via CSS variables. Dark mode flips on `.dark` class on `<html>`.
 ## Direction (not yet implemented in W-S1)
 
 - **Storybook / ladle**: deferred to a separate W-S1b slice or W-S2. Components are documented inline via TSDoc.
-- **lucide-react 0.562 → 1.16** bump: deferred to a separate commit on this branch so it can revert independently if icons break.
+- **lucide-react 0.562 → 1.16** bump: deferred to W-S6 (e2e refresh + final icon audit). Attempted during W-S1 but local `npm run build` could not verify icon-name compatibility in this environment (50+ icon import sites + npm cache permission issue). Safer to fold the bump into the slice that already revisits every icon usage.
 - **Migration of existing pages**: W-S2 onward. The legacy components in `src/components/` continue to work alongside the new ones — design system rollout is incremental, not big-bang.
 
 ## Why these specific components first?
