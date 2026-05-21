@@ -254,6 +254,13 @@ class Settings(BaseSettings):
         default=None,
         description="Optional model name for faithfulness fallback evaluation.",
     )
+    default_fallback_model: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default model name used as the openai-provider faithfulness fallback "
+            "when no explicit faithfulness_fallback_model is configured."
+        ),
+    )
 
     # OpenAI Configuration
     openai_api_key: str | None = Field(default=None, description="OpenAI API key")
