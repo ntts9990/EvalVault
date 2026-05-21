@@ -319,49 +319,5 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 | [docs/handbook/CHAPTERS/08_roadmap.md](docs/handbook/CHAPTERS/08_roadmap.md) | 로드맵 SSoT (PROJECT_STATE.md §8은 요약본) |
 | [docs/guides/OFFLINE_DOCKER.md](docs/guides/OFFLINE_DOCKER.md) | 오프라인 Docker 배포 가이드 |
 | [docs/guides/OFFLINE_MODELS.md](docs/guides/OFFLINE_MODELS.md) | 오프라인 모델 번들링 가이드 |
-| [agent/README.md](agent/README.md) | 자율 에이전트 시스템 가이드 (⚠️ X-S1 슬라이스에서 제거 예정) |
 
 > `docs/USER_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/COMPLETED.md`, `docs/IMPROVEMENT_PLAN.md`, `docs/KG_IMPROVEMENT_PLAN.md`는 모두 deprecated. 위 표가 새로운 진입점이다.
-
-## Autonomous Agent System
-
-EvalVault includes an autonomous agent system for development automation, based on [nonstop-agent](https://github.com/seolcoding/nonstop-agent) (MIT License).
-
-### Agent Types
-
-| Agent | Focus | P-Levels |
-|-------|-------|----------|
-| `architecture` | Code structure, Hexagonal Architecture | P0, P1, P2 |
-| `observability` | Phoenix integration, OpenTelemetry | P7 |
-| `rag-data` | Retrieval data collection, metrics | P7 |
-| `performance` | Caching, batch processing | P3 |
-| `testing` | Test optimization, coverage | P5 |
-| `documentation` | Tutorials, API docs | P6 |
-| `coordinator` | Parallel workflow management | All |
-
-### Usage
-
-```bash
-# Prerequisites
-cd agent/
-export ANTHROPIC_API_KEY='your-key'
-uv add claude-agent-sdk
-
-# List available agents
-uv run python main.py --list-agents
-
-# Run specific agent
-uv run python main.py --project-dir .. --agent-type architecture
-
-# Run coordinator to check all agents
-uv run python main.py --project-dir .. --agent-type coordinator
-```
-
-### Memory System
-
-Agents maintain persistent memory in `agent/memory/`:
-- `agents/<agent-type>/` - Per-agent session logs
-- `shared/decisions.md` - Cross-agent architecture decisions (ADR format)
-- `shared/dependencies.md` - Task dependencies and blocking issues
-
-See [agent/README.md](agent/README.md) for full documentation.

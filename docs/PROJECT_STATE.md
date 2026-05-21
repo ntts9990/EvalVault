@@ -156,7 +156,6 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 | 자동 회귀 게이트 (CI) | ⚠️ 코드 ✅ / 운영 강제 ⚠️ | `domain/services/regression_gate_service.py` + `.github/workflows/regression-gate.yml` — **GitHub 브랜치 보호 설정은 별도로 운영팀이 해야 강제됨** |
 | Web UI (React 19 + Vite 7 + Tailwind 4) | ✅ | `frontend/` (17개 페이지, Playwright e2e 포함) |
 | FastAPI Web 백엔드 | ✅ | `adapters/inbound/api/` (CLI `evalvault api serve` 또는 `serve-api`) |
-| 자율 에이전트 시스템 (nonstop-agent 기반) | ✅ | `agent/` — Claude Agent SDK 연동, ANTHROPIC_API_KEY 필요 |
 | 오프라인 번들 (Docker + 모델 캐시) | ✅ | `scripts/offline/`, `docker-compose.offline*.yml` |
 
 ### 3.4 테스트 요약
@@ -194,7 +193,7 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 | `gate` | 임계값 기반 합/불합격 판정 |
 | `profile-difficulty` | 데이터셋 난이도 프로파일링 |
 | `regress` | 회귀 비교 (`regress`, `regress-baseline`, `ci-gate`) |
-| `agent` | 자율 에이전트 호출 |
+| `agent` | 운영 에이전트 호출 (CLI 명령, `src/evalvault/config/agent_types.py` 기반 — repo-root `agent/` 폴더와 무관) |
 | `experiment` | A/B 실험 관리 |
 | `config` | 현재 설정 출력/검증 |
 | `langfuse` | Langfuse 동기화/유틸 |
@@ -270,7 +269,7 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 | `DB_BACKEND`, `EVALVAULT_DB_PATH` | 옵션 | 기본 Postgres+pgvector, SQLite로 바꿀 때 |
 | `EVALVAULT_PROFILE` | 옵션 | 예: `vllm`, `dev`, `ollama` (config/models.yaml 키와 매칭) |
 | `VLLM_BASE_URL`, `VLLM_MODEL` | vLLM 사용 시 | 외부 vLLM 서버 |
-| `ANTHROPIC_API_KEY` | 에이전트 사용 시 | `agent/` 자율 에이전트 |
+| `ANTHROPIC_API_KEY` | Anthropic LLM 사용 시 (`--extra anthropic`) | `adapters/outbound/llm/anthropic_adapter.py` 의존 |
 
 ### 5.3 프로필 (Model Configuration)
 
@@ -441,9 +440,9 @@ uv run pytest tests/ -v
 
 - 한국어 보험 도메인에 최적화된 fixtures와 메트릭이 있어, 다른 도메인으로 옮기면 **회귀 게이트 baseline이 의미 없을 수 있음**. baseline 재설정 정책 합의 필요.
 
-### 9.6 에이전트 시스템 의존
+### 9.6 (제거됨) 에이전트 시스템 의존
 
-- `agent/` 디렉토리는 nonstop-agent(MIT) 기반 자율 에이전트. **Anthropic 키가 필요**하고, 실행 결과가 `agent/memory/`에 남음. 인수팀이 이 컴포넌트를 유지할지/제거할지 결정 필요.
+> 2026-05-21: 인수팀 결정 (`REFACTOR_DIAGNOSIS.md §0.5`) 에 따라 `agent/` 디렉토리 전면 제거 (슬라이스 X-S1). 이 항목은 더 이상 리스크가 아니다. CLI 명령 `evalvault agent`(운영 에이전트, `src/evalvault/config/agent_types.py` 기반)는 별개 기능으로 유지.
 
 ---
 
@@ -504,7 +503,7 @@ uv run pytest tests/ -v
 | UX/제품 방향 | `docs/handbook/CHAPTERS/07_ux_and_product.md` | |
 | 로드맵/우선순위 결정 규칙 | `docs/handbook/CHAPTERS/08_roadmap.md` | 이 문서 §8 요약본 |
 | 경쟁/포지셔닝 | `docs/handbook/CHAPTERS/09_competitive_positioning.md` | |
-| 에이전트 시스템 | `agent/README.md` | 분리된 서브시스템 |
+| 운영 에이전트 CLI | `src/evalvault/adapters/inbound/cli/commands/agent.py` + `src/evalvault/config/agent_types.py` | `evalvault agent` 서브앱 |
 | Open RAG Trace 스펙 | `docs/architecture/open-rag-trace-spec.md` | |
 | 진단 플레이북 | `docs/guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md` | 장애 대응용 |
 | 배포 체크리스트 | `docs/guides/RELEASE_CHECKLIST.md` | |
@@ -568,7 +567,7 @@ uv run pytest tests/ -v
 - [ ] MLflow/Phoenix 서버 운영 위치 인계 (§6.3)
 - [ ] OpenAI/Azure/Anthropic 키 인계 + 비용 limit 설정 (§9.4)
 - [ ] `docs/guides/` 누적 plan/worklog 문서 정리 정책 (§9.2)
-- [ ] `agent/` 서브시스템 유지 여부 결정 (§9.6)
+- [x] `agent/` 서브시스템 — 제거됨 (X-S1, 2026-05-21)
 - [ ] 도메인 이식 여부 결정 (§10.5) — 한국어 보험 유지 vs 신규
 - [ ] §8 P0–P4 워크 스트림 우선순위 재합의
 - [ ] 이 문서의 다음 검증일 캘린더 등록
