@@ -525,4 +525,7 @@ class LangfuseAdapter(BaseTrackerAdapter, TrackerPort):
             langfuse_meta["trace_url"] = trace_url
 
         run.tracker_metadata = tracker_metadata
-        run.langfuse_trace_id = trace_id
+        # A-S4: write into the provider-keyed dict instead of the legacy
+        # vendor-specific field. ``tracker_trace_ids`` is a plain dict on
+        # the domain entity, so direct mutation is safe.
+        run.tracker_trace_ids["langfuse"] = trace_id

@@ -124,7 +124,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'evaluation_runs'
-              AND column_name IN ('metadata', 'retrieval_metadata')
+              AND column_name IN ('metadata', 'retrieval_metadata', 'tracker_trace_ids')
             """
         )
         columns = {row[0] for row in cursor.fetchall()}
@@ -132,6 +132,10 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata JSONB")
         if "retrieval_metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata JSONB")
+        if "tracker_trace_ids" not in columns:
+            # A-S4: per-provider trace IDs replacing langfuse_trace_id.
+            # The legacy column is kept for backward-compat reads.
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN tracker_trace_ids JSONB")
 
         pipeline_cursor = conn.execute(
             """

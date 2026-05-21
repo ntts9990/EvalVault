@@ -758,6 +758,11 @@ class WebUIAdapter:
             except Exception as exc:
                 raise RuntimeError(f"Tracker logging failed: {exc}") from exc
 
+            # A-S4: persist per-provider trace IDs on the domain entity so
+            # ``save_run`` writes the new ``tracker_trace_ids`` JSON column
+            # instead of the legacy vendor-specific ``langfuse_trace_id``.
+            if multi.last_trace_ids:
+                result.tracker_trace_ids.update(multi.last_trace_ids)
             for provider, trace_id in multi.last_trace_ids.items():
                 provider_meta = result.tracker_metadata.setdefault(provider, {})
                 if isinstance(provider_meta, dict):

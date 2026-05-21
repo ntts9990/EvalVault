@@ -63,7 +63,7 @@ def sample_run():
         thresholds={"faithfulness": 0.7, "answer_relevancy": 0.7},
         total_tokens=1000,
         total_cost_usd=0.05,
-        langfuse_trace_id="trace-123",
+        tracker_trace_ids={"langfuse": "trace-123"},
         tracker_metadata={
             "phoenix": {
                 "prompts": [

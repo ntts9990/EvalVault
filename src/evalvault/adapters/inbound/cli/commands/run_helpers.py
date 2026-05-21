@@ -462,6 +462,11 @@ def _log_to_trackers(
             )
             raise typer.Exit(2) from exc
 
+    # A-S4: surface per-provider trace IDs through the domain entity's
+    # ``tracker_trace_ids`` dict so the persistence layer can store the
+    # whole map instead of just the legacy Langfuse field.
+    if multi.last_trace_ids:
+        result.tracker_trace_ids.update(multi.last_trace_ids)
     for provider, trace_id in multi.last_trace_ids.items():
         tracker_name = provider.capitalize()
         console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
