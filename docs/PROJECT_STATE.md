@@ -84,7 +84,7 @@
 │   LLM:     OpenAI · Anthropic · Azure · Ollama · vLLM             │
 │   Dataset: CSV · Excel · JSON                                     │
 │   Storage: SQLite · PostgreSQL (pgvector)                         │
-│   Tracker: MLflow · Phoenix · Langfuse  (+ MultiTrackerAdapter)   │
+│   Tracker: MLflow · Phoenix · Langfuse  (MultiTracker: planned)   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -143,7 +143,7 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 | TrackerPort | MLflow | ✅ | `adapters/outbound/tracker/mlflow_adapter.py` (`--extra mlflow`) |
 | TrackerPort | Phoenix | ✅ | `adapters/outbound/tracker/phoenix_adapter.py` (`--extra phoenix`) |
 | TrackerPort | Langfuse | ✅ | `adapters/outbound/tracker/langfuse_adapter.py` |
-| TrackerPort | MultiTracker (MLflow + Phoenix dual) | ✅ | `tracker/__init__.py` factory |
+| TrackerPort | MultiTracker (MLflow + Phoenix dual) | ⚠️ 문서상 명시, 실구현 없음 — A-S3에서 구현 예정 | dual-logging은 현재 `cli/commands/run_helpers.py:339-377` + `api/adapter.py:238-286`에서 수동 합성. `MultiTrackerAdapter` 클래스 grep 0건. 결정: Option A (실제 구현) → `REFACTOR_DIAGNOSIS.md §0.5` |
 | EvaluatorPort | RagasEvaluator | ✅ | `domain/services/evaluator.py` |
 
 ### 3.3 인수 시 알아야 할 부가 컴포넌트
