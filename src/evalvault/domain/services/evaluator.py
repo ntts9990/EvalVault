@@ -54,6 +54,25 @@ from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
+def _summary_faithfulness_structured_output_enabled() -> bool:
+    """Return whether the Instructor structured-output wrapper is enabled.
+
+    Reads ``use_structured_output_for_summary_faithfulness`` from the
+    global :class:`Settings` lazily so the evaluator module avoids a
+    hard dependency on the settings singleton. The flag defaults to
+    ``False`` (D-S5d Part B), so existing behaviour stays byte-identical
+    until a deployment opts in.
+    """
+    try:
+        from evalvault.config.settings import get_settings
+
+        return bool(
+            getattr(get_settings(), "use_structured_output_for_summary_faithfulness", False)
+        )
+    except Exception:
+        return False
+
+
 def _patch_ragas_faithfulness_output() -> None:
     try:
         from ragas.metrics.collections import Faithfulness
@@ -282,6 +301,7 @@ class RagasEvaluator:
             faithfulness_fallback_score=self._score_faithfulness_with_fallback,
             calculate_cost=self._calculate_cost,
             summarize_error=self._summarize_ragas_error,
+            use_structured_output_getter=_summary_faithfulness_structured_output_enabled,
         )
 
     @property

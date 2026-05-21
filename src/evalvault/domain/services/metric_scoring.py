@@ -42,26 +42,19 @@ from evalvault.domain.entities import (
     TestCase,
 )
 from evalvault.domain.services.batch_executor import run_in_batches
+from evalvault.domain.services.prompt_catalog import (
+    PROMPT_REGISTRY,
+    SummaryFaithfulnessVerdict,
+)
 from evalvault.ports.outbound.llm_port import LLMPort
 
 logger = logging.getLogger(__name__)
 
 
-_SUMMARY_FAITHFULNESS_PROMPT_KO = (
-    "당신은 요약 충실도 판정자입니다.\n"
-    "컨텍스트와 요약을 보고 요약의 모든 주장이 컨텍스트에 의해 뒷받침되는지 판단하세요.\n"
-    "숫자, 조건, 면책, 기간, 자격 등이 누락되거나 추가되거나 모순되면 verdict는 unsupported입니다.\n"
-    'JSON만 반환: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
-    "컨텍스트:\n{context}\n\n요약:\n{summary}\n"
-)
-_SUMMARY_FAITHFULNESS_PROMPT_EN = (
-    "You are a strict summarization faithfulness judge.\n"
-    "Given the CONTEXT and SUMMARY, determine whether every claim in SUMMARY is supported by CONTEXT.\n"
-    "If any numbers, conditions, exclusions, durations, or eligibility are missing, added, or "
-    "contradicted, verdict is unsupported.\n"
-    'Return JSON only: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
-    "CONTEXT:\n{context}\n\nSUMMARY:\n{summary}\n"
-)
+# Backward-compatible aliases for prompt strings now owned by
+# :mod:`evalvault.domain.services.prompt_catalog` (D-S5d Part A).
+_SUMMARY_FAITHFULNESS_PROMPT_KO = PROMPT_REGISTRY["summary_faithfulness_judge_prompt_ko"]
+_SUMMARY_FAITHFULNESS_PROMPT_EN = PROMPT_REGISTRY["summary_faithfulness_judge_prompt_en"]
 
 
 @dataclass
@@ -129,6 +122,7 @@ class MetricScorer:
         faithfulness_fallback_score: Callable[[SingleTurnSample], Awaitable[float | None]],
         calculate_cost: Callable[[str, int, int], float],
         summarize_error: Callable[[Exception], str],
+        use_structured_output_getter: Callable[[], bool] | None = None,
     ) -> None:
         self._faithfulness_metrics = faithfulness_metrics
         self._metric_args = metric_args
@@ -143,6 +137,7 @@ class MetricScorer:
         self._faithfulness_fallback_score = faithfulness_fallback_score
         self._calculate_cost_cb = calculate_cost
         self._summarize_error = summarize_error
+        self._use_structured_output_getter = use_structured_output_getter or (lambda: False)
         self._faithfulness_ragas_failed = False
 
     @property
@@ -517,6 +512,14 @@ class MetricScorer:
         except Exception:
             return None
 
+        if self._use_structured_output_getter():
+            structured_score = self._parse_with_instructor_schema(response_text)
+            if structured_score is not None:
+                return structured_score
+            # Schema parsing failed (malformed or unexpected verdict);
+            # fall through to the legacy parser so behaviour stays at
+            # least as forgiving as the default-off path.
+
         payload = self._parse_json_payload(response_text)
         if not payload:
             return None
@@ -527,6 +530,30 @@ class MetricScorer:
         if verdict == "unsupported":
             return 0.0
         return None
+
+    @staticmethod
+    def _parse_with_instructor_schema(text: str) -> float | None:
+        """Parse the judge response via the Instructor structured-output schema.
+
+        Returns the numeric score (1.0 supported / 0.0 unsupported) when
+        the response cleanly validates against
+        :class:`SummaryFaithfulnessVerdict`. Returns ``None`` when the
+        payload is missing or fails validation so the caller can fall
+        back to the legacy raw-JSON parser. This keeps the feature-off
+        path byte-identical even when the feature flag is on but the
+        LLM returns malformed output.
+        """
+        if not text:
+            return None
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end < start:
+            return None
+        try:
+            verdict = SummaryFaithfulnessVerdict.model_validate_json(text[start : end + 1])
+        except Exception:
+            return None
+        return verdict.to_score()
 
     @staticmethod
     def _parse_json_payload(text: str) -> dict[str, Any] | None:
