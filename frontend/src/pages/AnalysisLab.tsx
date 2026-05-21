@@ -46,6 +46,10 @@ import {
 } from "lucide-react";
 import { buildAnalyzeCommand } from "../utils/cliCommandBuilder";
 import { copyTextToClipboard } from "../utils/clipboard";
+// Phase 4 W-S2d — AnalysisLab incremental migration onto W-S1 primitives.
+// This slice tokenizes the two inline error alerts; remaining buttons /
+// empty states are deferred to a follow-up given the 2,552-line page size.
+import { Button } from "../design";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
     verification: {
@@ -1235,9 +1239,12 @@ export function AnalysisLab() {
                 </div>
 
                 {catalogError && (
-                    <div className="mb-6 p-4 border border-destructive/30 bg-destructive/10 rounded-xl text-destructive flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{catalogError}</span>
+                    <div
+                        role="alert"
+                        className="mb-6 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{catalogError}</span>
                     </div>
                 )}
 
@@ -1686,9 +1693,12 @@ export function AnalysisLab() {
                             </div>
 
                             {error && (
-                                <div className="mb-4 p-3 border border-destructive/30 bg-destructive/10 rounded-lg text-destructive text-sm flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    {error}
+                                <div
+                                    role="alert"
+                                    className="mb-4 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-3 text-sm text-[hsl(var(--destructive))]"
+                                >
+                                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                                    <span className="leading-snug">{error}</span>
                                 </div>
                             )}
 
