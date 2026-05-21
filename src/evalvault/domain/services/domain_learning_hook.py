@@ -19,10 +19,10 @@ class DomainLearningHook:
     평가 완료 후 호출되어 도메인 메모리를 형성합니다.
     Formation dynamics를 구현합니다.
 
-    사용 예시:
-        from evalvault.adapters.outbound.domain_memory import build_domain_memory_adapter
-        memory_adapter = build_domain_memory_adapter()
-        hook = DomainLearningHook(memory_adapter)
+    사용 예시 (composition root에서 어댑터를 주입):
+        # 어댑터 빌드는 composition root(예: CLI/API 부트스트랩)에서 수행하고
+        # 도메인 서비스에는 MemoryLifecyclePort만 전달합니다.
+        hook = DomainLearningHook(memory_port=memory_adapter)
 
         # 평가 후 메모리 형성
         result = await hook.on_evaluation_complete(
