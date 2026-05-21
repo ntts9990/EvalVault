@@ -118,8 +118,14 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install dependencies
-        run: uv sync --extra dev --extra web --extra korean --extra docs
+      - name: Install lint dependencies
+        # T-S5: slimmed from `uv sync --extra dev --extra web --extra korean
+        # --extra docs`. Lint only needs ruff (for format/check) and mkdocs
+        # (for docs build / link check). Dropping `dev` skips manim/pycairo/
+        # faiss-cpu/etc; dropping `web`/`korean` skips kiwipiepy and friends.
+        run: |
+          uv sync --extra docs
+          uv pip install ruff
 
       - name: Docs build
         run: uv run mkdocs build -q
