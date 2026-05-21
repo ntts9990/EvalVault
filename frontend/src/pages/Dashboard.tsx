@@ -16,7 +16,7 @@ import { Layout } from "../components/Layout";
 // Phase 4 W-S2b — Dashboard incremental migration onto W-S1 primitives.
 // Imported here at the top so future hops (table, run cards) can pick from
 // the same barrel without touching the import block again.
-import { Button, EmptyState, MetricChip } from "../design";
+import { AuthorityBadge, Button, EmptyState, MetricChip } from "../design";
 import { useNavigate } from "react-router-dom";
 import {
     Area,
@@ -655,7 +655,14 @@ export function Dashboard() {
                                 <div className="space-y-3 mb-5">
                                     <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                         <span>Performance</span>
-                                        <span>{run.passed_test_cases}/{run.total_test_cases} passed</span>
+                                        <span className="flex items-center gap-2">
+                                            <span>{run.passed_test_cases}/{run.total_test_cases} passed</span>
+                                            {/* W-S7 follow-up: T2 evaluation-gate verdict on each run card. */}
+                                            <AuthorityBadge
+                                                level="T2"
+                                                verdict={run.pass_rate >= 0.7 ? "eval-pass" : "hold"}
+                                            />
+                                        </span>
                                     </div>
                                     <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
                                         <div
