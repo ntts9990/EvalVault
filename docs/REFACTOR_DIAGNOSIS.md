@@ -189,6 +189,36 @@
 | **A-S4** | `langfuse_trace_id` → `tracker_trace_ids: dict[str,str]` (도메인의 벤더 누수 제거) | adapter | H | 1d | `domain/entities/result.py`, `base_sql.py:52,148,667,1177` + DB 마이그레이션 1회 | A-S3 |
 | **D-S5** | `RagasEvaluator` 핵심 좁히기 (cost/fallback/custom-metric scoring 분리) | domain | H | 1주 | `evaluator.py`, `multiturn_evaluator.py`, `memory_aware_evaluator.py`, `prompt_scoring_service.py`, `graph_rag_experiment.py`, 2개 신규 서비스 | D-S2 |
 
+### Phase 4 — 웹 프론트엔드 전면 개선 (별도 sprint, CLI 안정 후)
+
+> 2026-05-21 사용자 지침으로 신설. CLI는 큰 문제 없으나 웹페이지 쪽이 심각하다는 판단. 다음 액션 계획 라운드에서 본격 슬라이스 분해.
+>
+> **방향성**: Claude design language(Anthropic / Claude.ai UI 패턴)를 **깊게** 활용. 단순 색·폰트 모방이 아니라 — 타이포그래피 위계, 색 절제(중성 기반 + 소수 강조색), 여백 후함, 명확한 primary action, 적절한 monospace, 시각적 잡음 제거 — 의 디자인 철학을 채택.
+>
+> **선행 조건**: Phase 3 A-S3 (MultiTrackerAdapter 실구현) + A-S4 (`tracker_trace_ids` 스키마 + DB 마이그레이션) 완료 후 시작. 그 전엔 FastAPI Web UI 백엔드(`src/evalvault/adapters/inbound/api/`)가 흔들리기 때문에 프론트 작업이 지속적으로 회귀 위험.
+>
+> **현재 17개 페이지** (`frontend/src/pages/`): `AiSdkChat`, `AnalysisCompareView`, `AnalysisLab`, `AnalysisResultView`, `Chat`, `CompareRuns`, `ComprehensiveAnalysis`, `CustomerReport`, `Dashboard`, `DomainMemory`, `EvaluationStudio`, `JudgeCalibration`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`, `VisualizationHome`. 일부는 합치거나 제거될 가능성 있음 — Phase 4 디스커버리에서 결정.
+
+| ID | 슬라이스 | 영역 | Risk | Wall | 영향 파일 | 의존 |
+|---|---|---|---|---|---|---|
+| **W-S0** | 디스커버리: 페이지별 문제점 인벤토리 (스크린샷, IA / 인터랙션 / 비주얼 / 성능 / a11y 분류) + 사용자 페인 포인트 청취 + Claude design tokens(palette, type scale, spacing, motion) 정의 | discovery | L | 2~3d | `docs/frontend/W-S0-inventory.md` (신규), 디자인 토큰 파일 | Phase 3 안정화 |
+| **W-S1** | 디자인 시스템 기반 구축: tailwind 토큰 재설정 + 공통 컴포넌트 라이브러리 (Button, Card, Table, EmptyState, StatusBadge, MetricChip 등) 1차 구축. Storybook 또는 ladle 도입 검토 | design-system | M | 1주 | `frontend/src/design/*` (신규), `frontend/tailwind.config.*` | W-S0 |
+| **W-S2** | 진입 동선 재설계: `Dashboard` / `EvaluationStudio` / `AnalysisLab` 3대 페이지를 Claude design 베이스로 재설계. CLI `run_id` 기반 일관성 유지 | redesign | M-H | 1~2주 | 3개 페이지 + 라우팅 | W-S1 |
+| **W-S3** | 분석 페이지군 정리: `AnalysisCompareView`/`AnalysisResultView`/`ComprehensiveAnalysis`/`CompareRuns` 4개를 **2개로 통합** (비교 vs 단일 결과). 시각화 라이브러리 재검토 (Plotly+Recharts → 더 단순한 single-purpose 시각화) | redesign | H | 1주 | 위 4 페이지 + 시각화 컴포넌트 | W-S1 |
+| **W-S4** | LLM 상호작용 페이지: `AiSdkChat`, `Chat`, `JudgeCalibration` 재설계. **LLM 프롬프트 디스시플린 메모리 준수** — 프롬프트 변경 시 명시적 디자인 결정으로 처리 | redesign | M-H | 1주 | 3 페이지 | W-S1, [[llm-prompt-discipline]] |
+| **W-S5** | 부수 페이지 정리: `CustomerReport`, `DomainMemory`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`/`VisualizationHome` — 합치거나 제거 결정 + 필요 시 재설계 | cleanup | M | 1주 | 6~7 페이지 | W-S1 |
+| **W-S6** | Playwright e2e 테스트 갱신: 재설계된 인터랙션에 맞춰 모든 e2e 갱신, 회귀 검증 | test | M | 3~5d | `frontend/tests/` (Playwright) | W-S2~5 |
+| **W-S7** | 의사결정 권한 가시화: 회귀 게이트 결과 등 T2/T1 decision artifact를 UI에서 표시할 때 `authority_level` 필드를 솔직하게 노출 (T2 verdict는 "evaluation passed"로 표시, "promoted"라고 표시하지 않음) | redesign | L | 2d | 위 페이지 중 결정 표시 영역 | W-S2, [[project-decision-authority-t2]] |
+
+**디스커버리 단계(W-S0)에서 결정해야 할 항목**:
+- 17개 페이지 중 유지/통합/제거 분류
+- Claude design tokens (palette, type scale, spacing, motion durations)의 구체값
+- Plotly + Recharts 유지 여부 / 대안 (visx, 직접 SVG, 또는 단순 D3)
+- 디자인 시스템 호스팅 (Storybook vs ladle vs 인라인 prose 문서)
+- FastAPI Web UI 백엔드와의 인터페이스 변경 필요 여부 (Phase 3 A-S4 이후 자연스러운 변경 흡수)
+
+**관련 메모리**: `project_phase4_web_frontend_overhaul.md` (이 디렉티브의 원본 기록).
+
 ---
 
 ## 4. 인수팀이 결정해야 할 미해결 질문 (Phase 2 전까지 합의 필요)
