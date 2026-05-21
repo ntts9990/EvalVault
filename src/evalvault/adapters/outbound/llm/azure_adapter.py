@@ -27,7 +27,10 @@ class AzureOpenAIAdapter(BaseLLMAdapter):
             LLMConfigurationError: If required Azure settings are missing
         """
         self._settings = settings
-        super().__init__(model_name=f"azure/{settings.azure_deployment or 'unset'}")
+        super().__init__(
+            model_name=f"azure/{settings.azure_deployment or 'unset'}",
+            retry_policy=settings.azure_retry_policy,
+        )
 
         # Validate Azure settings using common helper
         self._validate_required_settings(

@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import AliasChoices, Field, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from evalvault.adapters.outbound.llm.base import RetryPolicy
 from evalvault.config.secret_manager import (
     SecretProviderError,
     build_secret_provider,
@@ -253,6 +254,28 @@ class Settings(BaseSettings):
     faithfulness_fallback_model: str | None = Field(
         default=None,
         description="Optional model name for faithfulness fallback evaluation.",
+    )
+
+    # LLM retry/timeout policies (per provider)
+    openai_retry_policy: RetryPolicy = Field(
+        default_factory=RetryPolicy,
+        description="Retry+timeout policy applied to OpenAI adapter calls.",
+    )
+    ollama_retry_policy: RetryPolicy = Field(
+        default_factory=RetryPolicy,
+        description="Retry+timeout policy applied to Ollama adapter calls.",
+    )
+    vllm_retry_policy: RetryPolicy = Field(
+        default_factory=RetryPolicy,
+        description="Retry+timeout policy applied to vLLM adapter calls.",
+    )
+    azure_retry_policy: RetryPolicy = Field(
+        default_factory=RetryPolicy,
+        description="Retry+timeout policy applied to Azure OpenAI adapter calls.",
+    )
+    anthropic_retry_policy: RetryPolicy = Field(
+        default_factory=RetryPolicy,
+        description="Retry+timeout policy applied to Anthropic adapter calls.",
     )
 
     # OpenAI Configuration

@@ -62,6 +62,7 @@ class OllamaAdapter(BaseLLMAdapter):
         super().__init__(
             model_name=f"ollama/{self._ollama_model}",
             thinking_config=thinking_config,
+            retry_policy=settings.ollama_retry_policy,
         )
 
         chat_kwargs: dict[str, Any] = {
@@ -180,12 +181,17 @@ class OllamaAdapter(BaseLLMAdapter):
         async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout, connect=30.0)) as client:
             for start in range(0, len(text_list), batch_size):
                 batch = text_list[start : start + batch_size]
-                response = await client.post(
-                    f"{self._base_url}/v1/embeddings",
-                    json={"model": model, "input": batch},
-                    headers={"Authorization": "Bearer ollama"},
-                )
-                response.raise_for_status()
+
+                async def _post_batch(payload: list[str] = batch) -> Any:
+                    resp = await client.post(
+                        f"{self._base_url}/v1/embeddings",
+                        json={"model": model, "input": payload},
+                        headers={"Authorization": "Bearer ollama"},
+                    )
+                    resp.raise_for_status()
+                    return resp
+
+                response = await self._retry_async(_post_batch)
                 payload = response.json()
                 items = payload.get("data", []) if isinstance(payload, dict) else []
                 for item in items:
@@ -270,7 +276,9 @@ class OllamaAdapter(BaseLLMAdapter):
             api_kwargs["n"] = options.n
         if options and options.seed is not None:
             api_kwargs["seed"] = options.seed
-        response = await self._embedding_client.chat.completions.create(**api_kwargs)
+        response = await self._retry_async(
+            self._embedding_client.chat.completions.create, **api_kwargs
+        )
         return response.choices[0].message.content or ""
 
     def generate_text(

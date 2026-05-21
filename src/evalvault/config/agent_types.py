@@ -24,10 +24,10 @@ Shared agent type definitions for both development and operation modes.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class AgentMode(str, Enum):
+class AgentMode(StrEnum):
     """Agent operation modes.
 
     - DEVELOPMENT: For improving EvalVault code (agent/ folder)
@@ -38,7 +38,7 @@ class AgentMode(str, Enum):
     OPERATION = "operation"
 
 
-class AgentType(str, Enum):
+class AgentType(StrEnum):
     """Available agent types.
 
     Development mode agents:

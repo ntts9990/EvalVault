@@ -22,7 +22,10 @@ class VLLMAdapter(BaseLLMAdapter):
 
     def __init__(self, settings: Settings):
         self._settings = settings
-        super().__init__(model_name=settings.vllm_model)
+        super().__init__(
+            model_name=settings.vllm_model,
+            retry_policy=settings.vllm_retry_policy,
+        )
         self._embedding_model_name = settings.vllm_embedding_model
 
         base_url = settings.vllm_base_url
@@ -84,7 +87,7 @@ class VLLMAdapter(BaseLLMAdapter):
         }
         if dimension is not None:
             payload["dimensions"] = dimension
-        response = client.embeddings.create(**payload)
+        response = self._retry_sync(client.embeddings.create, **payload)
         return [item.embedding for item in response.data]
 
     async def agenerate_text(
@@ -114,7 +117,7 @@ class VLLMAdapter(BaseLLMAdapter):
         if options and options.seed is not None:
             api_kwargs["seed"] = options.seed
         with instrumentation_span("llm.generate_text", attrs) as span:
-            response = await self._client.chat.completions.create(**api_kwargs)
+            response = await self._retry_async(self._client.chat.completions.create, **api_kwargs)
             content = response.choices[0].message.content or ""
             if span:
                 set_span_attributes(span, {"llm.response.length": len(content)})
@@ -157,7 +160,7 @@ class VLLMAdapter(BaseLLMAdapter):
             "llm.mode": "sync",
         }
         with instrumentation_span("llm.generate_text", attrs) as span:
-            response = sync_client.chat.completions.create(**api_kwargs)
+            response = self._retry_sync(sync_client.chat.completions.create, **api_kwargs)
             content = response.choices[0].message.content or ""
             if span:
                 set_span_attributes(span, {"llm.response.length": len(content)})

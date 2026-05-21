@@ -105,6 +105,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         super().__init__(
             model_name=settings.anthropic_model,
             thinking_config=thinking_config,
+            retry_policy=settings.anthropic_retry_policy,
         )
 
         # Validate Anthropic settings using common helper
@@ -169,7 +170,8 @@ class AnthropicAdapter(BaseLLMAdapter):
             api_kwargs["temperature"] = options.temperature
         if options and options.top_p is not None:
             api_kwargs["top_p"] = options.top_p
-        response = await self._anthropic_client.messages.create(
+        response = await self._retry_async(
+            self._anthropic_client.messages.create,
             model=self._model_name,
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],

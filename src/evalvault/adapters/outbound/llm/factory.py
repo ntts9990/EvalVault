@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from evalvault.config.settings import Settings
+from typing import TYPE_CHECKING
+
 from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
+
+if TYPE_CHECKING:
+    from evalvault.config.settings import Settings
 
 
 class SettingsLLMFactory(LLMFactoryPort):

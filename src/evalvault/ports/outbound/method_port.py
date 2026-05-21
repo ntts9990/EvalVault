@@ -5,11 +5,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from evalvault.config.settings import Settings
 from evalvault.domain.entities.method import MethodInput, MethodOutput
 from evalvault.ports.outbound.llm_port import LLMPort
+
+if TYPE_CHECKING:
+    from evalvault.config.settings import Settings
 
 
 @dataclass
