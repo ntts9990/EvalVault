@@ -179,7 +179,7 @@ EvalVault는 Ragas 0.4.x 메트릭을 기반으로 Typer CLI와 FastAPI + React 
 - Knowledge Base의 KG 통계/파일 목록/문서 매핑 UI 보강
 - `doc_id` 정합성 검증 및 자동 매핑 도구 제공
 
-상세 워크플로와 Phoenix/자동화 예시는 [사용자 가이드](guides/USER_GUIDE.md)를 참고하세요.
+상세 워크플로와 Phoenix/자동화 예시는 [운영 핸드북](handbook/CHAPTERS/04_operations.md)을 참고하고, 현재 구현 현황은 [PROJECT_STATE.md](PROJECT_STATE.md)에서 확인하세요.
 
 ---
 
@@ -301,7 +301,7 @@ SQLite 경로를 쓰려면 아래 값을 추가합니다.
    uv run evalvault history --db data/db/evalvault.db
    ```
 
-Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Prompt snapshot(System/Ragas), Streaming dataset 처리 등 고급 시나리오는 [guides/USER_GUIDE.md](guides/USER_GUIDE.md)에 정리되어 있습니다.
+Langfuse, Phoenix Dataset/Experiment 업로드, Prompt manifest diff, Prompt snapshot(System/Ragas), Streaming dataset 처리 등 고급 시나리오는 [handbook/CHAPTERS/04_operations.md](handbook/CHAPTERS/04_operations.md)에 정리되어 있습니다.
 
 ## 실행 모드 (Simple / Full)
 
@@ -331,12 +331,14 @@ uv run evalvault run-full tests/fixtures/e2e/insurance_qa_korean.json \
 ---
 
 ## 문서
+- [PROJECT_STATE.md](PROJECT_STATE.md): **SSoT**. 현재 구현 현황·CLI 표면·운영·로드맵 요약 (인수팀 진입점)
+- [REFACTOR_DIAGNOSIS.md](REFACTOR_DIAGNOSIS.md): 슬라이스 단위 리팩터 진행 계획
 - [INDEX.md](INDEX.md): 전체 문서 인덱스
-- [handbook/INDEX.md](handbook/INDEX.md): handbook(교과서형, 내부 SSoT)
+- [handbook/INDEX.md](handbook/INDEX.md): handbook(교과서형, 내부 SSoT 상세본)
 - [handbook/EXTERNAL.md](handbook/EXTERNAL.md): 외부 공개 요약본
 - [handbook/CHAPTERS/04_operations.md](handbook/CHAPTERS/04_operations.md): 운영(로컬/도커/오프라인/관측)
 - [handbook/CHAPTERS/06_quality_and_testing.md](handbook/CHAPTERS/06_quality_and_testing.md): 테스트/품질/CI
-- (참고) `guides/USER_GUIDE.md`, `guides/DEV_GUIDE.md`, `new_whitepaper/*`는 과거 링크 호환을 위한 deprecated 스텁/아카이브일 수 있습니다.
+- (참고) `docs/` 최상위의 옛 사용자/아키텍처/완료/개선/KG 계획 문서들과 `docs/new_whitepaper/*`는 모두 deprecated 입니다. handbook과 `PROJECT_STATE.md`를 참고하세요.
 - [architecture/open-rag-trace-spec.md](architecture/open-rag-trace-spec.md): Open RAG Trace 표준 (Draft)
 - [architecture/open-rag-trace-collector.md](architecture/open-rag-trace-collector.md): Collector 구성 예시
 - [guides/OPEN_RAG_TRACE_SAMPLES.md](guides/OPEN_RAG_TRACE_SAMPLES.md): 최소 계측 샘플
