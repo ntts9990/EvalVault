@@ -39,6 +39,46 @@
 
 ---
 
+## 0.5 결정 사항 기록 (2026-05-21, 인수팀 의사결정)
+
+이 섹션은 §4 미해결 질문 중 인수팀이 본 라운드에서 확정한 결정을 기록한다. 슬라이스 실행 시 이 결정을 디폴트로 사용한다.
+
+| # | 결정 | 영향 슬라이스 | 비고 |
+|---|---|---|---|
+| 1 | **MultiTrackerAdapter: 실제 구현 (Option A)** | P-B, A-S3 | `tracker/multi_adapter.py` 신규 작성. `run_helpers.py:339-377` + `api/adapter.py:238-286` 수동 합성 제거. A-S3에서 본격 구현. P-B는 결정 문서화만. |
+| 3 | **9개 report 서비스 외부 표면: CLI/regression-gate snapshot byte-level 호환 유지** | D-S3 | Builder/Renderer/Composer 재배치는 OK, 출력 바이트는 동일. regression-gate baseline 변경 금지. |
+| 12 | **`agent/` 자율 에이전트 시스템 전면 제거** | **X-S1(신규)**, DOC-S3 | nonstop-agent 기반 서브시스템 제거. `agent/` 디렉토리 전체 + CLAUDE.md `Autonomous Agent System` 섹션 + PROJECT_STATE.md §9.6 + handbook 참조 정리. |
+| — | **실행 모드: Option α (풀 자율, max skill)** | 전 슬라이스 | OMC 스킬 적극 활용. Phase 1: `/oh-my-claudecode:team` 병렬 4 lane (Opus). Phase 2: `/oh-my-claudecode:ultrawork` 4 lane. Phase 3: `/oh-my-claudecode:ralph` per slice + `verifier` 게이트. baseline 이상 시 `tracer`. |
+
+### 0.5.1 §4 미해결 질문 상태 업데이트
+
+| # | 질문 | 상태 |
+|---|---|---|
+| 1 | MultiTrackerAdapter 의도 | ✅ **결정** (Option A: 실제 구현) |
+| 2 | `experiment_repository.py` 위치 | ⏳ Phase 2 (D-S3 시작 전) 결정 필요 |
+| 3 | 9개 report 서비스 외부 노출 표면 | ✅ **결정** (snapshot 호환 유지) |
+| 4 | `intent_classifier.py` / `pipeline_template_registry` 계층 | ⏳ Phase 2 (D-S4 시작 전) 결정 필요 |
+| 5 | mkdocs 실제 운영 여부 | ⏳ Phase 1 (DOC-S2 시작 전) 확인 필요 |
+| 6-11 | 부차 질문들 | ⏳ Phase 3 도중 결정 |
+| 12 | `agent/` 자율 에이전트 시스템 유지 | ✅ **결정** (제거) |
+
+### 0.5.2 신규 슬라이스 X-S1: agent/ 디렉토리 제거
+
+| 항목 | 값 |
+|---|---|
+| ID | **X-S1** |
+| 영역 | scope-cleanup |
+| Risk | L (의존성 없음) |
+| Wall | 1–2h |
+| 영향 파일 | `agent/**` (디렉토리 전체), `CLAUDE.md` (Autonomous Agent System 섹션), `docs/PROJECT_STATE.md §9.6`, `docs/handbook/CHAPTERS/*` (agent 언급), `docs/refactor/REFAC_010_agent_playbook.md` (별개 의미), `pyproject.toml` (`claude-agent-sdk` 의존성 확인) |
+| 의존 | 없음 (Phase 1 또는 2의 DOC-S3와 함께 처리 권장) |
+| DoD | `grep -ri "nonstop-agent\|agent/memory" docs/ src/`로 잔존 참조 0건. `uv run evalvault --help`에 영향 없음. 1,352 tests 통과 유지. |
+| baseline 영향 | 없음 (agent/는 분리된 서브시스템) |
+
+> 권장 실행 시점: DOC-S3(legacy 일괄 git rm)와 같은 PR로 묶음. 또는 P-A+B 직후 단독 슬라이스로 처리.
+
+---
+
 ## 1. 영역 교차 발견 (Cross-area Findings)
 
 ### 1.1 문서 ↔ 코드 불일치 (가장 시급)
@@ -112,7 +152,8 @@
 | ID | 슬라이스 | 영역 | Risk | Wall | 영향 파일 | DoD |
 |---|---|---|---|---|---|---|
 | **P-A** | `CLAUDE.md` 깨진 5개 링크 수술 + 표를 PROJECT_STATE/handbook로 재맵 | docs | L | 30분 | 1 (`CLAUDE.md`) | `ls`로 검증된 경로만 남음 |
-| **P-B** | `MultiTrackerAdapter` 코드/문서 정합 결정 → 결정 결과를 `PROJECT_STATE.md §3.2`·`CLAUDE.md`·`run_helpers.py`/`api/adapter.py`에 반영 | adapter+docs | L (문서만) / M (코드구현) | 1–4h | 2~5 | "표/코드/CLI/API"가 같은 진실 |
+| **P-B** | `MultiTrackerAdapter` 코드/문서 정합 결정 → **결정: Option A (실제 구현)** ✅ §0.5. 이 슬라이스에서는 결정만 문서화하고 실구현은 A-S3에서 진행. 즉, `PROJECT_STATE.md §3.2` 정정만 (P-A와 합쳐도 무방) | docs | L | 30분 | `PROJECT_STATE.md` | §3.2 행이 "⚠️ 문서상 명시, 실구현은 A-S3 예정"으로 정정됨 |
+| **X-S1** | `agent/` 디렉토리 + 관련 문서 참조 전면 제거 (§0.5.2) | scope-cleanup | L | 1–2h | `agent/**`, `CLAUDE.md`, `PROJECT_STATE.md §9.6`, `pyproject.toml` (claude-agent-sdk dep) | grep으로 nonstop-agent 잔존 참조 0건 |
 
 ### Phase 1 — 저위험 정리 (1~2주, baseline 영향 ≤ 0)
 
