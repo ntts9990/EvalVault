@@ -42,5 +42,44 @@ CI는 Ubuntu, macOS, Windows에서 Python 3.12/3.13으로 테스트를 실행합
 ## Security & Configuration Tips
 Do not commit `.env`; copy `.env.example`, inject `OPENAI_API_KEY` or Ollama host values locally, and keep profile overrides in `config/models.yaml`. Supply Langfuse keys via environment variables (or the provided Compose file) and scrub customer data from fixtures before attaching them to issues.
 
+## Parallel Work Approval (공유 스키마/공유 파일)
+병렬 작업 시 충돌을 방지하기 위해, 아래 공유 파일/스키마는 변경 전에 승인 절차를 거친다.
+
+**Shared files**
+- `src/evalvault/adapters/inbound/cli/commands/__init__.py`
+- `src/evalvault/adapters/inbound/cli/app.py`
+- `src/evalvault/domain/services/async_batch_executor.py`
+- 리포트 템플릿/공통 JSON 스키마 정의 문서
+
+**Shared schemas**
+- `artifacts/index.json`
+- CLI JSON envelope
+- stage metrics naming conventions
+- comparison/benchmark output JSON
+
+**Approval workflow**
+1. 변경 요청 등록 (작업 ID, 오너, 목적 명시)
+2. 영향 범위 검토 — 관련 에픽 오너 확인
+3. 변경 승인 — 2명 이상 승인 권장
+4. 변경 적용 + 검증 (테스트/리포트 재생성)
+5. 변경 로그 기록 (run_id 또는 작업 ID 연결)
+
+**원칙**
+- 승인 없는 공유 스키마/파일 변경 금지
+- 공통 포맷 변경 시 관련 문서/테스트 업데이트 동반
+- `commands/__init__.py` 수정은 반드시 승인 필요
+
+**Change request template**
+```
+[CHANGE REQUEST]
+- Work ID:
+- Owner:
+- Target File/Schema:
+- Reason:
+- Impacted Epics:
+- Validation Plan:
+- Rollback Plan:
+```
+
 # 표시 방법
 사용자에게는 반드시 한글 위주로 설명해줘야 함.
