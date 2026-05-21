@@ -86,21 +86,6 @@ def e2e_results_path():
     return E2E_RESULTS_DIR
 
 
-def pytest_runtest_setup(item):
-    """Skip tests based on required credentials."""
-    # Check for requires_openai marker
-    if item.get_closest_marker("requires_openai") and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("Requires OPENAI_API_KEY environment variable")
-
-    # Check for requires_langfuse marker
-    if item.get_closest_marker("requires_langfuse") and not (
-        os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")
-    ):
-        pytest.skip("Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY")
-
-    # Check for requires_phoenix marker
-    if item.get_closest_marker("requires_phoenix"):
-        try:
-            import opentelemetry  # noqa: F401
-        except ImportError:
-            pytest.skip("Requires OpenTelemetry dependencies (uv sync --extra phoenix)")
+# Note: pytest_runtest_setup for `requires_*` markers was hoisted to
+# tests/conftest.py in T-S3 so the skip rules apply to both tests/unit and
+# tests/integration (langfuse/phoenix flow tests were reclassified to unit).

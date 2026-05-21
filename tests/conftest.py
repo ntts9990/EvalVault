@@ -49,3 +49,27 @@ def pytest_configure(config: Any) -> None:
     config.option.numprocesses = _resolve_xdist_workers(xdist_value)
     if hasattr(config.option, "dist") and not config.option.dist:
         config.option.dist = "loadscope"
+
+
+def pytest_runtest_setup(item: Any) -> None:
+    """Skip tests whose ``requires_*`` marker has no matching environment.
+
+    Hoisted from ``tests/integration/conftest.py`` in T-S3 so the
+    marker-based skip applies to both ``tests/unit`` and ``tests/integration``
+    (langfuse/phoenix flow tests were reclassified to ``tests/unit``).
+    """
+    import pytest as _pytest
+
+    if item.get_closest_marker("requires_openai") and not os.environ.get("OPENAI_API_KEY"):
+        _pytest.skip("Requires OPENAI_API_KEY environment variable")
+
+    if item.get_closest_marker("requires_langfuse") and not (
+        os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY")
+    ):
+        _pytest.skip("Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY")
+
+    if item.get_closest_marker("requires_phoenix"):
+        try:
+            import opentelemetry  # noqa: F401
+        except ImportError:
+            _pytest.skip("Requires OpenTelemetry dependencies (uv sync --extra phoenix)")
