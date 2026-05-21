@@ -35,6 +35,7 @@ from evalvault.domain.metrics.summary_needs_followup import SummaryNeedsFollowup
 from evalvault.domain.metrics.summary_non_definitive import SummaryNonDefinitive
 from evalvault.domain.metrics.summary_risk_coverage import SummaryRiskCoverage
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
+from evalvault.domain.services import evaluation_cost as _evaluation_cost
 from evalvault.domain.services import ragas_korean_prompts as _korean_prompts
 from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
@@ -274,18 +275,10 @@ class RagasEvaluator:
     FACTUAL_CORRECTNESS_CLAIM_EXAMPLES = _korean_prompts.FACTUAL_CORRECTNESS_CLAIM_EXAMPLES
     FACTUAL_CORRECTNESS_NLI_EXAMPLES = _korean_prompts.FACTUAL_CORRECTNESS_NLI_EXAMPLES
 
-    # Estimated pricing (USD per 1M tokens) as of Jan 2025
-    # Format: (input_price, output_price)
-    MODEL_PRICING = {
-        "gpt-4o": (2.50, 10.00),
-        "gpt-4o-mini": (0.15, 0.60),
-        "gpt-4-turbo": (10.00, 30.00),
-        "gpt-3.5-turbo": (0.50, 1.50),
-        "openai/gpt-4o": (2.50, 10.00),
-        "openai/gpt-4o-mini": (0.15, 0.60),
-        "gpt-5-nano": (5.00, 15.00),  # Hypothetical project model
-        "openai/gpt-5-nano": (5.00, 15.00),
-    }
+    # Pricing table lives in evaluation_cost (D-S5a extraction). The class
+    # attribute is preserved so that ``self.MODEL_PRICING`` (and any subclass
+    # override) continues to work.
+    MODEL_PRICING = _evaluation_cost.MODEL_PRICING
 
     def __init__(
         self,
@@ -1748,19 +1741,16 @@ class RagasEvaluator:
             return float(metric_instance.score(answer=answer, contexts=contexts))
 
     def _calculate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
-        """Calculate estimated cost in USD based on model pricing."""
-        if "ollama" in model_name:
-            return 0.0
-        # Find matching model key (exact or substring match)
-        price_key = "openai/gpt-4o"  # Default fallback
-        for key in self.MODEL_PRICING:
-            if key in model_name or model_name in key:
-                price_key = key
-                break
+        """Calculate estimated cost in USD based on model pricing.
 
-        input_price, output_price = self.MODEL_PRICING.get(price_key, (0.0, 0.0))
-
-        cost = (prompt_tokens / 1_000_000 * input_price) + (
-            completion_tokens / 1_000_000 * output_price
+        Thin wrapper that delegates to
+        :func:`evalvault.domain.services.evaluation_cost.calculate_cost` while
+        forwarding ``self.MODEL_PRICING`` so subclass-level pricing overrides
+        keep their semantics (D-S5a extraction).
+        """
+        return _evaluation_cost.calculate_cost(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            pricing=self.MODEL_PRICING,
         )
-        return cost
