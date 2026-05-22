@@ -22,7 +22,13 @@ import {
     Sliders,
     ExternalLink,
     BookOpen,
+    AlertTriangle,
 } from "lucide-react";
+// Phase 4 W-S5b — Settings.tsx dedicated migration onto W-S1 primitives.
+// Surgical: error state → EmptyState, save/reset buttons → design Button.
+// Tab-pills, table empty state, and form inputs remain unchanged to keep
+// IA + form behavior intact.
+import { Button, EmptyState } from "../design";
 import { getPhoenixUiUrl } from "../utils/phoenix";
 
 type ProviderKey = "ollama" | "openai" | "vllm";
@@ -762,9 +768,12 @@ export function Settings() {
     if (error || !config) {
         return (
             <Layout>
-                <div className="flex flex-col items-center justify-center h-[50vh] text-destructive gap-4">
-                    <p className="text-xl font-bold">설정 오류</p>
-                    <p>{error || "설정 정보를 불러오지 못했습니다."}</p>
+                <div role="alert" className="flex h-[50vh] items-center justify-center">
+                    <EmptyState
+                        icon={<AlertTriangle size={20} className="text-[hsl(var(--destructive))]" />}
+                        title="설정 오류"
+                        description={error || "설정 정보를 불러오지 못했습니다."}
+                    />
                 </div>
             </Layout>
         );
@@ -785,22 +794,24 @@ export function Settings() {
                         <p className="text-muted-foreground">백엔드 런타임 설정을 편집할 수 있습니다.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <button
+                        <Button
                             type="button"
+                            variant="primary"
+                            size="md"
                             onClick={handleSave}
                             disabled={!hasChanges || saveStatus === "saving" || (requiresOpenAIConsent && !openaiConsent)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
                         >
                             {saveStatus === "saving" ? "저장 중..." : "변경사항 저장"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
+                            variant="secondary"
+                            size="md"
                             onClick={handleReset}
                             disabled={!hasChanges || saveStatus === "saving"}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-semibold text-muted-foreground disabled:opacity-50"
                         >
                             변경 취소
-                        </button>
+                        </Button>
                         {saveStatus === "success" && (
                             <span className="text-xs text-emerald-600">적용 완료</span>
                         )}
