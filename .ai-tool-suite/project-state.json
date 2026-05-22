@@ -107,7 +107,7 @@
     {
       "kind": "local-http",
       "name": "FastAPI Web Backend",
-      "command_or_path": "uv run evalvault api serve --host 0.0.0.0 --port 8000",
+      "command_or_path": "uv run evalvault serve-api --host 0.0.0.0 --port 8000",
       "schema_version": "1.0",
       "network_posture": "local-service",
       "required_secrets": [],

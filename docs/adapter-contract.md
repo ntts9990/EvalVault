@@ -24,7 +24,7 @@
 | `evalvault config` | 해석된 설정 출력 (시크릿 마스킹) | stable |
 | `evalvault analyze <run_id> [--intent ...]` | DAG 기반 분석 (선택적 LLM 사용) | beta |
 | `evalvault calibrate-judge <run_id> --metric <name>` | LLM judge 보정 (isotonic/Platt) | beta |
-| `evalvault api serve [--host ... --port ...]` | FastAPI 로컬 백엔드 + Web UI | stable |
+| `evalvault serve-api [--host ... --port ...] [--reload]` | FastAPI 로컬 백엔드 + Web UI | stable |
 
 `--help`는 모든 명령에 대해 동작; non-interactive 사용을 기본으로 가정.
 
@@ -157,7 +157,7 @@
 | `regress`, `history`, `export`, `metrics`, `config` | offline | OpenAI / Langfuse / MLflow / Phoenix 호출 없음 |
 | `run` | cloud-opt-in | profile에 따라 OpenAI / Azure / Anthropic 호출. Ollama / vLLM 프로필은 local-service. |
 | `analyze`, `calibrate-judge` | offline (옵션 LLM은 cloud-opt-in) | 보정 자체는 통계 연산; intent classifier가 LLM을 쓸 수 있음 |
-| `api serve` | local-service | FastAPI 백엔드는 로컬 binding. CORS / 인증은 운영자 책임 |
+| `serve-api` | local-service | FastAPI 백엔드는 로컬 binding. CORS / 인증은 운영자 책임 |
 
 ### 폐쇄망 실행 (Closed-Network Run)
 

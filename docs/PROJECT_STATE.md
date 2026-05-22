@@ -155,7 +155,7 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 | 멀티턴 평가 | ✅ | `domain/entities/multiturn.py`, `domain/services/multiturn_evaluator.py` |
 | 자동 회귀 게이트 (CI) | ⚠️ 코드 ✅ / 운영 강제 ⚠️ | `domain/services/regression_gate_service.py` + `.github/workflows/regression-gate.yml` — **GitHub 브랜치 보호 설정은 별도로 운영팀이 해야 강제됨** |
 | Web UI (React 19 + Vite 7 + Tailwind 4) | ✅ | `frontend/` (17개 페이지, Playwright e2e 포함) |
-| FastAPI Web 백엔드 | ✅ | `adapters/inbound/api/` (CLI `evalvault api serve` 또는 `serve-api`) |
+| FastAPI Web 백엔드 | ✅ | `adapters/inbound/api/` (CLI `evalvault serve-api`) |
 | 자율 에이전트 시스템 (nonstop-agent 기반) | ✅ | `agent/` — Claude Agent SDK 연동, ANTHROPIC_API_KEY 필요 |
 | 오프라인 번들 (Docker + 모델 캐시) | ✅ | `scripts/offline/`, `docker-compose.offline*.yml` |
 
@@ -218,7 +218,7 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 
 ### 4.3 FastAPI 백엔드
 
-- 기동: `uv run evalvault serve-api --reload` (개발) 또는 `evalvault api serve` (프로덕션).
+- 기동: `uv run evalvault serve-api --reload` (개발) 또는 `uv run evalvault serve-api --host 0.0.0.0 --port 8000` (프로덕션).
 - 위치: `src/evalvault/adapters/inbound/api/` (Web UI 전용).
 - 외부 SLA 대상 아님. Web UI 백엔드로만 사용.
 

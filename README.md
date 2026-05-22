@@ -34,6 +34,7 @@ Tip: 기본 저장소는 Postgres+pgvector입니다. SQLite를 쓰려면 `--db` 
 - **Artifacts-first**: 보고서뿐 아니라 모듈별 원본 결과를 구조화 저장
 - **옵션형 Observability**: Phoenix/Langfuse/MLflow는 필요할 때만 활성화
 - **CLI + Web UI**: 동일 run_id 기반으로 히스토리/비교/리포트 통합
+- **회귀 게이트(CI/CD)**: `evalvault regress` / `ci-gate`가 baseline 대비 통계적 회귀를 감지하고, 안정 스키마의 JSON 아티팩트 + exit code로 CI에 통합 (평가 게이트 verdict는 `passed`/`failed`까지만 — 릴리스 promote/rollback은 emit하지 않음)
 
 ---
 
@@ -47,6 +48,8 @@ Tip: 기본 저장소는 Postgres+pgvector입니다. SQLite를 쓰려면 `--db` 
 - 품질/테스트/CI: `docs/handbook/CHAPTERS/06_quality_and_testing.md`
 - 아키텍처: `docs/handbook/CHAPTERS/01_architecture.md`
 - 오프라인/폐쇄망(Docker/모델 캐시): `docs/guides/OFFLINE_DOCKER.md`, `docs/guides/OFFLINE_MODELS.md`
+- 어댑터 계약(외부 도구 통합): `docs/adapter-contract.md` · 머신-리더블 상태 `.ai-tool-suite/project-state.json` · 변경 narrative `docs/development-journal.md`
+- 회귀 게이트 픽스처 예제(폐쇄망): `tests/fixtures/e2e/regression_gate/` (pass/fail/incomplete-provenance)
 
 참고(호환성): `docs/guides/USER_GUIDE.md`, `docs/guides/DEV_GUIDE.md` 등 일부 문서는 과거 링크 호환을 위한 deprecated 스텁이며, 최신 내용은 handbook을 따릅니다.
 
