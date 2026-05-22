@@ -96,6 +96,28 @@
 #### 실험 단계 필드 (`fields_experimental`)
 
 - `results[].effect_level` enum 값 — 향후 minor에서 새 level이 추가될 가능성 있음
+- `results[].p_value`, `results[].effect_size` — scipy 파생; scipy/numpy 버전·BLAS 백엔드에 따라 미세하게 달라질 수 있음. 정확값이 아니라 의미(부호·유의성)에 의존할 것.
+
+#### 픽스처 예제 (Fixture-Only Examples)
+
+폐쇄망에서 어댑터를 작성·검증할 수 있도록 **pass / fail / incomplete-provenance** 3개 결정 클래스의 입력 run 픽스처 + 골든 출력 envelope을 제공한다. OpenAI/MLflow/Phoenix/Langfuse 불필요 (로컬 SQLite + scipy 경로만 사용).
+
+| 경로 | 내용 |
+|---|---|
+| `tests/fixtures/e2e/regression_gate/runs/` | 시딩 가능한 baseline/candidate run 픽스처 (3 시나리오 × 2) |
+| `tests/fixtures/e2e/regression_gate/expected/` | 골든 출력 envelope (`pass.json`, `fail.json`, `incomplete_provenance.json`) |
+| `tests/fixtures/e2e/regression_gate/README.md` | 시나리오·스키마·단언 granularity 설명 |
+| `tests/unit/test_regression_gate_fixtures.py` | 실행 가능한 스펙: temp SQLite 시딩 → 실제 `regress` CLI invoke → 계약 검증 |
+
+세 결정 클래스의 외부 신호:
+
+| 시나리오 | envelope `status` | `data.status` | exit code |
+|---|---|---|---|
+| pass (회귀 없음) | `ok` | `passed` | `0` |
+| fail (회귀 감지) | `ok` | `failed` | `2` |
+| incomplete provenance (공통 메트릭 없음) | `error` | — (`data: null`) | `1` |
+
+**incomplete provenance** 는 어댑터가 가장 자주 놓치는 클래스다: 게이트가 verdict를 낼 수 없는 경우(`error_type: "ValueError"`, `message: "No shared metrics available for regression gate."`). `passed`/`failed`로 매핑하지 말고 "abstain"으로 취급할 것. 재생성: `uv run pytest tests/unit/test_regression_gate_fixtures.py -q`.
 
 ### 2.2 Calibration Artifact (`schema_version: 0.9`)
 
@@ -167,6 +189,7 @@ EVALVAULT_PROFILE=ollama-local uv run evalvault run tests/fixtures/e2e/edge_case
 | 분류 | 경로 | gitignore | 설명 |
 |---|---|---|---|
 | 픽스처 | `tests/fixtures/e2e/` | tracked | 큐레이션된 평가 데이터셋. 한국어 보험 / 콜센터 / 엣지 케이스 / regression 베이스라인 등. |
+| 픽스처 | `tests/fixtures/e2e/regression_gate/` | tracked | 폐쇄망 regression-gate 예제 (pass/fail/incomplete-provenance) — 입력 run + 골든 envelope. §2.1 참조. |
 | 픽스처 | `tests/fixtures/` | tracked | 단위 테스트용 작은 결정적 데이터 |
 | 생성물 | `data/exports/` | ignored | `evalvault export` 출력 |
 | 생성물 | `mlruns/` | ignored | MLflow 로컬 트래킹 |

@@ -1,0 +1,194 @@
+"""Fixture-only, no-network regression-gate examples (pass / fail / incomplete provenance).
+
+These tests seed a temp SQLite DB from the curated fixtures under
+``tests/fixtures/e2e/regression_gate/`` and invoke the real ``evalvault regress`` CLI
+end-to-end — no OpenAI / MLflow / Phoenix / Langfuse / hosted tracker. They double as
+the executable spec for the regression-gate decision contract (adapter-contract.md §2.1)
+and validate the three golden envelopes adapter authors rely on.
+
+Assertion granularity is deliberate (see fixtures README): contract fields are matched
+exactly, score/diff fields use a 3-decimal tolerance to absorb cross-platform ~1 ULP
+jitter, and scipy-derived statistical fields are checked by range/sign only.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from typer.testing import CliRunner
+
+from evalvault.adapters.inbound.cli import app
+from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
+from evalvault.domain.entities import EvaluationRun, MetricScore, TestCaseResult
+
+runner = CliRunner()
+
+REGRESS_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.regress"
+FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "e2e" / "regression_gate"
+EFFECT_LEVELS = {"negligible", "small", "medium", "large"}
+
+# Contract-stable top-level report fields asserted for exact equality.
+EXACT_REPORT_FIELDS = (
+    "candidate_run_id",
+    "baseline_run_id",
+    "status",
+    "regression_detected",
+    "fail_on_regression",
+    "test",
+    "metrics",
+    "parallel",
+    "concurrency",
+)
+# Score/diff fields: deterministic arithmetic, asserted within 3-decimal tolerance.
+TOLERANCE_RESULT_FIELDS = ("baseline_score", "candidate_score", "diff", "diff_percent")
+
+
+def _load_run(fixture_name: str) -> EvaluationRun:
+    """Build an EvaluationRun from a compact run fixture (no network, no LLM)."""
+    payload = json.loads((FIXTURE_DIR / "runs" / fixture_name).read_text(encoding="utf-8"))
+    thresholds: dict[str, float] = payload.get("thresholds", {})
+    results = [
+        TestCaseResult(
+            test_case_id=case["test_case_id"],
+            metrics=[
+                MetricScore(name=metric, score=score, threshold=thresholds.get(metric, 0.7))
+                for metric, score in case["scores"].items()
+            ],
+        )
+        for case in payload["cases"]
+    ]
+    return EvaluationRun(
+        run_id=payload["run_id"],
+        dataset_name=payload["dataset_name"],
+        model_name=payload["model_name"],
+        results=results,
+        metrics_evaluated=list(payload["metrics_evaluated"]),
+        thresholds=thresholds,
+    )
+
+
+def _load_expected(name: str) -> dict:
+    return json.loads((FIXTURE_DIR / "expected" / name).read_text(encoding="utf-8"))
+
+
+def _seed_and_invoke(
+    tmp_path: Path, baseline_fixture: str, candidate_fixture: str
+) -> tuple[int, dict]:
+    """Seed a temp SQLite DB with the two fixture runs and run `regress --format json`."""
+    db_path = tmp_path / "regress_fixtures.db"
+    storage = SQLiteStorageAdapter(db_path=str(db_path))
+    baseline = _load_run(baseline_fixture)
+    candidate = _load_run(candidate_fixture)
+    storage.save_run(baseline)
+    storage.save_run(candidate)
+
+    with patch(f"{REGRESS_COMMAND_MODULE}.build_storage_adapter", return_value=storage):
+        result = runner.invoke(
+            app,
+            [
+                "regress",
+                candidate.run_id,
+                "--baseline",
+                baseline.run_id,
+                "--format",
+                "json",
+                "--db",
+                str(db_path),
+            ],
+        )
+    payload = json.loads(result.stdout)
+    return result.exit_code, payload
+
+
+def _assert_envelope_shape(payload: dict, *, status: str) -> None:
+    assert payload["command"] == "regress"
+    assert payload["version"] == 1
+    assert payload["status"] == status
+    # Runtime fields are present but not value-asserted.
+    for field in ("started_at", "finished_at", "duration_ms", "artifacts"):
+        assert field in payload
+
+
+def test_regress_fixture_pass(tmp_path: Path) -> None:
+    """Candidate ≈ baseline → no regression, verdict 'passed', exit 0."""
+    expected = _load_expected("pass.json")
+    exit_code, payload = _seed_and_invoke(tmp_path, "pass_baseline.json", "pass_candidate.json")
+
+    assert exit_code == expected["_meta"]["exit_code"] == 0
+    _assert_envelope_shape(payload, status="ok")
+
+    data = payload["data"]
+    exp = expected["data"]
+    for field in EXACT_REPORT_FIELDS:
+        assert data[field] == exp[field], f"contract field drift: {field}"
+    assert data["status"] == "passed"
+    assert data["regression_detected"] is False
+
+    actual_by_metric = {r["metric"]: r for r in data["results"]}
+    exp_by_metric = {r["metric"]: r for r in exp["results"]}
+    assert set(actual_by_metric) == set(exp_by_metric)
+    for metric, result in actual_by_metric.items():
+        golden = exp_by_metric[metric]
+        assert result["regression"] is False
+        for field in TOLERANCE_RESULT_FIELDS:
+            assert result[field] == pytest.approx(golden[field], abs=1e-3), f"{metric}.{field}"
+        assert 0.0 <= result["p_value"] <= 1.0
+        assert result["effect_level"] in EFFECT_LEVELS
+        assert isinstance(result["is_significant"], bool)
+
+
+def test_regress_fixture_fail(tmp_path: Path) -> None:
+    """Candidate faithfulness drops 0.21 (> 0.05) → regression, verdict 'failed', exit 2."""
+    expected = _load_expected("fail.json")
+    exit_code, payload = _seed_and_invoke(tmp_path, "fail_baseline.json", "fail_candidate.json")
+
+    assert exit_code == expected["_meta"]["exit_code"] == 2
+    _assert_envelope_shape(payload, status="ok")
+
+    data = payload["data"]
+    exp = expected["data"]
+    for field in EXACT_REPORT_FIELDS:
+        assert data[field] == exp[field], f"contract field drift: {field}"
+    assert data["status"] == "failed"
+    assert data["regression_detected"] is True
+    # Verdict vocabulary never leaks T3 release decisions (adapter-contract.md §9).
+    assert data["status"] not in {"promote", "rollback", "hold"}
+
+    actual_by_metric = {r["metric"]: r for r in data["results"]}
+    exp_by_metric = {r["metric"]: r for r in exp["results"]}
+    for metric, result in actual_by_metric.items():
+        golden = exp_by_metric[metric]
+        assert result["regression"] == golden["regression"], metric
+        for field in TOLERANCE_RESULT_FIELDS:
+            assert result[field] == pytest.approx(golden[field], abs=1e-3), f"{metric}.{field}"
+
+    # The regressed metric carries a significant negative effect.
+    faith = actual_by_metric["faithfulness"]
+    assert faith["regression"] is True
+    assert faith["diff"] < 0
+    assert faith["effect_size"] < 0
+    assert faith["p_value"] < 0.05
+    assert faith["is_significant"] is True
+    assert faith["effect_level"] in EFFECT_LEVELS
+    # The stable metric does not regress.
+    assert actual_by_metric["answer_relevancy"]["regression"] is False
+
+
+def test_regress_fixture_incomplete_provenance(tmp_path: Path) -> None:
+    """No shared metrics_evaluated → gate abstains: status 'error', exit 1, data null."""
+    expected = _load_expected("incomplete_provenance.json")
+    exit_code, payload = _seed_and_invoke(
+        tmp_path, "incomplete_baseline.json", "incomplete_candidate.json"
+    )
+
+    assert exit_code == expected["_meta"]["exit_code"] == 1
+    _assert_envelope_shape(payload, status="error")
+
+    # Abstain semantics: never a passed/failed verdict, no report payload.
+    assert payload["data"] is None
+    assert payload["error_type"] == expected["error_type"] == "ValueError"
+    assert payload["message"] == expected["message"]
+    assert "shared metrics" in payload["message"]

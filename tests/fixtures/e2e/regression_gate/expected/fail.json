@@ -1,0 +1,52 @@
+{
+  "command": "regress",
+  "version": 1,
+  "status": "ok",
+  "started_at": "2026-05-22T00:00:00Z",
+  "finished_at": "2026-05-22T00:00:00Z",
+  "duration_ms": 0,
+  "artifacts": null,
+  "data": {
+    "candidate_run_id": "candidate-fail",
+    "baseline_run_id": "baseline-fail",
+    "status": "failed",
+    "regression_detected": true,
+    "fail_on_regression": 0.05,
+    "test": "t-test",
+    "metrics": ["answer_relevancy", "faithfulness"],
+    "results": [
+      {
+        "metric": "answer_relevancy",
+        "baseline_score": 0.855,
+        "candidate_score": 0.86,
+        "diff": 0.005,
+        "diff_percent": 0.585,
+        "p_value": 0.537,
+        "effect_size": 0.535,
+        "effect_level": "medium",
+        "is_significant": false,
+        "regression": false
+      },
+      {
+        "metric": "faithfulness",
+        "baseline_score": 0.905,
+        "candidate_score": 0.695,
+        "diff": -0.21,
+        "diff_percent": -23.204,
+        "p_value": 0.0000004,
+        "effect_size": -18.783,
+        "effect_level": "large",
+        "is_significant": true,
+        "regression": true
+      }
+    ],
+    "parallel": true,
+    "concurrency": 8
+  },
+  "_meta": {
+    "exit_code": 2,
+    "runtime_fields": ["started_at", "finished_at", "duration_ms"],
+    "environment_sensitive_fields": ["data.results[].p_value", "data.results[].effect_size", "data.results[].effect_level", "data.results[].is_significant"],
+    "note": "regression_detected=true because faithfulness dropped 0.21 (> fail_on_regression 0.05). CLI exits 2 on detected regression. The verdict is 'failed' — never 'rollback'/'promote' (T2 cap, adapter-contract.md §9). p_value/effect_size are scipy-derived; assert ranges, not exact equality."
+  }
+}

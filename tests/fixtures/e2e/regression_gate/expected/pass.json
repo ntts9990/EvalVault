@@ -1,0 +1,52 @@
+{
+  "command": "regress",
+  "version": 1,
+  "status": "ok",
+  "started_at": "2026-05-22T00:00:00Z",
+  "finished_at": "2026-05-22T00:00:00Z",
+  "duration_ms": 0,
+  "artifacts": null,
+  "data": {
+    "candidate_run_id": "candidate-pass",
+    "baseline_run_id": "baseline-pass",
+    "status": "passed",
+    "regression_detected": false,
+    "fail_on_regression": 0.05,
+    "test": "t-test",
+    "metrics": ["answer_relevancy", "faithfulness"],
+    "results": [
+      {
+        "metric": "answer_relevancy",
+        "baseline_score": 0.855,
+        "candidate_score": 0.86,
+        "diff": 0.005,
+        "diff_percent": 0.585,
+        "p_value": 0.537,
+        "effect_size": 0.535,
+        "effect_level": "medium",
+        "is_significant": false,
+        "regression": false
+      },
+      {
+        "metric": "faithfulness",
+        "baseline_score": 0.8975,
+        "candidate_score": 0.895,
+        "diff": -0.0025,
+        "diff_percent": -0.279,
+        "p_value": 0.823,
+        "effect_size": -0.191,
+        "effect_level": "negligible",
+        "is_significant": false,
+        "regression": false
+      }
+    ],
+    "parallel": true,
+    "concurrency": 8
+  },
+  "_meta": {
+    "exit_code": 0,
+    "runtime_fields": ["started_at", "finished_at", "duration_ms"],
+    "environment_sensitive_fields": ["data.results[].p_value", "data.results[].effect_size", "data.results[].effect_level", "data.results[].is_significant"],
+    "note": "started_at/finished_at/duration_ms are wall-clock runtime values. p_value/effect_size/effect_level/is_significant come from scipy and may shift slightly across scipy versions; assert ranges/signs, not exact equality. All other fields are contract-stable (adapter-contract.md §2.1)."
+  }
+}
