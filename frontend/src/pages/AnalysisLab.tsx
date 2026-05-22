@@ -46,10 +46,6 @@ import {
 } from "lucide-react";
 import { buildAnalyzeCommand } from "../utils/cliCommandBuilder";
 import { copyTextToClipboard } from "../utils/clipboard";
-// Phase 4 W-S2d — AnalysisLab incremental migration onto W-S1 primitives.
-// This slice tokenizes the two inline error alerts; remaining buttons /
-// empty states are deferred to a follow-up given the 2,552-line page size.
-import { Button } from "../design";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
     verification: {

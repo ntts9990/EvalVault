@@ -55,12 +55,6 @@ import {
 
 type MetricTrendRow = Record<string, number | string | null>;
 
-function formatDelta(value: number, unit: string) {
-    const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-    const absValue = Math.abs(value);
-    return `${sign}${absValue.toFixed(1)}${unit}`;
-}
-
 function projectLabel(value: string) {
     if (value === PROJECT_ALL) return "All Projects";
     if (value === PROJECT_UNASSIGNED) return "Unassigned";
