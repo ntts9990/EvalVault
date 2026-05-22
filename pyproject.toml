@@ -43,9 +43,13 @@ classifiers = [
 dependencies = [
     "ragas==0.4.2",
     "langfuse",
-    "instructor",
-    "openai",
-    "langchain-openai",
+    # Phase 3.5 L-S2 — coordinated LLM cluster bump. instructor 1.15 still
+    # caps rich<15.0, so the rich 15+ bump is deferred to a separate slice
+    # (tracked as L-S2-rich follow-up; see commit body). The three packages
+    # bumped here are openai 2.x, instructor 1.15+, langchain-openai 1.x.
+    "instructor>=1.15",
+    "openai>=2.0",
+    "langchain-openai>=1.0",
     "networkx",
     "pydantic",
     "pydantic-settings",
