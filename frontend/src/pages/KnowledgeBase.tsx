@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Layout } from "../components/Layout";
+// Phase 4 W-S5 — secondary page migration. Surgical alert tokenization only.
+import { Button } from "../design";
 import {
     Upload,
     FileText,
@@ -123,9 +125,12 @@ export function KnowledgeBase() {
                 </div>
 
                 {error && (
-                    <div className="bg-destructive/10 text-destructive p-4 rounded-lg mb-6 flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5" />
-                        {error}
+                    <div
+                        role="alert"
+                        className="mb-6 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{error}</span>
                     </div>
                 )}
 
