@@ -14,7 +14,9 @@ import {
     type PromptDiffResponse,
 } from "../services/api";
 import { formatDateTime, formatDurationMs } from "../utils/format";
-import { Activity, AlertCircle, ArrowLeft, GitCompare, Download, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Activity, AlertCircle, ArrowLeft, GitCompare, Download, FileText, ChevronDown, ChevronUp, Inbox } from "lucide-react";
+// Phase 4 W-S3 — secondary surgical migration onto W-S1 primitives.
+import { EmptyState } from "../design";
 
 const METRIC_EPSILON = 0.0001;
 
@@ -758,16 +760,22 @@ export function AnalysisCompareView() {
                 )}
 
                 {error && (
-                    <div className="p-4 border border-destructive/30 bg-destructive/10 rounded-xl text-destructive flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{error}</span>
+                    <div
+                        role="alert"
+                        className="flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{error}</span>
                     </div>
                 )}
 
                 {!loading && (!idA || !idB) && (
-                    <div className="p-4 border border-border rounded-xl text-sm text-muted-foreground">
-                        비교할 결과가 없습니다. 분석 실험실에서 2개를 선택해 주세요.
-                    </div>
+                    <EmptyState
+                        compact
+                        icon={<Inbox size={16} />}
+                        title="비교할 결과가 없습니다"
+                        description="분석 실험실에서 2개의 결과를 선택해 주세요."
+                    />
                 )}
 
                 {!loading && resultA && resultB && (
