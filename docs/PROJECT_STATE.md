@@ -206,11 +206,11 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 
 > **검증 명령**: `uv run evalvault --help` 출력이 위 표와 1:1 일치해야 함. 어긋나면 이 문서가 stale.
 
-### 4.2 Web UI 페이지 (총 17개)
+### 4.2 Web UI 페이지 (총 16개; W-S3-Phase2에서 orphan `ComprehensiveAnalysis` 삭제됨)
 
 `frontend/src/pages/`:
 
-`AiSdkChat`, `AnalysisCompareView`, `AnalysisLab`, `AnalysisResultView`, `Chat`, `CompareRuns`, `ComprehensiveAnalysis`, `CustomerReport`, `Dashboard`, `DomainMemory`, `EvaluationStudio`, `JudgeCalibration`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`, `VisualizationHome`
+`AiSdkChat`, `AnalysisCompareView`, `AnalysisLab`, `AnalysisResultView`, `Chat`, `CompareRuns`, `CustomerReport`, `Dashboard`, `DomainMemory`, `EvaluationStudio`, `JudgeCalibration`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`, `VisualizationHome`
 
 - 진입점: `EvaluationStudio` (실행) / `AnalysisLab` (분석) / `Dashboard` (요약).
 - 시각화: Plotly + Recharts.

@@ -692,7 +692,6 @@
 ./frontend/src/pages/AnalysisResultView.tsx
 ./frontend/src/pages/Chat.tsx
 ./frontend/src/pages/CompareRuns.tsx
-./frontend/src/pages/ComprehensiveAnalysis.tsx
 ./frontend/src/pages/CustomerReport.tsx
 ./frontend/src/pages/Dashboard.tsx
 ./frontend/src/pages/DomainMemory.tsx
@@ -2486,7 +2485,6 @@
 | `./frontend/src/pages/AnalysisResultView.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: AnalysisResultView.tsx | 내부 |
 | `./frontend/src/pages/Chat.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: Chat.tsx | 내부 |
 | `./frontend/src/pages/CompareRuns.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: CompareRuns.tsx | 내부 |
-| `./frontend/src/pages/ComprehensiveAnalysis.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: ComprehensiveAnalysis.tsx | 내부 |
 | `./frontend/src/pages/CustomerReport.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: CustomerReport.tsx | 내부 |
 | `./frontend/src/pages/Dashboard.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: Dashboard.tsx | 내부 |
 | `./frontend/src/pages/DomainMemory.tsx` | TypeScript | code-frontend | lens:UX;type:소스 | 포함 | - | 2026-01-28T17:54:02 | read-full | last: } | TypeScript text file: DomainMemory.tsx | 내부 |
