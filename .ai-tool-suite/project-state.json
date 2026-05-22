@@ -1,0 +1,238 @@
+{
+  "project_id": "evalvault",
+  "project_name": "EvalVault",
+  "source_path": "/Users/sungyub/Documents/Projects/EvalVault",
+  "source_commit": "e9c79f3",
+  "updated_at": "2026-05-22T01:30:00Z",
+  "classification": "trusted-runtime",
+  "development_status": {
+    "summary": "Production-ready RAG evaluation platform (v1.77.0 on PyPI, main = bc88726). Phase 1–14 complete. Active Phase 4 web overhaul + Phase 3.5 dependency line update have 10 feature branches awaiting merge into main (see development-journal.md §머지 대기). Default profile caps decisions at T2 (Evaluation Gate); T3 promote/rollback authority is owned by Reverra-Gate.",
+    "recent_changes": [
+      "L-S2-data: mlflow 3.8.1 → 3.12.0, arize-phoenix 12.27.0 → 16.0.0 (rich 15+ and pandas 3 deferred — instructor 1.15.1 caps rich<15, mlflow 3.12.0 caps pandas<3)",
+      "L-S2: openai 1.40.8 → 2.38.0, instructor 1.4.1 → 1.15.1, langchain-openai 0.2.2 → 1.2.2 (src/ diff = 0; LLM prompt strings byte-identical)",
+      "W-S3-Phase2: ComprehensiveAnalysis.tsx (801 LOC orphan) deleted; analysisRecord helpers extracted to shared util (−27 LOC)",
+      "W-S5-follow: Visualization.tsx error state → EmptyState + design Button + useNavigate",
+      "W-S5b: Settings.tsx surgical migration onto W-S1 design primitives",
+      "W-S6: lucide-react 0.562 → 1.16; Playwright e2e refresh (18/18 green); 3 pre-existing dead imports cleaned",
+      "W-S3: Analysis consolidation plan + alert tokenization on AnalysisCompareView/AnalysisResultView",
+      "Phase 4 W-S1~W-S5: design system + cumulative page migrations (Dashboard, EvaluationStudio, AnalysisLab, RunDetails, CompareRuns, AiSdkChat, JudgeCalibration, KnowledgeBase, VisualizationHome, CustomerReport)"
+    ],
+    "active_work": [
+      "P0 안정성/재현성 — profile validation, run_id 규약, DB 저장 일관성",
+      "P1 자동 회귀 게이트 — code complete; GitHub branch protection rule still to be wired by ops team",
+      "P2 멀티턴 RAG 평가 — schema + CLI loader landed",
+      "P3 GraphRAG 실험 프레임워크 — top-k vs GraphRAG A/B; v0 heuristic → v1 LLM staging",
+      "P4 Judge 캘리브레이션 Web UI — Calibration page + Playwright e2e in place"
+    ],
+    "next_priorities": [
+      "Merge the 10 feature branches landed this session into main and cut v1.78.0",
+      "Wire regression-gate as a required GitHub Actions check on main (operational, not code)",
+      "Bump rich to 15.x when instructor releases a version that lifts the rich<15 cap",
+      "Bump pandas to 3.x when mlflow releases a stable that lifts the pandas<3 cap",
+      "AnalysisLab + AnalysisResultView full <AnalysisResultBody> extraction (W-S3-Phase2c deferred)",
+      "Closed-network smoke command refinement (this packet's `verification_commands.closed_network`)"
+    ]
+  },
+  "stable_surfaces": [
+    {
+      "kind": "cli",
+      "name": "evalvault run",
+      "command_or_path": "uv run evalvault run <dataset> --metrics faithfulness,answer_relevancy --profile <name>",
+      "schema_version": "1.0",
+      "network_posture": "cloud-opt-in",
+      "required_secrets": ["OPENAI_API_KEY (when profile uses OpenAI judge)"],
+      "stability": "stable",
+      "notes": "Runs Ragas-based evaluation on a JSON/CSV/Excel dataset. Output stored via configured StoragePort (SQLite default). Profile selection determines LLM provider (openai/azure/ollama/vllm/anthropic)."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault regress (alias: ci-gate)",
+      "command_or_path": "uv run evalvault regress <candidate_run_id> --baseline <baseline_run_id> --format json --output <out.json>",
+      "schema_version": "1.0",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "Produces regression-gate JSON artifact comparing two run_ids. Exits non-zero when any metric drops by more than --fail-on-regression (default 0.05). See adapter-contract.md §regression-gate-artifact for the JSON schema."
+    },
+    {
+      "kind": "json-artifact",
+      "name": "regression-gate report",
+      "command_or_path": "produced by `evalvault regress ... --format json --output <path>`",
+      "schema_version": "1.0",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "Top-level fields: candidate_run_id, baseline_run_id, status (passed|failed), regression_detected (bool), fail_on_regression (float), test ('t-test'|'mann-whitney'), metrics (list[str]), results (list[RegressionMetricResult]), parallel (bool), concurrency (int|null). RegressionMetricResult fields: metric, baseline_score, candidate_score, diff, diff_percent, p_value, effect_size, effect_level, is_significant, regression. Never emits 'promote' or 'rollback' verdicts — that authority is T3 / Reverra-Gate."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault history",
+      "command_or_path": "uv run evalvault history --limit 20 --format json",
+      "schema_version": "1.0",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "Lists stored evaluation runs (SQLite or Postgres depending on profile). Output is structured JSON when --format json."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault export",
+      "command_or_path": "uv run evalvault export <run_id> --output <path>",
+      "schema_version": "1.0",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "Exports a single run + metric scores as JSON. Lives under data/exports/ by convention (now gitignored as of e9c79f3)."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault analyze / analyze-compare",
+      "command_or_path": "uv run evalvault analyze <run_id> [--intent ...] / evalvault analyze-compare <run_a> <run_b>",
+      "schema_version": "0.9",
+      "network_posture": "cloud-opt-in",
+      "required_secrets": ["OPENAI_API_KEY (when LLM-driven intent analysis is enabled)"],
+      "stability": "beta",
+      "notes": "DAG-based analysis pipeline. Intent catalog covers verification/comparison/analysis/improvement. Saved results addressable via /analysis/results/:id in the Web UI."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault calibrate-judge",
+      "command_or_path": "uv run evalvault calibrate-judge <run_id> --metric faithfulness --labels-source feedback",
+      "schema_version": "0.9",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "beta",
+      "notes": "Isotonic / Platt scaling for LLM judge scores against ground-truth feedback. Produces calibration artifact under reports/calibration/artifacts/<calibration_id>/. Web UI /calibration page consumes the same artifact."
+    },
+    {
+      "kind": "local-http",
+      "name": "FastAPI Web Backend",
+      "command_or_path": "uv run evalvault api serve --host 0.0.0.0 --port 8000",
+      "schema_version": "1.0",
+      "network_posture": "local-service",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "REST + SSE/streaming endpoints under /api/v1/. Serves the frontend (React 19 + Vite 7 + Tailwind 4) and exposes runs, analysis, calibration, knowledge-base, and chat endpoints. Vite dev proxy at frontend/vite.config.ts maps /api → VITE_API_PROXY_TARGET (default http://localhost:8000)."
+    },
+    {
+      "kind": "cli",
+      "name": "evalvault metrics / config",
+      "command_or_path": "uv run evalvault metrics; uv run evalvault config",
+      "schema_version": "1.0",
+      "network_posture": "offline",
+      "required_secrets": [],
+      "stability": "stable",
+      "notes": "Diagnostic commands. `metrics` lists registered evaluation metrics; `config` prints the resolved configuration (no secrets in output)."
+    }
+  ],
+  "verification_commands": {
+    "install": "uv sync --extra dev",
+    "fast": "uv run pytest tests/unit/ -q -m \"not requires_openai and not requires_langfuse and not requires_phoenix and not requires_mlflow\"",
+    "full": "uv run pytest tests/ -v",
+    "closed_network": "TRACKER_PROVIDER= LANGFUSE_PUBLIC_KEY= LANGFUSE_SECRET_KEY= OPENAI_API_KEY= uv run pytest tests/unit/ -q -m \"not requires_openai and not requires_langfuse and not requires_phoenix and not requires_mlflow\"",
+    "artifact_generation": "uv run evalvault regress <candidate_run_id> --baseline <baseline_run_id> --format json --output reports/regression/sample.json"
+  },
+  "runtime_outputs": {
+    "generated_paths": [
+      "data/exports/ — local CSV/JSON exports from `evalvault export` (gitignored)",
+      "mlruns/ — MLflow local tracking artifacts (gitignored)",
+      "reports/calibration/artifacts/<calibration_id>/ — Judge calibration outputs",
+      "reports/regression/ — regression-gate JSON when --output is used",
+      "frontend/test-results/ and frontend/playwright-report/ — Playwright artifacts (gitignored)",
+      ".omc/ — OMC orchestration state (gitignored)"
+    ],
+    "fixture_paths": [
+      "tests/fixtures/e2e/ — curated evaluation datasets (auto_insurance_qa_korean_full.json, callcenter_summary_5cases.json, comprehensive_dataset.json, edge_cases.json, ab_test_baseline_korean.json, ab_test_candidate_korean.json, regression_baseline.json, graphrag_benchmark.json, multiturn_benchmark.json, etc.)",
+      "tests/fixtures/ — unit-test fixtures (small, deterministic)"
+    ],
+    "gitignored_paths": [
+      ".claude/",
+      ".omc/",
+      "mlruns/",
+      "test-results/",
+      "playwright-report/",
+      "data/exports/",
+      "presentation_work/",
+      "media/",
+      ".sisyphus/",
+      "scratch/"
+    ]
+  },
+  "adapter_impact": {
+    "breaking_changes_since_last_update": [
+      "L-S2 openai 1.x → 2.x — chat.completions.create API surface unchanged for EvalVault's adapters, but if an external caller of `evalvault.adapters.outbound.llm.openai_adapter` constructs the underlying `openai` client directly, they should re-verify on the openai 2.x release notes.",
+      "L-S2-data arize-phoenix 12 → 16 — Phoenix tracer init unchanged at the EvalVault adapter boundary; downstream OpenInference instrumentation pulled to 0.1.57."
+    ],
+    "new_adapter_opportunities": [
+      "Closed-network smoke command: a single `evalvault check` that exercises the local SQLite + Ollama path without requiring any cloud secret. Currently the closest equivalent is the filtered unit test command in verification_commands.closed_network.",
+      "Stable JSON output mode for `evalvault history` and `evalvault config` (currently table-oriented; --format json works but field-stability guarantee is not yet documented).",
+      "Webhook/HTTP push variant of the regression-gate artifact for CI systems that want push notifications instead of polling the output file."
+    ],
+    "fields_safe_to_rely_on": [
+      "RegressionGateReport.status (string: 'passed' | 'failed') — never 'promote' / 'rollback'",
+      "RegressionGateReport.candidate_run_id, baseline_run_id (string)",
+      "RegressionGateReport.regression_detected (bool)",
+      "RegressionGateReport.results[].metric, baseline_score, candidate_score, diff, diff_percent (float)",
+      "RegressionGateReport.results[].p_value, effect_size, is_significant (float / bool)",
+      "RegressionGateReport.fail_on_regression (float — the threshold used)",
+      "RegressionGateReport.test ('t-test' | 'mann-whitney')",
+      "evalvault CLI exit codes: 0 = success/pass, non-zero = error or regression detected"
+    ],
+    "fields_experimental": [
+      "RegressionGateReport.results[].effect_level (EffectSizeLevel enum string) — may add levels in future minor releases",
+      "Analysis CLI JSON shape (`evalvault analyze --output ...`) — still being refined; schema_version 0.9",
+      "Calibration artifact directory layout under reports/calibration/artifacts/ — file names stable, sub-structure beta"
+    ]
+  },
+  "reusable_patterns": [
+    {
+      "name": "Regression gate report shape",
+      "description": "Frozen dataclass with status / regression_detected / per-metric statistical comparison. Never emits T3 promote/rollback strings.",
+      "where_to_look": "src/evalvault/domain/services/regression_gate_service.py — RegressionGateReport.to_dict()",
+      "why_it_may_help_other_tools": "Other source projects that produce a Tier-2 evaluation verdict can adopt the same status vocabulary (passed/failed) and per-metric statistical schema. Keeps decision-emitting code uniform across the AI Tool Suite ecosystem."
+    },
+    {
+      "name": "RAG metric aggregation",
+      "description": "Per-metric pass-rate + threshold check against dataset-level thresholds defined in the dataset JSON (not env vars).",
+      "where_to_look": "src/evalvault/domain/entities/dataset.py + run.py + adapters/outbound/dataset/json_loader.py",
+      "why_it_may_help_other_tools": "Pattern of co-locating thresholds with fixtures (rather than env) makes regression reasoning portable across machines and CI."
+    },
+    {
+      "name": "Artifact storage layout",
+      "description": "Generated artifacts under reports/<category>/<id>/, fixtures under tests/fixtures/, raw exports under data/exports/. Each gitignored separately.",
+      "where_to_look": ".gitignore + tests/fixtures/ + reports/ (created at runtime)",
+      "why_it_may_help_other_tools": "Clear category boundary prevents \"is this a fixture or a generated output?\" confusion in adapter writers and reviewers."
+    },
+    {
+      "name": "Local CLI invocation assumptions",
+      "description": "All `evalvault` commands are non-interactive by default; --format json is available on read-paths; profile selection via --profile or EVALVAULT_PROFILE.",
+      "where_to_look": "src/evalvault/adapters/inbound/cli/ + .env.example",
+      "why_it_may_help_other_tools": "Adapter wrappers can rely on stdin/stdout JSON contracts without TTY assumptions."
+    },
+    {
+      "name": "T0-T4 authority hierarchy compliance",
+      "description": "EvalVault default profile caps decisions at T2 (Evaluation Gate). Never emits 'promote' or 'rollback' — those are T3 (Reverra-Gate) authority.",
+      "where_to_look": "regression_gate_service.py (status vocabulary), Web UI AuthorityBadge primitive at frontend/src/design/components/AuthorityBadge.tsx",
+      "why_it_may_help_other_tools": "Anti-conflation pattern: the same surface NEVER mixes a T2 verdict with a T3 string, even in error messages or UI badges."
+    },
+    {
+      "name": "Surgical UI primitive migration",
+      "description": "Phase 4 W-Sx pattern — tokenize visual atoms (alert blocks, empty states, buttons) onto design primitives WITHOUT changing IA, routes, or component boundaries. Each slice ships independently with build + Playwright verify.",
+      "where_to_look": "docs/guides/W-S3-ANALYSIS-CONSOLIDATION.md + commit history refactor/w-s2-* through refactor/w-s5-follow-*",
+      "why_it_may_help_other_tools": "Lets teams roll out a design system across an existing app without bigbang rewrites — each PR is small enough to review and revert."
+    }
+  ],
+  "known_risks": [
+    "P1 regression gate code exists but enforcement depends on GitHub branch protection rule (Repo Settings → Branches → main → required check). Operators must add `regression-gate` to required checks; the EvalVault repo cannot enforce this itself.",
+    "LLM cluster transitive coupling (openai/instructor/langchain-openai/rich): cannot bump packages individually; future bump proposals must dry-run `uv lock` against the full cluster.",
+    "pandas 3.x cannot be adopted until mlflow lifts its `pandas<3` cap (mlflow 3.12.0 is current latest).",
+    "OpenAI cost: default judge is `gpt-5-mini`; profile-based fallback to ollama/vllm must be set up for closed-network runs.",
+    "manim is a dev extra and depends on Cairo system libs; `uv sync --extra dev` fails on machines without `pkg-config` + Cairo installed. Consider slimming dev extras.",
+    "Ragas 0.4.2 pin: a major Ragas bump will require RagasEvaluator changes. Defensive pin documented in pyproject.toml."
+  ],
+  "requests_to_ai_tool_suite": [
+    "Adopt the RegressionGateReport schema (or a strict subset of it) when defining the cross-tool 'evaluation-gate decision' contract. Avoid mixing T2 (evaluation) and T3 (release) verdicts at the field level.",
+    "Provide a shared closed-network LLM stub (e.g., a deterministic local model) that source projects can target for verification_commands.closed_network without each project re-inventing the stub.",
+    "If the AI Tool Suite registry plans to ingest the calibration artifact directory (reports/calibration/artifacts/), please pin to schema_version >= 0.9 and document the breaking-change policy for sub-folder names."
+  ]
+}
