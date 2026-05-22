@@ -1,0 +1,17 @@
+{
+  "command": "regress",
+  "version": 1,
+  "status": "error",
+  "started_at": "2026-05-22T00:00:00Z",
+  "finished_at": "2026-05-22T00:00:00Z",
+  "duration_ms": 0,
+  "artifacts": null,
+  "data": null,
+  "message": "No shared metrics available for regression gate.",
+  "error_type": "ValueError",
+  "_meta": {
+    "exit_code": 1,
+    "runtime_fields": ["started_at", "finished_at", "duration_ms"],
+    "note": "Incomplete provenance: baseline evaluated ['faithfulness'] while candidate evaluated ['answer_relevancy'] — no shared metric to compare. The envelope status is 'error' (NOT 'passed'/'failed') and data is null. This is the third decision class an adapter must handle: a gate that cannot render a verdict. CLI exits 1 (KeyError/ValueError class), distinct from exit 2 (regression detected) and exit 0 (pass)."
+  }
+}

@@ -5,6 +5,10 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { Layout } from "../components/Layout";
 import { Conversation, Message, PromptInput } from "../components/ai-elements";
 import { fetchRuns, type RunSummary } from "../services/api";
+// Phase 4 W-S4 — LLM interaction page migration. Per memory
+// feedback_llm_prompt_discipline: structural visual primitives only;
+// the chat prompt strings themselves stay byte-identical.
+import { EmptyState } from "../design";
 
 type ChatDataParts = {
     status: { message: string };
@@ -241,15 +245,12 @@ export function AiSdkChat() {
                 </div>
                 <div className="flex-1 relative bg-background/50">
                     {messages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 opacity-70">
-                            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                                <MessageSquare className="w-8 h-8 text-primary" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground">AI SDK 채팅을 시작해보세요</h3>
-                            <p className="text-sm text-muted-foreground max-w-sm">
-                                AI SDK 스트리밍 프로토콜로 동작하는 챗봇입니다. 분석 결과 해석과 개선 아이디어를
-                                바로 질문해볼 수 있습니다.
-                            </p>
+                        <div className="flex h-full items-center justify-center px-8">
+                            <EmptyState
+                                icon={<MessageSquare size={20} />}
+                                title="AI SDK 채팅을 시작해보세요"
+                                description="AI SDK 스트리밍 프로토콜로 동작하는 챗봇입니다. 분석 결과 해석과 개선 아이디어를 바로 질문해볼 수 있습니다."
+                            />
                         </div>
                     ) : (
                         <Conversation>

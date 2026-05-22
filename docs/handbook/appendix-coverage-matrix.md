@@ -318,7 +318,6 @@
 | `./frontend/src/pages/AnalysisResultView.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
 | `./frontend/src/pages/Chat.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
 | `./frontend/src/pages/CompareRuns.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
-| `./frontend/src/pages/ComprehensiveAnalysis.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
 | `./frontend/src/pages/CustomerReport.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
 | `./frontend/src/pages/Dashboard.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |
 | `./frontend/src/pages/DomainMemory.tsx` | `CHAPTERS/07_ux_and_product.md` | lens:UX;type:소스 | 내부 |

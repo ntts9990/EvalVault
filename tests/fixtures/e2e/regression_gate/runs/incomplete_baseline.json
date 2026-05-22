@@ -1,0 +1,13 @@
+{
+  "run_id": "baseline-incomplete",
+  "dataset_name": "regression-gate-fixture",
+  "model_name": "fixture-model",
+  "metrics_evaluated": ["faithfulness"],
+  "thresholds": {"faithfulness": 0.8},
+  "cases": [
+    {"test_case_id": "tc-1", "scores": {"faithfulness": 0.90}},
+    {"test_case_id": "tc-2", "scores": {"faithfulness": 0.88}},
+    {"test_case_id": "tc-3", "scores": {"faithfulness": 0.92}},
+    {"test_case_id": "tc-4", "scores": {"faithfulness": 0.89}}
+  ]
+}

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, ExternalLink, Search, Sparkles } from "lucide-react";
 import { Layout } from "../components/Layout";
+// Phase 4 W-S5 — surgical migration of the secondary visualization landing page.
+import { EmptyState } from "../design";
 import { fetchRuns, type RunSummary } from "../services/api";
 import { PASS_RATE_COLOR_BANDS } from "../config/ui";
 
@@ -208,14 +210,22 @@ export function VisualizationHome() {
                         <div className="mt-8 text-sm text-muted-foreground">불러오는 중...</div>
                     )}
                     {error && (
-                        <div className="mt-8 flex items-center gap-2 text-sm text-rose-600">
-                            <AlertCircle className="w-4 h-4" />
-                            {error}
+                        <div
+                            role="alert"
+                            className="mt-8 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-3 text-sm text-[hsl(var(--destructive))]"
+                        >
+                            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <span className="leading-snug">{error}</span>
                         </div>
                     )}
                     {!loading && !error && filteredRuns.length === 0 && (
-                        <div className="mt-8 text-sm text-muted-foreground">
-                            조건에 맞는 Run이 없습니다.
+                        <div className="mt-4">
+                            <EmptyState
+                                compact
+                                icon={<Search size={16} />}
+                                title="조건에 맞는 Run이 없습니다"
+                                description="검색어를 조정하거나 새 평가를 실행해 보세요."
+                            />
                         </div>
                     )}
                     <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">

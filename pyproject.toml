@@ -43,14 +43,21 @@ classifiers = [
 dependencies = [
     "ragas==0.4.2",
     "langfuse",
-    "instructor",
-    "openai",
-    "langchain-openai",
+    # Phase 3.5 L-S2 — coordinated LLM cluster bump. instructor 1.15 still
+    # caps rich<15.0, so the rich 15+ bump is deferred to a separate slice
+    # (tracked as L-S2-rich follow-up; see commit body). The three packages
+    # bumped here are openai 2.x, instructor 1.15+, langchain-openai 1.x.
+    "instructor>=1.15",
+    "openai>=2.0",
+    "langchain-openai>=1.0",
     "networkx",
     "pydantic",
     "pydantic-settings",
     "typer",
     "rich",
+    # Phase 3.5 L-S2-data — pandas remains on 2.3.x until mlflow drops its
+    # `pandas<3` cap (verified 2026-05-22: mlflow 3.12.0 is latest and still
+    # depends on pandas<3). mlflow 3.12 + arize-phoenix 16 still riding here.
     "pandas",
     "openpyxl",
     "pypdf>=4.3.0",
@@ -90,8 +97,8 @@ dev = [
     "langchain-anthropic",
     "psycopg[binary]>=3.0.0",
     "pgvector>=0.2.5",
-    "mlflow>=2.0.0",
-    "arize-phoenix>=8.0.0",
+    "mlflow>=3.12.0",
+    "arize-phoenix>=16.0.0",
     "openinference-instrumentation-langchain>=0.1.0",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
@@ -138,10 +145,10 @@ postgres = [
     "pgvector>=0.2.5",
 ]
 mlflow = [
-    "mlflow>=2.0.0",
+    "mlflow>=3.12.0",
 ]
 phoenix = [
-    "arize-phoenix>=8.0.0",
+    "arize-phoenix>=16.0.0",
     "openinference-instrumentation-langchain>=0.1.0",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",

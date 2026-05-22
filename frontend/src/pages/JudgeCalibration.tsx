@@ -21,7 +21,12 @@ import {
     type RunSummary,
 } from "../services/api";
 import { Layout } from "../components/Layout";
+// Phase 4 W-S4 — JudgeCalibration migration. Per memory
+// feedback_llm_prompt_discipline: only structural visual atoms move; the
+// calibration prompts (which live in the backend) are untouched.
+import { Button } from "../design";
 import {
+    AlertCircle,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
@@ -294,8 +299,12 @@ export function JudgeCalibration() {
                 </div>
 
                 {error && (
-                    <div className="surface-panel border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                        {error}
+                    <div
+                        role="alert"
+                        className="flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{error}</span>
                     </div>
                 )}
 
@@ -447,19 +456,21 @@ export function JudgeCalibration() {
                                 </div>
                             </div>
 
-                            <button
-                                className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground flex items-center justify-center gap-2 disabled:opacity-60"
+                            <Button
+                                variant="primary"
+                                size="md"
                                 onClick={handleRunCalibration}
+                                loading={running}
                                 disabled={
-                                    running ||
                                     !selectedRunId ||
                                     !labelsSupported ||
                                     (requiresFeedback && eligibleRuns.length === 0)
                                 }
+                                leading={!running ? <Play className="w-4 h-4" /> : undefined}
+                                className="w-full font-semibold"
                             >
-                                {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                                 Judge 보정 실행
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="surface-panel p-5 space-y-4">

@@ -1,0 +1,13 @@
+{
+  "run_id": "candidate-incomplete",
+  "dataset_name": "regression-gate-fixture",
+  "model_name": "fixture-model",
+  "metrics_evaluated": ["answer_relevancy"],
+  "thresholds": {"answer_relevancy": 0.7},
+  "cases": [
+    {"test_case_id": "tc-1", "scores": {"answer_relevancy": 0.86}},
+    {"test_case_id": "tc-2", "scores": {"answer_relevancy": 0.85}},
+    {"test_case_id": "tc-3", "scores": {"answer_relevancy": 0.87}},
+    {"test_case_id": "tc-4", "scores": {"answer_relevancy": 0.86}}
+  ]
+}

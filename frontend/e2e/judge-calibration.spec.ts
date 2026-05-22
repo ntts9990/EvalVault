@@ -15,6 +15,9 @@ const runFixture = [
         phoenix_precision: null,
         phoenix_drift: null,
         phoenix_experiment_url: null,
+        // Phase 4 W-S6 — JudgeCalibration now gates the run selector on `feedback_count > 0`
+        // when labels_source = feedback (default). Ensure the fixture is eligible.
+        feedback_count: 5,
     },
 ];
 
@@ -87,7 +90,10 @@ const calibrationResponse = {
 };
 
 test("judge calibration page renders and runs", async ({ page }) => {
-    await page.route("**/api/v1/runs/", async (route) => {
+    // Phase 4 W-S6 — JudgeCalibration calls fetchRuns({ includeFeedback, limit, offset }),
+    // producing URLs like /api/v1/runs/?include_feedback=true&limit=50&offset=0. The original
+    // mock string `**/api/v1/runs/` does not include the query string, so we widen the glob.
+    await page.route("**/api/v1/runs/**", async (route) => {
         await route.fulfill({ json: runFixture });
     });
     await page.route("**/api/v1/calibration/judge/history?limit=20", async (route) => {
@@ -106,11 +112,22 @@ test("judge calibration page renders and runs", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Judge Calibration" })).toBeVisible();
     await expect(page.getByText("히스토리")).toBeVisible();
 
-    await page.getByRole("combobox").first().selectOption({ label: "demo · run_12345678" });
+    // Phase 4 W-S6 — spec refresh: target the Run select specifically (was `.first()`,
+    // which resolved to the labels-source combobox), and use the truncated option label
+    // produced by `run.run_id.slice(0, 8)` in JudgeCalibration.tsx.
+    await page
+        .locator("select")
+        .filter({ hasText: "Run을 선택하세요" })
+        .selectOption({ label: "demo · run_1234" });
     await expect(page.getByRole("button", { name: "faithfulness" })).toBeVisible();
 
     await page.getByRole("button", { name: "Judge 보정 실행" }).click();
     await expect(page.getByText("결과 요약")).toBeVisible();
-    await expect(page.getByText("30")).toBeVisible();
-    await expect(page.getByText("faithfulness")).toBeVisible();
+    // Phase 4 W-S6 — `getByText("30")` is ambiguous now that the histogram renders bin
+    // labels like "0.25-0.30". Use exact:true and scope to the Samples value paragraph.
+    await expect(page.getByText("30", { exact: true })).toBeVisible();
+    // Phase 4 W-S6 — `getByText("faithfulness")` now resolves to multiple cells in the
+    // result + metric table. Use first() to assert at least one is visible without
+    // tripping strict mode.
+    await expect(page.getByText("faithfulness").first()).toBeVisible();
 });

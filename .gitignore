@@ -162,6 +162,7 @@ dmypy.json
 .LSOverride
 scratch/
 .sisyphus/
+.omc/
 
 # Local artifacts
 MagicMock/
@@ -171,3 +172,16 @@ media/
 
 # Local presentation workspace
 presentation_work/
+
+# Claude Code local state + worktrees cache
+.claude/
+
+# MLflow local tracking dir (real runs go to MLFLOW_TRACKING_URI)
+mlruns/
+
+# Playwright test artifacts (HTML reports, traces, screenshots)
+test-results/
+playwright-report/
+
+# Local CSV/JSON exports produced by `evalvault export` and related commands
+data/exports/

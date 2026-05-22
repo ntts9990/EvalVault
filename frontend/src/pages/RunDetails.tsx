@@ -26,6 +26,11 @@ import {
 import { Layout } from "../components/Layout";
 import { InsightSpacePanel } from "../components/InsightSpacePanel";
 import { MarkdownContent } from "../components/MarkdownContent";
+// Phase 4 W-S7 — surface T2 evaluation-gate authority next to the Pass Rate.
+// Anti-conflation guard: EvalVault default profile NEVER emits T3 promote/
+// rollback. The badge makes that explicit to the reader. See
+// docs/adapter-contract.md §3.5.
+import { AuthorityBadge } from "../design";
 import { formatScore, normalizeScore, safeAverage } from "../utils/score";
 import {
     ArrowLeft,
@@ -794,6 +799,13 @@ export function RunDetails() {
                             <p className={`text-2xl font-bold ${summary.pass_rate >= 0.7 ? "text-emerald-500" : "text-rose-500"}`}>
                                 {(summary.pass_rate * 100).toFixed(1)}%
                             </p>
+                            {/* W-S7: T2 evaluation-gate authority. Never T3 from default. */}
+                            <div className="mt-1.5 flex justify-end">
+                                <AuthorityBadge
+                                    level="T2"
+                                    verdict={summary.pass_rate >= 0.7 ? "eval-pass" : "hold"}
+                                />
+                            </div>
                         </div>
 
                         {phoenixLinks.length > 0 && (

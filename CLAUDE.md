@@ -305,17 +305,23 @@ tc-001,"질문","답변","[""컨텍스트1"",""컨텍스트2""]","정답"
 
 ## Documentation
 
+> **Single Source of Truth**: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) — 인수팀 진입 문서. 이 표는 PROJECT_STATE.md §11 "진실의 출처 지도"의 핵심 항목만 발췌한 것이다.
+
 | Document | Description |
 |----------|-------------|
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 설치, 설정, 메트릭 설명, 문제 해결 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal Architecture 상세 설명 |
-| [docs/COMPLETED.md](docs/COMPLETED.md) | Phase 1-14 완료 내역, 기술 스펙, 아키텍처 현황 |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-2027 개발 로드맵 (Phase 15-19+) |
-| [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) | 코드 품질 개선 계획 (P1-P7 우선순위, 병렬 에이전트 워크플로우) |
-| [docs/KG_IMPROVEMENT_PLAN.md](docs/KG_IMPROVEMENT_PLAN.md) | Knowledge Graph 개선 계획 |
+| [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) | **SSoT**. 현재 상태·구현 현황·CLI 표면·환경변수·운영/배포·로드맵 요약 (인수팀 진입점) |
+| [docs/REFACTOR_DIAGNOSIS.md](docs/REFACTOR_DIAGNOSIS.md) | 누적된 부담의 슬라이스 단위 해체 계획 (구 `IMPROVEMENT_PLAN.md` 후속) |
+| [docs/handbook/CHAPTERS/01_architecture.md](docs/handbook/CHAPTERS/01_architecture.md) | Hexagonal Architecture 상세, Port/Adapter 매트릭스 (구 `ARCHITECTURE.md`) |
+| [docs/handbook/CHAPTERS/02_data_and_metrics.md](docs/handbook/CHAPTERS/02_data_and_metrics.md) | 데이터셋 스키마·메트릭 정의·임계값 정책·Knowledge Graph (구 `KG_IMPROVEMENT_PLAN.md` 통합) |
+| [docs/handbook/CHAPTERS/03_workflows.md](docs/handbook/CHAPTERS/03_workflows.md) | 평가·비교·회귀 워크플로 |
+| [docs/handbook/CHAPTERS/04_operations.md](docs/handbook/CHAPTERS/04_operations.md) | 로컬·Docker·오프라인 운영 런북 (구 `USER_GUIDE.md` 대체) |
+| [docs/handbook/CHAPTERS/06_quality_and_testing.md](docs/handbook/CHAPTERS/06_quality_and_testing.md) | 품질 게이트·테스트 정책·회귀 게이트 |
+| [docs/handbook/CHAPTERS/08_roadmap.md](docs/handbook/CHAPTERS/08_roadmap.md) | 로드맵 SSoT (PROJECT_STATE.md §8은 요약본) |
 | [docs/guides/OFFLINE_DOCKER.md](docs/guides/OFFLINE_DOCKER.md) | 오프라인 Docker 배포 가이드 |
 | [docs/guides/OFFLINE_MODELS.md](docs/guides/OFFLINE_MODELS.md) | 오프라인 모델 번들링 가이드 |
-| [agent/README.md](agent/README.md) | 자율 에이전트 시스템 사용 가이드 |
+| [agent/README.md](agent/README.md) | 자율 에이전트 시스템 가이드 (⚠️ X-S1 슬라이스에서 제거 예정) |
+
+> `docs/USER_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/COMPLETED.md`, `docs/IMPROVEMENT_PLAN.md`, `docs/KG_IMPROVEMENT_PLAN.md`는 모두 deprecated. 위 표가 새로운 진입점이다.
 
 ## Autonomous Agent System
 

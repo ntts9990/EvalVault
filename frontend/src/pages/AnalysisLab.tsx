@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
+import { PrioritySummaryPanel } from "../components/PrioritySummaryPanel";
 import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
@@ -46,6 +46,15 @@ import {
 } from "lucide-react";
 import { buildAnalyzeCommand } from "../utils/cliCommandBuilder";
 import { copyTextToClipboard } from "../utils/clipboard";
+import {
+    getNestedValue,
+    getNodeError,
+    getNodeOutput,
+    getNodeStatus,
+    isPlainRecord,
+    isPrioritySummary,
+    isRecord,
+} from "../utils/analysisRecord";
 
 const CATEGORY_META: Record<string, { label: string; description: string }> = {
     verification: {
@@ -144,37 +153,6 @@ const SIGNAL_GROUP_ORDER = [
     "efficiency",
 ];
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null;
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
-
-const getNodeStatus = (node: unknown) => {
-    if (!isRecord(node)) return "pending";
-    const status = node.status;
-    return typeof status === "string" ? status : "pending";
-};
-
-const getNodeError = (node: unknown) => {
-    if (!isRecord(node)) return null;
-    const error = node.error;
-    if (typeof error === "string") return error;
-    return error ? String(error) : null;
-};
-
-const getNodeOutput = (nodeResults: Record<string, unknown> | null | undefined, nodeId: string) => {
-    if (!nodeResults) return null;
-    const node = nodeResults[nodeId];
-    if (!isRecord(node)) return null;
-    return node.output;
-};
-
-function isPrioritySummary(value: unknown): value is PrioritySummary {
-    if (!isPlainRecord(value)) return false;
-    return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
-}
-
 const PARAM_LABELS: Record<string, string> = {
     use_llm_report: "LLM 보고서",
     recompute_ragas: "RAGAS 재평가",
@@ -227,24 +205,6 @@ const extractEvidenceRecords = (record: Record<string, unknown>) => {
         }
     }
     return [];
-};
-
-const normalizeNumber = (value: unknown) => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-};
-
-const getNestedValue = (record: Record<string, unknown>, path: string[]) => {
-    let current: unknown = record;
-    for (const key of path) {
-        if (!isPlainRecord(current)) return null;
-        current = current[key];
-    }
-    return normalizeNumber(current);
 };
 
 type ExecutionMeta = {
@@ -1235,9 +1195,12 @@ export function AnalysisLab() {
                 </div>
 
                 {catalogError && (
-                    <div className="mb-6 p-4 border border-destructive/30 bg-destructive/10 rounded-xl text-destructive flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{catalogError}</span>
+                    <div
+                        role="alert"
+                        className="mb-6 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{catalogError}</span>
                     </div>
                 )}
 
@@ -1686,9 +1649,12 @@ export function AnalysisLab() {
                             </div>
 
                             {error && (
-                                <div className="mb-4 p-3 border border-destructive/30 bg-destructive/10 rounded-lg text-destructive text-sm flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    {error}
+                                <div
+                                    role="alert"
+                                    className="mb-4 flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-3 text-sm text-[hsl(var(--destructive))]"
+                                >
+                                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                                    <span className="leading-snug">{error}</span>
                                 </div>
                             )}
 

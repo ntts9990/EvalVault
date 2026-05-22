@@ -503,9 +503,12 @@ export function CustomerReport() {
                             <span>프롬프트 변경 내역 분석 중...</span>
                         </div>
                     ) : diffError ? (
-                        <div className="flex items-center gap-2 text-destructive text-sm p-2 bg-destructive/10 rounded-lg border border-destructive/20">
-                            <AlertTriangle className="w-4 h-4" />
-                            <span>{diffError}</span>
+                        <div
+                            role="alert"
+                            className="flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-2 text-sm text-[hsl(var(--destructive))]"
+                        >
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <span className="leading-snug">{diffError}</span>
                         </div>
                     ) : promptDiff ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -14,6 +14,7 @@ import { CustomerReport } from './pages/CustomerReport';
 import { Visualization } from './pages/Visualization';
 import { VisualizationHome } from './pages/VisualizationHome';
 import { JudgeCalibration } from './pages/JudgeCalibration';
+import { DesignSystem } from './pages/DesignSystem';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/visualization/:id" element={<Visualization />} />
         <Route path="/calibration" element={<JudgeCalibration />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/design-system" element={<DesignSystem />} />
       </Routes>
     </BrowserRouter>
   );

@@ -14,7 +14,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "ai": "^6.0.69",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.562.0",
+    "lucide-react": "^1.16.0",
     "plotly.js-dist-min": "^2.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

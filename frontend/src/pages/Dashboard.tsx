@@ -13,6 +13,10 @@ import {
     TrendingUp,
 } from "lucide-react";
 import { Layout } from "../components/Layout";
+// Phase 4 W-S2b — Dashboard incremental migration onto W-S1 primitives.
+// Imported here at the top so future hops (table, run cards) can pick from
+// the same barrel without touching the import block again.
+import { AuthorityBadge, Button, EmptyState, MetricChip } from "../design";
 import { useNavigate } from "react-router-dom";
 import {
     Area,
@@ -50,12 +54,6 @@ import {
 } from "../config/ui";
 
 type MetricTrendRow = Record<string, number | string | null>;
-
-function formatDelta(value: number, unit: string) {
-    const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-    const absValue = Math.abs(value);
-    return `${sign}${absValue.toFixed(1)}${unit}`;
-}
 
 function projectLabel(value: string) {
     if (value === PROJECT_ALL) return "All Projects";
@@ -275,19 +273,22 @@ export function Dashboard() {
 
     if (error) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-background text-foreground">
-                <div className="flex flex-col items-center gap-4 text-destructive p-8 rounded-2xl bg-destructive/5 border border-destructive/20 max-w-md text-center">
-                    <AlertCircle className="w-12 h-12" />
-                    <div>
-                        <p className="text-xl font-bold tracking-tight">System Error</p>
-                        <p className="text-sm opacity-80 mt-1">{error}</p>
-                    </div>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="mt-4 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
-                    >
-                        Retry Connection
-                    </button>
+            <div className="flex min-h-screen items-center justify-center bg-background px-6">
+                <div className="w-full max-w-md rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 px-6">
+                    <EmptyState
+                        icon={<AlertCircle size={24} className="text-[hsl(var(--destructive))]" />}
+                        title="System Error"
+                        description={error}
+                        action={
+                            <Button
+                                variant="destructive"
+                                size="md"
+                                onClick={() => window.location.reload()}
+                            >
+                                Retry Connection
+                            </Button>
+                        }
+                    />
                 </div>
             </div>
         );
@@ -395,113 +396,52 @@ export function Dashboard() {
                 </div>
             </div>
 
+            {/*
+              * Phase 4 W-S2b — KPI grid migrated from bespoke surface-cards to
+              * MetricChip. Information preserved: label + value + delta vs
+              * previous period (delta sign carries direction; "vs previous
+              * period" is implicit and dropped to reduce visual noise per
+              * Claude design restraint). Authority hint "T1" tags each chip
+              * as metric evidence (not a verdict) — see docs/adapter-contract
+              * §3.5.
+              */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                <div className="surface-card p-5">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground font-medium">Runs</p>
-                            <p className="text-2xl font-bold mt-1">{stats.totalRuns.toLocaleString()}</p>
-                        </div>
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Database className="w-5 h-5" />
-                        </div>
-                    </div>
-                    {deltas && (
-                        <div className="mt-3 flex items-center gap-2 text-xs">
-                            {deltas.totalRuns >= 0 ? (
-                                <TrendingUp className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                                <TrendingDown className="w-3 h-3 text-rose-500" />
-                            )}
-                            <span className={deltas.totalRuns >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                {deltas.totalRuns >= 0 ? "+" : ""}{deltas.totalRuns}
-                            </span>
-                            <span className="text-muted-foreground">vs previous period</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="surface-card p-5">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground font-medium">Test Cases</p>
-                            <p className="text-2xl font-bold mt-1">
-                                {stats.totalTestCases.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Activity className="w-5 h-5" />
-                        </div>
-                    </div>
-                    {deltas && (
-                        <div className="mt-3 flex items-center gap-2 text-xs">
-                            {deltas.totalTestCases >= 0 ? (
-                                <TrendingUp className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                                <TrendingDown className="w-3 h-3 text-rose-500" />
-                            )}
-                            <span className={deltas.totalTestCases >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                {deltas.totalTestCases >= 0 ? "+" : ""}{deltas.totalTestCases}
-                            </span>
-                            <span className="text-muted-foreground">vs previous period</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="surface-card p-5">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground font-medium">Average Pass Rate</p>
-                            <p className="text-2xl font-bold mt-1">
-                                {(stats.avgPassRate * 100).toFixed(1)}%
-                            </p>
-                        </div>
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Activity className="w-5 h-5" />
-                        </div>
-                    </div>
-                    {deltas && (
-                        <div className="mt-3 flex items-center gap-2 text-xs">
-                            {deltas.avgPassRate >= 0 ? (
-                                <TrendingUp className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                                <TrendingDown className="w-3 h-3 text-rose-500" />
-                            )}
-                            <span className={deltas.avgPassRate >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                {formatDelta(deltas.avgPassRate * 100, "%")}
-                            </span>
-                            <span className="text-muted-foreground">vs previous period</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="surface-card p-5">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground font-medium">Total Cost</p>
-                            <p className="text-2xl font-bold mt-1">
-                                ${stats.totalCost.toFixed(2)}
-                            </p>
-                        </div>
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <DollarSign className="w-5 h-5" />
-                        </div>
-                    </div>
-                    {deltas && (
-                        <div className="mt-3 flex items-center gap-2 text-xs">
-                            {deltas.totalCost >= 0 ? (
-                                <TrendingUp className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                                <TrendingDown className="w-3 h-3 text-rose-500" />
-                            )}
-                            <span className={deltas.totalCost >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                {(deltas.totalCost > 0 ? "+" : deltas.totalCost < 0 ? "-" : "")}
-                                ${Math.abs(deltas.totalCost).toFixed(2)}
-                            </span>
-                            <span className="text-muted-foreground">vs previous period</span>
-                        </div>
-                    )}
-                </div>
+                <MetricChip
+                    label="Runs"
+                    value={stats.totalRuns}
+                    delta={deltas?.totalRuns}
+                    format="number"
+                    authority="T1"
+                    trailing={<Database className="w-4 h-4 text-muted-foreground" />}
+                />
+                <MetricChip
+                    label="Test Cases"
+                    value={stats.totalTestCases}
+                    delta={deltas?.totalTestCases}
+                    format="number"
+                    authority="T1"
+                    trailing={<Activity className="w-4 h-4 text-muted-foreground" />}
+                />
+                <MetricChip
+                    label="Average Pass Rate"
+                    value={`${(stats.avgPassRate * 100).toFixed(1)}%`}
+                    delta={deltas?.avgPassRate}
+                    authority="T2"
+                    trailing={
+                        deltas && deltas.avgPassRate >= 0 ? (
+                            <TrendingUp className="w-4 h-4 text-[hsl(var(--success))]" />
+                        ) : deltas ? (
+                            <TrendingDown className="w-4 h-4 text-[hsl(var(--destructive))]" />
+                        ) : null
+                    }
+                />
+                <MetricChip
+                    label="Total Cost"
+                    value={`$${stats.totalCost.toFixed(2)}`}
+                    delta={deltas?.totalCost}
+                    authority="T1"
+                    trailing={<DollarSign className="w-4 h-4 text-muted-foreground" />}
+                />
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
@@ -709,7 +649,14 @@ export function Dashboard() {
                                 <div className="space-y-3 mb-5">
                                     <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                         <span>Performance</span>
-                                        <span>{run.passed_test_cases}/{run.total_test_cases} passed</span>
+                                        <span className="flex items-center gap-2">
+                                            <span>{run.passed_test_cases}/{run.total_test_cases} passed</span>
+                                            {/* W-S7 follow-up: T2 evaluation-gate verdict on each run card. */}
+                                            <AuthorityBadge
+                                                level="T2"
+                                                verdict={run.pass_rate >= 0.7 ? "eval-pass" : "hold"}
+                                            />
+                                        </span>
                                     </div>
                                     <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
                                         <div

@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { AnalysisNodeOutputs } from "../components/AnalysisNodeOutputs";
 import { MarkdownContent } from "../components/MarkdownContent";
-import { PrioritySummaryPanel, type PrioritySummary } from "../components/PrioritySummaryPanel";
+import { PrioritySummaryPanel } from "../components/PrioritySummaryPanel";
 import { StatusBadge } from "../components/StatusBadge";
 import { VirtualizedText } from "../components/VirtualizedText";
 import {
@@ -18,6 +18,15 @@ import { ANALYSIS_LARGE_REPORT_THRESHOLD } from "../config/ui";
 import { formatDateTime, formatDurationMs } from "../utils/format";
 import { copyTextToClipboard } from "../utils/clipboard";
 import {
+    getNestedValue,
+    getNodeError,
+    getNodeOutput,
+    getNodeStatus,
+    isPlainRecord,
+    isPrioritySummary,
+    isRecord,
+} from "../utils/analysisRecord";
+import {
     Activity,
     AlertCircle,
     ArrowLeft,
@@ -25,9 +34,6 @@ import {
     ExternalLink,
     Link2,
 } from "lucide-react";
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null;
 
 const SIGNAL_GROUP_LABELS: Record<string, string> = {
     groundedness: "근거성",
@@ -46,52 +52,6 @@ const SIGNAL_GROUP_ORDER = [
     "embedding_quality",
     "efficiency",
 ];
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeNumber = (value: unknown) => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-};
-
-const getNestedValue = (record: Record<string, unknown>, path: string[]) => {
-    let current: unknown = record;
-    for (const key of path) {
-        if (!isPlainRecord(current)) return null;
-        current = current[key];
-    }
-    return normalizeNumber(current);
-};
-
-const getNodeStatus = (node: unknown) => {
-    if (!isRecord(node)) return "pending";
-    const status = node.status;
-    return typeof status === "string" ? status : "pending";
-};
-
-const getNodeError = (node: unknown) => {
-    if (!isRecord(node)) return null;
-    const error = node.error;
-    if (typeof error === "string") return error;
-    return error ? String(error) : null;
-};
-
-const getNodeOutput = (nodeResults: Record<string, unknown> | null | undefined, nodeId: string) => {
-    if (!nodeResults) return null;
-    const node = nodeResults[nodeId];
-    if (!isRecord(node)) return null;
-    return node.output;
-};
-
-function isPrioritySummary(value: unknown): value is PrioritySummary {
-    if (!isRecord(value)) return false;
-    return Array.isArray(value.bottom_cases) || Array.isArray(value.impact_cases);
-}
 
 function downloadText(filename: string, content: string, type: string) {
     const blob = new Blob([content], { type });
@@ -362,9 +322,12 @@ export function AnalysisResultView() {
                 )}
 
                 {error && (
-                    <div className="p-4 border border-destructive/30 bg-destructive/10 rounded-xl text-destructive flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{error}</span>
+                    <div
+                        role="alert"
+                        className="flex items-start gap-3 rounded-[var(--radius)] border border-destructive/30 bg-destructive/5 p-4 text-sm text-[hsl(var(--destructive))]"
+                    >
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <span className="leading-snug">{error}</span>
                     </div>
                 )}
 

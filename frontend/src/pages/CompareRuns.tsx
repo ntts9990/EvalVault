@@ -30,6 +30,11 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
 import { buildCompareCommand } from "../utils/cliCommandBuilder";
 import { copyTextToClipboard } from "../utils/clipboard";
+// Phase 4 W-S7 follow-up — surface T2 regression-gate authority on the
+// Regressions summary card. Anti-conflation: this comparison's "regression"
+// vocabulary is T2 evaluation-gate evidence, NOT a release-level rollback
+// recommendation. docs/adapter-contract.md §3.5.
+import { AuthorityBadge } from "../design";
 
 export function CompareRuns() {
     const [searchParams] = useSearchParams();
@@ -305,7 +310,13 @@ export function CompareRuns() {
 
                     {/* Regressions Count */}
                     <div className="surface-panel p-6">
-                        <p className="text-sm text-muted-foreground mb-1">Regressions</p>
+                        <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm text-muted-foreground mb-1">Regressions</p>
+                            <AuthorityBadge
+                                level="T2"
+                                verdict={resolvedCounts.regressions > 0 ? "hold" : "eval-pass"}
+                            />
+                        </div>
                         <p className="text-3xl font-bold text-rose-500">
                             {resolvedCounts.regressions}
                         </p>

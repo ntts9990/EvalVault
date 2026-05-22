@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
     CartesianGrid,
     ReferenceLine,
@@ -12,8 +12,10 @@ import {
     ZAxis,
     Cell,
 } from "recharts";
-import { ArrowLeft, Info, UploadCloud, X, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Info, UploadCloud, X, XCircle } from "lucide-react";
 import { Layout } from "../components/Layout";
+// Phase 4 W-S5-follow — Visualization error state migrated onto W-S1 EmptyState.
+import { Button, EmptyState } from "../design";
 import { CHART_METRIC_COLORS } from "../config/ui";
 import {
     fetchClusterMapFile,
@@ -413,6 +415,7 @@ function VisualizationPlot({
 
 export function Visualization() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
     const [data, setData] = useState<RunDetailsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -994,12 +997,17 @@ export function Visualization() {
     if (error || !data || !summary) {
         return (
             <Layout>
-                <div className="flex flex-col items-center justify-center h-[50vh] text-destructive gap-4">
-                    <p className="text-xl font-bold">시각화 로딩 실패</p>
-                    <p>{error || "데이터를 찾을 수 없습니다."}</p>
-                    <Link to="/" className="text-primary hover:underline">
-                        대시보드로 돌아가기
-                    </Link>
+                <div role="alert" className="flex h-[50vh] items-center justify-center">
+                    <EmptyState
+                        icon={<AlertTriangle size={20} className="text-[hsl(var(--destructive))]" />}
+                        title="시각화 로딩 실패"
+                        description={error || "데이터를 찾을 수 없습니다."}
+                        action={
+                            <Button variant="secondary" size="md" onClick={() => navigate("/")}>
+                                대시보드로 돌아가기
+                            </Button>
+                        }
+                    />
                 </div>
             </Layout>
         );
