@@ -3,10 +3,10 @@
 > **문서 성격**: 인수받는 사내 팀이 EvalVault 코드/운영을 이어받기 위해 **가장 먼저 읽는 단일 진입점**.
 > 세부 운영/설계 결정은 `docs/handbook/`에 위임하고, 이 문서는 "지금 무엇이 진실인가"의 SSoT(Single Source of Truth) 역할만 한다.
 >
-> - 기준 버전: **v1.77.0** (PyPI 배포 중)
+> - 기준 버전: **v1.77.0** (PyPI 배포 중 — main 기준)
 > - 기준 브랜치: `main`
 > - 기준 커밋: `bc88726 chore(release): 1.77.0 [skip ci]`
-> - 마지막 검증일: **2026-05-21**
+> - 마지막 검증일: **2026-05-22** (Phase 4 W-S6 / W-S3 / L-S2 / W-S5b 슬라이스 머지 대기 중 — §8.1 참조)
 > - 작성/검증 책임: 인수 시점에 owner를 명시 → **(TBD: 인수팀 리더 이름 박아두기)**
 > - 다음 검증 트리거: 새 minor 릴리스(예: v1.78.0)가 머지되면 이 문서의 §3, §8을 다시 검증
 
@@ -303,7 +303,9 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 - React 19, Vite 7, TypeScript 5.9, Tailwind 4
 - AI SDK (Vercel `ai`, `@ai-sdk/react`)
 - Plotly + Recharts (시각화)
-- Playwright (e2e)
+- Playwright (e2e — 18 specs, 머지 대기 중인 W-S6에서 lucide 1.16 호환 refresh)
+- `lucide-react` 아이콘 (W-S6 머지 후 1.16)
+- 디자인 시스템 (W-S1 머지 후): `frontend/src/design/` — Button, Card, Table, EmptyState, MetricChip, AuthorityBadge primitive + Claude 토큰 (`tokens.css`)
 
 ### 6.3 외부 서비스/도구
 
@@ -407,6 +409,35 @@ uv run pytest tests/ -v
 4. 성능 개선 주장에 실험 프레임이 필요한가? → P3
 5. 공유/운영 효율을 크게 올리는가? → P4
 
+### 8.1 머지 대기 중인 슬라이스 (2026-05-22 기준)
+
+> 메인(main, `bc88726`)에 아직 머지되지 않은 feature 브랜치 진행 상황. 각 브랜치는 자체 build / Playwright / unit-test 검증을 통과하고 origin에 푸시되어 있음.
+
+**Phase 4 — Web frontend overhaul** (Claude 디자인 시스템 surgical 마이그레이션):
+
+| 슬라이스 | 브랜치 | 커밋 | 적용 영역 |
+|---|---|---|---|
+| W-S1 design system | `refactor/w-s1-design-system` | — | Button, Card, Table, EmptyState, MetricChip, AuthorityBadge 6 primitive 추가 |
+| W-S2 ~ W-S5 | `refactor/w-s2-*` … `refactor/w-s5-secondary-pages` | (누적) | Dashboard, EvaluationStudio, AnalysisLab, RunDetails, CompareRuns, AiSdkChat, JudgeCalibration, KnowledgeBase, VisualizationHome, CustomerReport 토큰화 |
+| W-S6 lucide bump + e2e | `refactor/w-s6-playwright-lucide-bump` | `6220202` | lucide-react 0.562 → 1.16, Playwright 18/18, 3개 dead-import 정리 |
+| W-S3 Analysis 통합 plan | `refactor/w-s3-analysis-consolidation` | `853c8c1` | `docs/guides/W-S3-ANALYSIS-CONSOLIDATION.md` plan + 2개 페이지 surgical |
+| W-S5b Settings | `refactor/w-s5b-settings-migration` | `78464fd` | Settings.tsx 에러/버튼 design primitive 적용 |
+
+**Phase 3.5 — 의존성 라인 업데이트:**
+
+| 슬라이스 | 브랜치 | 커밋 | 변경 |
+|---|---|---|---|
+| L-S0 / L-S1 / L-S2i | (누적, 일부는 main에 머지됨) | — | Anthropic 0.34→0.43, mkdocstrings 0→1.0.4 등 |
+| L-S2 LLM 클러스터 | `refactor/l-s2-llm-cluster-bump` | `88739ab` | openai 1.40→2.38, instructor 1.4→1.15, langchain-openai 0.2→1.2 |
+
+**알아야 할 것**:
+
+- 모든 위 슬라이스는 origin에 푸시되어 있고 머지/리뷰 대기.
+- L-S2는 `src/` diff 0줄 (LLM 프롬프트 byte-identical 보존, [[feedback_llm_prompt_discipline]] 원칙 준수).
+- rich 15+ bump은 instructor 1.15 metadata가 rich<15를 강제하여 deferred (US-008 트래킹).
+- T0-T4 권한 hierarchy 준수: T2 cap, T3 (promote/rollback) 문자열 신규 도입 0건.
+- 회귀 anti-target 비변경 (`regression_gate_service.py`, `regression_baseline.json`, `regression-gate.yml`, `domain/metrics/*`).
+
 ---
 
 ## 9. 알려진 갭 / 리스크 (Known Gaps)
@@ -436,6 +467,8 @@ uv run pytest tests/ -v
 - **OpenAI 비용/레이트리밋**: 기본 judge가 `gpt-5-mini`라 평가 횟수 늘면 비용 폭증 가능. 프로필로 ollama/vllm으로 옮기는 시나리오 준비 필요.
 - **Ragas v0.4.2 pin**: ragas major bump이 일어나면 RagasEvaluator를 손봐야 함. 자동 dependency bump 정책 확인 필요.
 - **`matplotlib<3.9.0`** 핀 — manim/scikit-learn 호환 때문일 가능성. 무심코 풀면 OS별 빌드가 깨질 수 있음.
+- **LLM 클러스터 transitive coupling** (L-S2에서 확인): `openai` / `instructor` / `langchain-openai` / `rich`가 서로 metadata 캡으로 묶여 있어, 한 패키지만 bump 시도하면 다른 패키지가 backwards로 강제됨. 머지 대기 중인 L-S2가 openai 2.x / instructor 1.15 / langchain-openai 1.2를 같이 올렸고, rich 15는 instructor 1.15 metadata 캡(`rich<15.0`)에 막혀 별도 follow-up. 추후 single-package bump 제안 들어오면 transitive 검증 먼저 할 것.
+- **manim → pycairo → Cairo 시스템 라이브러리**: `uv sync --extra dev`가 `pycairo` 빌드 단계에서 `pkg-config`/`cairo` 부재 시 실패. 인수 머신에서 `brew install pkg-config cairo` (macOS) 또는 패키지 매니저 등가물 사전 설치 필요. dev extras 슬림화 검토 가치 있음.
 
 ### 9.5 도메인 의존 리스크
 
