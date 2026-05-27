@@ -1686,6 +1686,12 @@ def register_run_commands(
             raise typer.Exit(2) from exc
 
         phoenix_dataset_name = phoenix_dataset
+        # Did the user *explicitly* opt into Phoenix sync (via --phoenix-dataset
+        # / --phoenix-experiment), or is it merely auto-derived from the default
+        # mlflow+phoenix tracker? Auto-derived sync is best-effort (open-circuit,
+        # A-S3): an unreachable Phoenix must not fail an otherwise-successful
+        # evaluation. Only explicit requests fail loudly.
+        phoenix_sync_explicit = phoenix_dataset is not None or phoenix_experiment is not None
         if phoenix_experiment and not phoenix_dataset_name:
             phoenix_dataset_name = f"{ds.name}:{ds.version}"
 
@@ -1712,7 +1718,7 @@ def register_run_commands(
                     api_token=getattr(settings, "phoenix_api_token", None),
                 )
             except PhoenixSyncError as exc:
-                if auto_phoenix_sync:
+                if phoenix_sync_explicit:
                     print_cli_error(
                         console,
                         "Phoenix Sync 서비스를 초기화할 수 없습니다.",
@@ -2152,7 +2158,7 @@ def register_run_commands(
                     )
                     console.print(f"[dim]View datasets: {dataset_info.url}[/dim]")
                 except PhoenixSyncError as exc:
-                    if auto_phoenix_sync:
+                    if phoenix_sync_explicit:
                         print_cli_error(
                             console,
                             "Phoenix Dataset 업로드에 실패했습니다.",
@@ -2168,7 +2174,7 @@ def register_run_commands(
                 phoenix_experiment = f"{result.model_name}-{result.run_id[:8]}"
             if phoenix_experiment:
                 if not phoenix_dataset_result:
-                    if auto_phoenix_sync:
+                    if phoenix_sync_explicit:
                         print_cli_error(
                             console,
                             "Dataset 업로드에 실패해 Phoenix Experiment 생성을 진행할 수 없습니다.",
