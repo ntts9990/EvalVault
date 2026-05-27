@@ -11,7 +11,11 @@ versions, reach out before disclosing sensitive details publicly.
 
 ## Reporting a Vulnerability
 
-- Email `security@evalvault.dev` with the subject line `SECURITY REPORT`.
+**Preferred:** open a private report via GitHub Security Advisories —
+[Report a vulnerability](https://github.com/ntts9990/EvalVault/security/advisories/new).
+This keeps the report confidential and tracked. (Alternatively, email
+`security@evalvault.dev` with the subject line `SECURITY REPORT`.)
+
 - Include detailed reproduction steps, logs, and affected commit/tag hashes.
 - If possible, suggest mitigations or a failing test case.
 - Allow us at least **14 days** to investigate before disclosing publicly.
