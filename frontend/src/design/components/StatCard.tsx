@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
 
 /**
- * Phase 4 "Data-Dense Pro × Warm" StatCard — instrument-panel KPI tile.
+ * Phase 4 "Data-Dense Pro, Neutral-Cool Dark" StatCard.
  *
- * Tighter than the editorial build: p-4 not p-5, value at 1.75rem not 2rem,
- * smaller gap, mono label kicker in ALL CAPS tracking. The hero card gets a
- * restrained clay wash; the dark-ink CTA foreground rule applies here too
- * (icon on hero uses bg-primary/15 + text-primary, never cream-on-clay).
- *
- * Numbers are instruments: value always renders in JetBrains Mono tabular-nums.
- * Authority hint tags evidence level (T1/T2) — NOT a verdict.
+ * Compact KPI tile for the left rail instrument panel.
+ * - p-3 padding: tighter than before — fits more KPIs in a vertical rail
+ * - value at 1.5rem: rail-appropriate, not hero-oversized
+ * - label: mono 9px ALL CAPS kicker
+ * - hero tone: restrained indigo wash (8% opacity), no bloom
+ * - Numbers always JetBrains Mono tabular-nums — instruments
+ * - Authority tag: honest evidence level, NOT verdict
  */
 
 export type StatTone = "default" | "hero";
@@ -57,12 +57,11 @@ export function StatCard({
 }: StatCardProps) {
     const isHero = tone === "hero";
     const containerCls = [
-        // Tighter padding + radius for instrument-panel density
-        "group relative flex flex-col gap-2.5 overflow-hidden rounded-[var(--radius)] border p-4",
-        "transition-transform duration-[var(--duration-base)] hover:-translate-y-px",
+        "group relative flex flex-col gap-2 overflow-hidden rounded-[var(--radius)] border p-3",
+        "transition-colors duration-[var(--duration-base)]",
         isHero
-            ? "border-primary/25 bg-[hsl(var(--primary)/0.08)]"
-            : "border-border bg-card",
+            ? "border-primary/30 bg-[hsl(var(--primary)/0.08)] hover:bg-[hsl(var(--primary)/0.12)]"
+            : "border-border bg-card hover:bg-secondary/60",
         className,
     ]
         .filter(Boolean)
@@ -70,35 +69,27 @@ export function StatCard({
 
     return (
         <div className={containerCls} style={{ boxShadow: "var(--shadow-card)" }}>
-            {/* Clay glow bloom — hero card only, subtle instrument accent */}
-            {isHero && (
-                <span
-                    aria-hidden
-                    className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/12 blur-xl"
-                />
-            )}
-
             {/* Label row */}
-            <div className="relative flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
                     {icon && (
                         <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] ${
+                            className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius-sm)] ${
                                 isHero
-                                    ? "bg-primary/15 text-primary"
+                                    ? "bg-primary/20 text-primary"
                                     : "bg-muted text-muted-foreground"
                             }`}
                         >
                             {icon}
                         </span>
                     )}
-                    <span className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+                    <span className="font-mono text-[9px] font-medium uppercase tracking-[0.15em] text-muted-foreground truncate">
                         {label}
                     </span>
                 </div>
                 {authority && (
                     <span
-                        className="rounded-[var(--radius-sm)] border border-border/60 px-1 py-px font-mono text-[9px] font-medium text-muted-foreground/70"
+                        className="shrink-0 rounded-[var(--radius-sm)] border border-border/50 px-1 py-px font-mono text-[8px] font-medium text-muted-foreground/60"
                         title={`Authority: ${authority} (${AUTHORITY_LABEL[authority]})`}
                     >
                         {authority}
@@ -106,31 +97,33 @@ export function StatCard({
                 )}
             </div>
 
-            {/* Value + delta */}
-            <div className="relative flex items-baseline justify-between gap-2">
-                <span className="font-mono text-[1.75rem] font-semibold leading-none tabular-nums text-foreground">
-                    {value}
-                </span>
-                {delta != null && delta !== "" && (
-                    <span
-                        className={`font-mono text-[11px] font-medium tabular-nums ${deltaColor(
-                            deltaDirection,
-                            deltaIsPositiveGood,
-                        )}`}
-                    >
-                        {delta}
-                    </span>
-                )}
-            </div>
+            {/* Value */}
+            <span
+                className={`font-mono font-semibold leading-none tabular-nums text-foreground ${
+                    isHero ? "text-[1.5rem]" : "text-[1.25rem]"
+                }`}
+            >
+                {value}
+            </span>
 
-            {/* Sparkline slot — compact 28px height for density */}
-            {spark && <div className="relative h-7 w-full">{spark}</div>}
+            {/* Delta */}
+            {delta != null && delta !== "" && (
+                <span
+                    className={`font-mono text-[10px] font-medium tabular-nums ${deltaColor(
+                        deltaDirection,
+                        deltaIsPositiveGood,
+                    )}`}
+                >
+                    {delta}
+                </span>
+            )}
+
+            {/* Sparkline slot */}
+            {spark && <div className="h-6 w-full">{spark}</div>}
 
             {/* Caption */}
             {caption && (
-                <span className="relative font-mono text-[10px] text-muted-foreground/70">
-                    {caption}
-                </span>
+                <span className="font-mono text-[9px] text-muted-foreground/60">{caption}</span>
             )}
         </div>
     );

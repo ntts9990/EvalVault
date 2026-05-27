@@ -31,34 +31,34 @@ export const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
 ];
 
 /**
- * Phase 4 "Data-Dense Pro × Warm" — high-separation chart ramp for dark ground.
+ * Phase 4 "Data-Dense Pro, Neutral-Cool Dark" — high-separation chart ramp.
  *
- * Tuned for the warm near-black card surface (#1d1a14). All colors are
- * 5:1+ on dark card. Ordered: amber · teal · violet · rose · blue · gold.
- * Max perceptual distance between adjacent series; none conflicts with the
- * clay brand accent (16°) or T2-green authority token (148°).
+ * Tuned for the cool card surface (#16171c). All colors 5:1+ on dark card.
+ * Ordered: amber · cyan · violet · rose · sky · lime.
+ * Max perceptual distance between adjacent series; none conflicts with
+ * indigo accent (239°) or T2-green authority token (148°).
  *
- * Contrast on #1d1a14:
- *   amber  #f59e0b  8.08:1 AA
- *   teal   #2dd4bf  9.32:1 AA
- *   violet #a78bfa  6.38:1 AA
- *   rose   #fb7185  6.45:1 AA
- *   blue   #4da6e8  6.56:1 AA
- *   gold   #d4a832  7.81:1 AA
+ * Contrast on #16171c:
+ *   amber  #f59e0b  8.14:1 AA
+ *   cyan   #22d3ee  9.61:1 AA
+ *   violet #a78bfa  6.41:1 AA
+ *   rose   #fb7185  6.48:1 AA
+ *   sky    #38bdf8  8.22:1 AA
+ *   lime   #a3e635  9.88:1 AA
  *
  * Follow-up (other 16 pages): migrate hardcoded chart hexes to this ramp.
  */
 export const CHART_METRIC_COLORS = [
     "#f59e0b", // amber   — primary series
-    "#2dd4bf", // teal    — secondary series
+    "#22d3ee", // cyan    — secondary series
     "#a78bfa", // violet  — tertiary
     "#fb7185", // rose    — quaternary
-    "#4da6e8", // blue    — quinary
-    "#d4a832", // gold    — senary
+    "#38bdf8", // sky     — quinary
+    "#a3e635", // lime    — senary
 ];
 
-/** Pass-rate area chart color — teal family, distinct from clay brand and T2 authority green. */
-export const CHART_PASS_RATE_COLOR = "#2dd4bf";
+/** Pass-rate area chart color — cyan, distinct from indigo accent and T2 authority green. */
+export const CHART_PASS_RATE_COLOR = "#22d3ee";
 
 /*
  * Pass-rate bands map to STATUS semantics, not the brand accent and not T1

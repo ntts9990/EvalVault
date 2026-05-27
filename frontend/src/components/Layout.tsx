@@ -34,45 +34,54 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="min-h-screen bg-background text-foreground font-sans relative">
-            {/* Dark-ground instrument panel: single faint clay bloom, no light washes */}
+            {/* Subtle indigo bloom — cool, not warm */}
             <div className="pointer-events-none fixed inset-0 overflow-hidden">
-                <div className="absolute -top-40 left-0 h-80 w-80 rounded-full bg-primary/6 blur-3xl" />
-                <div className="absolute bottom-0 right-0 h-60 w-60 rounded-full bg-primary/4 blur-3xl" />
+                <div className="absolute -top-32 right-0 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
             </div>
 
             <div className="flex min-h-screen relative">
-                {/* Sidebar — dark card surface, slightly lighter than the ground */}
+                {/* Sidebar — cool card surface */}
                 <aside
                     className={`${
-                        isSidebarOpen ? "w-56" : "w-14"
+                        isSidebarOpen ? "w-52" : "w-12"
                     } bg-card border-r border-border transition-all duration-[var(--duration-slow)] flex flex-col fixed h-full z-20`}
                 >
                     {/* Logo lockup */}
-                    <div className="h-12 flex items-center px-4 border-b border-border shrink-0">
+                    <div className="h-11 flex items-center px-3 border-b border-border shrink-0">
                         <div
-                            className="w-7 h-7 rounded-[var(--radius)] bg-primary flex items-center justify-center shrink-0"
-                            style={{ boxShadow: "0 0 12px hsl(var(--primary)/0.35)" }}
+                            className="w-6 h-6 rounded-[var(--radius)] bg-primary flex items-center justify-center shrink-0"
+                            style={{ boxShadow: "0 0 10px hsl(var(--primary)/0.4)" }}
                         >
-                            {/* Dark ink on clay — not cream (cream fails WCAG on clay) */}
-                            <span className="text-[hsl(30_26%_7%)] font-display font-bold text-sm select-none">E</span>
+                            <span className="text-primary-foreground font-display font-bold text-xs select-none">E</span>
                         </div>
                         {isSidebarOpen && (
-                            <span className="ml-2.5 font-display font-semibold text-base text-foreground tracking-tight">
+                            <span className="ml-2 font-display font-semibold text-sm text-foreground tracking-tight">
                                 EvalVault
                             </span>
                         )}
-                        <button
-                            onClick={() => setIsSidebarOpen(false)}
-                            className="ml-auto lg:hidden p-1 hover:bg-secondary rounded-[var(--radius-sm)]"
-                            aria-label="Close sidebar"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
+                        {isSidebarOpen && (
+                            <button
+                                onClick={() => setIsSidebarOpen(false)}
+                                className="ml-auto p-1 hover:bg-secondary rounded-[var(--radius-sm)] text-muted-foreground hover:text-foreground"
+                                aria-label="Collapse sidebar"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        {!isSidebarOpen && (
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="ml-auto p-1 hover:bg-secondary rounded-[var(--radius-sm)] text-muted-foreground hover:text-foreground hidden lg:flex"
+                                aria-label="Expand sidebar"
+                            >
+                                <Menu className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
 
-                    <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+                    <nav className="flex-1 px-1.5 py-2 space-y-px overflow-y-auto">
                         {isSidebarOpen && (
-                            <p className="px-3 pt-3 pb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/60">
+                            <p className="px-2 pt-2 pb-1 font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/50">
                                 Workspace
                             </p>
                         )}
@@ -89,15 +98,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     aria-current={isActive ? "page" : undefined}
                                     title={!isSidebarOpen ? item.label : undefined}
                                     className={`
-                                        relative flex items-center px-3 py-2 rounded-[var(--radius)]
-                                        text-sm transition-colors group
+                                        relative flex items-center px-2 py-1.5 rounded-[var(--radius)]
+                                        text-xs transition-colors group
                                         ${isActive
-                                            ? "bg-secondary/80 text-foreground"
-                                            : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                                            ? "bg-primary/10 text-foreground"
+                                            : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                                         }
                                     `}
                                 >
-                                    {/* Clay left-border for active item — instrument panel style */}
+                                    {/* Indigo left-border for active item */}
                                     {isActive && (
                                         <span
                                             aria-hidden
@@ -105,14 +114,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                         />
                                     )}
                                     <item.icon
-                                        className={`shrink-0 w-4 h-4 ${
+                                        className={`shrink-0 w-3.5 h-3.5 ${
                                             isActive
                                                 ? "text-primary"
                                                 : "text-muted-foreground group-hover:text-foreground"
                                         }`}
                                     />
                                     {isSidebarOpen && (
-                                        <span className="ml-2.5 font-medium truncate">{item.label}</span>
+                                        <span className="ml-2 font-medium truncate">{item.label}</span>
                                     )}
                                 </Link>
                             );
@@ -120,15 +129,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </nav>
 
                     {/* User profile footer */}
-                    <div className="p-3 border-t border-border/40 shrink-0">
-                        <div className={`flex items-center ${isSidebarOpen ? "gap-2.5" : "justify-center"}`}>
-                            <div className="w-7 h-7 rounded-[var(--radius-sm)] bg-secondary flex items-center justify-center font-mono text-[10px] font-bold text-muted-foreground shrink-0">
+                    <div className="p-2 border-t border-border/40 shrink-0">
+                        <div className={`flex items-center ${isSidebarOpen ? "gap-2" : "justify-center"}`}>
+                            <div className="w-6 h-6 rounded-[var(--radius-sm)] bg-secondary flex items-center justify-center font-mono text-[9px] font-bold text-muted-foreground shrink-0">
                                 JS
                             </div>
                             {isSidebarOpen && (
                                 <div className="min-w-0">
                                     <p className="text-xs font-medium truncate text-foreground">John Smith</p>
-                                    <p className="font-mono text-[10px] text-muted-foreground truncate">john@example.com</p>
+                                    <p className="font-mono text-[9px] text-muted-foreground truncate">john@example.com</p>
                                 </div>
                             )}
                         </div>
@@ -138,32 +147,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {/* Main content area */}
                 <div
                     className={`flex-1 flex flex-col min-w-0 relative transition-all duration-[var(--duration-slow)] ${
-                        isSidebarOpen ? "ml-56" : "ml-14"
+                        isSidebarOpen ? "ml-52" : "ml-12"
                     }`}
                 >
                     {/* Mobile header */}
-                    <header className="lg:hidden h-12 flex items-center px-4 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-40">
+                    <header className="lg:hidden h-11 flex items-center px-4 border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-40">
                         <button
                             onClick={() => setIsSidebarOpen(true)}
                             aria-label="Open sidebar"
                         >
-                            <Menu className="w-5 h-5" />
+                            <Menu className="w-4 h-4" />
                         </button>
                         <span className="ml-3 font-display font-semibold text-sm">EvalVault</span>
                     </header>
 
-                    {/* Desktop topbar — slim breadcrumb strip */}
-                    <header className="hidden lg:flex h-11 items-center justify-between px-6 border-b border-border/50 bg-background/70 backdrop-blur-sm sticky top-0 z-40">
-                        <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                            <span className="text-foreground/70">workspace</span>
-                            <span className="text-border">/</span>
+                    {/* Desktop topbar — slim command strip */}
+                    <header className="hidden lg:flex h-10 items-center justify-between px-5 border-b border-border/60 bg-background/80 backdrop-blur-sm sticky top-0 z-40">
+                        <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+                            <span className="text-foreground/60">workspace</span>
+                            <span className="text-border mx-0.5">/</span>
                             <span className="text-foreground">
-                                {navItems.find(i => i.href === location.pathname)?.label ?? "—"}
+                                {navItems.find(i =>
+                                    i.href === "/"
+                                        ? location.pathname === "/"
+                                        : location.pathname.startsWith(i.href)
+                                )?.label ?? "—"}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[9px] text-muted-foreground/50 uppercase tracking-[0.2em]">
+                                v1.78.0
                             </span>
                         </div>
                     </header>
 
-                    <main className="flex-1 overflow-y-auto p-4 lg:p-6 scroll-smooth">
+                    <main className="flex-1 overflow-y-auto scroll-smooth">
                         {children}
                     </main>
                 </div>

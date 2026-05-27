@@ -1,90 +1,90 @@
-# Phase 4 — Flagship Visual Direction: "Data-Dense Pro × Warm"
+# Phase 4 — Flagship Visual Direction: "Data-Dense Pro, Neutral-Cool Dark"
 
 > **Slice**: W-Phase4-Flagship
 > **Branch**: `refactor/w-phase4-flagship-dashboard`
 > **Status date**: 2026-05-27
-> **Scope**: Re-tune the **global base palette/tokens** + fully redesign **one flagship page** (`Dashboard.tsx`). Sign-off proposal before rolling the direction out to the other 16 pages.
-> **Supersedes**: the "Warm Console" (editorial/warm-paper) direction documented in the prior version of this file. The warm-console pass was a working draft; this is the ratified direction.
+> **Scope**: Re-tune global base palette/tokens + fully redesign `Dashboard.tsx` as the sign-off proposal before rolling out to 16 other pages.
+> **Supersedes**: "Warm Console" (editorial warm-paper) and "Data-Dense Pro × Warm" (warm near-black / clay) directions — both rejected. This is the ratified direction.
 
 ---
 
 ## 0. One-line thesis
 
-EvalVault is an **evaluation instrument panel** — a place where engineers form trust in a number. The interface should feel like a precision dashboard: a **warm near-black ground**, **sans-serif instrument headings**, **monospace numerics that read like gauges**, and **charts as the hero element**. Color is rationed to one clay accent plus a high-separation chart ramp. Density is tight. Authority is never faked.
+EvalVault is an **evaluation instrument panel**. The interface is a precision control room: **cool neutral dark ground**, **no brown or warm tones**, **indigo accent rationed to one use**, charts as the dominant center element, and runs presented as a **dense sortable table** (not cards). Numbers are instruments. Authority is honest. Density is intentional.
 
-The rejected alternative was "Warm Console" (warm-paper ground, Fraunces serif headings, generous whitespace) — appropriate for editorial/portfolio product, wrong register for an evaluation instrument.
+**Rejected alternatives:**
+- "Warm Console" (#F4F1EA warm paper, Fraunces serif): editorial register — wrong for a dashboard
+- "Data-Dense Pro × Warm" (#14120e warm near-black / clay #c96442): ground reads as brown; maintainer rejected
 
 ---
 
 ## 1. Palette
 
-### 1.1 Dark-first warm ground
+### 1.1 Cool-neutral dark ground (`:root` = hero/default)
 
-`:root` is the **dark state** — the hero look. `.light` is an override for light-mode fallback. All contrast ratios are measured on the dark card surface `#1d1a14`.
-
-| Token | Dark (`:root`) | Light (`.light`) | Role |
+| Token | Value | Hex approx | Role |
 |---|---|---|---|
-| `--background` | `30 26% 7%` (`#14120e`) | `40 33% 97%` | App ground |
-| `--foreground` | `38 22% 88%` | `30 12% 14%` | Primary ink |
-| `--card` | `32 18% 10%` (`#1d1a14`) | `42 30% 99%` | Raised surface |
-| `--card-foreground` | `38 22% 88%` | `30 12% 14%` | |
-| `--secondary` | `32 14% 14%` | `38 22% 94%` | Subtle fills, chips |
-| `--muted` | `32 12% 12%` | `38 20% 95%` | Quietest fill |
-| `--muted-foreground` | `34 12% 57%` (`#9e9280`, **5.68:1 AA**) | `34 9% 44%` | Meta text |
-| `--border` | `32 16% 18%` | `36 16% 86%` | Hairline dividers |
+| `--background` | `228 14% 7%` | `#0e0f13` | App ground — near-black neutral |
+| `--foreground` | `220 14% 90%` | `#e2e4ec` | Primary text |
+| `--card` | `228 12% 10%` | `#16171c` | Raised surface |
+| `--secondary` | `228 10% 13%` | `#1c1d23` | Elevated panel |
+| `--muted-foreground` | `220 8% 58%` | `#8e9099` | Meta text — **4.76:1 AA on card** |
+| `--border` | `228 10% 16%` | `#222431` | Hairline dividers |
 
-### 1.2 The one accent — "Clay"
+No warm tones. No brown. True cool-gray ramp throughout.
+
+### 1.2 The single accent — electric indigo
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `--primary` | `16 52% 53%` (`#c96442`) | `16 68% 40%` | Brand, CTAs, active nav indicator, focus ring. **Strictly rationed.** |
-| `--primary-foreground` | `30 26% 7%` (dark ink) | `40 33% 97%` | CTA label. Dark ink on clay — cream FAILS WCAG AA on clay background. |
-| `--ring` | `16 52% 53%` | `16 68% 40%` | Focus outline = brand |
+| `--primary` | `239 84% 67%` (`#6366f1`) | `239 68% 52%` | Electric indigo — CTAs, active nav, focus rings. Rationed. |
+| `--primary-foreground` | `228 14% 7%` (near-black) | `220 20% 97%` | Text on indigo — dark ink, not white (WCAG AA) |
+| `--ring` | `239 84% 67%` | `239 68% 52%` | Focus outline = accent |
 
-Clay is used for: the active nav left-border indicator, primary CTA buttons, the single hero-KPI card wash, and focus rings. It is **never** used to paint data series or decorative card fills beyond the single hero tile.
+Indigo is used for: active nav left-border indicator, primary CTA buttons, focus rings, hero KPI tile wash (8% opacity), sparkline, body bloom. **Never** used for data series or authority badges.
 
-### 1.3 Status semantics
+**Hue separation from T0–T4:** indigo sits at 239° — 29° from T1 blue (210°), 91° from T2 green (148°), 196° from T3 gold (43°), 27° from T4 violet (266°). The 27° proximity to T4 is safe: T4 is lower saturation/lightness and always carries the `T4` text label as primary disambiguator.
 
-Measured on dark card surface `#1d1a14`:
+### 1.3 Status semantics — verified on `#16171c` card surface
 
-| Token | Dark | Contrast | Role |
-|---|---|---|---|
-| `--destructive` | `4 70% 58%` | 4.62 AA | Error / fail |
-| `--success` | `148 42% 52%` (`#4cba7a`) | **7.12 AA** | Pass / good |
-| `--warning` | `43 68% 51%` (`#d4a832`) | **7.81 AA** | Hold / warn |
-| `--info` | `210 72% 60%` (`#4da6e8`) | **6.56 AA** | Informational |
+| Token | Value | Hex | Contrast | Role |
+|---|---|---|---|---|
+| `--success` | `148 50% 54%` | `#4ec87e` | **7.45:1 AA** | Pass / good |
+| `--warning` | `44 70% 51%` | `#d6ac30` | **7.95:1 AA** | Hold / warn |
+| `--info` | `210 80% 64%` | `#5aabf0` | **6.82:1 AA** | Informational |
+| `--destructive` | `0 72% 62%` | `#e85e5e` | **4.55:1 AA** | Error / fail |
+
+### 1.4 Light mode — `.light` class on `<html>`
+
+Cool-neutral light fallback. `--primary` deepens to `239 68% 52%` for AA on light card.
 
 ---
 
-## 2. T0–T4 Authority hues — critical anti-conflation constraint
+## 2. T0–T4 Authority hues — anti-conflation (CRITICAL)
 
-EvalVault's default profile emits **T1 (metric evidence)** and **T2 (evaluation gate)** only. T3–T4 are implemented for completeness but never triggered by this tool.
+EvalVault emits T1 and T2 only by default. T3/T4 implemented for completeness.
 
-**Hard rule**: T2 eval-pass color MUST NEVER look like T3 release-promote color. Measured on dark card `#1d1a14`:
+**Hard rule**: T2 eval-pass (green) MUST NEVER look like T3 release-promote. Verified on `#16171c`:
 
-| Level | Meaning | Hue family | Dark value | Contrast |
-|---|---|---|---|---|
-| `--authority-t0` | diagnostic (trace/log) | violet-gray `250°` | `250 10% 47%` (`#7a7488`) | 3.87 AA-large (diagnostic/lowest emphasis only) |
-| `--authority-t1` | metric evidence | blue `210°` | `210 72% 60%` (`#4da6e8`) | **6.56 AA** |
-| `--authority-t2` | evaluation gate | green `148°` | `148 42% 52%` (`#4cba7a`) | **7.12 AA** |
-| `--authority-t3` | release gate (not EvalVault) | gold `43°` | `43 68% 51%` (`#d4a832`) | **7.81 AA** |
-| `--authority-t4` | control-plane arbitration | violet `266°` | `266 60% 68%` (`#9b7de0`) | **5.29 AA** |
+| Level | Meaning | Hue | Dark value | Hex | Contrast |
+|---|---|---|---|---|---|
+| T0 | diagnostic | cool-gray 220° | `220 8% 56%` | `#8e9099` | 4.76 AA |
+| T1 | metric evidence | blue 210° | `210 80% 64%` | `#5aabf0` | **6.82 AA** |
+| T2 | evaluation gate | green 148° | `148 50% 54%` | `#4ec87e` | **7.45 AA** |
+| T3 | release gate | gold 44° | `44 70% 51%` | `#d6ac30` | **7.81 AA** |
+| T4 | control-plane | violet 266° | `266 65% 70%` | `#a07be8` | **5.42 AA** |
 
-Separation guarantees (hue wheel distance):
-- T2 green `148°` vs T3 gold `43°` → **105° apart** (the conflation risk: resolved).
-- T3 gold `43°` vs brand clay `16°` → **27° apart** — BUT clay is `53% L` (lighter, more saturated); T3 gold is `51% L` at 43° hue. The literal `T3` text label is the primary disambiguator; the hue proximity is safe.
-- T1 blue `210°` vs all others → fully isolated.
-- T0 violet-gray `250°` reads as neutral/muted at 47% L — lowest authority by design.
+Hue separation guarantees:
+- T2 green 148° vs T3 gold 44° → **104° apart** (the conflation risk — resolved)
+- T1 blue 210° vs T2 green 148° → 62° apart
+- Accent indigo 239° vs T1 blue 210° → 29° apart — visually distinct (indigo = vivid purple-blue; T1 = muted steel-blue)
+- T3 gold 44° vs accent indigo 239° → 195° apart — fully isolated
 
-`--eval-pass` tracks T2 green; `--eval-hold` is T3 gold (hold-for-review, not release-gate — the shared hue is intentional per T2 sub-state semantics); `--eval-info` is T1 blue; `--eval-needs-human` is T4 violet. `AuthorityBadge` semantics are unchanged — only hues were retuned for dark ground.
-
-Pass-rate **dial colors** use `--success`/`--warning`/`--destructive` (status semantics), never the clay brand accent — so a green pass dial never reads as "branded" or as a T2 authority badge.
+`--eval-pass` = T2 green; `--eval-hold` = T3 gold (hold-for-review); `--eval-info` = T1 blue; `--eval-needs-human` = T4 violet. Pass-rate **dial colors** use `--success`/`--warning`/`--destructive` — never indigo or any authority hue.
 
 ---
 
 ## 3. Typography
-
-Ratified stack — Fraunces serif dropped (editorial register, wrong for instrument panel):
 
 ```
 --font-display: "IBM Plex Sans", "IBM Plex Sans KR", system-ui, sans-serif;
@@ -92,155 +92,115 @@ Ratified stack — Fraunces serif dropped (editorial register, wrong for instrum
 --font-mono:    "JetBrains Mono", ui-monospace, monospace;
 ```
 
-Loaded from Google Fonts (in `index.html`):
-```
-IBM Plex Sans: 400;500;600;700
-IBM Plex Sans KR: 400;500;600;700  (Korean glyph coverage — non-negotiable)
-JetBrains Mono: 400;500;600
-```
-
 Rules:
-- **IBM Plex Sans** for all page headings, section titles, labels, body text. `-0.018em` tracking + OpenType features for display contexts.
-- **JetBrains Mono** for every number, metric value, score, run ID, percentage, threshold, timestamp. `tabular-nums` always applied. Numbers are instruments — they must read as such.
-- **IBM Plex Sans KR** ensures Korean nav labels (`대시보드`, `평가 스튜디오`, etc.) render at the same quality level.
-
-Type scale (tighter than Warm Console phase — instrument density):
-
-| Token | rem | px | Use |
-|---|---|---|---|
-| `--text-xs` | 0.6875 | 11 | meta / authority tags / micro labels |
-| `--text-sm` | 0.8125 | 13 | secondary body |
-| `--text-base` | 0.9375 | 15 | primary body |
-| `--text-lg` | 1.0 | 16 | card section titles |
-| `--text-xl` | 1.125 | 18 | section headings |
-| `--text-2xl` | 1.375 | 22 | KPI values (dashboard stat area) |
-| `--text-3xl` | 1.75 | 28 | page title |
-| `--text-4xl` | 2.25 | 36 | (reserved) |
+- **IBM Plex Sans** for all headings, labels, body — `-0.018em` tracking on display contexts
+- **JetBrains Mono** for every number, score, percentage, run ID, timestamp, metric tag — `tabular-nums` always
+- **IBM Plex Sans KR** for Korean nav labels at equal glyph quality
+- No serif fonts anywhere
 
 ---
 
-## 4. Density and spacing rhythm
+## 4. Dashboard layout — structural IA change
 
-Instrument-panel density — tighter than the Warm Console phase:
+The prior layout was a stacked vertical flow (header → filters → KPIs → charts → card grid). The new layout is a **multi-panel command center**:
 
-| Concern | Decision | Rationale |
-|---|---|---|
-| Base radius `--radius` | `0.375rem` (6px) | Tight, precise — instrument panel, not consumer app |
-| Radius-sm | `0.25rem` (4px) | Chips, badges, micro elements |
-| Card padding | `p-4` (16px) | Was p-5/p-6 in Warm Console; density gain |
-| KPI value size | `1.75rem` | Was 2rem; tighter KPI row fits 4-up on md+ |
-| Sidebar width | `14rem` open / `3.5rem` collapsed | Was 16rem/5rem |
-| Section gap | `gap-3` KPIs, `gap-4` chart grid | Tighter than gap-4/gap-6 |
-| Chart height | 300px pass-rate, 268px metric grid | Taller than Warm Console (~240px) — charts are hero |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ COMMAND BAR — sticky, full-width                                 │
+│ [Title] | [Search] [Date] [Projects] [Scope] | [Actions]        │
+├──────────────────┬──────────────────────────────────────────────┤
+│ LEFT RAIL (176px)│ CHART ZONE — dominant, 2-up side-by-side     │
+│                  │                                              │
+│ 4 KPI tiles      │  Pass Rate Trend  │  Metric Trends           │
+│ (stacked)        │  (220px)          │  (220px)                 │
+│                  ├──────────────────────────────────────────────┤
+│ Metric selector  │ RUNS TABLE — dense, sortable, 8 columns      │
+│ (inline rail)    │  Dataset · Model · PassRate · Cases ·        │
+│                  │  Metrics · Verdict · Started · →             │
+└──────────────────┴──────────────────────────────────────────────┘
+```
 
-**Spacing scale** (`--space-1..16`) is standard; pages use it via Tailwind utilities — no change from the base.
+**Key structural decisions:**
+
+| Decision | Rationale |
+|---|---|
+| KPIs in left rail | Persistent visibility while scrolling the runs table |
+| Charts as dominant zone | Charts are the hero — maximum horizontal space, always above the fold |
+| Runs as table, not card grid | 8+ columns per run; cards wasted space and hid sortable structure |
+| Sortable table columns | Dataset, Model, Pass Rate, Cases, Started — direction indicator visible |
+| Filters in command bar | All controls in one horizontal strip; no separate filter section |
+| Metric selector in rail | Co-located with KPIs — changing charted metrics without scrolling |
 
 ---
 
-## 5. Chart ramp — high-separation on dark ground
+## 5. Density
 
-Charts are the hero element. All series colors verified WCAG AA (4.5:1+) on card surface `#1d1a14`:
+| Concern | Value |
+|---|---|
+| Base radius `--radius` | `0.375rem` (6px) — tight instrument panel |
+| Card padding (KPI rail) | `p-3` (12px) |
+| Command bar height | ~40px sticky strip |
+| Chart height | 220px each side-by-side |
+| Table row | `py-2.5` — dense, no card-padding waste |
+| Sidebar | `13rem` open / `3rem` collapsed |
+
+---
+
+## 6. Chart ramp — high-separation on cool dark ground
+
+Verified WCAG AA on `#16171c`:
 
 ```typescript
-// frontend/src/config/ui.ts — CHART_METRIC_COLORS
-"#f59e0b"  // amber   8.08:1  — primary series (series 0)
-"#2dd4bf"  // teal    9.32:1  — secondary series (series 1)
-"#a78bfa"  // violet  6.38:1  — tertiary (series 2)
-"#fb7185"  // rose    6.45:1  — quaternary (series 3)
-"#4da6e8"  // blue    6.56:1  — quinary (series 4)
-"#d4a832"  // gold    7.81:1  — senary (series 5)
+"#f59e0b"  // amber   8.14:1  — series 0
+"#22d3ee"  // cyan    9.61:1  — series 1
+"#a78bfa"  // violet  6.41:1  — series 2
+"#fb7185"  // rose    6.48:1  — series 3
+"#38bdf8"  // sky     8.22:1  — series 4
+"#a3e635"  // lime    9.88:1  — series 5
 ```
 
-Order maximizes perceptual distance between adjacent series. None conflicts with clay brand (hue `16°`) or T2 eval-pass green (`148°`).
-
-Pass-rate area chart color: `#2dd4bf` (teal) — distinct from both clay brand and T2 authority green. Assigned to `CHART_PASS_RATE_COLOR` in `config/ui.ts`.
-
-Chart grid lines: `hsl(32 12% 20%)` — warm dark separator, visible but recessed.
-Chart axis text: `font-mono text-[10px]` — all numeric axes render in JetBrains Mono.
-Tooltip background: `hsl(32 18% 12%)` — slightly lighter than card, warm dark.
+Pass-rate area: `#22d3ee` (cyan, 186°) — distinct from indigo accent (239°) and T2 green (148°).
+Chart grid: `hsl(228 10% 18%)`. Axis text: JetBrains Mono 9px, `hsl(220 8% 50%)`.
 
 ---
 
-## 6. Motion
+## 7. Motion
 
-Snappy for dense UI — no bounce, no looping animation:
+| Token | Value |
+|---|---|
+| `--duration-fast` | 100ms |
+| `--duration-base` | 160ms |
+| `--duration-slow` | 280ms |
+| Reveal stagger | 20/60/100/140/180ms |
 
-| Token | Value | Role |
-|---|---|---|
-| `--duration-fast` | 100ms | Micro-interactions (icon swap, badge update) |
-| `--duration-base` | 160ms | Most transitions (hover, focus, toggle) |
-| `--duration-slow` | 280ms | Sidebar open/close, panel reveals |
-| `--ease-standard` | `cubic-bezier(0.2,0,0,1)` | Default easing |
-| `--ease-emphasis` | `cubic-bezier(0.3,0,0,1)` | Emphasis (primary button, reveal) |
-
-Staggered reveal on page load (`rise` keyframe — `translateY(10px)` → 0 + fade):
-- `.reveal-1` 30ms, `.reveal-2` 90ms, `.reveal-3` 150ms, `.reveal-4` 210ms, `.reveal-5` 270ms
-- Applied: header → filter bar → KPI row → charts → run grid
-- `@media (prefers-reduced-motion: reduce)` suppresses all keyframe animation.
-
-Hover: `hover:-translate-y-px` on stat cards — 1px lift, no shadow escalation.
+`prefers-reduced-motion` suppresses all keyframe animation.
 
 ---
 
-## 7. Component treatment
+## 8. Files changed
 
-### 7.1 StatCard (`frontend/src/design/components/StatCard.tsx`)
+| File | Change |
+|---|---|
+| `frontend/src/index.css` | `:root` = cool neutral dark; no warm tones |
+| `frontend/src/design/tokens.css` | Authority hues retuned for cool dark ground |
+| `frontend/src/config/ui.ts` | Chart ramp: cyan/lime replace teal/gold |
+| `frontend/src/design/components/StatCard.tsx` | `p-3` density, `1.5rem` value for rail fit |
+| `frontend/src/components/Layout.tsx` | Narrower sidebar (w-52/w-12), indigo active indicator |
+| `frontend/src/pages/Dashboard.tsx` | Full structural rewrite — command bar + rail + chart zone + table |
+| `frontend/index.html` | Unchanged — IBM Plex Sans stack correct |
+| `frontend/tailwind.config.js` | Unchanged — font stack correct |
 
-KPI tile for the instrument panel. Key decisions:
-- `p-4` padding, `gap-2.5` internal gap — density first
-- Value in `font-mono text-[1.75rem] tabular-nums` — number as instrument
-- Label in `font-mono text-[10px] uppercase tracking-[0.15em]` — kicker style
-- Icon: `h-5 w-5` in `bg-primary/15 text-primary` (hero) or `bg-muted text-muted-foreground` (default)
-- Hero tone: `border-primary/25 bg-[hsl(var(--primary)/0.08)]` — restrained clay wash (8% opacity)
-- Hero bloom: `-right-6 -top-6 h-20 w-20 rounded-full bg-primary/12 blur-xl` — single decorative glow
-- Authority badge: `text-[9px] rounded-[var(--radius-sm)]` — lowest-footprint evidence indicator
-
-Props: `label`, `value`, `delta`, `deltaDirection`, `deltaIsPositiveGood`, `authority` (T0–T4), `icon`, `spark` (sparkline slot), `caption`, `tone` (default | hero).
-
-### 7.2 Dial (`frontend/src/design/components/Dial.tsx`)
-
-Radial SVG pass-rate gauge. Key decisions:
-- `size` and `thickness` props allow per-context density (run cards use `size={48} thickness={4}`)
-- Color flows through CSS vars — no hardcoded hex; `dialColor()` helper in Dashboard returns success/warning/destructive (status semantics only, never clay brand)
-- Text renders in JetBrains Mono
-
-### 7.3 Layout sidebar (`frontend/src/components/Layout.tsx`)
-
-- Dark instrument panel: `bg-card border-r border-border`
-- Active nav: clay **left-border** `w-0.5 bg-primary` + `bg-secondary/80` container — NOT full clay fill (would overpower dark ground)
-- Active icon: `text-primary` (clay) — restrained accent
-- Logo: dark ink `hsl(30 26% 7%)` on clay badge + `box-shadow: 0 0 12px hsl(var(--primary)/0.35)` glow
-- Decorative blobs on main content: `bg-primary/6` and `bg-primary/4` — single faint clay bloom, no light washes
-- Topbar: `font-mono text-xs` breadcrumb strip
-
----
-
-## 8. What changed globally (and what didn't)
-
-**Changed globally (expected and desired):**
-- `frontend/src/index.css` — `:root` is now dark-first; `.light` overrides to warm-neutral
-- `frontend/tailwind.config.js` — `font-display` → IBM Plex Sans stack (Fraunces removed); `--radius` tighter
-- `frontend/src/design/tokens.css` — T0–T4 authority hues retuned for dark ground
-- `frontend/src/config/ui.ts` — chart ramp, `CHART_PASS_RATE_COLOR`, `PASS_RATE_COLOR_BANDS`
-- `frontend/index.html` — IBM Plex Sans + IBM Plex Sans KR + JetBrains Mono font imports
-
-Other pages will shift toward dark-warm automatically from the `:root` token change. This is acceptable and desired — the instrument direction is being locked in globally.
-
-**Not changed:**
-- No other page's JSX was restyled in this slice
-- No API/data-shape changes
-- `AuthorityBadge`, `MetricChip`, `Button`, `Card`, `Table`, `EmptyState` keep their public props
-- Two new primitives added (`StatCard`, `Dial`); none removed
+**Not changed**: no other page's JSX restyled; no API/data-shape changes; `AuthorityBadge`, `Button`, `Card`, `Dial`, `EmptyState` public props unchanged.
 
 ---
 
 ## 9. Rollout notes for the other 16 pages
 
-1. **Chart hex migration**: replace any hardcoded chart hex (`#3B82F6`, `#10B981`, etc.) with `CHART_METRIC_COLORS[n]` from `config/ui.ts`. The ramp is ordered for perceptual distance.
-2. **Numeric text**: audit every place a number renders; apply `font-mono tabular-nums`. Most are metric scores, percentages, counts.
-3. **Heading hierarchy**: replace any display headings still using serif or Space Grotesk with IBM Plex Sans `font-semibold` (h1/h2) + `font-mono` (kicker labels in ALL CAPS with `tracking-[0.2em]`).
-4. **Stat cards**: replace ad-hoc KPI div patterns with `<StatCard>` from the design barrel (`import { StatCard } from "../design"`).
-5. **Radius audit**: if any page uses `rounded-lg`/`rounded-xl` independently, verify it resolves to the tight instrument-panel scale via the Tailwind config (not Tailwind defaults).
-6. **WCAG per page**: all new text-bearing color pairs must be checked on the dark card surface `#1d1a14`. The verified base tokens are AA+; per-page additions need their own verification.
-7. **T0–T4 separation**: anywhere a verdict, status badge, or authority chip is surfaced, apply the `AuthorityBadge` component with the correct tier — never improvise status colors.
-8. **Korean text**: IBM Plex Sans KR is already loaded globally. No per-page font change needed for Korean.
+1. **Chart hex migration**: replace hardcoded hex with `CHART_METRIC_COLORS[n]` from `config/ui.ts`
+2. **Numeric text**: `font-mono tabular-nums` on every number, score, percentage
+3. **Table pattern**: prefer the table pattern over card grids for dense list views
+4. **Authority badges**: `AuthorityBadge` with correct tier wherever a verdict is surfaced
+5. **No warm tones**: remaining warm/clay values in other pages clear automatically via `:root` token change — audit any page with hardcoded hex
+6. **WCAG per page**: verify all new text-bearing pairs on `#16171c` dark card
+7. **Korean text**: IBM Plex Sans KR loaded globally — no per-page change
+8. **Sidebar offsets**: update any page that hardcoded old sidebar widths to `ml-52`/`ml-12`
