@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from rich.console import Console
 
 from evalvault.adapters.inbound.cli.utils.progress import (
@@ -38,6 +39,7 @@ class TestETACalculator:
         calc.advance(5)
         assert calc.completed == 15
 
+    @pytest.mark.slow
     def test_elapsed_time(self) -> None:
         calc = ETACalculator(total=100)
         time.sleep(0.1)

@@ -36,35 +36,40 @@ def create_llm_adapter_for_model(
     provider = provider.lower()
 
     if provider == "openai":
-        base_settings.llm_provider = "openai"
-        base_settings.openai_model = model_name
+        derived = base_settings.model_copy(
+            update={"llm_provider": "openai", "openai_model": model_name}
+        )
         from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
 
-        return OpenAIAdapter(base_settings)
+        return OpenAIAdapter(derived)
     if provider == "ollama":
-        base_settings.llm_provider = "ollama"
-        base_settings.ollama_model = model_name
+        derived = base_settings.model_copy(
+            update={"llm_provider": "ollama", "ollama_model": model_name}
+        )
         from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
 
-        return OllamaAdapter(base_settings)
+        return OllamaAdapter(derived)
     if provider == "vllm":
-        base_settings.llm_provider = "vllm"
-        base_settings.vllm_model = model_name
+        derived = base_settings.model_copy(
+            update={"llm_provider": "vllm", "vllm_model": model_name}
+        )
         from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
 
-        return VLLMAdapter(base_settings)
+        return VLLMAdapter(derived)
     if provider == "azure":
-        base_settings.llm_provider = "azure"
-        base_settings.azure_deployment = model_name
+        derived = base_settings.model_copy(
+            update={"llm_provider": "azure", "azure_deployment": model_name}
+        )
         from evalvault.adapters.outbound.llm.azure_adapter import AzureOpenAIAdapter
 
-        return AzureOpenAIAdapter(base_settings)
+        return AzureOpenAIAdapter(derived)
     if provider == "anthropic":
-        base_settings.llm_provider = "anthropic"
-        base_settings.anthropic_model = model_name
+        derived = base_settings.model_copy(
+            update={"llm_provider": "anthropic", "anthropic_model": model_name}
+        )
         from evalvault.adapters.outbound.llm.anthropic_adapter import AnthropicAdapter
 
-        return AnthropicAdapter(base_settings)
+        return AnthropicAdapter(derived)
 
     raise ValueError(
         f"Unsupported LLM provider: '{provider}'. Supported: openai, ollama, vllm, azure, anthropic"
@@ -89,19 +94,21 @@ def _resolve_faithfulness_fallback_config(
     if not provider and model:
         provider = default_provider
     if provider and not model:
-        model = _default_faithfulness_fallback_model(provider)
+        model = _default_faithfulness_fallback_model(provider, settings)
     if not provider and not model:
         provider = default_provider
-        model = _default_faithfulness_fallback_model(default_provider)
+        model = _default_faithfulness_fallback_model(default_provider, settings)
 
     if not provider or not model:
         return None, None
     return provider, model
 
 
-def _default_faithfulness_fallback_model(provider: str) -> str | None:
+def _default_faithfulness_fallback_model(provider: str, settings: Settings) -> str | None:
     if provider == "ollama":
         return "qwen3:8b"
     if provider == "vllm":
         return "gpt-oss-120b"
+    if provider == "openai":
+        return settings.default_fallback_model
     return None

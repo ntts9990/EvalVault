@@ -264,6 +264,13 @@ class Settings(BaseSettings):
             "byte-identical to the legacy path."
         ),
     )
+    default_fallback_model: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default model name used as the openai-provider faithfulness fallback "
+            "when no explicit faithfulness_fallback_model is configured."
+        ),
+    )
 
     # LLM retry/timeout policies (per provider)
     openai_retry_policy: RetryPolicy = Field(
