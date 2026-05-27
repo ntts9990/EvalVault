@@ -395,8 +395,7 @@ def _unified_report_to_report_data(report: UnifiedReport) -> ReportData:
                 name="metric_scores",
                 columns=("metric", "score"),
                 rows=tuple(
-                    (metric, float(score))
-                    for metric, score in report.metric_scores.items()
+                    (metric, float(score)) for metric, score in report.metric_scores.items()
                 ),
             )
         )
@@ -448,9 +447,7 @@ class UnifiedReportBuilder:
         benchmark_run = kwargs.pop("benchmark_run", None)
         if eval_run is None or benchmark_run is None:
             if len(args) != 2:
-                raise ValueError(
-                    "UnifiedReportBuilder.build requires eval_run and benchmark_run"
-                )
+                raise ValueError("UnifiedReportBuilder.build requires eval_run and benchmark_run")
             eval_run, benchmark_run = args
         report = self._service.generate_unified_report_sync(
             eval_run,  # type: ignore[arg-type]
@@ -494,9 +491,7 @@ class UnifiedRenderer:
             "",
         ]
 
-        metric_table = next(
-            (table for table in data.tables if table.name == "metric_scores"), None
-        )
+        metric_table = next((table for table in data.tables if table.name == "metric_scores"), None)
         if metric_table and metric_table.rows:
             lines.extend(
                 ["### RAG 메트릭 점수", "", "| 메트릭 | 점수 | 상태 |", "|--------|------|------|"]

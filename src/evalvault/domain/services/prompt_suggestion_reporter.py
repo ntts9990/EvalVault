@@ -378,9 +378,7 @@ class PromptSuggestionBuilder:
         result = kwargs.pop("result", None)
         if result is None:
             if not args:
-                raise ValueError(
-                    "PromptSuggestionBuilder.build requires a PromptSuggestionResult"
-                )
+                raise ValueError("PromptSuggestionBuilder.build requires a PromptSuggestionResult")
             result = args[0]
         return _prompt_suggestion_to_report_data(result)
 
@@ -407,15 +405,11 @@ class PromptSuggestionRenderer:
         lines: list[str] = [f"# {data.title}", ""]
         for section in data.sections:
             lines.extend([f"## {section.title}", section.body, ""])
-        ranking_table = next(
-            (t for t in data.tables if t.name == "prompt_ranking"), None
-        )
+        ranking_table = next((t for t in data.tables if t.name == "prompt_ranking"), None)
         if ranking_table and ranking_table.rows:
             lines.append("## Ranking")
             for rank, candidate_id, source, weighted_score in ranking_table.rows:
-                lines.append(
-                    f"- {rank}. {candidate_id} (source={source}, score={weighted_score})"
-                )
+                lines.append(f"- {rank}. {candidate_id} (source={source}, score={weighted_score})")
         return "\n".join(lines).strip()
 
 

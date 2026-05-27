@@ -259,9 +259,7 @@ def test_structured_output_helper_returns_none_on_invalid_payload() -> None:
     never more brittle than default-off.
     """
 
-    score = MetricScorer._parse_with_instructor_schema(
-        '{"verdict": "maybe", "reason": "unclear"}'
-    )
+    score = MetricScorer._parse_with_instructor_schema('{"verdict": "maybe", "reason": "unclear"}')
     assert score is None
 
     # No-payload / no-JSON cases also return None.

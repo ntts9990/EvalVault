@@ -144,15 +144,11 @@ class ExperimentRenderer:
         lines: list[str] = [f"# {data.title}", ""]
         for section in data.sections:
             lines.extend([f"## {section.title}", section.body, ""])
-        comparison_table = next(
-            (t for t in data.tables if t.name == "comparisons"), None
-        )
+        comparison_table = next((t for t in data.tables if t.name == "comparisons"), None)
         if comparison_table and comparison_table.rows:
             lines.append("## Comparisons")
             for metric_name, best_group, improvement in comparison_table.rows:
-                lines.append(
-                    f"- {metric_name}: best={best_group} improvement={improvement}"
-                )
+                lines.append(f"- {metric_name}: best={best_group} improvement={improvement}")
         return "\n".join(lines).strip()
 
 

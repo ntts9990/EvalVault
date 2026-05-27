@@ -34,9 +34,7 @@ MIGRATION_SCRIPT = REPO_ROOT / "scripts" / "migrate_tracker_trace_ids.py"
 
 def _load_migration_module():
     """Load the migration script as an importable module."""
-    spec = importlib.util.spec_from_file_location(
-        "migrate_tracker_trace_ids", MIGRATION_SCRIPT
-    )
+    spec = importlib.util.spec_from_file_location("migrate_tracker_trace_ids", MIGRATION_SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -104,9 +102,7 @@ def _row(db_path: Path, run_id: str) -> sqlite3.Row:
     conn = sqlite3.connect(db_path)
     try:
         conn.row_factory = sqlite3.Row
-        return conn.execute(
-            "SELECT * FROM evaluation_runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
+        return conn.execute("SELECT * FROM evaluation_runs WHERE run_id = ?", (run_id,)).fetchone()
     finally:
         conn.close()
 

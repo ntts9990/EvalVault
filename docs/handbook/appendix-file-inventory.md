@@ -1846,7 +1846,7 @@
 | `./.sisyphus/plans/project-handbook.md` | Markdown | meta | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: - \[ \] 외부 공개 파트에서 민감 정보 제외 | Markdown file: 프로젝트 교과서형 총정리 문서화 계획 | 내부 |
 | `./AGENTS.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: 사용자에게는 반드시 한글 위주로 설명해줘야 함. | Markdown file: Repository Guidelines | 내부 |
 | `./CHANGELOG.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: \[0.1.0\]: https://github.com/ntts9990/EvalVault/releases/tag/v0.1.0 | Markdown file: Changelog | 내부 |
-| `./CLAUDE.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: See \[agent/README.md\](../../agent/README.md) for full documentation. | Markdown file: CLAUDE.md | 내부 |
+| `./CLAUDE.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: See agent/README.md for full documentation. (agent/ removed in X-S1) | Markdown file: CLAUDE.md | 내부 |
 | `./CODE_OF_CONDUCT.md` | Markdown | misc | lens:제품;type:소스 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: \[homepage\]: https://www.contributor-covenant.org | Markdown file: Contributor Covenant Code of Conduct | 내부 |
 | `./CONTRIBUTING.md` | Markdown | docs | lens:제품;type:문서 | 포함 | - | 2026-01-28T17:50:13 | read-full | last: Thank you for contributing! | Markdown file: Contributing to EvalVault | 내부 |
 | `./Dockerfile` | File | infra | lens:운영;type:설정 | 포함 | - | 2026-01-28T17:50:13 | binary-scan | size: 1399 bytes | File binary file (1399 bytes) | 내부 |

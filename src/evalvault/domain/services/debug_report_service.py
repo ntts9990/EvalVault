@@ -152,9 +152,7 @@ def _debug_report_to_report_data(report: DebugReport) -> ReportData:
                 section_type="summary",
                 metadata={
                     "stage_type_counts": dict(stage_summary.stage_type_counts),
-                    "stage_type_avg_durations": dict(
-                        stage_summary.stage_type_avg_durations
-                    ),
+                    "stage_type_avg_durations": dict(stage_summary.stage_type_avg_durations),
                     "missing_required_stage_types": list(
                         stage_summary.missing_required_stage_types
                     ),
@@ -166,9 +164,7 @@ def _debug_report_to_report_data(report: DebugReport) -> ReportData:
         sections.append(
             ReportSection(
                 title="Bottlenecks",
-                body="; ".join(
-                    str(item.get("type", "unknown")) for item in report.bottlenecks
-                ),
+                body="; ".join(str(item.get("type", "unknown")) for item in report.bottlenecks),
                 section_type="analysis",
                 metadata={"items": list(report.bottlenecks)},
             )
@@ -187,9 +183,7 @@ def _debug_report_to_report_data(report: DebugReport) -> ReportData:
     metric_table = MetricTable(
         name="failing_stage_metrics",
         columns=("metric_name", "score", "threshold", "stage_id"),
-        rows=tuple(
-            (m.metric_name, m.score, m.threshold, m.stage_id) for m in failing_metrics
-        ),
+        rows=tuple((m.metric_name, m.score, m.threshold, m.stage_id) for m in failing_metrics),
     )
 
     metadata: dict[str, Any] = {
@@ -219,9 +213,7 @@ class DebugReportBuilder:
         stage_storage = kwargs.pop("stage_storage", None)
         if run_id is None or storage is None or stage_storage is None:
             if len(args) != 3:
-                raise ValueError(
-                    "DebugReportBuilder.build requires run_id, storage, stage_storage"
-                )
+                raise ValueError("DebugReportBuilder.build requires run_id, storage, stage_storage")
             run_id, storage, stage_storage = args
         report = self._service.build_report(run_id, storage, stage_storage)
         return _debug_report_to_report_data(report)
@@ -255,15 +247,11 @@ class DebugRenderer:
             lines.append("")
         for section in data.sections:
             lines.extend([f"## {section.title}", section.body, ""])
-        failing = next(
-            (t for t in data.tables if t.name == "failing_stage_metrics"), None
-        )
+        failing = next((t for t in data.tables if t.name == "failing_stage_metrics"), None)
         if failing and failing.rows:
             lines.append("## Failing Stage Metrics")
             for name, score, threshold, stage_id in failing.rows:
-                lines.append(
-                    f"- {name}: score={score} threshold={threshold} stage_id={stage_id}"
-                )
+                lines.append(f"- {name}: score={score} threshold={threshold} stage_id={stage_id}")
         return "\n".join(lines).strip()
 
 

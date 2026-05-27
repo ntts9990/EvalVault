@@ -204,6 +204,7 @@ markers = [
     "requires_openai: marks tests that require OpenAI API key",
     "requires_langfuse: marks tests that require Langfuse credentials",
     "requires_phoenix: marks tests that require Phoenix/OpenTelemetry dependencies",
+    "requires_ollama: marks tests that require a running Ollama instance with the model pulled",
 ]
 filterwarnings = [
     "ignore:tagMap is deprecated.*",
