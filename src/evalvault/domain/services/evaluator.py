@@ -33,6 +33,7 @@ from evalvault.domain.metrics.summary_risk_coverage import SummaryRiskCoverage
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services import evaluation_cost as _evaluation_cost
 from evalvault.domain.services import ragas_korean_prompts as _korean_prompts
+from evalvault.domain.services import ragas_language as _language
 from evalvault.domain.services import ragas_prompt_overrides as _prompt_overrides
 from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
@@ -360,9 +361,11 @@ class RagasEvaluator:
         self._active_llm_provider = getattr(llm, "provider_name", None)
         self._active_llm_model = llm.get_model_name()
         self._active_llm = llm
-        self._prompt_language = self._normalize_language_hint(language) if language else None
+        self._prompt_language = _language.normalize_language_hint(language) if language else None
         if self._prompt_language is None:
-            self._prompt_language = self._resolve_dataset_language(dataset)
+            self._prompt_language = _language.resolve_dataset_language(
+                dataset, sample_limit=self.LANGUAGE_SAMPLE_LIMIT
+            )
         # Resolve thresholds: CLI > dataset > default(0.7)
         resolved_thresholds = {}
         for metric in metrics:
@@ -678,18 +681,13 @@ class RagasEvaluator:
         ragas_metrics: list[Any],
         prompt_overrides: dict[str, str] | None,
     ) -> None:
-        if not ragas_metrics:
-            return
-        if prompt_overrides and "answer_relevancy" in prompt_overrides:
-            return
-        resolved_language = self._resolve_dataset_language(dataset)
-        if resolved_language == "en":
-            return
-
-        for metric in ragas_metrics:
-            if getattr(metric, "name", None) != "answer_relevancy":
-                continue
-            self._apply_korean_answer_relevancy_prompt(metric)
+        _korean_prompts.apply_answer_relevancy_prompt_defaults(
+            dataset,
+            ragas_metrics,
+            prompt_overrides,
+            prompt_language=self._prompt_language,
+            sample_limit=self.LANGUAGE_SAMPLE_LIMIT,
+        )
 
     def _apply_summary_prompt_defaults(
         self,
@@ -698,22 +696,13 @@ class RagasEvaluator:
         ragas_metrics: list[Any],
         prompt_overrides: dict[str, str] | None,
     ) -> None:
-        if not ragas_metrics:
-            return
-        if prompt_overrides and any(
-            metric in prompt_overrides for metric in ("summary_score", "summary_faithfulness")
-        ):
-            return
-        resolved_language = self._resolve_dataset_language(dataset)
-        if resolved_language == "en":
-            return
-
-        for metric in ragas_metrics:
-            metric_name = getattr(metric, "name", None)
-            if metric_name == "summary_score":
-                self._apply_korean_summary_score_prompts(metric)
-            elif metric_name == "summary_faithfulness":
-                self._apply_korean_summary_faithfulness_prompts(metric)
+        _korean_prompts.apply_summary_prompt_defaults(
+            dataset,
+            ragas_metrics,
+            prompt_overrides,
+            prompt_language=self._prompt_language,
+            sample_limit=self.LANGUAGE_SAMPLE_LIMIT,
+        )
 
     def _apply_factual_correctness_prompt_defaults(
         self,
@@ -722,78 +711,13 @@ class RagasEvaluator:
         ragas_metrics: list[Any],
         prompt_overrides: dict[str, str] | None,
     ) -> None:
-        if not ragas_metrics:
-            return
-        if prompt_overrides and "factual_correctness" in prompt_overrides:
-            return
-        resolved_language = self._resolve_dataset_language(dataset)
-        if resolved_language == "en":
-            return
-
-        for metric in ragas_metrics:
-            if getattr(metric, "name", None) != "factual_correctness":
-                continue
-            self._apply_korean_factual_correctness_prompts(metric)
-
-    def _resolve_dataset_language(self, dataset: Dataset) -> str | None:
-        if self._prompt_language:
-            return self._prompt_language
-        metadata = dataset.metadata if isinstance(dataset.metadata, dict) else {}
-        for key in ("language", "lang", "locale"):
-            normalized = self._normalize_language_hint(metadata.get(key))
-            if normalized:
-                return normalized
-
-        languages = metadata.get("languages")
-        if isinstance(languages, list | tuple | set):
-            for entry in languages:
-                normalized = self._normalize_language_hint(entry)
-                if normalized:
-                    return normalized
-
-        english_found = False
-        for test_case in dataset.test_cases[: self.LANGUAGE_SAMPLE_LIMIT]:
-            if self._contains_korean(test_case.question) or self._contains_korean(test_case.answer):
-                return "ko"
-            if self._contains_latin(test_case.question) or self._contains_latin(test_case.answer):
-                english_found = True
-            for ctx in test_case.contexts:
-                if self._contains_korean(ctx):
-                    return "ko"
-                if self._contains_latin(ctx):
-                    english_found = True
-        if english_found:
-            return "en"
-        return None
-
-    @classmethod
-    def _normalize_language_hint(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip().lower().replace("_", "-")
-        if not text:
-            return None
-        if text in {"ko", "kor", "korean", "ko-kr", "kor-hang", "kr"}:
-            return "ko"
-        if text.startswith(("ko-", "kor-")):
-            return "ko"
-        if text in {"en", "eng", "english", "en-us", "en-gb"}:
-            return "en"
-        if text.startswith("en-"):
-            return "en"
-        return None
-
-    def _apply_korean_answer_relevancy_prompt(self, metric: Any) -> bool:
-        return _korean_prompts.apply_korean_answer_relevancy_prompt(metric)
-
-    def _apply_korean_summary_score_prompts(self, metric: Any) -> bool:
-        return _korean_prompts.apply_korean_summary_score_prompts(metric)
-
-    def _apply_korean_summary_faithfulness_prompts(self, metric: Any) -> bool:
-        return _korean_prompts.apply_korean_summary_faithfulness_prompts(metric)
-
-    def _apply_korean_factual_correctness_prompts(self, metric: Any) -> bool:
-        return _korean_prompts.apply_korean_factual_correctness_prompts(metric)
+        _korean_prompts.apply_factual_correctness_prompt_defaults(
+            dataset,
+            ragas_metrics,
+            prompt_overrides,
+            prompt_language=self._prompt_language,
+            sample_limit=self.LANGUAGE_SAMPLE_LIMIT,
+        )
 
     async def _evaluate_sequential(
         self,
@@ -1047,11 +971,7 @@ class RagasEvaluator:
 
     @staticmethod
     def _contains_korean(text: str) -> bool:
-        return any("\uac00" <= ch <= "\ud7a3" for ch in text)
-
-    @staticmethod
-    def _contains_latin(text: str) -> bool:
-        return any("A" <= ch <= "Z" or "a" <= ch <= "z" for ch in text)
+        return _language.contains_korean(text)
 
     @staticmethod
     def _summarize_ragas_error(exc: Exception) -> str:
