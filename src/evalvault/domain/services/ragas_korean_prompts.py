@@ -16,9 +16,14 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import Any
 
+from evalvault.domain.entities import Dataset
 from evalvault.domain.services.prompt_catalog import (
     EXAMPLE_REGISTRY,
     PROMPT_REGISTRY,
+)
+from evalvault.domain.services.ragas_language import (
+    DEFAULT_LANGUAGE_SAMPLE_LIMIT,
+    resolve_dataset_language,
 )
 
 ANSWER_RELEVANCY_KOREAN_INSTRUCTION = PROMPT_REGISTRY["answer_relevancy_korean_instruction"]
@@ -180,3 +185,85 @@ def apply_korean_factual_correctness_prompts(metric: Any) -> bool:
         applied = True
 
     return applied
+
+
+def apply_answer_relevancy_prompt_defaults(
+    dataset: Dataset,
+    ragas_metrics: list[Any],
+    prompt_overrides: dict[str, str] | None,
+    *,
+    prompt_language: str | None = None,
+    sample_limit: int = DEFAULT_LANGUAGE_SAMPLE_LIMIT,
+) -> None:
+    """Apply Korean answer_relevancy defaults unless the dataset is English."""
+
+    if not ragas_metrics:
+        return
+    if prompt_overrides and "answer_relevancy" in prompt_overrides:
+        return
+    resolved = resolve_dataset_language(
+        dataset, prompt_language=prompt_language, sample_limit=sample_limit
+    )
+    if resolved == "en":
+        return
+
+    for metric in ragas_metrics:
+        if getattr(metric, "name", None) != "answer_relevancy":
+            continue
+        apply_korean_answer_relevancy_prompt(metric)
+
+
+def apply_summary_prompt_defaults(
+    dataset: Dataset,
+    ragas_metrics: list[Any],
+    prompt_overrides: dict[str, str] | None,
+    *,
+    prompt_language: str | None = None,
+    sample_limit: int = DEFAULT_LANGUAGE_SAMPLE_LIMIT,
+) -> None:
+    """Apply Korean summary_score/summary_faithfulness defaults unless English."""
+
+    if not ragas_metrics:
+        return
+    if prompt_overrides and any(
+        metric in prompt_overrides for metric in ("summary_score", "summary_faithfulness")
+    ):
+        return
+    resolved = resolve_dataset_language(
+        dataset, prompt_language=prompt_language, sample_limit=sample_limit
+    )
+    if resolved == "en":
+        return
+
+    for metric in ragas_metrics:
+        metric_name = getattr(metric, "name", None)
+        if metric_name == "summary_score":
+            apply_korean_summary_score_prompts(metric)
+        elif metric_name == "summary_faithfulness":
+            apply_korean_summary_faithfulness_prompts(metric)
+
+
+def apply_factual_correctness_prompt_defaults(
+    dataset: Dataset,
+    ragas_metrics: list[Any],
+    prompt_overrides: dict[str, str] | None,
+    *,
+    prompt_language: str | None = None,
+    sample_limit: int = DEFAULT_LANGUAGE_SAMPLE_LIMIT,
+) -> None:
+    """Apply Korean factual_correctness defaults unless the dataset is English."""
+
+    if not ragas_metrics:
+        return
+    if prompt_overrides and "factual_correctness" in prompt_overrides:
+        return
+    resolved = resolve_dataset_language(
+        dataset, prompt_language=prompt_language, sample_limit=sample_limit
+    )
+    if resolved == "en":
+        return
+
+    for metric in ragas_metrics:
+        if getattr(metric, "name", None) != "factual_correctness":
+            continue
+        apply_korean_factual_correctness_prompts(metric)
