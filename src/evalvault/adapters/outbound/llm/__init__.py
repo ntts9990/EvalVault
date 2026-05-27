@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from evalvault.adapters.outbound.llm.base import (
     BaseLLMAdapter,
     LLMConfigurationError,
+    RetryPolicy,
     create_openai_embeddings_with_legacy,
 )
 from evalvault.adapters.outbound.llm.factory import (
@@ -13,7 +14,6 @@ from evalvault.adapters.outbound.llm.factory import (
     create_llm_adapter_for_model,
 )
 from evalvault.adapters.outbound.llm.llm_relation_augmenter import LLMRelationAugmenter
-from evalvault.config.settings import Settings
 from evalvault.ports.outbound.llm_port import LLMPort
 
 if TYPE_CHECKING:
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from evalvault.adapters.outbound.llm.ollama_adapter import OllamaAdapter
     from evalvault.adapters.outbound.llm.openai_adapter import OpenAIAdapter
     from evalvault.adapters.outbound.llm.vllm_adapter import VLLMAdapter
+    from evalvault.config.settings import Settings
 
 
 _LAZY_IMPORTS: dict[str, str] = {
@@ -77,6 +78,7 @@ def get_llm_adapter(settings: Settings) -> LLMPort:
 __all__ = [
     "BaseLLMAdapter",
     "LLMConfigurationError",
+    "RetryPolicy",
     "create_openai_embeddings_with_legacy",
     "OpenAIAdapter",
     "AzureOpenAIAdapter",

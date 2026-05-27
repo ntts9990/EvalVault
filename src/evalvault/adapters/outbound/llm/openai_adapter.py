@@ -39,7 +39,10 @@ class OpenAIAdapter(BaseLLMAdapter):
             settings: Application settings containing OpenAI configuration
         """
         self._settings = settings
-        super().__init__(model_name=settings.openai_model)
+        super().__init__(
+            model_name=settings.openai_model,
+            retry_policy=settings.openai_retry_policy,
+        )
         self._embedding_model_name = settings.openai_embedding_model
 
         client_kwargs: dict[str, Any] = {}
@@ -111,7 +114,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         if options and options.seed is not None:
             api_kwargs["seed"] = options.seed
         with instrumentation_span("llm.generate_text", attrs) as span:
-            response = await self._client.chat.completions.create(**api_kwargs)
+            response = await self._retry_async(self._client.chat.completions.create, **api_kwargs)
             content = response.choices[0].message.content or ""
             if span:
                 set_span_attributes(span, {"llm.response.length": len(content)})
@@ -173,7 +176,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             "llm.mode": "sync",
         }
         with instrumentation_span("llm.generate_text", attrs) as span:
-            response = sync_client.chat.completions.create(**api_kwargs)
+            response = self._retry_sync(sync_client.chat.completions.create, **api_kwargs)
             content = response.choices[0].message.content or ""
             if span:
                 set_span_attributes(span, {"llm.response.length": len(content)})
