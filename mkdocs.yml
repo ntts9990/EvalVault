@@ -93,6 +93,8 @@ markdown_extensions:
 
 nav:
   - Docs: INDEX.md
+  - Project State (SSoT): PROJECT_STATE.md
+  - Refactor Diagnosis: REFACTOR_DIAGNOSIS.md
   - Handbook:
       - Index: handbook/INDEX.md
       - Overview: handbook/CHAPTERS/00_overview.md
@@ -118,8 +120,6 @@ nav:
   - Getting Started:
       - Installation: getting-started/INSTALLATION.md
   - Guides:
-      - User Guide: guides/USER_GUIDE.md
-      - Dev Guide: guides/DEV_GUIDE.md
       - Run Excel Sheet Guide: guides/EVALVAULT_RUN_EXCEL_SHEETS.md
       - Diagnostic Playbook: guides/EVALVAULT_DIAGNOSTIC_PLAYBOOK.md
       - Release Checklist: guides/RELEASE_CHECKLIST.md
@@ -128,22 +128,6 @@ nav:
   - Open RAG Trace:
       - Spec: architecture/open-rag-trace-spec.md
       - Collector: architecture/open-rag-trace-collector.md
-  - Whitepaper:
-      - Index: new_whitepaper/INDEX.md
-      - Overview: new_whitepaper/01_overview.md
-      - Architecture: new_whitepaper/02_architecture.md
-      - Data Flow: new_whitepaper/03_data_flow.md
-      - Components: new_whitepaper/04_components.md
-      - Expert Lenses: new_whitepaper/05_expert_lenses.md
-      - Implementation: new_whitepaper/06_implementation.md
-      - Advanced: new_whitepaper/07_advanced.md
-      - Customization: new_whitepaper/08_customization.md
-      - Quality: new_whitepaper/09_quality.md
-      - Performance: new_whitepaper/10_performance.md
-      - Security: new_whitepaper/11_security.md
-      - Operations: new_whitepaper/12_operations.md
-      - Standards: new_whitepaper/13_standards.md
-      - Roadmap (Whitepaper): new_whitepaper/14_roadmap.md
   - API Reference:
       - Domain:
           - Entities: api/domain/entities.md

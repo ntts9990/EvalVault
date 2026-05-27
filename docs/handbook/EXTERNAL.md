@@ -23,6 +23,7 @@ EvalVault는 RAG(Retrieval-Augmented Generation) 시스템을 대상으로,
 
 ## 문서
 
-- 내부 상세 handbook: `INDEX.md`
-- 사용자/운영 가이드: `../guides/USER_GUIDE.md` (deprecated 스텁, 최신은 handbook)
-- 상태/로드맵: `CHAPTERS/08_roadmap.md` (SSoT, 내부 상세)
+- 내부 상세 handbook: [`INDEX.md`](INDEX.md)
+- 현재 상태(SSoT, 인수팀 진입점): [`../PROJECT_STATE.md`](../PROJECT_STATE.md)
+- 사용자/운영 가이드(런북): [`CHAPTERS/04_operations.md`](CHAPTERS/04_operations.md)
+- 상태/로드맵: [`CHAPTERS/08_roadmap.md`](CHAPTERS/08_roadmap.md) (SSoT, 내부 상세)
