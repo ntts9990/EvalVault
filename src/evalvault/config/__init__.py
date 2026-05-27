@@ -1,12 +1,5 @@
 """Configuration module."""
 
-from evalvault.config.agent_types import (
-    AgentConfig,
-    AgentMode,
-    AgentType,
-    get_agent_config,
-    get_parallel_groups,
-)
 from evalvault.config.domain_config import (
     DomainMemoryConfig,
     DomainMetadata,
@@ -51,10 +44,4 @@ __all__ = [
     "list_domains",
     "generate_domain_template",
     "save_domain_config",
-    # Agent config
-    "AgentType",
-    "AgentMode",
-    "AgentConfig",
-    "get_agent_config",
-    "get_parallel_groups",
 ]

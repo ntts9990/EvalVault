@@ -9,7 +9,6 @@ from typing import Any
 import typer
 from rich.console import Console
 
-from .agent import register_agent_commands
 from .analyze import register_analyze_commands
 from .api import register_api_command
 from .artifacts import create_artifacts_app
@@ -71,7 +70,6 @@ COMMAND_MODULES: tuple[CommandModule, ...] = (
     CommandModule(register_gate_commands),
     CommandModule(register_profile_difficulty_commands, needs_metrics=True),
     CommandModule(register_regress_commands),
-    CommandModule(register_agent_commands),
     CommandModule(register_experiment_commands),
     CommandModule(register_config_commands),
     CommandModule(register_langfuse_commands),
