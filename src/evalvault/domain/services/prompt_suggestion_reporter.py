@@ -1,3 +1,21 @@
+"""Prompt suggestion reporter.
+
+D-S3b rewiring
+--------------
+The legacy :class:`PromptSuggestionReporter` (with ``render_json``,
+``render_markdown``, ``write_outputs``) remains the canonical CLI and
+storage path. This module additionally exposes
+:class:`PromptSuggestionBuilder` and :class:`PromptSuggestionRenderer`
+conforming to the ``ReportBuilder`` / ``Renderer`` Protocols.
+
+IMPORTANT (memory: ``feedback_llm_prompt_discipline``):
+**No LLM prompt strings are constructed here.** This module only renders
+structured display markdown / JSON over an already-evaluated
+:class:`PromptSuggestionResult`. The new Builder/Renderer do not introduce
+any prompt strings either; they only delegate to the legacy renderer to
+preserve byte-identical output.
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +27,11 @@ from evalvault.domain.entities.prompt_suggestion import (
     PromptCandidateSampleScore,
     PromptCandidateScore,
     PromptSuggestionResult,
+)
+from evalvault.domain.services.reporting import (
+    MetricTable,
+    ReportData,
+    ReportSection,
 )
 from evalvault.ports.outbound.storage_port import StoragePort
 
@@ -275,3 +298,129 @@ class PromptSuggestionReporter:
                 "ranking": str(ranking_path),
             },
         }
+
+
+# ---------------------------------------------------------------------------
+# D-S3b: Builder / Renderer adapters
+# ---------------------------------------------------------------------------
+
+
+def _prompt_suggestion_to_report_data(result: PromptSuggestionResult) -> ReportData:
+    """Project :class:`PromptSuggestionResult` onto :class:`ReportData`.
+
+    NOTE: no LLM prompt strings are constructed here; only display
+    markdown/JSON structures over evaluated candidates.
+    """
+
+    score_map = {score.candidate_id: score for score in result.scores}
+    rows: list[tuple[Any, ...]] = []
+    for rank, candidate_id in enumerate(result.ranking, start=1):
+        candidate = next(
+            (item for item in result.candidates if item.candidate_id == candidate_id),
+            None,
+        )
+        score = score_map.get(candidate_id)
+        if candidate is None or score is None:
+            continue
+        rows.append(
+            (
+                rank,
+                candidate_id,
+                candidate.source,
+                score.weighted_score,
+            )
+        )
+
+    ranking_table = MetricTable(
+        name="prompt_ranking",
+        columns=("rank", "candidate_id", "source", "weighted_score"),
+        rows=tuple(rows),
+    )
+
+    sections: list[ReportSection] = [
+        ReportSection(
+            title="Overview",
+            body=(
+                f"run_id={result.run_id}; role={result.role}; "
+                f"metrics={list(result.metrics)}; holdout_ratio={result.holdout_ratio:.2f}"
+            ),
+            section_type="summary",
+        )
+    ]
+
+    metadata: dict[str, Any] = {
+        "run_id": result.run_id,
+        "role": result.role,
+        "metrics": list(result.metrics),
+        "weights": dict(result.weights),
+        "holdout_ratio": result.holdout_ratio,
+        **dict(result.metadata),
+    }
+
+    return ReportData(
+        report_id=result.run_id,
+        title="프롬프트 추천 결과",
+        sections=tuple(sections),
+        tables=(ranking_table,),
+        metadata=metadata,
+    )
+
+
+class PromptSuggestionBuilder:
+    """:class:`ReportBuilder` Protocol adapter.
+
+    Pure projection — does not construct any LLM prompts. The underlying
+    :class:`PromptSuggestionResult` is already produced by upstream prompt
+    evaluation; this builder only translates its shape to :class:`ReportData`.
+    """
+
+    def build(self, *args: Any, **kwargs: Any) -> ReportData:
+        result = kwargs.pop("result", None)
+        if result is None:
+            if not args:
+                raise ValueError(
+                    "PromptSuggestionBuilder.build requires a PromptSuggestionResult"
+                )
+            result = args[0]
+        return _prompt_suggestion_to_report_data(result)
+
+
+class PromptSuggestionRenderer:
+    """:class:`Renderer` Protocol adapter for prompt suggestion reports.
+
+    Delegates to :meth:`PromptSuggestionReporter.render_markdown` so the
+    byte-for-byte output stays identical to the legacy CLI surface. The
+    underlying :class:`PromptSuggestionResult` is fetched from
+    ``data.metadata['_legacy_result']`` when supplied by the matching
+    builder pipeline, otherwise this renderer falls back to a domain-level
+    markdown view that does not duplicate prompt-bearing strings.
+    """
+
+    def __init__(self, reporter: PromptSuggestionReporter | None = None) -> None:
+        self._reporter = reporter or PromptSuggestionReporter()
+
+    def render(self, data: ReportData) -> str:
+        legacy_result = data.metadata.get("_legacy_result")
+        if isinstance(legacy_result, PromptSuggestionResult):
+            return self._reporter.render_markdown(legacy_result)
+
+        lines: list[str] = [f"# {data.title}", ""]
+        for section in data.sections:
+            lines.extend([f"## {section.title}", section.body, ""])
+        ranking_table = next(
+            (t for t in data.tables if t.name == "prompt_ranking"), None
+        )
+        if ranking_table and ranking_table.rows:
+            lines.append("## Ranking")
+            for rank, candidate_id, source, weighted_score in ranking_table.rows:
+                lines.append(
+                    f"- {rank}. {candidate_id} (source={source}, score={weighted_score})"
+                )
+        return "\n".join(lines).strip()
+
+
+__all__ = [
+    "PromptSuggestionBuilder",
+    "PromptSuggestionRenderer",
+    "PromptSuggestionReporter",
+]

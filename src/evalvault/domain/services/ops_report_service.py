@@ -1,3 +1,15 @@
+"""Ops report service.
+
+D-S3b rewiring
+--------------
+The legacy :class:`OpsReportService` / :class:`OpsReport` path stays the
+canonical persistence shape. This module additionally exposes
+:class:`OpsReportBuilder` and :class:`OpsRenderer` conforming to the
+``ReportBuilder`` / ``Renderer`` Protocols. Legacy markdown rendering lives
+in ``evalvault.adapters.outbound.ops.report_renderer`` and remains
+byte-identical.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -6,6 +18,11 @@ from evalvault.config.langfuse_support import get_langfuse_trace_url
 from evalvault.config.phoenix_support import get_phoenix_trace_url
 from evalvault.domain.entities.ops_report import OpsReport
 from evalvault.domain.entities.stage import StageEvent, StageMetric, StageSummary
+from evalvault.domain.services.reporting import (
+    MetricTable,
+    ReportData,
+    ReportSection,
+)
 from evalvault.domain.services.stage_metric_guide_service import StageMetricGuideService
 from evalvault.domain.services.stage_metric_service import StageMetricService
 from evalvault.domain.services.stage_summary_service import StageSummaryService
@@ -190,3 +207,151 @@ def _stage_error_severity(rate: float | None) -> str | None:
     if rate >= 0.02:
         return "warning"
     return "ok"
+
+
+# ---------------------------------------------------------------------------
+# D-S3b: Builder / Renderer adapters
+# ---------------------------------------------------------------------------
+
+
+def _ops_report_to_report_data(report: OpsReport) -> ReportData:
+    """Project :class:`OpsReport` onto :class:`ReportData`."""
+
+    run_summary = dict(report.run_summary)
+    metadata: dict[str, Any] = {**dict(report.metadata), "run_summary": run_summary}
+
+    sections: list[ReportSection] = []
+    stage_summary = report.stage_summary
+    if stage_summary is not None:
+        sections.append(
+            ReportSection(
+                title="Stage Summary",
+                body=(
+                    f"total_events={stage_summary.total_events}; "
+                    f"missing={list(stage_summary.missing_required_stage_types)}"
+                ),
+                section_type="summary",
+                metadata={
+                    "stage_type_counts": dict(stage_summary.stage_type_counts),
+                    "stage_type_avg_durations": dict(
+                        stage_summary.stage_type_avg_durations
+                    ),
+                    "missing_required_stage_types": list(
+                        stage_summary.missing_required_stage_types
+                    ),
+                },
+            )
+        )
+
+    if report.bottlenecks:
+        sections.append(
+            ReportSection(
+                title="Ops Signals",
+                body="; ".join(
+                    str(item.get("type", "unknown")) for item in report.bottlenecks
+                ),
+                section_type="analysis",
+                metadata={"items": list(report.bottlenecks)},
+            )
+        )
+
+    if report.recommendations:
+        sections.append(
+            ReportSection(
+                title="Recommendations",
+                body="\n".join(report.recommendations),
+                section_type="recommendation",
+            )
+        )
+
+    kpi_table = MetricTable(
+        name="ops_kpis",
+        columns=("kpi", "value"),
+        rows=tuple((kpi, value) for kpi, value in report.ops_kpis.items()),
+    )
+    failing_metrics = [m for m in report.stage_metrics if m.passed is False]
+    failing_table = MetricTable(
+        name="failing_stage_metrics",
+        columns=("metric_name", "score", "threshold", "stage_id"),
+        rows=tuple(
+            (m.metric_name, m.score, m.threshold, m.stage_id) for m in failing_metrics
+        ),
+    )
+
+    severity = report.ops_kpis.get("stage_error_severity")
+    # T2 authority discipline: map ops severity to T1/T2 status only.
+    status_map: dict[str | None, str | None] = {
+        "ok": "ok",
+        "warning": "warning",
+        "critical": "critical",
+    }
+    status = status_map.get(severity if isinstance(severity, str) else None)
+
+    return ReportData(
+        report_id=str(run_summary.get("run_id", "")),
+        title="Ops Report",
+        sections=tuple(sections),
+        tables=(kpi_table, failing_table),
+        status=status,
+        metadata=metadata,
+    )
+
+
+class OpsReportBuilder:
+    """:class:`ReportBuilder` adapter over :class:`OpsReportService`."""
+
+    def __init__(self, service: OpsReportService | None = None) -> None:
+        self._service = service or OpsReportService()
+
+    def build(self, *args: Any, **kwargs: Any) -> ReportData:
+        run_id = kwargs.pop("run_id", None)
+        storage = kwargs.pop("storage", None)
+        stage_storage = kwargs.pop("stage_storage", None)
+        if run_id is None:
+            if not args:
+                raise ValueError("OpsReportBuilder.build requires run_id")
+            run_id = args[0]
+        if storage is None or stage_storage is None:
+            raise ValueError(
+                "OpsReportBuilder.build requires storage and stage_storage kwargs"
+            )
+        report = self._service.build_report(
+            run_id, storage=storage, stage_storage=stage_storage
+        )
+        return _ops_report_to_report_data(report)
+
+
+class OpsRenderer:
+    """:class:`Renderer` Protocol adapter for ops reports.
+
+    Produces a domain-level markdown summary. Legacy CLI bytes still flow
+    through ``evalvault.adapters.outbound.ops.report_renderer.render_markdown``.
+    """
+
+    def render(self, data: ReportData) -> str:
+        lines: list[str] = [f"# {data.title}", ""]
+        kpi_table = next((t for t in data.tables if t.name == "ops_kpis"), None)
+        if kpi_table and kpi_table.rows:
+            lines.append("## Ops KPIs")
+            for kpi, value in kpi_table.rows:
+                lines.append(f"- {kpi}: {value}")
+            lines.append("")
+        for section in data.sections:
+            lines.extend([f"## {section.title}", section.body, ""])
+        failing = next(
+            (t for t in data.tables if t.name == "failing_stage_metrics"), None
+        )
+        if failing and failing.rows:
+            lines.append("## Failing Stage Metrics")
+            for name, score, threshold, stage_id in failing.rows:
+                lines.append(
+                    f"- {name}: score={score} threshold={threshold} stage_id={stage_id}"
+                )
+        return "\n".join(lines).strip()
+
+
+__all__ = [
+    "OpsRenderer",
+    "OpsReportBuilder",
+    "OpsReportService",
+]

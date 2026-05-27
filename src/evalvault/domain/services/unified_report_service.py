@@ -1,6 +1,14 @@
 """Unified Report Service.
 
 RAG 평가 결과와 벤치마크 결과를 통합하여 종합적인 성능 분석 보고서를 생성합니다.
+
+D-S3b rewiring
+--------------
+This module is the *canonical* home of the :class:`ReportComposer` pattern
+introduced by D-S3a. Alongside the legacy :class:`UnifiedReportService`,
+it now also exposes :class:`UnifiedReportBuilder`, :class:`UnifiedRenderer`,
+and the :func:`build_unified_composer` factory. Existing CLI output bytes
+flow through ``UnifiedReport.to_markdown`` and stay byte-identical.
 """
 
 from __future__ import annotations
@@ -10,6 +18,13 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from evalvault.domain.services.reporting import (
+    MetricTable,
+    ReportComposer,
+    ReportData,
+    ReportSection,
+)
 
 if TYPE_CHECKING:
     from evalvault.domain.entities import EvaluationRun
@@ -353,3 +368,202 @@ class UnifiedReportService:
         benchmark_run: BenchmarkRun,
     ) -> UnifiedReport:
         return asyncio.run(self.generate_unified_report(eval_run, benchmark_run))
+
+
+# ---------------------------------------------------------------------------
+# D-S3b: Builder / Renderer / Composer
+# ---------------------------------------------------------------------------
+
+
+def _unified_report_to_report_data(report: UnifiedReport) -> ReportData:
+    """Project a legacy :class:`UnifiedReport` onto :class:`ReportData`."""
+
+    sections = tuple(
+        ReportSection(
+            title=section.title,
+            body=section.content,
+            section_type=section.section_type,
+            metadata=dict(section.metadata),
+        )
+        for section in report.sections
+    )
+
+    tables: list[MetricTable] = []
+    if report.metric_scores:
+        tables.append(
+            MetricTable(
+                name="metric_scores",
+                columns=("metric", "score"),
+                rows=tuple(
+                    (metric, float(score))
+                    for metric, score in report.metric_scores.items()
+                ),
+            )
+        )
+    if report.benchmark_results:
+        tables.append(
+            MetricTable(
+                name="benchmark_results",
+                columns=("domain", "accuracy", "num_samples"),
+                rows=tuple(
+                    (
+                        domain,
+                        float(result.get("accuracy", 0.0)),
+                        int(result.get("num_samples", 0)),
+                    )
+                    for domain, result in report.benchmark_results.items()
+                ),
+            )
+        )
+
+    metadata: dict[str, object] = {
+        "eval_run_id": report.eval_run_id,
+        "benchmark_run_id": report.benchmark_run_id,
+        "dataset_name": report.dataset_name,
+        "eval_model": report.eval_model,
+        "benchmark_model": report.benchmark_model,
+        "pass_rate": report.pass_rate,
+        "benchmark_accuracy": report.benchmark_accuracy,
+        **dict(report.metadata),
+    }
+
+    return ReportData(
+        report_id=report.report_id,
+        title="RAG 성능 통합 분석 보고서",
+        sections=sections,
+        tables=tuple(tables),
+        metadata=metadata,
+        generated_at=report.generated_at,
+    )
+
+
+class UnifiedReportBuilder:
+    """:class:`ReportBuilder` adapter over :class:`UnifiedReportService`."""
+
+    def __init__(self, service: UnifiedReportService) -> None:
+        self._service = service
+
+    def build(self, *args: object, **kwargs: object) -> ReportData:
+        eval_run = kwargs.pop("eval_run", None)
+        benchmark_run = kwargs.pop("benchmark_run", None)
+        if eval_run is None or benchmark_run is None:
+            if len(args) != 2:
+                raise ValueError(
+                    "UnifiedReportBuilder.build requires eval_run and benchmark_run"
+                )
+            eval_run, benchmark_run = args
+        report = self._service.generate_unified_report_sync(
+            eval_run,  # type: ignore[arg-type]
+            benchmark_run,  # type: ignore[arg-type]
+        )
+        return _unified_report_to_report_data(report)
+
+
+class UnifiedRenderer:
+    """:class:`Renderer` Protocol adapter for unified reports.
+
+    Mirrors the layout of ``UnifiedReport.to_markdown`` for the projected
+    :class:`ReportData` shape. Legacy CLI consumers continue to use
+    ``UnifiedReport.to_markdown`` directly to guarantee byte equality.
+    """
+
+    def render(self, data: ReportData) -> str:
+        metadata = dict(data.metadata)
+        dataset_name = str(metadata.get("dataset_name", ""))
+        eval_model = str(metadata.get("eval_model", ""))
+        pass_rate = float(metadata.get("pass_rate", 0.0))
+        benchmark_model = str(metadata.get("benchmark_model", ""))
+        benchmark_accuracy = float(metadata.get("benchmark_accuracy", 0.0))
+
+        lines = [
+            "# RAG 성능 통합 분석 보고서",
+            "",
+            f"> 생성일시: {data.generated_at.strftime('%Y-%m-%d %H:%M:%S')}",
+            "",
+            "## 평가 개요",
+            "",
+            "| 구분 | 항목 | 값 |",
+            "|------|------|-----|",
+            f"| RAG 평가 | 데이터셋 | {dataset_name} |",
+            f"| RAG 평가 | 모델 | {eval_model} |",
+            f"| RAG 평가 | 통과율 | {pass_rate:.1%} |",
+            f"| 벤치마크 | 모델 | {benchmark_model} |",
+            f"| 벤치마크 | 정확도 | {benchmark_accuracy:.1%} |",
+            "",
+            "---",
+            "",
+        ]
+
+        metric_table = next(
+            (table for table in data.tables if table.name == "metric_scores"), None
+        )
+        if metric_table and metric_table.rows:
+            lines.extend(
+                ["### RAG 메트릭 점수", "", "| 메트릭 | 점수 | 상태 |", "|--------|------|------|"]
+            )
+            for metric, score in metric_table.rows:
+                score_f = float(score)
+                status = "✅" if score_f >= 0.7 else "⚠️" if score_f >= 0.5 else "❌"
+                lines.append(f"| {metric} | {score_f:.3f} | {status} |")
+            lines.extend(["", "---", ""])
+
+        benchmark_table = next(
+            (table for table in data.tables if table.name == "benchmark_results"), None
+        )
+        if benchmark_table and benchmark_table.rows:
+            lines.extend(
+                [
+                    "### 벤치마크 도메인 점수",
+                    "",
+                    "| 도메인 | 정확도 | 상태 |",
+                    "|--------|--------|------|",
+                ]
+            )
+            for row in benchmark_table.rows:
+                domain = row[0]
+                acc = float(row[1])
+                status = "✅" if acc >= 0.7 else "⚠️" if acc >= 0.5 else "❌"
+                lines.append(f"| {domain} | {acc:.1%} | {status} |")
+            lines.extend(["", "---", ""])
+
+        for section in data.sections:
+            lines.extend([f"## {section.title}", "", section.body, "", "---", ""])
+
+        lines.extend(
+            [
+                "",
+                "*본 보고서는 AI가 생성한 분석입니다. 전문가 검토를 권장합니다.*",
+                "*EvalVault Unified Report | RAG Evaluation + Benchmark Analysis*",
+            ]
+        )
+
+        return "\n".join(lines)
+
+
+def build_unified_composer(
+    llm_adapter: LLMPort,
+    *,
+    language: str = "ko",
+) -> ReportComposer:
+    """Factory: assemble the canonical :class:`ReportComposer` for unified reports.
+
+    This is the canonical Composer consumer for D-S3b. CLI / web wrappers
+    that want the new contract should call this and use
+    :meth:`ReportComposer.compose` or :meth:`ReportComposer.emit`. Existing
+    consumers of :class:`UnifiedReportService` keep working unchanged.
+    """
+
+    service = UnifiedReportService(llm_adapter, language=language)
+    return ReportComposer(builder=UnifiedReportBuilder(service), renderer=UnifiedRenderer())
+
+
+__all__ = [
+    "CORRELATION_ANALYSIS_PROMPT",
+    "UNIFIED_REPORT_PROMPT",
+    "UnifiedRenderer",
+    "UnifiedReport",
+    "UnifiedReportBuilder",
+    "UnifiedReportSection",
+    "UnifiedReportService",
+    "build_unified_composer",
+]
