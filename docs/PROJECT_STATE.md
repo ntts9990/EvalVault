@@ -5,10 +5,10 @@
 >
 > - 기준 버전: **v1.77.0** (PyPI 배포 중 — main 기준)
 > - 기준 브랜치: `main`
-> - 기준 커밋: `bc88726 chore(release): 1.77.0 [skip ci]`
-> - 마지막 검증일: **2026-05-22** (Phase 4 W-S6 / W-S3 / L-S2 / W-S5b 슬라이스 머지 대기 중 — §8.1 참조)
+> - 기준 커밋: `81e1659` (v1.79.0 라인)
+> - 마지막 검증일: **2026-05-27** (REFACTOR_DIAGNOSIS 슬라이스 프로그램 + W/L 시리즈 **전부 main 머지 완료**, **v1.79.0 릴리스** — §8.1 참조)
 > - 작성/검증 책임: 인수 시점에 owner를 명시 → **(TBD: 인수팀 리더 이름 박아두기)**
-> - 다음 검증 트리거: 새 minor 릴리스(예: v1.78.0)가 머지되면 이 문서의 §3, §8을 다시 검증
+> - 다음 검증 트리거: 새 minor 릴리스가 머지되면 이 문서의 §3, §8을 다시 검증
 
 ---
 
@@ -408,34 +408,25 @@ uv run pytest tests/ -v
 4. 성능 개선 주장에 실험 프레임이 필요한가? → P3
 5. 공유/운영 효율을 크게 올리는가? → P4
 
-### 8.1 머지 대기 중인 슬라이스 (2026-05-22 기준)
+### 8.1 슬라이스 프로그램 — 머지 완료 + 남은 작업 (2026-05-27 기준)
 
-> 메인(main, `bc88726`)에 아직 머지되지 않은 feature 브랜치 진행 상황. 각 브랜치는 자체 build / Playwright / unit-test 검증을 통과하고 origin에 푸시되어 있음.
+> 2026-05-22 시점의 "머지 대기" 목록은 **모두 main에 머지 완료**되었고 **v1.79.0**으로 릴리스됨.
+> 이 절은 이제 (a) 완료된 것과 (b) 의도적으로 남긴/보류한 것을 기록한다.
 
-**Phase 4 — Web frontend overhaul** (Claude 디자인 시스템 surgical 마이그레이션):
+**완료 (main, v1.79.0):**
 
-| 슬라이스 | 브랜치 | 커밋 | 적용 영역 |
-|---|---|---|---|
-| W-S1 design system | `refactor/w-s1-design-system` | — | Button, Card, Table, EmptyState, MetricChip, AuthorityBadge 6 primitive 추가 |
-| W-S2 ~ W-S5 | `refactor/w-s2-*` … `refactor/w-s5-secondary-pages` | (누적) | Dashboard, EvaluationStudio, AnalysisLab, RunDetails, CompareRuns, AiSdkChat, JudgeCalibration, KnowledgeBase, VisualizationHome, CustomerReport 토큰화 |
-| W-S6 lucide bump + e2e | `refactor/w-s6-playwright-lucide-bump` | `6220202` | lucide-react 0.562 → 1.16, Playwright 18/18, 3개 dead-import 정리 |
-| W-S3 Analysis 통합 plan | `refactor/w-s3-analysis-consolidation` | `853c8c1` | `docs/guides/W-S3-ANALYSIS-CONSOLIDATION.md` plan + 2개 페이지 surgical |
-| W-S5b Settings | `refactor/w-s5b-settings-migration` | `78464fd` | Settings.tsx 에러/버튼 design primitive 적용 |
+- **REFACTOR_DIAGNOSIS 슬라이스 프로그램 전체** — A-S1~S5(LLM RetryPolicy / BaseTracker / MultiTrackerAdapter 실구현 / tracker_trace_ids / factory mutation), D-S1~S5(domain port / korean prompts / report Builder·Renderer·Composer / pipeline templates / evaluator god-class 분해 1,951→971L), DOC-S2~S5, T-S1~S5(CI 매트릭스·마커·regression-gate 중복 제거·lint 슬림), X-S1(agent/ 서브시스템 + 패키지 내 `evalvault agent` CLI 제거), L-S0.
+- **Phase 4 W-시리즈 (surgical 마이그레이션)** — W-S1 디자인 시스템 프리미티브(`frontend/src/design/`) + W-S2~S7 페이지 토큰화/AuthorityBadge + `/design-system` 쇼케이스 + lucide 1.16 + Playwright.
+- **Phase 3.5 의존성 라인** — openai 2.x / instructor 1.15 / langchain-openai 1.x / mlflow 3.12 / arize-phoenix 16, dead deps(manim·chainlit·langchain-anthropic) 제거, ruff 0.15 + UP042(24개 enum → `StrEnum`).
+- **CI 복구** — Phoenix 자동 동기화 open-circuit 수정(`fix(run)`), 스토리지 `--db` 존중, ruff 결정적 핀. test + lint 잡 모두 green.
 
-**Phase 3.5 — 의존성 라인 업데이트:**
+**남은 작업 (의도적 보류 / 미착수):**
 
-| 슬라이스 | 브랜치 | 커밋 | 변경 |
-|---|---|---|---|
-| L-S0 / L-S1 / L-S2i | (누적, 일부는 main에 머지됨) | — | Anthropic 0.34→0.43, mkdocstrings 0→1.0.4 등 |
-| L-S2 LLM 클러스터 | `refactor/l-s2-llm-cluster-bump` | `88739ab` | openai 1.40→2.38, instructor 1.4→1.15, langchain-openai 0.2→1.2 |
+- **Phase 4 — 웹 *전면* 오버홀 (미착수)**: 위 W-시리즈는 디자인 토대 + surgical 이식까지. Claude 디자인 언어로 17개 페이지를 통째로 재구성하는 comprehensive overhaul은 별도 라운드(2026-05-21 사용자 플래그).
+- **D-S5 프롬프트 품질 (미착수)**: evaluator 구조 분해는 완료(971L, ≤700L는 가치/위험 역전으로 추구 안 함). 메모리 [[feedback_llm_prompt_discipline]] / [[project_phase3_d_s5_prompt_focus]]의 프롬프트 품질(DSPy/Instructor) 재설계는 남음.
+- **rich 15+ bump (deferred)**: instructor 1.15 metadata가 `rich<15`를 강제 → US-008 트래킹. 우회/캡 해제 시 진행.
 
-**알아야 할 것**:
-
-- 모든 위 슬라이스는 origin에 푸시되어 있고 머지/리뷰 대기.
-- L-S2는 `src/` diff 0줄 (LLM 프롬프트 byte-identical 보존, [[feedback_llm_prompt_discipline]] 원칙 준수).
-- rich 15+ bump은 instructor 1.15 metadata가 rich<15를 강제하여 deferred (US-008 트래킹).
-- T0-T4 권한 hierarchy 준수: T2 cap, T3 (promote/rollback) 문자열 신규 도입 0건.
-- 회귀 anti-target 비변경 (`regression_gate_service.py`, `regression_baseline.json`, `regression-gate.yml`, `domain/metrics/*`).
+**보존 불변식**: T0-T4 권한 hierarchy (T2 cap, T3 promote/rollback 신규 0건), 회귀 anti-target 비변경 (`regression_gate_service.py`, `regression_baseline.json`, `regression-gate.yml`, `domain/metrics/*`).
 
 ---
 
