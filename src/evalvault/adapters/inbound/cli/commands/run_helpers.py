@@ -556,9 +556,7 @@ def _log_analysis_artifacts(
         multi.save_artifact(
             parent_trace_id, "analysis_artifacts", artifact_index, artifact_type="json"
         )
-        multi.save_artifact(
-            parent_trace_id, "analysis_report", report_text, artifact_type="text"
-        )
+        multi.save_artifact(parent_trace_id, "analysis_report", report_text, artifact_type="text")
         per_tracker_ids = multi.per_tracker_trace_ids(parent_trace_id)
         multi.end_trace(parent_trace_id)
     except Exception as exc:

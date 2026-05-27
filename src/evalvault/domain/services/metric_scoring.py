@@ -171,9 +171,7 @@ class MetricScorer:
 
             # 단일 테스트 케이스 평가
             test_case_started_at = datetime.now()
-            scores, claim_details = await score_sample(
-                sample, ragas_metrics, test_case_id
-            )
+            scores, claim_details = await score_sample(sample, ragas_metrics, test_case_id)
             test_case_finished_at = datetime.now()
 
             latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
@@ -245,9 +243,7 @@ class MetricScorer:
             error: Exception | None = None
             claim_details: dict[str, ClaimLevelResult] | None = None
             try:
-                scores, claim_details = await score_sample(
-                    sample, ragas_metrics, test_case.id
-                )
+                scores, claim_details = await score_sample(sample, ragas_metrics, test_case.id)
             except Exception as exc:  # pragma: no cover - safe fallback
                 logger.warning(
                     "Failed to evaluate test case '%s' in parallel mode: %s",
@@ -434,10 +430,7 @@ class MetricScorer:
                 scores[metric.name] = score_value
 
                 # Collect claim details when claim_level is enabled for faithfulness metrics
-                if (
-                    self._claim_level_getter()
-                    and metric.name in self._faithfulness_metrics
-                ):
+                if self._claim_level_getter() and metric.name in self._faithfulness_metrics:
                     claim_result = self._korean_fallback_details(sample)
                     if isinstance(claim_result, ClaimLevelResult):
                         # Update claim IDs with test_case_id prefix
@@ -483,14 +476,10 @@ class MetricScorer:
 
         return scores, claim_details
 
-    async def score_summary_faithfulness_judge(
-        self, sample: SingleTurnSample
-    ) -> float | None:
+    async def score_summary_faithfulness_judge(self, sample: SingleTurnSample) -> float | None:
         return await self._score_summary_faithfulness_judge(sample)
 
-    async def _score_summary_faithfulness_judge(
-        self, sample: SingleTurnSample
-    ) -> float | None:
+    async def _score_summary_faithfulness_judge(self, sample: SingleTurnSample) -> float | None:
         llm = self._active_llm_getter()
         if llm is None or not sample.response or not sample.retrieved_contexts:
             return None

@@ -32,9 +32,7 @@ def _make_report() -> ReportData:
     return ReportData(
         report_id="run-001",
         title="Sample report",
-        sections=(
-            ReportSection(title="Summary", body="hello", section_type="summary"),
-        ),
+        sections=(ReportSection(title="Summary", body="hello", section_type="summary"),),
         tables=(
             MetricTable(
                 name="metrics",

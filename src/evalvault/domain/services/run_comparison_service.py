@@ -243,9 +243,7 @@ class RunComparisonBuilder:
         request = kwargs.pop("request", None)
         if request is None:
             if not args:
-                raise ValueError(
-                    "RunComparisonBuilder.build requires a RunComparisonRequest"
-                )
+                raise ValueError("RunComparisonBuilder.build requires a RunComparisonRequest")
             request = args[0]
         outcome = self._service.compare_runs(request)
         return _run_comparison_outcome_to_report_data(outcome)

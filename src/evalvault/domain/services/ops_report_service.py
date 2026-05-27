@@ -233,9 +233,7 @@ def _ops_report_to_report_data(report: OpsReport) -> ReportData:
                 section_type="summary",
                 metadata={
                     "stage_type_counts": dict(stage_summary.stage_type_counts),
-                    "stage_type_avg_durations": dict(
-                        stage_summary.stage_type_avg_durations
-                    ),
+                    "stage_type_avg_durations": dict(stage_summary.stage_type_avg_durations),
                     "missing_required_stage_types": list(
                         stage_summary.missing_required_stage_types
                     ),
@@ -247,9 +245,7 @@ def _ops_report_to_report_data(report: OpsReport) -> ReportData:
         sections.append(
             ReportSection(
                 title="Ops Signals",
-                body="; ".join(
-                    str(item.get("type", "unknown")) for item in report.bottlenecks
-                ),
+                body="; ".join(str(item.get("type", "unknown")) for item in report.bottlenecks),
                 section_type="analysis",
                 metadata={"items": list(report.bottlenecks)},
             )
@@ -273,9 +269,7 @@ def _ops_report_to_report_data(report: OpsReport) -> ReportData:
     failing_table = MetricTable(
         name="failing_stage_metrics",
         columns=("metric_name", "score", "threshold", "stage_id"),
-        rows=tuple(
-            (m.metric_name, m.score, m.threshold, m.stage_id) for m in failing_metrics
-        ),
+        rows=tuple((m.metric_name, m.score, m.threshold, m.stage_id) for m in failing_metrics),
     )
 
     severity = report.ops_kpis.get("stage_error_severity")
@@ -312,12 +306,8 @@ class OpsReportBuilder:
                 raise ValueError("OpsReportBuilder.build requires run_id")
             run_id = args[0]
         if storage is None or stage_storage is None:
-            raise ValueError(
-                "OpsReportBuilder.build requires storage and stage_storage kwargs"
-            )
-        report = self._service.build_report(
-            run_id, storage=storage, stage_storage=stage_storage
-        )
+            raise ValueError("OpsReportBuilder.build requires storage and stage_storage kwargs")
+        report = self._service.build_report(run_id, storage=storage, stage_storage=stage_storage)
         return _ops_report_to_report_data(report)
 
 
@@ -338,15 +328,11 @@ class OpsRenderer:
             lines.append("")
         for section in data.sections:
             lines.extend([f"## {section.title}", section.body, ""])
-        failing = next(
-            (t for t in data.tables if t.name == "failing_stage_metrics"), None
-        )
+        failing = next((t for t in data.tables if t.name == "failing_stage_metrics"), None)
         if failing and failing.rows:
             lines.append("## Failing Stage Metrics")
             for name, score, threshold, stage_id in failing.rows:
-                lines.append(
-                    f"- {name}: score={score} threshold={threshold} stage_id={stage_id}"
-                )
+                lines.append(f"- {name}: score={score} threshold={threshold} stage_id={stage_id}")
         return "\n".join(lines).strip()
 
 

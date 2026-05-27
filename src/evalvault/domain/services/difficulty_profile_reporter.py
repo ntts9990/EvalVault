@@ -116,9 +116,7 @@ class DifficultyProfileBuilder:
         artifacts = kwargs.pop("artifacts", None)
         if envelope is None or artifacts is None:
             if len(args) != 2:
-                raise ValueError(
-                    "DifficultyProfileBuilder.build requires envelope and artifacts"
-                )
+                raise ValueError("DifficultyProfileBuilder.build requires envelope and artifacts")
             envelope, artifacts = args
         return _difficulty_envelope_to_report_data(envelope, artifacts)
 
@@ -130,9 +128,7 @@ class DifficultyProfileRenderer:
         lines: list[str] = [f"# {data.title}", ""]
         for section in data.sections:
             lines.extend([f"## {section.title}", section.body, ""])
-        buckets = next(
-            (t for t in data.tables if t.name == "difficulty_buckets"), None
-        )
+        buckets = next((t for t in data.tables if t.name == "difficulty_buckets"), None)
         if buckets and buckets.rows:
             lines.append("## Buckets")
             for bucket, count, pass_rate in buckets.rows:

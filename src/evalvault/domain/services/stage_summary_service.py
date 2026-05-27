@@ -71,10 +71,7 @@ def _stage_summary_to_report_data(summary: StageSummary) -> ReportData:
     counts_table = MetricTable(
         name="stage_type_counts",
         columns=("stage_type", "count"),
-        rows=tuple(
-            (stage_type, count)
-            for stage_type, count in summary.stage_type_counts.items()
-        ),
+        rows=tuple((stage_type, count) for stage_type, count in summary.stage_type_counts.items()),
     )
     durations_table = MetricTable(
         name="stage_type_avg_durations_ms",
@@ -139,9 +136,7 @@ class StageSummaryRenderer:
             lines.append("## Stage Type Counts")
             for stage_type, count in counts.rows:
                 lines.append(f"- {stage_type}: {count}")
-        durations = next(
-            (t for t in data.tables if t.name == "stage_type_avg_durations_ms"), None
-        )
+        durations = next((t for t in data.tables if t.name == "stage_type_avg_durations_ms"), None)
         if durations and durations.rows:
             lines.append("## Stage Type Avg Durations (ms)")
             for stage_type, duration in durations.rows:
