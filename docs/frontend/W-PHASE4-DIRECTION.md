@@ -204,3 +204,32 @@ Chart grid: `hsl(228 10% 18%)`. Axis text: JetBrains Mono 9px, `hsl(220 8% 50%)`
 6. **WCAG per page**: verify all new text-bearing pairs on `#16171c` dark card
 7. **Korean text**: IBM Plex Sans KR loaded globally — no per-page change
 8. **Sidebar offsets**: update any page that hardcoded old sidebar widths to `ml-52`/`ml-12`
+
+---
+
+## 10. Evidence-Based Design pass — principles → decisions mapping
+
+Applied as **surgical refinements** to the existing command-bar + left-rail + chart-zone + runs-table structure. Layout and IA unchanged. Smaller diff, intentional decisions.
+
+| # | Principle | Concrete decision |
+|---|---|---|
+| 1 | **Von Restorff / isolation effect** | Pass Rate hero card breaks from the other 3 KPIs via **3 independent differentiators**: value font `2rem` vs `1.125rem` for subordinate cards; indigo tinted border + bg wash; sparkline slot (only hero). Other cards intentionally flat — no border tint, no glow, transparent bg. The gap in perceived weight is the signal. |
+| 2 | **Miller's Law / chunking** | Left rail KPIs reorganized into **2 labeled clusters** with `font-mono text-[8px] uppercase` group headers: "Quality" (Pass Rate — the decision-critical single KPI) and "Throughput" (Runs + Cases + Cost — volume context). Each cluster ≤ 4 items. |
+| 3 | **Gestalt — proximity + common region** | Clusters use `.rail-cluster` (a `bg-secondary/40` region fill with `rounded-[var(--radius)] p-2`) instead of divider lines. Fewer `border-b` rules in the table — row separation via `border-border/30` (60% lighter than before). Chart panels share a common section boundary rather than internal borders between them. |
+| 4 | **Hick's Law** | Command bar demoted Compare to an **icon-only `<button>`** (32×28px, no label, tooltip-only) — visible only as a ghost when ≥1 run is selected. "New run" is the sole full-label primary CTA, rightmost, highest contrast. Project chips reduced from 4 to 3 max visible. Scope count badge reduced to muted `text-muted-foreground/60` text — not a colored pill. |
+| 5 | **Fitts's Law** | Sort header buttons gain `p-1 -m-1` (larger invisible hit area without changing visual size). Table rows use `py-3` (up from `py-2.5`) — generous vertical click target. Primary CTA is rightmost in the command bar, far from the sidebar edge. |
+| 6 | **Pre-attentive processing + Tufte data-ink** | Verdict column replaced `AuthorityBadge` verdict display with `<VerdictPill>` — encodes status via **3 pre-attentive channels**: hue (green/amber/red) + icon shape (CheckCircle2/MinusCircle/XCircle) + text label ("pass"/"hold"/"fail"). Chart fill-area opacity reduced from 0.20→0.18, chart grid stroke `hsl(... / 0.6)` (was solid) — Tufte data-ink improvement. Icon removed from non-hero StatCards (was redundant encoding alongside the label). |
+| 7 | **Recognition over recall (Nielsen)** | Added a **persistent active-filter summary strip** immediately below the command bar controls: `scope: Last 30 days · project-name · "query"` — always visible, updates reactively. Users never have to remember what filters are active while scanning the runs table. |
+| 8 | **F-pattern scanning + numerical cognition** | Pass % column is `text-right` with `SortHeader align="right"` (chevron on left of label for right-aligned headers). Cases column right-aligned. Timestamps right-aligned. **All numeric cells**: `tabular-nums` + JetBrains Mono + consistent **1-decimal precision** (`toFixed(1)` throughout — was mixed 0/1/2). Passed/total cases: foreground for numerator, `text-muted-foreground/40` for denominator — weight encodes importance. |
+| 9 | **Color-blind safety / redundant coding** | `<VerdictPill>` carries hue + distinct icon shape + text — readable in grayscale and under deuteranopia simulation. Chart metric selector: swatch dot shows color when selected, **hollow border** when unselected (shape change, not just color). Mini progress bar in pass-rate column adds a **position/length** cue alongside the dial arc (two independent encodings for the same value). |
+| 10 | **Dark-mode visual ergonomics (halation)** | `--foreground` softened from `220 14% 90%` (`#e2e4ec`) → `220 10% 87%` (`#dcdee6`) — 3% luminance reduction cuts blooming on near-black ground. `--primary` accent desaturated `84%→72%` (`#6366f1→#6e71f2`) — less electric glare while remaining WCAG AA. Background radial bloom opacity reduced from `0.06→0.05`. |
+| 11 | **Progressive disclosure** | Metric tags in table rows reduced to **2 visible + "+N" overflow** (was 3 + overflow). The `+N` counter is `text-[8px] text-muted-foreground/40` — extremely quiet. Row hover reveals the `ArrowUpRight` nav arrow only on hover (`opacity-0 → opacity-100`). Full metric detail is behind the row click. |
+| 12 | **Jakob's Law / external consistency** | Sort headers: ascending `ChevronUp` / descending `ChevronDown` + `aria-sort` attribute — matches Linear, Grafana, Notion table conventions. `VerdictPill` follows the Jira/Linear status pill pattern (dot/icon + label). Sparkline in hero card follows Grafana mini-trend convention. Tooltip: mono font + `padding: 6px 10px` — matches Recharts/Grafana defaults. |
+
+### Files changed in this pass
+
+| File | What changed |
+|---|---|
+| `frontend/src/index.css` | Foreground softened; accent desaturated; added `.rail-cluster`, `.verdict-pass/hold/fail` CSS classes |
+| `frontend/src/design/components/StatCard.tsx` | 3-level type hierarchy (2rem hero / 1.125rem subordinate); icon stripped from non-hero; delta gets arrow prefix; spark slot hero-only |
+| `frontend/src/pages/Dashboard.tsx` | `VerdictPill` component (3-channel redundant coding); `SortHeader` with `aria-sort` + Fitts padding; rail clusters with group labels; active-filter summary strip; right-aligned numeric columns; `py-3` rows; chart opacity/grid tuning; Hick's Law CTA demotion |

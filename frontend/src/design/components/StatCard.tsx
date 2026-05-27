@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 
 /**
- * Phase 4 "Data-Dense Pro, Neutral-Cool Dark" StatCard.
+ * Phase 4 Evidence-Based Design pass — StatCard.
  *
- * Compact KPI tile for the left rail instrument panel.
- * - p-3 padding: tighter than before — fits more KPIs in a vertical rail
- * - value at 1.5rem: rail-appropriate, not hero-oversized
- * - label: mono 9px ALL CAPS kicker
- * - hero tone: restrained indigo wash (8% opacity), no bloom
- * - Numbers always JetBrains Mono tabular-nums — instruments
- * - Authority tag: honest evidence level, NOT verdict
+ * Von Restorff / isolation: hero tone creates clear visual dominance via
+ * larger value (2rem vs 1rem), indigo tint, sparkline slot, and explicit
+ * group separation in the rail. Non-hero cards are intentionally subordinate.
+ *
+ * Miller / chunking: authority tag preserved for honest evidence level.
+ * Progressive disclosure: spark + caption available but not forced.
+ * Dark ergonomics: value color is var(--foreground) = #dcdee6, not pure white.
+ * Numerical cognition: value always JetBrains Mono tabular-nums.
  */
 
 export type StatTone = "default" | "hero";
@@ -56,57 +57,65 @@ export function StatCard({
     className = "",
 }: StatCardProps) {
     const isHero = tone === "hero";
+
     const containerCls = [
-        "group relative flex flex-col gap-2 overflow-hidden rounded-[var(--radius)] border p-3",
+        "relative flex flex-col overflow-hidden rounded-[var(--radius)] border",
         "transition-colors duration-[var(--duration-base)]",
         isHero
-            ? "border-primary/30 bg-[hsl(var(--primary)/0.08)] hover:bg-[hsl(var(--primary)/0.12)]"
-            : "border-border bg-card hover:bg-secondary/60",
+            // Von Restorff: hero is visually isolated — tinted border + bg wash
+            ? "gap-2.5 p-3 border-primary/35 bg-[hsl(var(--primary)/0.07)] hover:bg-[hsl(var(--primary)/0.1)]"
+            // Subordinate cards: neutral, no tint, no glow — clearly secondary
+            : "gap-1.5 p-3 border-border/50 bg-transparent hover:bg-secondary/40",
         className,
     ]
         .filter(Boolean)
         .join(" ");
 
     return (
-        <div className={containerCls} style={{ boxShadow: "var(--shadow-card)" }}>
-            {/* Label row */}
+        <div className={containerCls} style={{ boxShadow: isHero ? "var(--shadow-card)" : "none" }}>
+            {/* Label row: icon stripped from non-hero cards (Tufte: remove redundant encoding) */}
             <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1.5 min-w-0">
-                    {icon && (
-                        <span
-                            className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius-sm)] ${
-                                isHero
-                                    ? "bg-primary/20 text-primary"
-                                    : "bg-muted text-muted-foreground"
-                            }`}
-                        >
+                    {/* Icon only shown on hero (Von Restorff isolation) */}
+                    {icon && isHero && (
+                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-primary/20 text-primary">
                             {icon}
                         </span>
                     )}
+                    {/* 3-level hierarchy level 3: kicker label — smallest, muted */}
                     <span className="font-mono text-[9px] font-medium uppercase tracking-[0.15em] text-muted-foreground truncate">
                         {label}
                     </span>
                 </div>
                 {authority && (
                     <span
-                        className="shrink-0 rounded-[var(--radius-sm)] border border-border/50 px-1 py-px font-mono text-[8px] font-medium text-muted-foreground/60"
-                        title={`Authority: ${authority} (${AUTHORITY_LABEL[authority]})`}
+                        className="shrink-0 rounded-[var(--radius-sm)] border border-border/40 px-1 py-px font-mono text-[8px] text-muted-foreground/50"
+                        title={`Authority: ${authority} — ${AUTHORITY_LABEL[authority]}`}
                     >
                         {authority}
                     </span>
                 )}
             </div>
 
-            {/* Value */}
+            {/*
+             * 3-level hierarchy:
+             *   L1 hero value: 2rem — dominant, draws the eye first (Von Restorff)
+             *   L2 subordinate value: 1.125rem — clearly smaller, scannable
+             *   L3 label/caption: 9px mono kicker — lowest
+             *
+             * All values: JetBrains Mono tabular-nums (numerical cognition, column alignment)
+             */}
             <span
-                className={`font-mono font-semibold leading-none tabular-nums text-foreground ${
-                    isHero ? "text-[1.5rem]" : "text-[1.25rem]"
+                className={`font-mono font-semibold leading-none tabular-nums ${
+                    isHero
+                        ? "text-[2rem] text-foreground"
+                        : "text-[1.125rem] text-foreground/80"
                 }`}
             >
                 {value}
             </span>
 
-            {/* Delta */}
+            {/* Delta — color + direction (redundant coding) */}
             {delta != null && delta !== "" && (
                 <span
                     className={`font-mono text-[10px] font-medium tabular-nums ${deltaColor(
@@ -114,16 +123,17 @@ export function StatCard({
                         deltaIsPositiveGood,
                     )}`}
                 >
+                    {deltaDirection === "up" ? "↑ " : deltaDirection === "down" ? "↓ " : ""}
                     {delta}
                 </span>
             )}
 
-            {/* Sparkline slot */}
-            {spark && <div className="h-6 w-full">{spark}</div>}
+            {/* Sparkline slot — hero only (progressive disclosure, Tufte) */}
+            {spark && isHero && <div className="h-7 w-full">{spark}</div>}
 
-            {/* Caption */}
+            {/* Caption — lowest hierarchy, muted */}
             {caption && (
-                <span className="font-mono text-[9px] text-muted-foreground/60">{caption}</span>
+                <span className="font-mono text-[9px] text-muted-foreground/50">{caption}</span>
             )}
         </div>
     );

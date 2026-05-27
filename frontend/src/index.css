@@ -6,93 +6,78 @@
 @import "./design/tokens.css";
 
 /*
- * Phase 4 Flagship — "Data-Dense Pro, Neutral-Cool Dark" palette.
- * See docs/frontend/W-PHASE4-DIRECTION.md.
+ * Phase 4 Flagship — "Data-Dense Pro, Neutral-Cool Dark"
+ * Evidence-Based Design pass (W-Phase4 §3).
  *
- * Dark-first: :root encodes the cool-neutral dark instrument-panel look.
- * Ground: #0e0f13 (near-black neutral, no brown).
- * Card:   #16171c (cool-slate raised surface).
+ * Dark-ergonomics: foreground softened to #dcdee6 (87% L) — reduces halation
+ * vs pure-white (#e2e4ec 90% L). Primary accent desaturated 84%→72% to cut
+ * electric glare while staying WCAG AA.
  *
- * Accent: electric indigo #6366f1 — rationed (CTAs, active state, focus).
- * Indigo hue 239° — clearly distinct from T1 blue (210°) and T2 green (148°).
- * No warm tones, no brown, no clay. Cool-gray text ramp throughout.
+ * See docs/frontend/W-PHASE4-DIRECTION.md §evidence for principle mapping.
  */
 @layer base {
   :root {
     /* === Cool-neutral dark ground === */
-    --background: 228 14% 7%;         /* #0e0f13 near-black neutral */
-    --foreground: 220 14% 90%;        /* #e2e4ec cool-gray text */
+    --background: 228 14% 7%;         /* #0e0f13 — near-black, no brown */
+    --foreground: 220 10% 87%;        /* #dcdee6 — off-white, halation-reduced */
 
-    --card: 228 12% 10%;              /* #16171c cool-slate surface */
-    --card-foreground: 220 14% 90%;
+    --card: 228 12% 10%;              /* #16171c — raised surface */
+    --card-foreground: 220 10% 87%;
 
     --popover: 228 11% 12%;
-    --popover-foreground: 220 14% 90%;
+    --popover-foreground: 220 10% 87%;
 
-    /* Indigo accent — rationed. CTAs, active nav, focus rings.
-     * NOT data series, NOT authority badges.
-     * Hue 239° — 29° from T1 blue (210°), 91° from T2 green (148°). */
-    --primary: 239 84% 67%;           /* #6366f1 electric indigo */
-    --primary-foreground: 228 14% 7%; /* near-black on indigo (WCAG AA) */
+    /*
+     * Indigo accent — desaturated 84%→72% for reduced glare on dark ground.
+     * Still WCAG AA on card. Rationed: CTAs, active nav, focus, hero KPI wash.
+     */
+    --primary: 239 72% 68%;           /* #6e71f2 — indigo, desaturated */
+    --primary-foreground: 228 14% 7%; /* near-black on indigo */
 
-    /* Panel surfaces */
-    --secondary: 228 10% 13%;         /* #1c1d23 slightly elevated */
-    --secondary-foreground: 220 10% 72%; /* #aeb1be */
+    /* Surfaces */
+    --secondary: 228 10% 13%;         /* #1c1d23 */
+    --secondary-foreground: 220 8% 68%; /* #a8aab4 */
 
     --muted: 228 9% 12%;
-    --muted-foreground: 220 8% 58%;   /* #8e9099 — 4.76:1 AA on card */
+    --muted-foreground: 220 8% 55%;   /* #898b96 — 4.52:1 AA on card */
 
     --accent: 228 10% 15%;
-    --accent-foreground: 220 12% 82%;
+    --accent-foreground: 220 10% 80%;
 
-    --destructive: 0 72% 62%;         /* #e85e5e — 4.55:1 AA on card */
-    --destructive-foreground: 220 14% 90%;
+    --destructive: 0 65% 60%;         /* #e06060 — 4.56:1 AA on card */
+    --destructive-foreground: 220 10% 87%;
 
-    --border: 228 10% 16%;            /* #222431 cool hairline */
-    --input: 228 10% 16%;
-    --ring: 239 84% 67%;              /* indigo focus ring */
+    --border: 228 10% 17%;            /* #242534 — slightly lighter for visibility */
+    --input: 228 10% 17%;
+    --ring: 239 72% 68%;
 
-    /* Tight instrument-panel radii */
-    --radius: 0.375rem;               /* 6px */
+    --radius: 0.375rem;               /* 6px — instrument density */
 
-    /* Cool-black depth tokens */
+    /* Cool-black depth */
     --shadow-card: 0 1px 3px hsl(228 20% 4% / 0.5), 0 4px 12px hsl(228 20% 4% / 0.4);
     --shadow-pop:  0 8px 32px hsl(228 20% 4% / 0.7), 0 2px 8px hsl(228 20% 4% / 0.5);
   }
 
-  /*
-   * Light mode — cool-neutral fallback.
-   * Apply via class="light" on <html>.
-   */
   .light {
     --background: 220 20% 97%;
     --foreground: 228 16% 14%;
-
     --card: 220 18% 100%;
     --card-foreground: 228 16% 14%;
-
     --popover: 220 18% 100%;
     --popover-foreground: 228 16% 14%;
-
-    --primary: 239 68% 52%;           /* deeper indigo for AA on light */
+    --primary: 239 68% 52%;
     --primary-foreground: 220 20% 97%;
-
     --secondary: 220 14% 93%;
     --secondary-foreground: 228 14% 22%;
-
     --muted: 220 12% 94%;
     --muted-foreground: 220 8% 44%;
-
     --accent: 220 14% 91%;
     --accent-foreground: 228 14% 20%;
-
     --destructive: 0 72% 50%;
     --destructive-foreground: 220 20% 97%;
-
     --border: 220 12% 86%;
     --input: 220 12% 86%;
     --ring: 239 68% 52%;
-
     --shadow-card: 0 1px 2px hsl(228 16% 14% / 0.06), 0 4px 16px hsl(228 16% 14% / 0.07);
     --shadow-pop:  0 8px 30px hsl(228 16% 14% / 0.15);
   }
@@ -105,24 +90,14 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    /*
-     * Cool dark ground: faint indigo bloom top-right, no warm washes.
-     * Subtle vignette via radial gradients only — no color leakage.
-     */
+    /* Faint indigo bloom top-right — no warm tones */
     background-image:
-      radial-gradient(800px circle at 85% 0%, hsl(239 84% 67% / 0.06), transparent 50%),
+      radial-gradient(800px circle at 85% 0%, hsl(239 72% 68% / 0.05), transparent 50%),
       radial-gradient(600px circle at 0% 100%, hsl(228 12% 10% / 0.8), transparent 60%);
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
 
-  .light body {
-    background-image:
-      radial-gradient(900px circle at 90% -5%, hsl(239 68% 52% / 0.04), transparent 44%),
-      radial-gradient(700px circle at -5% 105%, hsl(220 20% 88% / 0.5), transparent 48%);
-  }
-
-  /* Display: IBM Plex Sans — tight tracking for headings */
   .font-display {
     letter-spacing: -0.018em;
     font-feature-settings: "ss01" 1, "cv01" 1;
@@ -130,7 +105,6 @@
 }
 
 @layer components {
-  /* === Surfaces — cool borders, deep shadows, tight radii === */
   .surface-card {
     @apply bg-card border border-border rounded-[var(--radius)];
     box-shadow: var(--shadow-card);
@@ -145,19 +119,16 @@
     @apply bg-muted/60 border border-border rounded-[var(--radius-sm)];
   }
 
-  /* Chart panel: recessed instrument-display feel */
   .chart-panel {
     @apply bg-card border border-border rounded-[var(--radius)] relative;
     box-shadow: var(--shadow-card);
-    border-top-color: hsl(228 12% 20%);
   }
 
-  /* Section headings: IBM Plex Sans 600 */
   .section-title {
     @apply text-base font-semibold font-display tracking-tight text-foreground;
   }
 
-  /* Kicker: mono uppercase label */
+  /* Kicker: mono ALL-CAPS label at lowest hierarchy level */
   .section-kicker {
     @apply font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground;
   }
@@ -179,39 +150,59 @@
     @apply text-muted-foreground hover:text-foreground hover:bg-card/50;
   }
 
-  /* Filter chips */
   .filter-chip {
-    @apply px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-medium border border-border
-           bg-muted/40 text-muted-foreground transition-colors;
+    @apply px-2 py-0.5 rounded-[var(--radius-sm)] text-[10px] font-medium border border-border/60
+           bg-transparent text-muted-foreground transition-colors cursor-pointer;
   }
 
   .filter-chip-active {
-    @apply border-primary/60 bg-primary/10 text-primary;
+    @apply border-primary/50 bg-primary/8 text-primary;
   }
 
   .filter-chip-inactive {
-    @apply hover:border-border hover:text-foreground hover:bg-muted/70;
+    @apply hover:border-border hover:text-foreground hover:bg-secondary/60;
   }
 
-  /* Field controls: cool dark-first */
+  /* Field controls */
   .field-control {
-    @apply w-full rounded-[var(--radius)] border border-input bg-muted/50 px-3 py-1.5
-           text-sm text-foreground transition-colors placeholder:text-muted-foreground;
-    @apply focus:outline-none focus:border-primary/70 focus:ring-1 focus:ring-[hsl(var(--ring)/0.3)]
+    @apply w-full rounded-[var(--radius)] border border-input bg-muted/40 px-2.5 py-1.5
+           text-sm text-foreground transition-colors placeholder:text-muted-foreground/60;
+    @apply focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-[hsl(var(--ring)/0.25)]
            focus:bg-card;
   }
 
-  /* Runs table row */
-  .runs-row {
-    @apply border-b border-border/50 transition-colors hover:bg-secondary/60 cursor-pointer;
+  /*
+   * Cluster region — Gestalt common-region grouping via background fill,
+   * NOT a dividing border. Groups related KPIs without adding visual noise.
+   */
+  .rail-cluster {
+    @apply rounded-[var(--radius)] bg-secondary/40 p-2;
   }
 
-  .runs-row-selected {
-    @apply bg-primary/8 border-b border-primary/20;
+  /*
+   * Verdict pill — pre-attentive: color + icon + label (3 channels, Jakob's Law).
+   * Color-blind safe: shape (icon) + position carry the signal without hue alone.
+   */
+  .verdict-pass {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--success)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--success))];
+  }
+
+  .verdict-hold {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--warning)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--warning))];
+  }
+
+  .verdict-fail {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--destructive)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--destructive))];
   }
 }
 
-/* === Staggered rise entrance — dense UI timing === */
+/* === Staggered rise entrance === */
 @keyframes rise {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }

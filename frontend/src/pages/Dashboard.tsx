@@ -5,41 +5,39 @@ import {
     AlertCircle,
     ArrowUpRight,
     Check,
+    CheckCircle2,
     ChevronDown,
     ChevronUp,
     Clock,
     Cpu,
     Database,
-    DollarSign,
     GitCompareArrows,
     Layers,
+    MinusCircle,
     Search,
     TrendingDown,
     TrendingUp,
-    X,
+    XCircle,
 } from "lucide-react";
 import { Layout } from "../components/Layout";
 /*
- * Phase 4 "Data-Dense Pro, Neutral-Cool Dark" Dashboard.
+ * Phase 4 Evidence-Based Design pass — Dashboard.tsx
  *
- * STRUCTURAL CHANGE — not just a recolor:
- * Previous layout: stacked vertical (header → filters → KPIs → charts → card grid)
- * New layout: true multi-panel command center
- *   ┌─────────────────────────────────────────────────────────────┐
- *   │ Command bar: search · date · project · actions (full width) │
- *   ├──────────────┬──────────────────────────────────────────────┤
- *   │ Left rail    │ Chart zone (dominant, 2-up side-by-side)     │
- *   │ 4 KPI tiles  │                                              │
- *   │ (vertical)   ├──────────────────────────────────────────────┤
- *   │              │ Runs table (dense, sortable — not card grid) │
- *   └──────────────┴──────────────────────────────────────────────┘
+ * STRUCTURE UNCHANGED: command bar + left rail + chart zone + runs table.
+ * This pass applies 12 cognitive/UX principles as surgical refinements:
  *
- * Key IA decisions:
- * - KPIs move to a persistent left rail — always visible while scrolling
- * - Charts are the dominant center-right zone, much larger than before
- * - Runs are a dense TABLE (not cards) — 8-10 columns, sortable headers
- * - Filters live in a compact command bar at the top, always accessible
- * - Floating compare bar retained but repositioned
+ *  1. Von Restorff   — hero pass-rate KPI visually isolated (2rem vs 1.125rem)
+ *  2. Miller         — rail KPIs grouped into "Quality" / "Throughput" clusters
+ *  3. Gestalt        — clusters use rail-cluster region fills, not divider lines
+ *  4. Hick's Law     — command bar: New Run is sole primary; Compare is icon-only
+ *  5. Fitts's Law    — row py-3 (generous target); sort headers have -m-1 padding
+ *  6. Pre-attentive  — verdict: icon shape + color + label (3 channels)
+ *  7. Recognition    — active filters echoed in persistent state summary strip
+ *  8. F-pattern      — numbers right-aligned; consistent 1-decimal precision
+ *  9. Color-blind    — verdict uses icon+label redundant coding beyond hue alone
+ * 10. Halation       — foreground #dcdee6 (off-white), primary desaturated 72%
+ * 11. Prog. disc.    — metric tags collapsed to "+N"; detail behind row click
+ * 12. Jakob's Law    — sort chevrons, sparklines, status pills all conventional
  *
  * Data hooks / logic UNCHANGED. See docs/frontend/W-PHASE4-DIRECTION.md.
  */
@@ -122,59 +120,103 @@ function fmtCostDelta(d: number | undefined): string | null {
     return `${d > 0 ? "+" : "-"}$${Math.abs(d).toFixed(2)}`;
 }
 
-// Tooltip style — cool dark surface
+// Tooltip — cool dark surface, mono font (Jakob's Law: Grafana convention)
 const TOOLTIP_STYLE = {
     borderRadius: "var(--radius)",
     border: "1px solid hsl(var(--border))",
     background: "hsl(228 12% 13%)",
-    color: "hsl(220 14% 88%)",
+    color: "hsl(220 10% 87%)",
     boxShadow: "var(--shadow-pop)",
     fontSize: "10px",
     fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+    padding: "6px 10px",
 } as const;
 
-// Chart grid color — cool neutral
-const CHART_GRID = "hsl(228 10% 18%)";
+// Tufte: minimal grid — very faint, just enough to anchor the axis
+const CHART_GRID = "hsl(228 10% 20% / 0.6)";
 
-// Dial color: status-semantic only, never brand indigo
+// Dial/verdict color: status-semantic only, NEVER brand indigo
 function dialColor(rate: number): string {
     if (rate >= 0.7) return "hsl(var(--success))";
     if (rate >= 0.5) return "hsl(var(--warning))";
     return "hsl(var(--destructive))";
 }
 
-// Sortable column header
+/*
+ * VerdictPill — pre-attentive processing + color-blind safety (principle 6 & 9):
+ * Encodes verdict via THREE independent channels so hue alone is never the sole signal:
+ *   1. Hue: green / amber / red
+ *   2. Icon shape: CheckCircle2 / MinusCircle / XCircle  (shape distinguishable in B&W)
+ *   3. Text label: "pass" / "hold" / "fail"
+ */
+function VerdictPill({ rate }: { rate: number }) {
+    if (rate >= 0.7) {
+        return (
+            <span className="verdict-pass" title={`${(rate * 100).toFixed(1)}% — evaluation passed`}>
+                <CheckCircle2 className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                pass
+            </span>
+        );
+    }
+    if (rate >= 0.5) {
+        return (
+            <span className="verdict-hold" title={`${(rate * 100).toFixed(1)}% — hold for review`}>
+                <MinusCircle className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                hold
+            </span>
+        );
+    }
+    return (
+        <span className="verdict-fail" title={`${(rate * 100).toFixed(1)}% — failed threshold`}>
+            <XCircle className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            fail
+        </span>
+    );
+}
+
+/*
+ * SortHeader — Fitts's Law: larger invisible hit area via p-1 -m-1.
+ * Jakob's Law: chevron up/down is the canonical sort-direction pattern.
+ */
 function SortHeader({
     label,
     sortKey,
     current,
     dir,
     onSort,
+    align = "left",
 }: {
     label: string;
     sortKey: SortKey;
     current: SortKey;
     dir: SortDir;
     onSort: (k: SortKey) => void;
+    align?: "left" | "right";
 }) {
     const active = current === sortKey;
     return (
         <button
             type="button"
             onClick={() => onSort(sortKey)}
-            className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            // Fitts: generous hit area without visible size increase
+            className={`inline-flex items-center gap-0.5 p-1 -m-1 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors rounded-[var(--radius-sm)] ${
+                align === "right" ? "flex-row-reverse" : ""
+            } ${
+                active
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
             }`}
+            aria-sort={active ? (dir === "desc" ? "descending" : "ascending") : "none"}
         >
             {label}
             {active ? (
                 dir === "desc" ? (
-                    <ChevronDown className="h-2.5 w-2.5" />
+                    <ChevronDown className="h-2.5 w-2.5 shrink-0" />
                 ) : (
-                    <ChevronUp className="h-2.5 w-2.5" />
+                    <ChevronUp className="h-2.5 w-2.5 shrink-0" />
                 )
             ) : (
-                <ChevronDown className="h-2.5 w-2.5 opacity-30" />
+                <ChevronDown className="h-2.5 w-2.5 shrink-0 opacity-25" />
             )}
         </button>
     );
@@ -316,7 +358,7 @@ export function Dashboard() {
         () =>
             trendSeries.map((pt) => ({
                 date: pt.date,
-                passRate: pt.totalCases > 0 ? Number((pt.passRate * 100).toFixed(2)) : null,
+                passRate: pt.totalCases > 0 ? Number((pt.passRate * 100).toFixed(1)) : null,
                 totalCases: pt.totalCases,
             })),
         [trendSeries],
@@ -343,7 +385,7 @@ export function Dashboard() {
             const row: MetricTrendRow = { date: pt.date };
             selectedMetrics.forEach((m) => {
                 const v = pt.metricAverages[m];
-                row[m] = typeof v === "number" ? Number((v * 100).toFixed(2)) : null;
+                row[m] = typeof v === "number" ? Number((v * 100).toFixed(1)) : null;
             });
             return row;
         });
@@ -356,6 +398,18 @@ export function Dashboard() {
             return next.size === prev.size ? prev : next;
         });
     }, [filteredRuns]);
+
+    // Active filter summary — recognition over recall (principle 7)
+    const activeFilterSummary = useMemo(() => {
+        const parts: string[] = [];
+        const rangeLabel = DATE_RANGE_OPTIONS.find((o) => o.value === rangePreset)?.label ?? rangePreset;
+        parts.push(rangeLabel);
+        if (!selectedProjects.includes(PROJECT_ALL)) {
+            parts.push(selectedProjects.join(", "));
+        }
+        if (searchQuery.trim()) parts.push(`"${searchQuery.trim()}"`);
+        return parts.join(" · ");
+    }, [rangePreset, selectedProjects, searchQuery]);
 
     // ------------------------------------------------------------------ //
     //  Loading / error states
@@ -395,7 +449,7 @@ export function Dashboard() {
     }
 
     // ------------------------------------------------------------------ //
-    //  Main render — multi-panel command center layout
+    //  Main render — same structure, evidence-based refinements applied
     // ------------------------------------------------------------------ //
 
     return (
@@ -403,33 +457,32 @@ export function Dashboard() {
             <div className="flex h-full flex-col">
 
                 {/* ══════════════════════════════════════════════════════
-                 *  COMMAND BAR — full-width, sticky, compact
-                 *  Contains: page title + search + date + project + actions
-                 *  Replaces the old stacked header + separate filter section
+                 *  COMMAND BAR — Hick's Law: single primary action (New Run);
+                 *  Compare demoted to icon-only with tooltip.
+                 *  Recognition: active filter summary echoed below controls.
                  * ══════════════════════════════════════════════════════ */}
                 <div className="reveal reveal-1 sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-                    <div className="flex items-center gap-3 px-5 py-2.5">
-                        {/* Title block */}
+                    {/* Main controls row */}
+                    <div className="flex items-center gap-2.5 px-5 py-2">
+                        {/* Title — 3-level type hierarchy L2 */}
                         <div className="shrink-0">
-                            <h1 className="font-display text-sm font-semibold text-foreground leading-tight">
+                            <h1 className="font-display text-sm font-semibold leading-tight text-foreground">
                                 Evaluation Overview
                             </h1>
-                            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                                eval dashboard
-                            </p>
                         </div>
 
-                        <div className="mx-1 h-8 w-px bg-border/60 shrink-0" />
+                        <div className="mx-1 h-6 w-px bg-border/50 shrink-0" />
 
                         {/* Search */}
-                        <div className="relative w-48 shrink-0">
-                            <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                        <div className="relative w-44 shrink-0">
+                            <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/60" />
                             <input
                                 type="text"
                                 placeholder="dataset · model · run-id"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="field-control pl-6 py-1 text-xs h-7"
+                                className="field-control pl-6 py-1 text-[11px] h-7"
+                                aria-label="Search runs"
                             />
                         </div>
 
@@ -437,7 +490,9 @@ export function Dashboard() {
                         <select
                             value={rangePreset}
                             onChange={(e) => setRangePreset(e.target.value as DateRangePreset)}
-                            className="field-control h-7 py-0 text-xs w-36 shrink-0"
+                            className="field-control h-7 py-0 text-[11px] w-34 shrink-0"
+                            aria-label="Date range"
+                            style={{ width: "8.5rem" }}
                         >
                             {DATE_RANGE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>
@@ -446,28 +501,29 @@ export function Dashboard() {
                             ))}
                         </select>
 
-                        {/* Custom range inline */}
                         {rangePreset === "custom" && (
                             <>
                                 <input
                                     type="date"
                                     value={customStart}
                                     onChange={(e) => setCustomStart(e.target.value)}
-                                    className="field-control h-7 py-0 text-xs w-32 shrink-0"
+                                    className="field-control h-7 py-0 text-[11px] w-32 shrink-0"
+                                    aria-label="Start date"
                                 />
-                                <span className="font-mono text-[9px] text-muted-foreground shrink-0">→</span>
+                                <span className="font-mono text-[9px] text-muted-foreground/50 shrink-0">→</span>
                                 <input
                                     type="date"
                                     value={customEnd}
                                     onChange={(e) => setCustomEnd(e.target.value)}
-                                    className="field-control h-7 py-0 text-xs w-32 shrink-0"
+                                    className="field-control h-7 py-0 text-[11px] w-32 shrink-0"
+                                    aria-label="End date"
                                 />
                             </>
                         )}
 
-                        {/* Project chips — compact, inline */}
-                        <div className="flex items-center gap-1 flex-wrap">
-                            {[PROJECT_ALL, ...projectOptions.slice(0, 4)].map((p) => {
+                        {/* Project chips — reduced visual weight (Hick's Law) */}
+                        <div className="flex items-center gap-1" role="group" aria-label="Project filter">
+                            {[PROJECT_ALL, ...projectOptions.slice(0, 3)].map((p) => {
                                 const active = selectedProjects.includes(p);
                                 return (
                                     <button
@@ -475,160 +531,186 @@ export function Dashboard() {
                                         type="button"
                                         onClick={() => toggleProject(p)}
                                         aria-pressed={active}
-                                        className={`filter-chip py-0.5 text-[10px] h-6 ${
-                                            active ? "filter-chip-active" : "filter-chip-inactive"
-                                        }`}
+                                        className={`filter-chip ${active ? "filter-chip-active" : "filter-chip-inactive"}`}
                                     >
                                         {projectLabel(p)}
                                     </button>
                                 );
                             })}
-                            {projectOptions.length > 4 && (
-                                <button
-                                    type="button"
-                                    onClick={() => toggleProject(PROJECT_UNASSIGNED)}
-                                    className="filter-chip py-0.5 text-[10px] h-6 filter-chip-inactive"
-                                >
-                                    +{projectOptions.length - 4}
-                                </button>
+                            {projectOptions.length > 3 && (
+                                <span className="font-mono text-[9px] text-muted-foreground/50 px-1">
+                                    +{projectOptions.length - 3}
+                                </span>
                             )}
                         </div>
 
-                        {/* Scope badge */}
-                        <span className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-primary/20 bg-primary/8 px-1.5 py-px font-mono text-[9px] text-primary shrink-0">
+                        {/* Scope count — low-weight, right of chips (recognition) */}
+                        <span
+                            className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/60 shrink-0"
+                            aria-live="polite"
+                            aria-label={`${filteredRuns.length} runs in scope`}
+                        >
                             <Layers className="h-2.5 w-2.5" />
                             {filteredRuns.length}
                         </span>
 
-                        {/* Actions — pushed right */}
-                        <div className="ml-auto flex shrink-0 items-center gap-2">
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                leading={<GitCompareArrows className="h-3 w-3" />}
-                                disabled={selectedRuns.size !== 2}
+                        {/* Actions — Hick's Law: one clear primary, one demoted secondary */}
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                            {/* Compare: icon-only, demoted — only relevant when 2 selected */}
+                            <button
+                                type="button"
                                 onClick={handleCompare}
+                                disabled={selectedRuns.size !== 2}
                                 title={
                                     selectedRuns.size === 2
                                         ? "Compare selected runs"
-                                        : "Select exactly 2 runs"
+                                        : "Select exactly 2 runs to compare"
                                 }
+                                aria-label="Compare selected runs"
+                                className={`flex h-7 w-7 items-center justify-center rounded-[var(--radius)] border transition-colors ${
+                                    selectedRuns.size === 2
+                                        ? "border-border text-foreground hover:bg-secondary/60 hover:border-border"
+                                        : "border-border/30 text-muted-foreground/30 cursor-not-allowed"
+                                }`}
                             >
-                                Compare
-                            </Button>
+                                <GitCompareArrows className="h-3.5 w-3.5" />
+                            </button>
+                            {/* New Run: sole primary CTA — Hick's Law, Fitts's Law */}
                             <Button
                                 variant="primary"
                                 size="sm"
-                                leading={<ArrowUpRight className="h-3 w-3" />}
+                                leading={<ArrowUpRight className="h-3.5 w-3.5" />}
                                 onClick={() => navigate("/studio")}
                             >
                                 New run
                             </Button>
                         </div>
                     </div>
+
+                    {/* Recognition over recall: active-filter summary strip (principle 7) */}
+                    <div className="flex items-center gap-2 border-t border-border/30 px-5 py-1">
+                        <span className="font-mono text-[9px] text-muted-foreground/40 uppercase tracking-[0.15em] shrink-0">
+                            scope
+                        </span>
+                        <span className="font-mono text-[9px] text-muted-foreground/60 truncate">
+                            {activeFilterSummary}
+                        </span>
+                    </div>
                 </div>
 
                 {/* ══════════════════════════════════════════════════════
-                 *  BODY — two-column: left rail + main content
+                 *  BODY — same two-column: left rail + main content
                  * ══════════════════════════════════════════════════════ */}
                 <div className="flex flex-1 min-h-0">
 
-                    {/* ─── LEFT RAIL — persistent KPI column ──────────── */}
-                    <aside className="reveal reveal-2 w-44 shrink-0 border-r border-border bg-card/50 flex flex-col gap-0 overflow-y-auto">
-                        {/* Rail header */}
-                        <div className="px-3 pt-3 pb-2 border-b border-border/60">
-                            <p className="font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/60">
-                                Metrics
+                    {/* ─── LEFT RAIL — KPIs chunked into labeled clusters ── */}
+                    <aside className="reveal reveal-2 w-44 shrink-0 border-r border-border bg-card/30 flex flex-col overflow-y-auto">
+
+                        {/*
+                         * Miller's Law / chunking (principle 2):
+                         * Cluster 1 — QUALITY: the single decision-relevant KPI.
+                         * Von Restorff: isolated by its own region fill + hero tone.
+                         * Gestalt: rail-cluster uses bg fill, not a divider line.
+                         */}
+                        <div className="px-2.5 pt-3 pb-1">
+                            {/* Cluster label — 3-level hierarchy L3 */}
+                            <p className="mb-1.5 font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/40">
+                                Quality
                             </p>
+                            <div className="rail-cluster">
+                                <StatCard
+                                    tone="hero"
+                                    label="Pass Rate"
+                                    value={`${(stats.avgPassRate * 100).toFixed(1)}%`}
+                                    delta={fmtPctDelta(deltas?.avgPassRate)}
+                                    deltaDirection={deltaDir(deltas?.avgPassRate)}
+                                    deltaIsPositiveGood
+                                    authority="T2"
+                                    icon={
+                                        deltas && deltas.avgPassRate < 0
+                                            ? <TrendingDown className="h-2.5 w-2.5" />
+                                            : <TrendingUp className="h-2.5 w-2.5" />
+                                    }
+                                    spark={
+                                        passRateSeries.length > 1 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={passRateSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                                    <defs>
+                                                        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="0%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0.3} />
+                                                            <stop offset="100%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="passRate"
+                                                        stroke={CHART_PASS_RATE_COLOR}
+                                                        strokeWidth={1.5}
+                                                        fill="url(#sparkGrad)"
+                                                        connectNulls
+                                                        isAnimationActive={false}
+                                                        dot={false}
+                                                    />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        ) : null
+                                    }
+                                    caption="vs prev period"
+                                />
+                            </div>
                         </div>
 
-                        {/* KPI tiles — stacked vertically */}
-                        <div className="flex flex-col gap-px p-2">
-                            <StatCard
-                                tone="hero"
-                                label="Pass Rate"
-                                value={`${(stats.avgPassRate * 100).toFixed(1)}%`}
-                                delta={fmtPctDelta(deltas?.avgPassRate)}
-                                deltaDirection={deltaDir(deltas?.avgPassRate)}
-                                deltaIsPositiveGood
-                                authority="T2"
-                                icon={
-                                    deltas && deltas.avgPassRate < 0
-                                        ? <TrendingDown className="h-2.5 w-2.5" />
-                                        : <TrendingUp className="h-2.5 w-2.5" />
-                                }
-                                spark={
-                                    passRateSeries.length > 1 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={passRateSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0.35} />
-                                                        <stop offset="100%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="passRate"
-                                                    stroke={CHART_PASS_RATE_COLOR}
-                                                    strokeWidth={1.5}
-                                                    fill="url(#sparkGrad)"
-                                                    connectNulls
-                                                    isAnimationActive={false}
-                                                    dot={false}
-                                                />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    ) : null
-                                }
-                                caption="vs prev period"
-                            />
-
-                            <StatCard
-                                label="Runs"
-                                value={stats.totalRuns.toLocaleString()}
-                                delta={fmtCountDelta(deltas?.totalRuns)}
-                                deltaDirection={deltaDir(deltas?.totalRuns)}
-                                deltaIsPositiveGood
-                                authority="T1"
-                                icon={<Database className="h-2.5 w-2.5" />}
-                                caption="in scope"
-                            />
-
-                            <StatCard
-                                label="Test Cases"
-                                value={stats.totalTestCases.toLocaleString()}
-                                delta={fmtCountDelta(deltas?.totalTestCases)}
-                                deltaDirection={deltaDir(deltas?.totalTestCases)}
-                                deltaIsPositiveGood
-                                authority="T1"
-                                icon={<Activity className="h-2.5 w-2.5" />}
-                                caption="evaluated"
-                            />
-
-                            <StatCard
-                                label="LLM Cost"
-                                value={`$${stats.totalCost.toFixed(2)}`}
-                                delta={fmtCostDelta(deltas?.totalCost)}
-                                deltaDirection={deltaDir(deltas?.totalCost)}
-                                deltaIsPositiveGood={false}
-                                authority="T1"
-                                icon={<DollarSign className="h-2.5 w-2.5" />}
-                                caption="USD in scope"
-                            />
+                        {/*
+                         * Miller / chunking — Cluster 2: THROUGHPUT
+                         * Gestalt: separate region fill, no divider line between clusters.
+                         * Three subordinate KPIs grouped logically (runs + cases + cost).
+                         */}
+                        <div className="px-2.5 pt-2 pb-3">
+                            <p className="mb-1.5 font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/40">
+                                Throughput
+                            </p>
+                            <div className="rail-cluster flex flex-col gap-px">
+                                <StatCard
+                                    label="Runs"
+                                    value={stats.totalRuns.toLocaleString()}
+                                    delta={fmtCountDelta(deltas?.totalRuns)}
+                                    deltaDirection={deltaDir(deltas?.totalRuns)}
+                                    deltaIsPositiveGood
+                                    authority="T1"
+                                    caption="in scope"
+                                />
+                                <StatCard
+                                    label="Test Cases"
+                                    value={stats.totalTestCases.toLocaleString()}
+                                    delta={fmtCountDelta(deltas?.totalTestCases)}
+                                    deltaDirection={deltaDir(deltas?.totalTestCases)}
+                                    deltaIsPositiveGood
+                                    authority="T1"
+                                    caption="evaluated"
+                                />
+                                <StatCard
+                                    label="LLM Cost"
+                                    value={`$${stats.totalCost.toFixed(2)}`}
+                                    delta={fmtCostDelta(deltas?.totalCost)}
+                                    deltaDirection={deltaDir(deltas?.totalCost)}
+                                    deltaIsPositiveGood={false}
+                                    authority="T1"
+                                    caption="USD"
+                                />
+                            </div>
                         </div>
 
-                        {/* Rail divider */}
-                        <div className="mt-2 mx-3 border-t border-border/40" />
+                        {/* Divider */}
+                        <div className="mx-3 border-t border-border/30" />
 
-                        {/* Metric filter — inline in rail */}
-                        <div className="px-3 pt-3 pb-2">
-                            <p className="mb-2 font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/60">
+                        {/* Chart metric selector — co-located with KPIs (Gestalt proximity) */}
+                        <div className="px-2.5 pt-2.5 pb-3 flex-1">
+                            <p className="mb-1.5 font-mono text-[8px] uppercase tracking-[0.25em] text-muted-foreground/40">
                                 Chart metrics
                             </p>
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-0.5">
                                 {availableMetrics.length === 0 ? (
-                                    <span className="font-mono text-[9px] text-muted-foreground">none</span>
+                                    <span className="font-mono text-[9px] text-muted-foreground/50 px-1.5">none</span>
                                 ) : (
                                     availableMetrics.map((metric, idx) => {
                                         const sel = selectedMetrics.includes(metric);
@@ -647,15 +729,22 @@ export function Dashboard() {
                                                 aria-pressed={sel}
                                                 className={`flex items-center gap-1.5 rounded-[var(--radius-sm)] px-1.5 py-1 text-left transition-colors ${
                                                     sel
-                                                        ? "bg-secondary/80 text-foreground"
-                                                        : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                                                        ? "bg-secondary/70 text-foreground"
+                                                        : "text-muted-foreground/70 hover:bg-secondary/40 hover:text-foreground"
                                                 }`}
                                             >
+                                                {/*
+                                                 * Color-blind safety (principle 9): swatch dot is a
+                                                 * redundant encoding — chart color is also the line label.
+                                                 * When unselected the dot is gray (border color only).
+                                                 */}
                                                 <span
-                                                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                                                    className="h-1.5 w-1.5 shrink-0 rounded-full border"
                                                     style={{
-                                                        background: sel ? swatch : "hsl(var(--border))",
+                                                        background: sel ? swatch : "transparent",
+                                                        borderColor: sel ? swatch : "hsl(var(--border))",
                                                     }}
+                                                    aria-hidden
                                                 />
                                                 <span className="font-mono text-[9px] truncate">{metric}</span>
                                             </button>
@@ -669,7 +758,7 @@ export function Dashboard() {
                     {/* ─── MAIN CONTENT — charts + table ──────────────── */}
                     <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
 
-                        {/* ── CHART ZONE — dominant, side-by-side ──────── */}
+                        {/* ── CHART ZONE ───────────────────────────────── */}
                         <section className="reveal reveal-3 border-b border-border">
                             <div className="grid grid-cols-1 gap-0 xl:grid-cols-2">
 
@@ -677,48 +766,53 @@ export function Dashboard() {
                                 <div className="border-r border-border p-5">
                                     <div className="mb-3 flex items-center justify-between gap-2">
                                         <div>
-                                            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                                                Pass Rate Trend
+                                            {/* 3-level hierarchy: L2 chart title */}
+                                            <p className="font-display text-sm font-semibold tracking-tight text-foreground">
+                                                Pass Rate
                                             </p>
-                                            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground/60">
-                                                weighted by test cases / day
+                                            {/* L3 kicker */}
+                                            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground/50">
+                                                weighted avg · {dateRange.label}
                                             </p>
                                         </div>
                                         <AuthorityBadge level="T2" scope="evaluation_gate" />
                                     </div>
                                     <div className="h-[220px]">
                                         {passRateSeries.length === 0 ? (
-                                            <div className="flex h-full items-center justify-center font-mono text-[10px] text-muted-foreground">
+                                            <div className="flex h-full items-center justify-center font-mono text-[10px] text-muted-foreground/50">
                                                 no data for selected filters
                                             </div>
                                         ) : (
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart
                                                     data={passRateSeries}
-                                                    margin={{ top: 4, right: 8, left: -12, bottom: 0 }}
+                                                    margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
                                                 >
                                                     <defs>
                                                         <linearGradient id="passGrad" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0.2} />
-                                                            <stop offset="95%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0.01} />
+                                                            <stop offset="5%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0.18} />
+                                                            <stop offset="95%" stopColor={CHART_PASS_RATE_COLOR} stopOpacity={0} />
                                                         </linearGradient>
                                                     </defs>
+                                                    {/* Tufte: faint grid at 60% opacity — just enough to anchor axis */}
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID} />
                                                     <XAxis
                                                         dataKey="date"
                                                         stroke="transparent"
-                                                        tick={{ fill: "hsl(220 8% 50%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
+                                                        tick={{ fill: "hsl(220 8% 48%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickFormatter={formatShortDate}
+                                                        interval="preserveStartEnd"
                                                     />
                                                     <YAxis
-                                                        tick={{ fill: "hsl(220 8% 50%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
+                                                        tick={{ fill: "hsl(220 8% 48%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         domain={[0, 100]}
                                                         tickFormatter={(v) => `${v}%`}
-                                                        width={32}
+                                                        width={30}
+                                                        tickCount={5}
                                                     />
                                                     <Tooltip
                                                         formatter={(v: number | undefined) =>
@@ -726,7 +820,7 @@ export function Dashboard() {
                                                         }
                                                         labelFormatter={(l) => `${l}`}
                                                         contentStyle={TOOLTIP_STYLE}
-                                                        cursor={{ stroke: "hsl(228 10% 25%)", strokeWidth: 1 }}
+                                                        cursor={{ stroke: "hsl(228 10% 28%)", strokeWidth: 1 }}
                                                     />
                                                     <Area
                                                         type="monotone"
@@ -736,7 +830,7 @@ export function Dashboard() {
                                                         fill="url(#passGrad)"
                                                         name="pass rate"
                                                         dot={false}
-                                                        activeDot={{ r: 2.5, strokeWidth: 0, fill: CHART_PASS_RATE_COLOR }}
+                                                        activeDot={{ r: 3, strokeWidth: 0, fill: CHART_PASS_RATE_COLOR }}
                                                     />
                                                 </AreaChart>
                                             </ResponsiveContainer>
@@ -748,50 +842,52 @@ export function Dashboard() {
                                 <div className="p-5">
                                     <div className="mb-3 flex items-center justify-between gap-2">
                                         <div>
-                                            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                                            <p className="font-display text-sm font-semibold tracking-tight text-foreground">
                                                 Metric Trends
                                             </p>
-                                            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground/60">
-                                                average scores over time
+                                            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground/50">
+                                                daily avg · select in rail
                                             </p>
                                         </div>
                                         <AuthorityBadge level="T1" scope="metric_evidence" />
                                     </div>
                                     <div className="h-[220px]">
                                         {metricSeries.length === 0 || selectedMetrics.length === 0 ? (
-                                            <div className="flex h-full items-center justify-center font-mono text-[10px] text-muted-foreground">
+                                            <div className="flex h-full items-center justify-center font-mono text-[10px] text-muted-foreground/50">
                                                 select metrics in the left rail
                                             </div>
                                         ) : (
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <LineChart
                                                     data={metricSeries}
-                                                    margin={{ top: 4, right: 8, left: -12, bottom: 0 }}
+                                                    margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
                                                 >
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID} />
                                                     <XAxis
                                                         dataKey="date"
                                                         stroke="transparent"
-                                                        tick={{ fill: "hsl(220 8% 50%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
+                                                        tick={{ fill: "hsl(220 8% 48%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         tickFormatter={formatShortDate}
+                                                        interval="preserveStartEnd"
                                                     />
                                                     <YAxis
-                                                        tick={{ fill: "hsl(220 8% 50%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
+                                                        tick={{ fill: "hsl(220 8% 48%)", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}
                                                         tickLine={false}
                                                         axisLine={false}
                                                         domain={[0, 100]}
                                                         tickFormatter={(v) => `${v}%`}
-                                                        width={32}
+                                                        width={30}
+                                                        tickCount={5}
                                                     />
                                                     <Tooltip
-                                                        formatter={(v: number | undefined) =>
-                                                            v == null ? "—" : `${v.toFixed(1)}%`
+                                                        formatter={(v: number | undefined, name) =>
+                                                            [v == null ? "—" : `${v.toFixed(1)}%`, name]
                                                         }
                                                         labelFormatter={(l) => `${l}`}
                                                         contentStyle={TOOLTIP_STYLE}
-                                                        cursor={{ stroke: "hsl(228 10% 25%)", strokeWidth: 1 }}
+                                                        cursor={{ stroke: "hsl(228 10% 28%)", strokeWidth: 1 }}
                                                     />
                                                     {selectedMetrics.map((metric, idx) => (
                                                         <Line
@@ -801,8 +897,10 @@ export function Dashboard() {
                                                             stroke={CHART_METRIC_COLORS[idx % CHART_METRIC_COLORS.length]}
                                                             strokeWidth={1.5}
                                                             dot={false}
-                                                            activeDot={{ r: 2.5, strokeWidth: 0 }}
+                                                            activeDot={{ r: 3, strokeWidth: 0 }}
                                                             connectNulls
+                                                            // Jakob's Law: name shown in tooltip (recognition)
+                                                            name={metric}
                                                         />
                                                     ))}
                                                 </LineChart>
@@ -813,14 +911,15 @@ export function Dashboard() {
                             </div>
                         </section>
 
-                        {/* ── RUNS TABLE — dense, sortable, not card grid ── */}
+                        {/* ── RUNS TABLE ───────────────────────────────── */}
                         <section className="reveal reveal-4 flex-1 min-h-0">
                             {/* Table header bar */}
-                            <div className="flex items-center justify-between border-b border-border px-5 py-2 bg-secondary/30">
-                                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                                    Recent Runs
+                            <div className="flex items-center justify-between border-b border-border px-5 py-2 bg-secondary/20">
+                                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/60">
+                                    Runs
                                 </p>
-                                <span className="font-mono text-[9px] text-muted-foreground/60">
+                                {/* Numerical cognition: right-aligned count */}
+                                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/40">
                                     {filteredRuns.length} shown
                                 </span>
                             </div>
@@ -836,85 +935,78 @@ export function Dashboard() {
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[800px] border-collapse">
+                                    {/*
+                                     * F-pattern scanning: primary column (Dataset) left-anchored.
+                                     * Numbers right-aligned for column-level comparison.
+                                     * Gestalt: column groups separated by slight header spacing
+                                     * (no explicit border lines between groups — proximity alone).
+                                     *
+                                     * Column conceptual groups:
+                                     *   Identity: [✓] Dataset  Model
+                                     *   Quality:  Pass Rate  Verdict
+                                     *   Volume:   Cases
+                                     *   Detail:   Metrics  (progressive disclosure — muted)
+                                     *   Time:     Started
+                                     */}
+                                    <table className="w-full min-w-[760px] border-collapse">
                                         <thead>
-                                            <tr className="border-b border-border bg-secondary/20">
-                                                {/* Select col */}
-                                                <th className="w-8 px-3 py-2 text-left" />
+                                            <tr className="border-b border-border/60 bg-secondary/15">
+                                                {/* Select */}
+                                                <th className="w-8 px-3 py-2" />
+
+                                                {/* Identity group */}
                                                 <th className="px-3 py-2 text-left">
-                                                    <SortHeader
-                                                        label="Dataset"
-                                                        sortKey="dataset_name"
-                                                        current={sortKey}
-                                                        dir={sortDir}
-                                                        onSort={handleSort}
-                                                    />
+                                                    <SortHeader label="Dataset" sortKey="dataset_name" current={sortKey} dir={sortDir} onSort={handleSort} />
                                                 </th>
                                                 <th className="px-3 py-2 text-left">
-                                                    <SortHeader
-                                                        label="Model"
-                                                        sortKey="model_name"
-                                                        current={sortKey}
-                                                        dir={sortDir}
-                                                        onSort={handleSort}
-                                                    />
+                                                    <SortHeader label="Model" sortKey="model_name" current={sortKey} dir={sortDir} onSort={handleSort} />
                                                 </th>
+
+                                                {/* Quality group — primary sorting target */}
                                                 <th className="px-3 py-2 text-right">
-                                                    <SortHeader
-                                                        label="Pass Rate"
-                                                        sortKey="pass_rate"
-                                                        current={sortKey}
-                                                        dir={sortDir}
-                                                        onSort={handleSort}
-                                                    />
-                                                </th>
-                                                <th className="px-3 py-2 text-right">
-                                                    <SortHeader
-                                                        label="Cases"
-                                                        sortKey="total_test_cases"
-                                                        current={sortKey}
-                                                        dir={sortDir}
-                                                        onSort={handleSort}
-                                                    />
+                                                    <SortHeader label="Pass %" sortKey="pass_rate" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
                                                 </th>
                                                 <th className="px-3 py-2 text-left">
-                                                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
-                                                        Metrics
-                                                    </span>
-                                                </th>
-                                                <th className="px-3 py-2 text-left">
-                                                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+                                                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground/50">
                                                         Verdict
                                                     </span>
                                                 </th>
+
+                                                {/* Volume group */}
                                                 <th className="px-3 py-2 text-right">
-                                                    <SortHeader
-                                                        label="Started"
-                                                        sortKey="started_at"
-                                                        current={sortKey}
-                                                        dir={sortDir}
-                                                        onSort={handleSort}
-                                                    />
+                                                    <SortHeader label="Cases" sortKey="total_test_cases" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
                                                 </th>
-                                                <th className="w-8 px-3 py-2" />
+
+                                                {/* Detail — muted, progressive disclosure */}
+                                                <th className="px-3 py-2 text-left">
+                                                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground/40">
+                                                        Metrics
+                                                    </span>
+                                                </th>
+
+                                                {/* Time */}
+                                                <th className="px-3 py-2 text-right">
+                                                    <SortHeader label="Started" sortKey="started_at" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                                                </th>
+
+                                                <th className="w-6 px-2 py-2" />
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filteredRuns.map((run) => {
                                                 const isSelected = selectedRuns.has(run.run_id);
-                                                const passed = run.pass_rate >= 0.7;
                                                 return (
                                                     <tr
                                                         key={run.run_id}
                                                         onClick={() => navigate(`/runs/${run.run_id}`)}
-                                                        className={`group border-b border-border/40 transition-colors cursor-pointer ${
+                                                        className={`group border-b border-border/30 transition-colors cursor-pointer ${
                                                             isSelected
-                                                                ? "bg-primary/8 border-b-primary/20"
-                                                                : "hover:bg-secondary/50"
+                                                                ? "bg-primary/6"
+                                                                : "hover:bg-secondary/40"
                                                         }`}
                                                     >
-                                                        {/* Select checkbox */}
-                                                        <td className="px-3 py-2.5">
+                                                        {/* Select — Fitts: py-3 generous row height */}
+                                                        <td className="px-3 py-3">
                                                             <button
                                                                 type="button"
                                                                 aria-pressed={isSelected}
@@ -923,45 +1015,50 @@ export function Dashboard() {
                                                                 className={`flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] border transition-colors ${
                                                                     isSelected
                                                                         ? "border-primary bg-primary text-primary-foreground"
-                                                                        : "border-border/60 bg-muted/40 text-transparent hover:border-primary/40"
+                                                                        : "border-border/50 bg-transparent text-transparent hover:border-primary/50"
                                                                 }`}
                                                             >
                                                                 <Check className="h-2.5 w-2.5" />
                                                             </button>
                                                         </td>
 
-                                                        {/* Dataset + project */}
-                                                        <td className="px-3 py-2.5 max-w-[200px]">
+                                                        {/* Dataset — F-pattern: left anchor, text label */}
+                                                        <td className="px-3 py-3 max-w-[180px]">
                                                             <div className="flex items-center gap-1.5">
-                                                                <Database className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                                                <span className="font-medium text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                                                                <Database className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                                                                <span className="text-xs font-medium text-foreground truncate transition-colors group-hover:text-primary">
                                                                     {run.dataset_name}
                                                                 </span>
                                                             </div>
                                                             {run.project_name && (
-                                                                <span className="mt-0.5 block font-mono text-[9px] text-muted-foreground/60 truncate pl-4">
+                                                                <span className="mt-0.5 block pl-4 font-mono text-[9px] text-muted-foreground/40 truncate">
                                                                     {run.project_name}
                                                                 </span>
                                                             )}
                                                         </td>
 
                                                         {/* Model */}
-                                                        <td className="px-3 py-2.5 max-w-[160px]">
+                                                        <td className="px-3 py-3 max-w-[140px]">
                                                             <div className="flex items-center gap-1">
-                                                                <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                                                <span className="font-mono text-[10px] text-muted-foreground truncate">
+                                                                <Cpu className="h-3 w-3 shrink-0 text-muted-foreground/30" />
+                                                                <span className="font-mono text-[10px] text-muted-foreground/70 truncate">
                                                                     {run.model_name}
                                                                 </span>
                                                             </div>
                                                         </td>
 
-                                                        {/* Pass rate — dial + bar */}
-                                                        <td className="px-3 py-2.5 text-right">
+                                                        {/*
+                                                         * Pass % — right-aligned, consistent 1 decimal (numerical cognition).
+                                                         * Dial provides pre-attentive status encoding (hue + arc fill).
+                                                         * F-pattern: primary numeric column for scanning.
+                                                         */}
+                                                        <td className="px-3 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                <div className="w-16 hidden sm:block">
-                                                                    <div className="h-1 w-full overflow-hidden rounded-full bg-secondary">
+                                                                {/* Mini bar — pre-attentive position cue */}
+                                                                <div className="w-12 hidden sm:block">
+                                                                    <div className="h-1 w-full overflow-hidden rounded-full bg-secondary/80">
                                                                         <div
-                                                                            className="h-full rounded-full"
+                                                                            className="h-full rounded-full transition-all duration-[var(--duration-slow)]"
                                                                             style={{
                                                                                 width: `${run.pass_rate * 100}%`,
                                                                                 background: dialColor(run.pass_rate),
@@ -971,64 +1068,74 @@ export function Dashboard() {
                                                                 </div>
                                                                 <Dial
                                                                     value={run.pass_rate}
-                                                                    size={36}
+                                                                    size={34}
                                                                     thickness={3}
                                                                     color={dialColor(run.pass_rate)}
-                                                                    label={`Pass rate ${(run.pass_rate * 100).toFixed(0)}%`}
+                                                                    label={`Pass rate: ${(run.pass_rate * 100).toFixed(1)}%`}
                                                                 />
                                                             </div>
                                                         </td>
 
-                                                        {/* Test cases */}
-                                                        <td className="px-3 py-2.5 text-right">
-                                                            <span className="font-mono text-[10px] text-foreground tabular-nums">
+                                                        {/*
+                                                         * Verdict — VerdictPill: 3 redundant channels
+                                                         * (hue + icon shape + text) for color-blind safety.
+                                                         * AuthorityBadge preserved for T2 signal.
+                                                         */}
+                                                        <td className="px-3 py-3">
+                                                            <div className="flex flex-col gap-1">
+                                                                <VerdictPill rate={run.pass_rate} />
+                                                                <AuthorityBadge level="T2" />
+                                                            </div>
+                                                        </td>
+
+                                                        {/*
+                                                         * Cases — right-aligned tabular-nums.
+                                                         * passed/total: consistent format, muted denominator.
+                                                         */}
+                                                        <td className="px-3 py-3 text-right">
+                                                            <span className="font-mono text-[10px] tabular-nums text-foreground/80">
                                                                 {run.passed_test_cases}
-                                                                <span className="text-muted-foreground">/{run.total_test_cases}</span>
+                                                            </span>
+                                                            <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">
+                                                                /{run.total_test_cases}
                                                             </span>
                                                         </td>
 
-                                                        {/* Metric tags */}
-                                                        <td className="px-3 py-2.5">
-                                                            <div className="flex flex-wrap gap-0.5">
-                                                                {run.metrics_evaluated.slice(0, 3).map((m) => (
+                                                        {/*
+                                                         * Metrics — progressive disclosure (principle 11):
+                                                         * show at most 2 tags + count; full list behind row click.
+                                                         */}
+                                                        <td className="px-3 py-3">
+                                                            <div className="flex items-center gap-0.5">
+                                                                {run.metrics_evaluated.slice(0, 2).map((m) => (
                                                                     <span
                                                                         key={m}
-                                                                        className="rounded-[var(--radius-sm)] border border-border/40 bg-muted/50 px-1 py-px font-mono text-[8px] text-muted-foreground"
+                                                                        className="rounded-[var(--radius-sm)] border border-border/30 bg-muted/30 px-1 py-px font-mono text-[8px] text-muted-foreground/50"
                                                                     >
                                                                         {m}
                                                                     </span>
                                                                 ))}
-                                                                {run.metrics_evaluated.length > 3 && (
-                                                                    <span className="rounded-[var(--radius-sm)] border border-border/40 bg-muted/50 px-1 py-px font-mono text-[8px] text-muted-foreground">
-                                                                        +{run.metrics_evaluated.length - 3}
+                                                                {run.metrics_evaluated.length > 2 && (
+                                                                    <span className="font-mono text-[8px] text-muted-foreground/40 pl-0.5">
+                                                                        +{run.metrics_evaluated.length - 2}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </td>
 
-                                                        {/* Authority verdict */}
-                                                        <td className="px-3 py-2.5">
-                                                            <AuthorityBadge
-                                                                level="T2"
-                                                                verdict={passed ? "eval-pass" : "hold"}
-                                                            />
-                                                        </td>
-
-                                                        {/* Timestamp */}
-                                                        <td className="px-3 py-2.5 text-right">
-                                                            <div className="flex items-center justify-end gap-1 text-muted-foreground">
+                                                        {/* Timestamp — right-aligned, mono, muted */}
+                                                        <td className="px-3 py-3 text-right">
+                                                            <div className="flex items-center justify-end gap-1 text-muted-foreground/50">
                                                                 <Clock className="h-2.5 w-2.5 shrink-0" />
-                                                                <span className="font-mono text-[9px]">
+                                                                <span className="font-mono text-[9px] tabular-nums">
                                                                     {new Date(run.started_at).toLocaleDateString()}
                                                                 </span>
                                                             </div>
                                                         </td>
 
-                                                        {/* Arrow */}
-                                                        <td className="px-3 py-2.5">
-                                                            <ArrowUpRight
-                                                                className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-hover:text-primary"
-                                                            />
+                                                        {/* Row nav arrow — revealed on hover (progressive disclosure) */}
+                                                        <td className="px-2 py-3">
+                                                            <ArrowUpRight className="h-3 w-3 text-muted-foreground/30 opacity-0 transition-all group-hover:opacity-100 group-hover:text-primary" />
                                                         </td>
                                                     </tr>
                                                 );
@@ -1042,7 +1149,7 @@ export function Dashboard() {
                 </div>
             </div>
 
-            {/* ── Floating compare bar ──────────────────────────────── */}
+            {/* ── Floating compare bar — appears only when 2 selected ── */}
             {selectedRuns.size > 0 && (
                 <div
                     className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3
@@ -1050,16 +1157,17 @@ export function Dashboard() {
                         animate-in slide-in-from-bottom-4 duration-200"
                     style={{ boxShadow: "var(--shadow-pop)" }}
                 >
-                    <span className="font-mono text-xs font-medium text-foreground">
+                    <span className="font-mono text-xs font-medium tabular-nums text-foreground">
                         {selectedRuns.size} selected
                     </span>
-                    <div className="h-3 w-px bg-border" />
+                    <div className="h-3 w-px bg-border/60" />
                     <button
+                        type="button"
                         onClick={() => setSelectedRuns(new Set())}
                         className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="Clear selection"
                     >
-                        <X className="h-2.5 w-2.5" />
-                        clear
+                        <span aria-hidden>×</span> clear
                     </button>
                     <Button
                         variant="primary"
