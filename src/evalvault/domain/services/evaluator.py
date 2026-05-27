@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import json
 import logging
-import math
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, overload
 
@@ -21,7 +18,6 @@ from evalvault.domain.entities import (
     Dataset,
     EvaluationRun,
     MetricScore,
-    TestCase,
     TestCaseResult,
 )
 from evalvault.domain.metrics.confidence import ConfidenceScore
@@ -35,30 +31,46 @@ from evalvault.domain.metrics.summary_needs_followup import SummaryNeedsFollowup
 from evalvault.domain.metrics.summary_non_definitive import SummaryNonDefinitive
 from evalvault.domain.metrics.summary_risk_coverage import SummaryRiskCoverage
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
+from evalvault.domain.services import evaluation_cost as _evaluation_cost
 from evalvault.domain.services import ragas_korean_prompts as _korean_prompts
-from evalvault.domain.services.batch_executor import run_in_batches
 from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
+from evalvault.domain.services.faithfulness_fallback import FaithfulnessFallback
+from evalvault.domain.services.metric_scoring import (
+    MetricScorer,
+    ParallelSampleOutcome,  # re-exported for backward compatibility (tests import here)
+    TestCaseEvalResult,
+)
+
+__all__ = [
+    "ParallelSampleOutcome",
+    "RagasEvaluator",
+    "SummaryFaithfulness",
+    "TestCaseEvalResult",
+]
 from evalvault.domain.services.retriever_context import apply_retriever_to_dataset
 from evalvault.ports.outbound.korean_nlp_port import KoreanNLPToolkitPort, RetrieverPort
 from evalvault.ports.outbound.llm_factory_port import LLMFactoryPort
 from evalvault.ports.outbound.llm_port import LLMPort
 
-_SUMMARY_FAITHFULNESS_PROMPT_KO = (
-    "당신은 요약 충실도 판정자입니다.\n"
-    "컨텍스트와 요약을 보고 요약의 모든 주장이 컨텍스트에 의해 뒷받침되는지 판단하세요.\n"
-    "숫자, 조건, 면책, 기간, 자격 등이 누락되거나 추가되거나 모순되면 verdict는 unsupported입니다.\n"
-    'JSON만 반환: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
-    "컨텍스트:\n{context}\n\n요약:\n{summary}\n"
-)
-_SUMMARY_FAITHFULNESS_PROMPT_EN = (
-    "You are a strict summarization faithfulness judge.\n"
-    "Given the CONTEXT and SUMMARY, determine whether every claim in SUMMARY is supported by CONTEXT.\n"
-    "If any numbers, conditions, exclusions, durations, or eligibility are missing, added, or "
-    "contradicted, verdict is unsupported.\n"
-    'Return JSON only: {"verdict": "supported|unsupported", "reason": "..."}\n\n'
-    "CONTEXT:\n{context}\n\nSUMMARY:\n{summary}\n"
-)
+
+def _summary_faithfulness_structured_output_enabled() -> bool:
+    """Return whether the Instructor structured-output wrapper is enabled.
+
+    Reads ``use_structured_output_for_summary_faithfulness`` from the
+    global :class:`Settings` lazily so the evaluator module avoids a
+    hard dependency on the settings singleton. The flag defaults to
+    ``False`` (D-S5d Part B), so existing behaviour stays byte-identical
+    until a deployment opts in.
+    """
+    try:
+        from evalvault.config.settings import get_settings
+
+        return bool(
+            getattr(get_settings(), "use_structured_output_for_summary_faithfulness", False)
+        )
+    except Exception:
+        return False
 
 
 def _patch_ragas_faithfulness_output() -> None:
@@ -142,35 +154,6 @@ class SummaryFaithfulness(Faithfulness):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.name = "summary_faithfulness"
-
-
-@dataclass
-class TestCaseEvalResult:
-    """Ragas 평가 결과 (토큰 사용량, 비용, 타이밍 포함)."""
-
-    __test__ = False
-
-    scores: dict[str, float]
-    tokens_used: int = 0
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    cost_usd: float = 0.0
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    latency_ms: int = 0
-    claim_details: dict[str, ClaimLevelResult] | None = None  # metric_name -> ClaimLevelResult
-
-
-@dataclass
-class ParallelSampleOutcome:
-    """Container for per-sample metadata collected during parallel evaluation."""
-
-    scores: dict[str, float]
-    started_at: datetime
-    finished_at: datetime
-    latency_ms: int
-    error: Exception | None = None
-    claim_details: dict[str, ClaimLevelResult] | None = None
 
 
 class RagasEvaluator:
@@ -274,18 +257,10 @@ class RagasEvaluator:
     FACTUAL_CORRECTNESS_CLAIM_EXAMPLES = _korean_prompts.FACTUAL_CORRECTNESS_CLAIM_EXAMPLES
     FACTUAL_CORRECTNESS_NLI_EXAMPLES = _korean_prompts.FACTUAL_CORRECTNESS_NLI_EXAMPLES
 
-    # Estimated pricing (USD per 1M tokens) as of Jan 2025
-    # Format: (input_price, output_price)
-    MODEL_PRICING = {
-        "gpt-4o": (2.50, 10.00),
-        "gpt-4o-mini": (0.15, 0.60),
-        "gpt-4-turbo": (10.00, 30.00),
-        "gpt-3.5-turbo": (0.50, 1.50),
-        "openai/gpt-4o": (2.50, 10.00),
-        "openai/gpt-4o-mini": (0.15, 0.60),
-        "gpt-5-nano": (5.00, 15.00),  # Hypothetical project model
-        "openai/gpt-5-nano": (5.00, 15.00),
-    }
+    # Pricing table lives in evaluation_cost (D-S5a extraction). The class
+    # attribute is preserved so that ``self.MODEL_PRICING`` (and any subclass
+    # override) continues to work.
+    MODEL_PRICING = _evaluation_cost.MODEL_PRICING
 
     def __init__(
         self,
@@ -297,15 +272,51 @@ class RagasEvaluator:
         self._preprocessor = preprocessor or DatasetPreprocessor()
         self._korean_toolkit = korean_toolkit
         self._llm_factory = llm_factory
-        self._faithfulness_ragas_failed = False
-        self._faithfulness_fallback_llm = None
-        self._faithfulness_fallback_metric = None
-        self._faithfulness_fallback_failed = False
-        self._faithfulness_fallback_logged = False
         self._active_llm_provider = None
         self._active_llm_model = None
         self._active_llm = None
         self._prompt_language = None
+        self._faithfulness_fallback = FaithfulnessFallback(
+            llm_factory=self._llm_factory,
+            metric_map=self.METRIC_MAP,
+            metric_args=self.METRIC_ARGS,
+            summarize_error=self._summarize_ragas_error,
+            korean_fallback=lambda s: self._fallback_korean_faithfulness(s, return_details=False),
+        )
+        self._metric_scorer = MetricScorer(
+            faithfulness_metrics=self.FAITHFULNESS_METRICS,
+            metric_args=self.METRIC_ARGS,
+            custom_metric_map=self.CUSTOM_METRIC_MAP,
+            reference_required_metrics=self.REFERENCE_REQUIRED_METRICS,
+            active_llm_provider_getter=lambda: self._active_llm_provider,
+            active_llm_getter=lambda: self._active_llm,
+            prompt_language_getter=lambda: self._prompt_language,
+            claim_level_getter=lambda: getattr(self, "_claim_level", False),
+            korean_fallback_score=lambda s: self._fallback_korean_faithfulness(
+                s, return_details=False
+            ),
+            korean_fallback_details=lambda s: self._fallback_korean_faithfulness(
+                s, return_details=True
+            ),
+            faithfulness_fallback_score=self._score_faithfulness_with_fallback,
+            calculate_cost=self._calculate_cost,
+            summarize_error=self._summarize_ragas_error,
+            use_structured_output_getter=_summary_faithfulness_structured_output_enabled,
+        )
+
+    @property
+    def _faithfulness_ragas_failed(self) -> bool:
+        """Latched faithfulness-failure flag.
+
+        State now lives in :class:`MetricScorer` (D-S5c extraction); the
+        property keeps ``evaluator._faithfulness_ragas_failed`` working for
+        existing call sites and tests.
+        """
+        return self._metric_scorer.faithfulness_ragas_failed
+
+    @_faithfulness_ragas_failed.setter
+    def _faithfulness_ragas_failed(self, value: bool) -> None:
+        self._metric_scorer.faithfulness_ragas_failed = bool(value)
 
     async def evaluate(
         self,
@@ -968,58 +979,17 @@ class RagasEvaluator:
         llm: LLMPort,
         on_progress: Callable[[int, int, str], None] | None = None,
     ) -> dict[str, TestCaseEvalResult]:
-        """순차 평가 (기존 로직)."""
-        results: dict[str, TestCaseEvalResult] = {}
-        total = len(ragas_samples)
-
-        for idx, sample in enumerate(ragas_samples):
-            test_case_id = dataset.test_cases[idx].id
-
-            # Reset token tracking before each test case
-            if hasattr(llm, "reset_token_usage"):
-                llm.reset_token_usage()
-
-            # 단일 테스트 케이스 평가
-            test_case_started_at = datetime.now()
-            scores, claim_details = await self._score_single_sample(
-                sample, ragas_metrics, test_case_id=test_case_id
-            )
-            test_case_finished_at = datetime.now()
-
-            latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
-
-            # Get token usage for this test case
-            test_case_prompt_tokens = 0
-            test_case_completion_tokens = 0
-            test_case_tokens = 0
-            if hasattr(llm, "get_and_reset_token_usage"):
-                (
-                    test_case_prompt_tokens,
-                    test_case_completion_tokens,
-                    test_case_tokens,
-                ) = llm.get_and_reset_token_usage()
-
-            # Calculate cost
-            cost_usd = self._calculate_cost(
-                llm.get_model_name(), test_case_prompt_tokens, test_case_completion_tokens
-            )
-
-            results[test_case_id] = TestCaseEvalResult(
-                scores=scores,
-                tokens_used=test_case_tokens,
-                prompt_tokens=test_case_prompt_tokens,
-                completion_tokens=test_case_completion_tokens,
-                cost_usd=cost_usd,
-                started_at=test_case_started_at,
-                finished_at=test_case_finished_at,
-                latency_ms=latency_ms,
-                claim_details=claim_details if claim_details else None,
-            )
-
-            if on_progress:
-                on_progress(idx + 1, total, f"Evaluated {test_case_id}")
-
-        return results
+        """순차 평가 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return await self._metric_scorer.evaluate_sequential(
+            dataset=dataset,
+            ragas_samples=ragas_samples,
+            ragas_metrics=ragas_metrics,
+            llm=llm,
+            score_sample=lambda sample, metrics, tcid: self._score_single_sample(
+                sample, metrics, test_case_id=tcid
+            ),
+            on_progress=on_progress,
+        )
 
     async def _evaluate_parallel(
         self,
@@ -1030,109 +1000,18 @@ class RagasEvaluator:
         batch_size: int = 5,
         on_progress: Callable[[int, int, str], None] | None = None,
     ) -> dict[str, TestCaseEvalResult]:
-        """병렬 평가 (배치 단위로 동시 실행).
-
-        Args:
-            dataset: 데이터셋
-            ragas_samples: Ragas 샘플 목록
-            ragas_metrics: 평가할 메트릭 목록
-            llm: LLM 어댑터
-            batch_size: 동시 실행할 테스트 케이스 수
-
-        Returns:
-            테스트 케이스별 평가 결과
-        """
-        results: dict[str, TestCaseEvalResult] = {}
-        sample_pairs = list(zip(dataset.test_cases, ragas_samples, strict=True))
-        total_samples = len(sample_pairs)
-        completed_count = 0
-
-        async def worker(pair: tuple[TestCase, Any]):
-            test_case, sample = pair
-            started_at = datetime.now()
-            error: Exception | None = None
-            claim_details: dict[str, ClaimLevelResult] | None = None
-            try:
-                scores, claim_details = await self._score_single_sample(
-                    sample, ragas_metrics, test_case_id=test_case.id
-                )
-            except Exception as exc:  # pragma: no cover - safe fallback
-                logger.warning(
-                    "Failed to evaluate test case '%s' in parallel mode: %s",
-                    test_case.id,
-                    exc,
-                )
-                scores = {metric.name: 0.0 for metric in ragas_metrics}
-                error = exc
-            finished_at = datetime.now()
-            latency_ms = int((finished_at - started_at).total_seconds() * 1000)
-
-            nonlocal completed_count
-            completed_count += 1
-            if on_progress:
-                on_progress(completed_count, total_samples, f"Evaluated {test_case.id}")
-
-            return (
-                test_case.id,
-                ParallelSampleOutcome(
-                    scores=scores,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    latency_ms=latency_ms,
-                    error=error,
-                    claim_details=claim_details if claim_details else None,
-                ),
-            )
-
-        batched_outcomes = await run_in_batches(
-            sample_pairs,
-            worker=worker,
+        """병렬 평가 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return await self._metric_scorer.evaluate_parallel(
+            dataset=dataset,
+            ragas_samples=ragas_samples,
+            ragas_metrics=ragas_metrics,
+            llm=llm,
+            score_sample=lambda sample, metrics, tcid: self._score_single_sample(
+                sample, metrics, test_case_id=tcid
+            ),
             batch_size=batch_size,
-            return_exceptions=True,
+            on_progress=on_progress,
         )
-
-        for outcome in batched_outcomes:
-            if isinstance(outcome, Exception):  # pragma: no cover - defensive
-                logger.error("Parallel evaluation batch failed: %s", outcome)
-                continue
-            test_case_id, sample_outcome = outcome
-            if sample_outcome.error:
-                logger.debug(
-                    "Parallel evaluation error for '%s': %s",
-                    test_case_id,
-                    sample_outcome.error,
-                )
-            results[test_case_id] = TestCaseEvalResult(
-                scores=sample_outcome.scores,
-                tokens_used=0,
-                prompt_tokens=0,
-                completion_tokens=0,
-                cost_usd=0.0,
-                started_at=sample_outcome.started_at,
-                finished_at=sample_outcome.finished_at,
-                latency_ms=sample_outcome.latency_ms,
-                claim_details=sample_outcome.claim_details,
-            )
-
-        # 전체 토큰 사용량 가져와서 테스트 케이스별로 평균 분배
-        if hasattr(llm, "get_and_reset_token_usage"):
-            total_prompt, total_completion, total_tokens = llm.get_and_reset_token_usage()
-            if total_samples > 0:
-                avg_tokens = total_tokens // total_samples
-                avg_prompt = total_prompt // total_samples
-                avg_completion = total_completion // total_samples
-
-                for test_case_id in results:
-                    results[test_case_id].tokens_used = avg_tokens
-                    results[test_case_id].prompt_tokens = avg_prompt
-                    results[test_case_id].completion_tokens = avg_completion
-                    results[test_case_id].cost_usd = self._calculate_cost(
-                        llm.get_model_name(),
-                        avg_prompt,
-                        avg_completion,
-                    )
-
-        return results
 
     async def _score_single_sample(
         self,
@@ -1141,159 +1020,10 @@ class RagasEvaluator:
         *,
         test_case_id: str = "",
     ) -> tuple[dict[str, float], dict[str, ClaimLevelResult]]:
-        """단일 샘플에 대해 모든 메트릭 점수 계산.
-
-        Args:
-            sample: 평가할 Ragas 샘플
-            ragas_metrics: 메트릭 인스턴스 목록
-            test_case_id: 테스트 케이스 ID (claim ID 생성용)
-
-        Returns:
-            (메트릭명: 점수 딕셔너리, 메트릭명: ClaimLevelResult 딕셔너리)
-        """
-        scores: dict[str, float] = {}
-        claim_details: dict[str, ClaimLevelResult] = {}
-
-        for metric in ragas_metrics:
-            if metric.name in self.FAITHFULNESS_METRICS:
-                if self._active_llm_provider == "ollama":
-                    fallback_score = self._fallback_korean_faithfulness(
-                        sample, return_details=False
-                    )
-                    if fallback_score is None:
-                        fallback_score = await self._score_faithfulness_with_fallback(sample)
-                    if fallback_score is not None:
-                        scores[metric.name] = fallback_score
-                        continue
-                if self._faithfulness_ragas_failed:
-                    if metric.name == "summary_faithfulness":
-                        judge_score = await self._score_summary_faithfulness_judge(sample)
-                        if judge_score is not None:
-                            scores[metric.name] = judge_score
-                            continue
-                    fallback_score = await self._score_faithfulness_with_fallback(sample)
-                    if fallback_score is not None:
-                        scores[metric.name] = fallback_score
-                        continue
-            try:
-                # Ragas >=0.4 uses ascore() with kwargs
-                if hasattr(metric, "ascore"):
-                    all_args = {
-                        "user_input": sample.user_input,
-                        "response": sample.response,
-                        "retrieved_contexts": sample.retrieved_contexts,
-                        "reference_contexts": sample.reference_contexts,
-                        "reference": sample.reference,
-                    }
-                    required_args = self.METRIC_ARGS.get(
-                        metric.name,
-                        ["user_input", "response", "retrieved_contexts"],
-                    )
-                    kwargs = {
-                        k: v for k, v in all_args.items() if k in required_args and v is not None
-                    }
-                    result = await metric.ascore(**kwargs)
-                    ragas_input = kwargs
-                elif hasattr(metric, "single_turn_ascore"):
-                    # Legacy Ragas <0.4 API
-                    result = await metric.single_turn_ascore(sample)
-                    ragas_input = {
-                        "user_input": sample.user_input,
-                        "response": sample.response,
-                        "retrieved_contexts": sample.retrieved_contexts,
-                        "reference_contexts": sample.reference_contexts,
-                        "reference": sample.reference,
-                    }
-                else:
-                    raise AttributeError(
-                        f"{metric.__class__.__name__} does not support scoring API."
-                    )
-
-                # Handle MetricResult (v0.4+), score attr, or raw float
-                if hasattr(result, "value"):
-                    score_value = result.value
-                elif hasattr(result, "score"):
-                    score_value = result.score
-                else:
-                    score_value = result
-
-                try:
-                    score_value = float(score_value)
-                except (TypeError, ValueError):
-                    logger.warning(
-                        "Metric %s returned non-numeric score (%r). Using 0.0.",
-                        metric.name,
-                        score_value,
-                    )
-                    score_value = 0.0
-
-                if math.isnan(score_value):
-                    if metric.name == "summary_faithfulness":
-                        judge_score = await self._score_summary_faithfulness_judge(sample)
-                        if judge_score is not None:
-                            scores[metric.name] = judge_score
-                            continue
-                    logger.warning(
-                        "Metric %s returned NaN. Using 0.0. ragas_input=%s ragas_output=%r",
-                        metric.name,
-                        ragas_input,
-                        result,
-                    )
-                    score_value = 0.0
-
-                scores[metric.name] = score_value
-
-                # Collect claim details when claim_level is enabled for faithfulness metrics
-                if (
-                    getattr(self, "_claim_level", False)
-                    and metric.name in self.FAITHFULNESS_METRICS
-                ):
-                    claim_result = self._fallback_korean_faithfulness(sample, return_details=True)
-                    if isinstance(claim_result, ClaimLevelResult):
-                        # Update claim IDs with test_case_id prefix
-                        for claim in claim_result.claims:
-                            if not claim.claim_id.startswith(test_case_id):
-                                idx = claim.claim_id.split("-")[-1]
-                                claim.claim_id = f"{test_case_id}-claim-{idx}"
-                        claim_details[metric.name] = claim_result
-
-            except Exception as e:
-                fallback_score = None
-                fallback_claim_result = None
-                if metric.name == "summary_faithfulness":
-                    fallback_score = await self._score_summary_faithfulness_judge(sample)
-                if fallback_score is None and metric.name in self.FAITHFULNESS_METRICS:
-                    if not self._faithfulness_ragas_failed:
-                        logger.warning(
-                            "Failed to score metric %s via Ragas (%s). "
-                            "Switching to fallback scoring.",
-                            metric.name,
-                            self._summarize_ragas_error(e),
-                        )
-                        self._faithfulness_ragas_failed = True
-                    # When claim_level is enabled, get detailed results
-                    if getattr(self, "_claim_level", False):
-                        fallback_claim_result = self._fallback_korean_faithfulness(
-                            sample, return_details=True
-                        )
-                        if isinstance(fallback_claim_result, ClaimLevelResult):
-                            fallback_score = fallback_claim_result.support_rate
-                            # Update claim IDs with test_case_id prefix
-                            for claim in fallback_claim_result.claims:
-                                if not claim.claim_id.startswith(test_case_id):
-                                    idx = claim.claim_id.split("-")[-1]
-                                    claim.claim_id = f"{test_case_id}-claim-{idx}"
-                            claim_details[metric.name] = fallback_claim_result
-                    else:
-                        fallback_score = await self._score_faithfulness_with_fallback(sample)
-                if fallback_score is not None:
-                    scores[metric.name] = fallback_score
-                else:
-                    # 개별 메트릭 실패 시 로그 출력 후 0.0으로 처리
-                    logger.error(f"Failed to score metric {metric.name}: {e}", exc_info=True)
-                    scores[metric.name] = 0.0
-
-        return scores, claim_details
+        """단일 샘플에 대해 모든 메트릭 점수 계산 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return await self._metric_scorer.score_single_sample(
+            sample, ragas_metrics, test_case_id=test_case_id
+        )
 
     @classmethod
     def _resolve_summary_score_coeff(cls, domain: str | None) -> float:
@@ -1467,161 +1197,29 @@ class RagasEvaluator:
         )
 
     async def _score_summary_faithfulness_judge(self, sample: SingleTurnSample) -> float | None:
-        llm = self._active_llm
-        if llm is None or not sample.response or not sample.retrieved_contexts:
-            return None
-
-        context = "\n\n".join(sample.retrieved_contexts)
-        language = self._prompt_language or "ko"
-        template = (
-            _SUMMARY_FAITHFULNESS_PROMPT_EN if language == "en" else _SUMMARY_FAITHFULNESS_PROMPT_KO
-        )
-        prompt = template.format(context=context, summary=sample.response)
-
-        try:
-            response_text = await asyncio.to_thread(llm.generate_text, prompt, json_mode=True)
-        except NotImplementedError:
-            try:
-                response_text = await llm.agenerate_text(prompt)
-            except Exception:
-                return None
-        except Exception:
-            return None
-
-        payload = self._parse_json_payload(response_text)
-        if not payload:
-            return None
-
-        verdict = str(payload.get("verdict", "")).strip().lower()
-        if verdict == "supported":
-            return 1.0
-        if verdict == "unsupported":
-            return 0.0
-        return None
+        """Summary-faithfulness LLM judge — :class:`MetricScorer` 위임 (D-S5c)."""
+        return await self._metric_scorer.score_summary_faithfulness_judge(sample)
 
     @staticmethod
     def _parse_json_payload(text: str) -> dict[str, Any] | None:
-        if not text:
-            return None
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end < start:
-            return None
-        try:
-            return json.loads(text[start : end + 1])
-        except json.JSONDecodeError:
-            return None
+        """JSON 페이로드 추출 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return MetricScorer._parse_json_payload(text)
 
     async def _score_faithfulness_with_fallback(
         self,
         sample: SingleTurnSample,
     ) -> float | None:
-        metric = self._get_faithfulness_fallback_metric()
-        if metric is None:
-            return self._fallback_korean_faithfulness(sample, return_details=False)
+        """Delegate fallback scoring to :class:`FaithfulnessFallback` (D-S5b).
 
-        try:
-            if hasattr(metric, "ascore"):
-                all_args = {
-                    "user_input": sample.user_input,
-                    "response": sample.response,
-                    "retrieved_contexts": sample.retrieved_contexts,
-                    "reference": sample.reference,
-                }
-                required_args = self.METRIC_ARGS.get(
-                    metric.name,
-                    ["user_input", "response", "retrieved_contexts"],
-                )
-                kwargs = {k: v for k, v in all_args.items() if k in required_args and v is not None}
-                result = await metric.ascore(**kwargs)
-            elif hasattr(metric, "single_turn_ascore"):
-                result = await metric.single_turn_ascore(sample)
-            else:
-                raise AttributeError(f"{metric.__class__.__name__} does not support scoring API.")
-
-            if hasattr(result, "value"):
-                score_value = result.value
-            elif hasattr(result, "score"):
-                score_value = result.score
-            else:
-                score_value = result
-
-            if score_value is None:
-                raise ValueError("Metric returned None")
-            score_value = float(score_value)
-            if math.isnan(score_value):
-                raise ValueError("Metric returned NaN")
-            return score_value
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback LLM failed (%s). Using Korean fallback.",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return self._fallback_korean_faithfulness(sample, return_details=False)
-
-    def _get_faithfulness_fallback_metric(self):
-        if self._faithfulness_fallback_failed:
-            return None
-        if self._faithfulness_fallback_metric is not None:
-            return self._faithfulness_fallback_metric
-
-        llm = self._get_faithfulness_fallback_llm()
-        if llm is None:
-            return None
-
-        metric_class = self.METRIC_MAP.get("faithfulness")
-        if not metric_class:
-            return None
-        try:
-            self._faithfulness_fallback_metric = metric_class(llm=llm.as_ragas_llm())
-            return self._faithfulness_fallback_metric
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback metric init failed (%s).",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return None
-
-    def _get_faithfulness_fallback_llm(self) -> LLMPort | None:
-        if self._faithfulness_fallback_failed:
-            return None
-        if self._faithfulness_fallback_llm is not None:
-            return self._faithfulness_fallback_llm
-        if self._llm_factory is None:
-            return None
-
-        try:
-            llm = self._llm_factory.create_faithfulness_fallback(
-                self._active_llm_provider,
-                self._active_llm_model,
-            )
-        except Exception as exc:
-            if not self._faithfulness_fallback_failed:
-                logger.warning(
-                    "Faithfulness fallback LLM init failed (%s).",
-                    self._summarize_ragas_error(exc),
-                )
-                self._faithfulness_fallback_failed = True
-            return None
-
-        if llm is None:
-            return None
-
-        self._faithfulness_fallback_llm = llm
-        if not self._faithfulness_fallback_logged:
-            provider = getattr(llm, "provider_name", None)
-            model = llm.get_model_name()
-            logger.warning(
-                "Faithfulness fallback LLM enabled: %s/%s",
-                provider,
-                model,
-            )
-            self._faithfulness_fallback_logged = True
-        return llm
+        Behaviour is preserved exactly; the helper owns the cached LLM,
+        cached metric, and one-shot warning state that used to live on
+        ``self``.
+        """
+        return await self._faithfulness_fallback.score(
+            sample,
+            self._active_llm_provider,
+            self._active_llm_model,
+        )
 
     @staticmethod
     def _contains_korean(text: str) -> bool:
@@ -1656,83 +1254,8 @@ class RagasEvaluator:
     async def _evaluate_with_custom_metrics(
         self, dataset: Dataset, metrics: list[str]
     ) -> dict[str, TestCaseEvalResult]:
-        """커스텀 메트릭으로 평가 수행.
-
-        Args:
-            dataset: 평가할 데이터셋
-            metrics: 평가할 커스텀 메트릭 리스트
-
-        Returns:
-            테스트 케이스 ID별 평가 결과
-            예: {"tc-001": TestCaseEvalResult(scores={"insurance_term_accuracy": 0.9})}
-        """
-        results: dict[str, TestCaseEvalResult] = {}
-
-        # Initialize custom metric instances
-        metric_instances = {}
-        for metric_name in metrics:
-            metric_class = self.CUSTOM_METRIC_MAP.get(metric_name)
-            if metric_class:
-                metric_instances[metric_name] = metric_class()
-
-        # Evaluate each test case
-        for test_case in dataset.test_cases:
-            scores: dict[str, float] = {}
-
-            # Track start time for this test case
-            test_case_started_at = datetime.now()
-
-            # Run each custom metric
-            for metric_name, metric_instance in metric_instances.items():
-                # Check if metric requires ground_truth
-                if metric_name in self.REFERENCE_REQUIRED_METRICS:
-                    if not test_case.ground_truth:
-                        logger.warning(
-                            "Metric %s requires ground_truth but test case %s has none. "
-                            "Skipping metric.",
-                            metric_name,
-                            test_case.id,
-                        )
-                        scores[metric_name] = 0.0
-                        continue
-                    score = metric_instance.score(
-                        answer=test_case.answer,
-                        ground_truth=test_case.ground_truth,
-                        contexts=test_case.contexts,
-                    )
-                else:
-                    if metric_name == "contextual_relevancy":
-                        score = metric_instance.score(
-                            question=test_case.question,
-                            answer=test_case.answer,
-                            ground_truth=test_case.ground_truth,
-                            contexts=test_case.contexts,
-                        )
-                    else:
-                        score = self._score_custom_metric_with_metadata(
-                            metric_instance,
-                            answer=test_case.answer,
-                            contexts=test_case.contexts,
-                            metadata=test_case.metadata,
-                        )
-                scores[metric_name] = score
-
-            # Track end time and calculate latency
-            test_case_finished_at = datetime.now()
-            latency_ms = int((test_case_finished_at - test_case_started_at).total_seconds() * 1000)
-
-            results[test_case.id] = TestCaseEvalResult(
-                scores=scores,
-                tokens_used=0,  # Custom metrics don't use LLM
-                prompt_tokens=0,
-                completion_tokens=0,
-                cost_usd=0.0,
-                started_at=test_case_started_at,
-                finished_at=test_case_finished_at,
-                latency_ms=latency_ms,
-            )
-
-        return results
+        """커스텀 메트릭 평가 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return await self._metric_scorer.evaluate_with_custom_metrics(dataset, metrics)
 
     def _score_custom_metric_with_metadata(
         self,
@@ -1742,25 +1265,25 @@ class RagasEvaluator:
         contexts: list[str],
         metadata: dict[str, Any],
     ) -> float:
-        try:
-            return float(metric_instance.score(answer=answer, contexts=contexts, metadata=metadata))
-        except TypeError:
-            return float(metric_instance.score(answer=answer, contexts=contexts))
+        """커스텀 메트릭 metadata 시그니처 어댑터 — :class:`MetricScorer` 위임 (D-S5c)."""
+        return self._metric_scorer._score_custom_metric_with_metadata(
+            metric_instance,
+            answer=answer,
+            contexts=contexts,
+            metadata=metadata,
+        )
 
     def _calculate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
-        """Calculate estimated cost in USD based on model pricing."""
-        if "ollama" in model_name:
-            return 0.0
-        # Find matching model key (exact or substring match)
-        price_key = "openai/gpt-4o"  # Default fallback
-        for key in self.MODEL_PRICING:
-            if key in model_name or model_name in key:
-                price_key = key
-                break
+        """Calculate estimated cost in USD based on model pricing.
 
-        input_price, output_price = self.MODEL_PRICING.get(price_key, (0.0, 0.0))
-
-        cost = (prompt_tokens / 1_000_000 * input_price) + (
-            completion_tokens / 1_000_000 * output_price
+        Thin wrapper that delegates to
+        :func:`evalvault.domain.services.evaluation_cost.calculate_cost` while
+        forwarding ``self.MODEL_PRICING`` so subclass-level pricing overrides
+        keep their semantics (D-S5a extraction).
+        """
+        return _evaluation_cost.calculate_cost(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            pricing=self.MODEL_PRICING,
         )
-        return cost

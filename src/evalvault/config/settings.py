@@ -254,6 +254,15 @@ class Settings(BaseSettings):
         default=None,
         description="Optional model name for faithfulness fallback evaluation.",
     )
+    use_structured_output_for_summary_faithfulness: bool = Field(
+        default=False,
+        description=(
+            "Opt-in: parse the summary-faithfulness judge LLM response with the "
+            "Instructor structured-output schema (T2 verdict only) instead of "
+            "raw JSON dictionary lookups. Defaults to off so behaviour stays "
+            "byte-identical to the legacy path."
+        ),
+    )
 
     # OpenAI Configuration
     openai_api_key: str | None = Field(default=None, description="OpenAI API key")
