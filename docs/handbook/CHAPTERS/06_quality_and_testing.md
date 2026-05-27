@@ -180,6 +180,39 @@ CI는 문서가 깨지지 않도록 docs build/link check를 수행한다.
 [2026-01-27] CI regression gate runner 추가, ci suite config 설정, CI job 통합, PR 코멘트 포맷터 확장(pr-comment format), 단위 테스트 10+ 추가.
 자세한 내용: `.sisyphus/notepads/p7-regression/worklog.md`
 
+### 5.6 회귀 게이트 실행기(runner)와 ci.json 스위트
+
+PR/릴리즈마다 핵심 CLI 경로를 최소 비용으로 재검증하기 위해, EvalVault는 별도의 게이트 러너 스크립트와 스위트 정의 파일을 운영한다.
+
+- 러너 스크립트: `scripts/ci/run_regression_gate.py`
+- 스위트 정의: `config/regressions/ci.json`
+  - `unit-cli-gate`: gate 관련 CLI 유닛 테스트
+  - `integration-cli-e2e`: API 키 없이 실행 가능한 CLI e2e 스모크
+- 요약 산출물: `reports/regression/ci_gate.json`
+- CI 통합: `.github/workflows/ci.yml` 의 `regression-gate` job
+- 실패 기준: 어느 한 스위트라도 실패하면 게이트 실패
+
+로컬에서 동일하게 재현:
+
+```bash
+uv run python scripts/ci/run_regression_gate.py \
+  --config config/regressions/ci.json \
+  --format text
+```
+
+이 게이트의 실행 단위는 “API 키 없이도 항상 가능한 테스트”다. 외부 시크릿이 필요한 통합 시나리오는 의도적으로 제외한다 (CI 기본 마커 제외 정책과 동일한 원칙).
+
+### 5.7 `evalvault ci-gate` 종료 코드 정책(요약)
+
+CI/CD 스크립트는 종료 코드로 게이트 상태를 판별한다.
+
+- `0`: 성공 (게이트 통과)
+- `1`: 임계치 미달/검증 실패, 또는 잘못된 입력(예: DB 경로 누락, 잘못된 포맷)
+- `2`: 회귀 감지 + `--fail-on-regression` 활성화
+- `3`: 런 조회 실패/데이터 누락 등 **복구 불가능한 오류**
+
+근거: `src/evalvault/adapters/inbound/cli/commands/regress.py#ci_gate`
+
 ---
 
 ## 6) 실패 triage(실전)
