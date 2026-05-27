@@ -49,7 +49,7 @@ class SQLQueries:
         INSERT INTO evaluation_runs (
             run_id, dataset_name, dataset_version, model_name,
             started_at, finished_at, total_tokens, total_cost_usd,
-            pass_rate, metrics_evaluated, thresholds, langfuse_trace_id,
+            pass_rate, metrics_evaluated, thresholds, tracker_trace_ids,
             metadata, retrieval_metadata
         ) VALUES ({values})
         """
@@ -142,10 +142,18 @@ class SQLQueries:
         """
 
     def select_run(self) -> str:
+        # A-S4: runtime reads ONLY ``tracker_trace_ids``. The legacy
+        # ``langfuse_trace_id`` column remains in the schema for a
+        # future cleanup slice but is intentionally not selected here --
+        # the one-shot migration script
+        # (``scripts/migrate_tracker_trace_ids.py``) is the single
+        # mechanism for converting legacy rows. Rows whose
+        # ``tracker_trace_ids`` is NULL hydrate to an empty dict.
         return f"""
         SELECT run_id, dataset_name, dataset_version, model_name,
                started_at, finished_at, total_tokens, total_cost_usd,
-               pass_rate, metrics_evaluated, thresholds, langfuse_trace_id,
+               pass_rate, metrics_evaluated, thresholds,
+               tracker_trace_ids,
                metadata, retrieval_metadata
         FROM evaluation_runs
         WHERE run_id = {self.placeholder}
@@ -386,7 +394,7 @@ class BaseSQLStorageAdapter(ABC):
                 results=results,
                 metrics_evaluated=self._deserialize_json(run_row["metrics_evaluated"]) or [],
                 thresholds=self._deserialize_json(run_row["thresholds"]) or {},
-                langfuse_trace_id=run_row["langfuse_trace_id"],
+                tracker_trace_ids=self._read_tracker_trace_ids(run_row),
                 tracker_metadata=self._deserialize_json(run_row["metadata"]) or {},
                 retrieval_metadata=self._deserialize_json(run_row["retrieval_metadata"]) or {},
             )
@@ -664,7 +672,11 @@ class BaseSQLStorageAdapter(ABC):
             run.pass_rate,
             self._serialize_json(run.metrics_evaluated),
             self._serialize_json(run.thresholds),
-            run.langfuse_trace_id,
+            # A-S4: write the new JSON column. The legacy
+            # ``langfuse_trace_id`` column is intentionally never
+            # touched -- the migration script is the only thing that
+            # reads/writes it, and a future cleanup slice drops it.
+            self._serialize_json(run.tracker_trace_ids) if run.tracker_trace_ids else None,
             self._serialize_json(run.tracker_metadata),
             self._serialize_json(run.retrieval_metadata),
         )
@@ -797,6 +809,21 @@ class BaseSQLStorageAdapter(ABC):
             name = self._row_value(row, fallback_column)
         return name or ""
 
+    def _read_tracker_trace_ids(self, row: Any) -> dict[str, str]:
+        """Hydrate per-tracker trace IDs from the JSON column.
+
+        A-S4 maintains a single read/write path through the new
+        ``tracker_trace_ids`` JSON column. Legacy rows where the column
+        is still NULL hydrate to an empty dict; run
+        ``scripts/migrate_tracker_trace_ids.py`` to back-fill them from
+        the (now-unreferenced) ``langfuse_trace_id`` column.
+        """
+        raw = self._row_value(row, "tracker_trace_ids")
+        parsed = self._deserialize_json(raw)
+        if isinstance(parsed, dict) and parsed:
+            return {str(k): str(v) for k, v in parsed.items() if v is not None}
+        return {}
+
     def _serialize_datetime(self, value: datetime | None) -> str | None:
         return value.isoformat() if value else None
 
@@ -907,7 +934,13 @@ class BaseSQLStorageAdapter(ABC):
 
             run_rows = self._normalize_rows(
                 [run_row],
-                json_columns={"metrics_evaluated", "thresholds", "metadata", "retrieval_metadata"},
+                json_columns={
+                    "metrics_evaluated",
+                    "thresholds",
+                    "tracker_trace_ids",
+                    "metadata",
+                    "retrieval_metadata",
+                },
             )
 
             test_case_rows = self._execute(
@@ -1174,7 +1207,7 @@ class BaseSQLStorageAdapter(ABC):
                     "pass_rate",
                     "metrics_evaluated",
                     "thresholds",
-                    "langfuse_trace_id",
+                    "tracker_trace_ids",
                     "metadata",
                     "retrieval_metadata",
                     "created_at",

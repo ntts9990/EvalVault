@@ -177,8 +177,14 @@ class EvaluationRun:
     total_tokens: int = 0
     total_cost_usd: float | None = None
 
-    # Langfuse 연동
-    langfuse_trace_id: str | None = None
+    # Tracker 연동
+    # Per-provider trace IDs keyed by tracker provider name.
+    # Shape: ``{"mlflow": "<trace_id>", "phoenix": "<trace_id>", "langfuse": "<trace_id>"}``.
+    # Populated from ``MultiTrackerAdapter.per_tracker_trace_ids`` /
+    # ``last_trace_ids`` after a successful tracker fan-out. Replaces the
+    # vendor-specific ``langfuse_trace_id`` field so the domain entity no
+    # longer leaks a single backend's name.
+    tracker_trace_ids: dict[str, str] = field(default_factory=dict)
     tracker_metadata: dict[str, Any] = field(default_factory=dict)
     retrieval_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
 

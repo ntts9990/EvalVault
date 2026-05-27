@@ -94,6 +94,10 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN metadata TEXT")
         if "retrieval_metadata" not in columns:
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN retrieval_metadata TEXT")
+        if "tracker_trace_ids" not in columns:
+            # A-S4: per-provider trace IDs replacing langfuse_trace_id.
+            # The legacy column is kept for backward-compat reads.
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN tracker_trace_ids TEXT")
 
         cluster_cursor = conn.execute("PRAGMA table_info(run_cluster_maps)")
         cluster_columns = {row[1] for row in cluster_cursor.fetchall()}

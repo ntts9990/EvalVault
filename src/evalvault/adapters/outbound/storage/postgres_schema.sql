@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS evaluation_runs (
     pass_rate DECIMAL(5, 4),
     metrics_evaluated JSONB,  -- JSON array of metric names
     thresholds JSONB,  -- JSON object of metric thresholds
-    langfuse_trace_id VARCHAR(255),
+    langfuse_trace_id VARCHAR(255),  -- Legacy column, retained for backward-compat reads (A-S4)
+    tracker_trace_ids JSONB,  -- {"mlflow": "...", "phoenix": "...", "langfuse": "..."}
     metadata JSONB,  -- Tracker metadata (Phoenix, Langfuse, etc.)
     retrieval_metadata JSONB,  -- Retrieval metadata by test case
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

@@ -440,49 +440,62 @@ def _log_to_trackers(
         return
 
     result.tracker_metadata.setdefault("tracker_providers", tracker_types)
+
+    tracker_pairs: list[tuple[str, TrackerPort]] = []
     for provider in tracker_types:
         tracker = _get_tracker(settings, provider, console, required=True)
         if tracker is None:
             raise typer.Exit(2)
+        tracker_pairs.append((provider, tracker))
+
+    from evalvault.adapters.outbound.tracker import MultiTrackerAdapter
+
+    multi = MultiTrackerAdapter(tracker_pairs)
+    with console.status("[bold green]Logging to trackers..."):
+        try:
+            multi.log_evaluation_run(result)
+        except Exception as exc:
+            print_cli_error(
+                console,
+                "Tracker 로깅에 실패했습니다.",
+                details=str(exc),
+            )
+            raise typer.Exit(2) from exc
+
+    # A-S4: surface per-provider trace IDs through the domain entity's
+    # ``tracker_trace_ids`` dict so the persistence layer can store the
+    # whole map instead of just the legacy Langfuse field.
+    if multi.last_trace_ids:
+        result.tracker_trace_ids.update(multi.last_trace_ids)
+    for provider, trace_id in multi.last_trace_ids.items():
         tracker_name = provider.capitalize()
-        trace_id: str | None = None
-        with console.status(f"[bold green]Logging to {tracker_name}..."):
-            try:
-                trace_id = tracker.log_evaluation_run(result)
-                console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
-            except Exception as exc:
-                print_cli_error(
-                    console,
-                    f"{tracker_name} 로깅에 실패했습니다.",
-                    details=str(exc),
-                )
-                raise typer.Exit(2) from exc
+        console.print(f"[green]Logged to {tracker_name}[/green] (trace_id: {trace_id})")
+        provider_meta = result.tracker_metadata.setdefault(provider, {})
+        if isinstance(provider_meta, dict):
+            provider_meta.setdefault("trace_id", trace_id)
+        if provider == "phoenix":
+            endpoint = getattr(settings, "phoenix_endpoint", "http://localhost:6006/v1/traces")
+            if not isinstance(endpoint, str) or not endpoint:
+                endpoint = "http://localhost:6006/v1/traces"
+            phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+            phoenix_meta.update(
+                {
+                    "trace_id": trace_id,
+                    "endpoint": endpoint,
+                    "trace_url": _build_phoenix_trace_url(endpoint, trace_id),
+                }
+            )
+            phoenix_meta.setdefault("schema_version", 2)
+            trace_url = get_phoenix_trace_url(result.tracker_metadata)
+            if trace_url:
+                console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
 
-        if trace_id:
-            provider_meta = result.tracker_metadata.setdefault(provider, {})
-            if isinstance(provider_meta, dict):
-                provider_meta.setdefault("trace_id", trace_id)
-            if provider == "phoenix":
-                endpoint = getattr(settings, "phoenix_endpoint", "http://localhost:6006/v1/traces")
-                if not isinstance(endpoint, str) or not endpoint:
-                    endpoint = "http://localhost:6006/v1/traces"
-                phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-                phoenix_meta.update(
-                    {
-                        "trace_id": trace_id,
-                        "endpoint": endpoint,
-                        "trace_url": _build_phoenix_trace_url(endpoint, trace_id),
-                    }
-                )
-                phoenix_meta.setdefault("schema_version", 2)
-                trace_url = get_phoenix_trace_url(result.tracker_metadata)
-                if trace_url:
-                    console.print(f"[dim]Phoenix Trace: {trace_url}[/dim]")
-
+            phoenix_tracker = multi.get_tracker("phoenix")
+            if phoenix_tracker is not None:
                 options = phoenix_options or {}
                 log_traces = log_phoenix_traces_fn or log_phoenix_traces
                 extra = log_traces(
-                    tracker,
+                    phoenix_tracker,
                     result,
                     max_traces=options.get("max_traces"),
                     metadata=options.get("metadata"),
@@ -524,32 +537,43 @@ def _log_analysis_artifacts(
         "event_type": "analysis",
     }
 
+    tracker_pairs: list[tuple[str, TrackerPort]] = []
     for provider in tracker_types:
         tracker = _get_tracker(settings, provider, console, required=True)
         if tracker is None:
             raise typer.Exit(2)
-        trace_name = f"analysis-{result.run_id[:8]}"
-        try:
-            trace_id = tracker.start_trace(trace_name, metadata=metadata)
-            tracker.save_artifact(
-                trace_id, "analysis_payload", analysis_payload, artifact_type="json"
-            )
-            tracker.save_artifact(
-                trace_id, "analysis_artifacts", artifact_index, artifact_type="json"
-            )
-            tracker.save_artifact(trace_id, "analysis_report", report_text, artifact_type="text")
-            tracker.end_trace(trace_id)
-            console.print(
-                f"[green]Logged analysis artifacts to {provider.capitalize()}[/green] "
-                f"(trace_id: {trace_id})"
-            )
-        except Exception as exc:
-            print_cli_error(
-                console,
-                f"{provider.capitalize()} 분석 로깅에 실패했습니다.",
-                details=str(exc),
-            )
-            raise typer.Exit(2) from exc
+        tracker_pairs.append((provider, tracker))
+
+    from evalvault.adapters.outbound.tracker import MultiTrackerAdapter
+
+    multi = MultiTrackerAdapter(tracker_pairs)
+    trace_name = f"analysis-{result.run_id[:8]}"
+    try:
+        parent_trace_id = multi.start_trace(trace_name, metadata=metadata)
+        multi.save_artifact(
+            parent_trace_id, "analysis_payload", analysis_payload, artifact_type="json"
+        )
+        multi.save_artifact(
+            parent_trace_id, "analysis_artifacts", artifact_index, artifact_type="json"
+        )
+        multi.save_artifact(
+            parent_trace_id, "analysis_report", report_text, artifact_type="text"
+        )
+        per_tracker_ids = multi.per_tracker_trace_ids(parent_trace_id)
+        multi.end_trace(parent_trace_id)
+    except Exception as exc:
+        print_cli_error(
+            console,
+            "분석 아티팩트 로깅에 실패했습니다.",
+            details=str(exc),
+        )
+        raise typer.Exit(2) from exc
+
+    for provider, trace_id in per_tracker_ids.items():
+        console.print(
+            f"[green]Logged analysis artifacts to {provider.capitalize()}[/green] "
+            f"(trace_id: {trace_id})"
+        )
 
 
 def _save_to_db(

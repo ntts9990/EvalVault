@@ -750,25 +750,34 @@ class WebUIAdapter:
         if trackers:
             emit_progress("Logging trackers...", status="finalizing")
             result.tracker_metadata.setdefault("tracker_providers", tracker_providers)
-            for provider, tracker in trackers:
-                try:
-                    trace_id = tracker.log_evaluation_run(result)
-                    provider_meta = result.tracker_metadata.setdefault(provider, {})
-                    if isinstance(provider_meta, dict):
-                        provider_meta.setdefault("trace_id", trace_id)
-                    if provider == "phoenix":
-                        endpoint = settings.phoenix_endpoint or "http://localhost:6006/v1/traces"
-                        phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
-                        phoenix_meta.update(
-                            {
-                                "trace_id": trace_id,
-                                "endpoint": endpoint,
-                                "trace_url": self._build_phoenix_trace_url(endpoint, trace_id),
-                                "schema_version": 2,
-                            }
-                        )
-                except Exception as exc:
-                    raise RuntimeError(f"Tracker logging failed for {provider}: {exc}") from exc
+            from evalvault.adapters.outbound.tracker import MultiTrackerAdapter
+
+            multi = MultiTrackerAdapter(trackers)
+            try:
+                multi.log_evaluation_run(result)
+            except Exception as exc:
+                raise RuntimeError(f"Tracker logging failed: {exc}") from exc
+
+            # A-S4: persist per-provider trace IDs on the domain entity so
+            # ``save_run`` writes the new ``tracker_trace_ids`` JSON column
+            # instead of the legacy vendor-specific ``langfuse_trace_id``.
+            if multi.last_trace_ids:
+                result.tracker_trace_ids.update(multi.last_trace_ids)
+            for provider, trace_id in multi.last_trace_ids.items():
+                provider_meta = result.tracker_metadata.setdefault(provider, {})
+                if isinstance(provider_meta, dict):
+                    provider_meta.setdefault("trace_id", trace_id)
+                if provider == "phoenix":
+                    endpoint = settings.phoenix_endpoint or "http://localhost:6006/v1/traces"
+                    phoenix_meta = result.tracker_metadata.setdefault("phoenix", {})
+                    phoenix_meta.update(
+                        {
+                            "trace_id": trace_id,
+                            "endpoint": endpoint,
+                            "trace_url": self._build_phoenix_trace_url(endpoint, trace_id),
+                            "schema_version": 2,
+                        }
+                    )
 
         if stage_store and self._storage and hasattr(self._storage, "save_stage_events"):
             emit_progress("Storing stage events...", status="finalizing")
