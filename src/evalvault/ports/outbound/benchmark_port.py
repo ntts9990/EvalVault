@@ -5,14 +5,14 @@ Provides abstraction for running benchmarks like lm-evaluation-harness, HRET, et
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from evalvault.domain.entities.benchmark_run import BenchmarkRun
 
 
-class BenchmarkBackend(str, Enum):
+class BenchmarkBackend(StrEnum):
     HF = "hf"
     VLLM = "vllm"
     OPENAI = "openai"

@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 
-class MetricType(str, Enum):
+class MetricType(StrEnum):
     """Ragas 평가 메트릭 타입."""
 
     FAITHFULNESS = "faithfulness"

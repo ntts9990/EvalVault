@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -18,7 +18,7 @@ from uuid import uuid4
 # =============================================================================
 
 
-class AnalysisIntent(str, Enum):
+class AnalysisIntent(StrEnum):
     """사용자 쿼리에서 파악되는 분석 의도.
 
     의도 분류기(Intent Classifier)가 사용자 쿼리를 분석하여
@@ -60,7 +60,7 @@ class AnalysisIntent(str, Enum):
     GENERATE_COMPARISON = "generate_comparison"  # 비교 보고서
 
 
-class AnalysisIntentCategory(str, Enum):
+class AnalysisIntentCategory(StrEnum):
     """분석 의도 카테고리.
 
     의도를 상위 카테고리로 그룹화합니다.
@@ -72,7 +72,7 @@ class AnalysisIntentCategory(str, Enum):
     REPORT = "report"  # 보고서
 
 
-class NodeExecutionStatus(str, Enum):
+class NodeExecutionStatus(StrEnum):
     """노드 실행 상태."""
 
     PENDING = "pending"  # 대기 중

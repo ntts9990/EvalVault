@@ -86,10 +86,10 @@ dev = [
     "pytest-xdist",
     "pytest-rerunfailures",
     "pytest-html",
-    # Pin ruff to 0.14.x: 0.15 newly enforces UP042 (str+Enum -> StrEnum) on the
-    # 24 existing enums. The StrEnum migration is a deliberate follow-up slice
-    # (it changes str()/format behaviour); until then, keep lint deterministic.
-    "ruff>=0.14.10,<0.15",
+    # Pinned to one ruff minor for deterministic lint (local == CI). 0.15
+    # enforces UP042 (str+Enum -> StrEnum); the 24 enums have been migrated to
+    # StrEnum, so 0.15 is now the floor. Bump the range deliberately per minor.
+    "ruff>=0.15.0,<0.16",
     "pydeps>=3.0.1",
     "python-multipart",
     # Full feature extras (analysis/korean/postgres/mlflow/phoenix/perf/anthropic/docs/benchmark)

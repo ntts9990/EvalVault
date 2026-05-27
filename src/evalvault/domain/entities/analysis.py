@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 
-class AnalysisType(str, Enum):
+class AnalysisType(StrEnum):
     """분석 유형."""
 
     STATISTICAL = "statistical"
@@ -17,7 +17,7 @@ class AnalysisType(str, Enum):
     DATASET_FEATURES = "dataset_features"
 
 
-class QuestionType(str, Enum):
+class QuestionType(StrEnum):
     """질문 유형."""
 
     FACTUAL = "factual"  # 사실형: 무엇, 언제, 어디, 누가
@@ -27,7 +27,7 @@ class QuestionType(str, Enum):
     OPINION = "opinion"  # 의견형: 생각, 의견
 
 
-class EffectSizeLevel(str, Enum):
+class EffectSizeLevel(StrEnum):
     """효과 크기 수준 (Cohen's d 기준)."""
 
     NEGLIGIBLE = "negligible"  # < 0.2
@@ -372,7 +372,7 @@ class NLPAnalysis:
 # =============================================================================
 
 
-class CausalFactorType(str, Enum):
+class CausalFactorType(StrEnum):
     """인과 요인 유형."""
 
     QUESTION_LENGTH = "question_length"  # 질문 길이
@@ -385,7 +385,7 @@ class CausalFactorType(str, Enum):
     KEYWORD_OVERLAP = "keyword_overlap"  # 질문-컨텍스트 키워드 겹침
 
 
-class ImpactDirection(str, Enum):
+class ImpactDirection(StrEnum):
     """영향 방향."""
 
     POSITIVE = "positive"  # 증가할수록 점수 증가
@@ -394,7 +394,7 @@ class ImpactDirection(str, Enum):
     NONLINEAR = "nonlinear"  # 비선형 관계 (예: U자형)
 
 
-class ImpactStrength(str, Enum):
+class ImpactStrength(StrEnum):
     """영향 강도."""
 
     NEGLIGIBLE = "negligible"  # < 0.1

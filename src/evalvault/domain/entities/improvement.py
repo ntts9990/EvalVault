@@ -6,12 +6,12 @@ Rule-based 패턴 탐지와 LLM-based 인사이트 생성을 결합한 하이브
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 
-class RAGComponent(str, Enum):
+class RAGComponent(StrEnum):
     """RAG 파이프라인 컴포넌트."""
 
     RETRIEVER = "retriever"
@@ -23,7 +23,7 @@ class RAGComponent(str, Enum):
     PROMPT = "prompt"
 
 
-class ImprovementPriority(str, Enum):
+class ImprovementPriority(StrEnum):
     """개선 우선순위."""
 
     P0_CRITICAL = "p0_critical"  # 즉시 수정 필요
@@ -32,7 +32,7 @@ class ImprovementPriority(str, Enum):
     P3_LOW = "p3_low"  # 낮은 우선순위
 
 
-class PatternType(str, Enum):
+class PatternType(StrEnum):
     """문제 패턴 유형."""
 
     # Retrieval 관련
@@ -57,7 +57,7 @@ class PatternType(str, Enum):
     STAGE_METRIC_BELOW_THRESHOLD = "stage_metric_below_threshold"
 
 
-class EffortLevel(str, Enum):
+class EffortLevel(StrEnum):
     """개선 노력 수준."""
 
     LOW = "low"  # 설정 변경, 파라미터 조정
@@ -65,7 +65,7 @@ class EffortLevel(str, Enum):
     HIGH = "high"  # 아키텍처 변경, 모델 재학습
 
 
-class EvidenceSource(str, Enum):
+class EvidenceSource(StrEnum):
     """증거 출처."""
 
     RULE_BASED = "rule_based"  # 규칙 기반 탐지
