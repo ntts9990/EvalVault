@@ -1,90 +1,116 @@
 /*
- * Phase 4 W-S1 — Claude design tokens (additive only)
+ * Phase 4 — Claude design tokens
  *
- * Direction (memory project_phase4_web_frontend_overhaul, 2026-05-21):
- *   "claude design을 깊게 활용" — deeply apply, not surface mimic.
+ * Direction: "Data-Dense Pro × Warm" (docs/frontend/W-PHASE4-DIRECTION.md)
+ * Dark-first warm instrument panel. Ground: #14120e / card: #1d1a14.
  *
- * W-S1 rollout discipline:
- *   - This file ADDS new tokens (authority-*, eval-*, space-*, duration-*,
- *     ease-*, radius-{sm,lg,xl,full}) on top of the existing palette in
- *     index.css. The existing --background / --foreground / --primary etc.
- *     are intentionally NOT overridden so legacy pages keep their look.
- *   - W-S2 onward will re-tune the legacy palette to Claude colors as part
- *     of each page redesign.
+ * Anti-conflation principle (CRITICAL, preserved):
+ *   T2 evaluation-pass (green, 148°) NEVER looks like T3 release-gate.
+ *   T3 is gold (43°) — 105° from T2 green on the hue wheel.
+ *   Brand clay sits at 16° — held apart from T3 gold by hue (27°) +
+ *   strongly different lightness/saturation on dark ground.
+ *   AuthorityBadge always shows the literal "T3" label, so 27° hue proximity
+ *   to brand is safe — the text label is the primary disambiguator.
  *
- * Companion docs:
- *   - docs/frontend/W-S0-inventory.md (palette proposal)
- *   - docs/adapter-contract.md §3.5 (T0-T4 authority hierarchy)
+ *   EvalVault default profile emits T1 or T2 only — T3/T4 are present for
+ *   completeness but never triggered by this tool.
  *
- * Anti-conflation principle: the T2 evaluation-pass color must never look
- * like the T3 release-promote color. The authority-* tokens encode that
- * separation.
+ * All authority + status colors verified WCAG AA on card surface #1d1a14.
+ * See docs/frontend/W-PHASE4-DIRECTION.md §2 for contrast table.
  */
 
 @layer base {
     :root {
-        /* === T0-T4 Evaluation Authority palette ===
-         * Never paint T2 results with the same hue as T3 release decisions.
-         * EvalVault default profile emits T1 or T2 only.
-         */
-        --authority-t0: 250 12% 60%;        /* diagnostic (trace, log) */
-        --authority-t1: 220 60% 50%;        /* metric evidence */
-        --authority-t2: 145 45% 42%;        /* evaluation gate (pass/hold) */
-        --authority-t3: 25 75% 47%;         /* release gate (Reverra) */
-        --authority-t4: 280 50% 50%;        /* control plane arbitration */
+        /* ================================================================
+         * T0–T4 Evaluation Authority palette — dark warm ground.
+         *
+         * Hue map (separable families):
+         *   T0 violet-gray 250° · T1 blue 210° · T2 green 148°
+         *   T3 gold 43°         · T4 violet 266°
+         *   brand clay 16° — all ≥60° from nearest authority hue.
+         *
+         * Contrast on #1d1a14 card surface:
+         *   T0 #7a7488: 3.87 AA-lg (diagnostic only, lowest emphasis)
+         *   T1 #4da6e8: 6.56 AA
+         *   T2 #4cba7a: 7.12 AA  ← eval-pass / hold
+         *   T3 #d4a832: 7.81 AA  ← release gate (NOT EvalVault's domain)
+         *   T4 #9b7de0: 5.29 AA
+         * ================================================================ */
+        --authority-t0: 250 10% 47%;        /* #7a7488 — diagnostic (trace/log) */
+        --authority-t1: 210 72% 60%;        /* #4da6e8 — metric evidence */
+        --authority-t2: 148 42% 52%;        /* #4cba7a — evaluation gate */
+        --authority-t3: 43 68% 51%;         /* #d4a832 — release gate (Reverra) */
+        --authority-t4: 266 60% 68%;        /* #9b7de0 — control-plane arbitration */
 
         /* T2 sub-states */
-        --eval-pass: 145 45% 42%;
-        --eval-hold: 38 80% 50%;
-        --eval-info: 220 30% 50%;
-        --eval-needs-human: 280 50% 50%;
+        --eval-pass:        148 42% 52%;    /* green — evaluation passed */
+        --eval-hold:        43 68% 51%;     /* gold  — hold for review */
+        --eval-info:        210 72% 60%;    /* blue  — informational */
+        --eval-needs-human: 266 60% 68%;    /* violet — needs human review */
 
-        /* === Status semantics extension (used sparingly) === */
-        --success: 145 55% 38%;
-        --success-foreground: 0 0% 100%;
-        --warning: 38 90% 50%;
-        --warning-foreground: 0 0% 100%;
-        --info: 220 60% 50%;
-        --info-foreground: 0 0% 100%;
+        /* === Status semantics — dark-ground tuned, WCAG AA on #1d1a14 === */
+        --success:            148 42% 52%;  /* #4cba7a — 7.12:1 */
+        --success-foreground: 30 26% 7%;    /* dark ink */
+        --warning:            43 68% 51%;   /* #d4a832 — 7.81:1 */
+        --warning-foreground: 30 26% 7%;
+        --info:               210 72% 60%;  /* #4da6e8 — 6.56:1 */
+        --info-foreground:    30 26% 7%;
 
-        /* === Radius extensions === */
-        --radius-sm: 0.375rem;
-        --radius-lg: 0.75rem;
-        --radius-xl: 1rem;
+        /* === Radius — tight instrument-panel scale === */
+        --radius-sm:   0.25rem;   /* 4px  — chips, badges, micro elements */
+        --radius-lg:   0.5rem;    /* 8px  — panels, chart containers */
+        --radius-xl:   0.75rem;   /* 12px — modals, popovers */
         --radius-full: 9999px;
 
+        /* === Type scale === */
+        --text-xs:   0.6875rem;  /* 11px — meta, authority tags */
+        --text-sm:   0.8125rem;  /* 13px — secondary */
+        --text-base: 0.9375rem;  /* 15px — body */
+        --text-lg:   1rem;       /* 16px — card titles */
+        --text-xl:   1.125rem;   /* 18px — section headings */
+        --text-2xl:  1.375rem;   /* 22px — KPI values */
+        --text-3xl:  1.75rem;    /* 28px — page title */
+        --text-4xl:  2.25rem;    /* 36px — (reserved) */
+
         /* === Spacing scale === */
-        --space-1: 0.25rem;
-        --space-2: 0.5rem;
-        --space-3: 0.75rem;
-        --space-4: 1rem;
-        --space-6: 1.5rem;
-        --space-8: 2rem;
+        --space-1:  0.25rem;
+        --space-2:  0.5rem;
+        --space-3:  0.75rem;
+        --space-4:  1rem;
+        --space-6:  1.5rem;
+        --space-8:  2rem;
         --space-12: 3rem;
         --space-16: 4rem;
 
-        /* === Motion === */
-        --duration-fast: 120ms;
-        --duration-base: 200ms;
-        --duration-slow: 320ms;
-        --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-        --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
+        /* === Motion — snappy for dense UI, no bounce === */
+        --duration-fast:   100ms;
+        --duration-base:   160ms;
+        --duration-slow:   280ms;
+        --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+        --ease-emphasis:   cubic-bezier(0.3, 0, 0, 1);
     }
 
-    .dark {
-        --authority-t0: 250 12% 55%;
-        --authority-t1: 220 60% 65%;
-        --authority-t2: 145 45% 55%;
-        --authority-t3: 25 75% 60%;
-        --authority-t4: 280 50% 65%;
+    /*
+     * Light-mode authority overrides — deeper values for AA on warm-paper card.
+     * Applied when .light is on <html> (see index.css).
+     */
+    .light {
+        --authority-t0: 250 10% 46%;
+        --authority-t1: 210 64% 42%;
+        --authority-t2: 148 52% 32%;
+        --authority-t3: 40 82% 33%;
+        --authority-t4: 266 48% 46%;
 
-        --eval-pass: 145 45% 55%;
-        --eval-hold: 38 80% 60%;
-        --eval-info: 220 30% 65%;
-        --eval-needs-human: 280 50% 65%;
+        --eval-pass:        148 52% 32%;
+        --eval-hold:        36 100% 36%;
+        --eval-info:        210 64% 42%;
+        --eval-needs-human: 266 48% 46%;
 
-        --success: 145 55% 50%;
-        --warning: 38 90% 60%;
-        --info: 220 60% 65%;
+        --success:            148 52% 32%;
+        --success-foreground: 38 28% 97%;
+        --warning:            36 100% 36%;
+        --warning-foreground: 30 14% 14%;
+        --info:               210 64% 42%;
+        --info-foreground:    38 28% 97%;
     }
 }
