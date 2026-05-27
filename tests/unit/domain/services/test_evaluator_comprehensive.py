@@ -30,6 +30,7 @@ from evalvault.domain.services.evaluator import (
     RagasEvaluator,
     TestCaseEvalResult,
 )
+from evalvault.domain.services.ragas_prompt_overrides import override_metric_prompt
 from evalvault.ports.outbound.llm_port import LLMPort
 
 
@@ -828,7 +829,7 @@ class TestAnswerRelevancyPromptTuning:
         metric = SimpleNamespace(question_generation=prompt)
         original = metric.question_generation.instruction
 
-        applied = RagasEvaluator._override_metric_prompt(metric, "새 프롬프트 지시문")
+        applied = override_metric_prompt(metric, "새 프롬프트 지시문")
 
         assert applied is True
         assert metric.question_generation.instruction == "새 프롬프트 지시문"

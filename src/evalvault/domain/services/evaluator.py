@@ -33,6 +33,7 @@ from evalvault.domain.metrics.summary_risk_coverage import SummaryRiskCoverage
 from evalvault.domain.metrics.text_match import ExactMatch, F1Score
 from evalvault.domain.services import evaluation_cost as _evaluation_cost
 from evalvault.domain.services import ragas_korean_prompts as _korean_prompts
+from evalvault.domain.services import ragas_prompt_overrides as _prompt_overrides
 from evalvault.domain.services.custom_metric_snapshot import build_custom_metric_snapshot
 from evalvault.domain.services.dataset_preprocessor import DatasetPreprocessor
 from evalvault.domain.services.faithfulness_fallback import FaithfulnessFallback
@@ -634,9 +635,11 @@ class RagasEvaluator:
 
         override_status = {}
         if prompt_overrides:
-            override_status = self._apply_prompt_overrides(ragas_metrics, prompt_overrides)
+            override_status = _prompt_overrides.apply_prompt_overrides(
+                ragas_metrics, prompt_overrides
+            )
 
-        prompt_snapshots = self._collect_ragas_prompt_snapshots(
+        prompt_snapshots = _prompt_overrides.collect_ragas_prompt_snapshots(
             ragas_metrics,
             prompt_overrides,
             override_status,
@@ -791,185 +794,6 @@ class RagasEvaluator:
 
     def _apply_korean_factual_correctness_prompts(self, metric: Any) -> bool:
         return _korean_prompts.apply_korean_factual_correctness_prompts(metric)
-
-    def _apply_prompt_overrides(
-        self,
-        ragas_metrics: list[Any],
-        prompt_overrides: dict[str, str],
-    ) -> dict[str, str]:
-        """Apply prompt overrides to Ragas metric instances."""
-
-        statuses: dict[str, str] = {}
-        for metric in ragas_metrics:
-            metric_name = getattr(metric, "name", None)
-            if not metric_name or metric_name not in prompt_overrides:
-                continue
-            prompt_text = prompt_overrides[metric_name]
-            applied = self._override_metric_prompt(metric, prompt_text)
-            if not applied and metric_name == "faithfulness":
-                applied = self._override_faithfulness_prompt(metric, prompt_text)
-            statuses[metric_name] = "applied" if applied else "unsupported"
-            if not applied:
-                logger.warning("Prompt override for metric '%s' could not be applied.", metric_name)
-        return statuses
-
-    @staticmethod
-    def _override_metric_prompt(metric: Any, prompt_text: str) -> bool:
-        """Best-effort override for metric prompt templates."""
-
-        if hasattr(metric, "prompt"):
-            target = metric.prompt
-            if isinstance(target, str):
-                metric.prompt = prompt_text
-                return True
-            if target is not None and hasattr(target, "template"):
-                target.template = prompt_text
-                return True
-            if target is not None and hasattr(target, "instruction"):
-                target.instruction = prompt_text
-                return True
-
-        if hasattr(metric, "question_generation"):
-            target = getattr(metric, "question_generation", None)
-            if isinstance(target, str):
-                metric.question_generation = prompt_text
-                return True
-            if target is not None and hasattr(target, "template"):
-                target.template = prompt_text
-                return True
-            if target is not None and hasattr(target, "instruction"):
-                target.instruction = prompt_text
-                return True
-
-        candidates: list[tuple[str, Any]] = []
-        for attr in dir(metric):
-            if not attr.endswith("_prompt") or attr == "prompt":
-                continue
-            try:
-                value = getattr(metric, attr)
-            except Exception:
-                continue
-            if value is None:
-                continue
-            candidates.append((attr, value))
-
-        if len(candidates) == 1:
-            attr, value = candidates[0]
-            if isinstance(value, str):
-                setattr(metric, attr, prompt_text)
-                return True
-            if hasattr(value, "template"):
-                value.template = prompt_text
-                return True
-            if hasattr(value, "instruction"):
-                value.instruction = prompt_text
-                return True
-
-        return False
-
-    @staticmethod
-    def _override_faithfulness_prompt(metric: Any, prompt_text: str) -> bool:
-        target = getattr(metric, "nli_statements_prompt", None)
-        if target is None:
-            return False
-        if hasattr(target, "instruction"):
-            target.instruction = prompt_text
-            return True
-        return False
-
-    @staticmethod
-    def _extract_prompt_text(value: Any) -> str | None:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            return value
-        for attr in ("template", "instruction", "prompt", "text"):
-            try:
-                candidate = getattr(value, attr)
-            except Exception:
-                continue
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate
-        return None
-
-    def _collect_metric_prompt_text(self, metric: Any) -> str | None:
-        for attr in ("prompt", "question_generation"):
-            if hasattr(metric, attr):
-                try:
-                    value = getattr(metric, attr)
-                except Exception:
-                    continue
-                text = self._extract_prompt_text(value)
-                if text:
-                    return text
-        for attr in dir(metric):
-            if not attr.endswith("_prompt") or attr == "prompt":
-                continue
-            try:
-                value = getattr(metric, attr)
-            except Exception:
-                continue
-            text = self._extract_prompt_text(value)
-            if text:
-                return text
-        return None
-
-    def _collect_ragas_prompt_snapshots(
-        self,
-        ragas_metrics: list[Any],
-        prompt_overrides: dict[str, str] | None,
-        override_status: dict[str, str],
-    ) -> dict[str, dict[str, Any]]:
-        snapshots: dict[str, dict[str, Any]] = {}
-        for metric in ragas_metrics:
-            metric_name = getattr(metric, "name", None)
-            if not metric_name:
-                continue
-            requested = bool(prompt_overrides and metric_name in prompt_overrides)
-            status = override_status.get(metric_name)
-            source = "override" if status == "applied" else "default"
-
-            prompts: dict[str, str] = {}
-            if metric_name == "summary_score":
-                prompts["question_generation"] = (
-                    self._extract_prompt_text(getattr(metric, "question_generation_prompt", None))
-                    or ""
-                )
-                prompts["answer_generation"] = (
-                    self._extract_prompt_text(getattr(metric, "answer_generation_prompt", None))
-                    or ""
-                )
-                prompts["extract_keyphrases"] = (
-                    self._extract_prompt_text(getattr(metric, "extract_keyphrases_prompt", None))
-                    or ""
-                )
-                prompts = {k: v for k, v in prompts.items() if v}
-            elif metric_name == "summary_faithfulness":
-                prompts["statement_generation"] = (
-                    self._extract_prompt_text(getattr(metric, "statement_generator_prompt", None))
-                    or ""
-                )
-                prompts["nli_statements"] = (
-                    self._extract_prompt_text(getattr(metric, "nli_statements_prompt", None)) or ""
-                )
-                prompts = {k: v for k, v in prompts.items() if v}
-
-            prompt_text = self._collect_metric_prompt_text(metric)
-            if prompts:
-                snapshots[str(metric_name)] = {
-                    "prompts": prompts,
-                    "source": source,
-                    "override_requested": requested,
-                    "override_status": status,
-                }
-            elif prompt_text:
-                snapshots[str(metric_name)] = {
-                    "prompt": prompt_text,
-                    "source": source,
-                    "override_requested": requested,
-                    "override_status": status,
-                }
-        return snapshots
 
     async def _evaluate_sequential(
         self,
