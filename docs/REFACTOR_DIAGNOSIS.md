@@ -189,6 +189,62 @@
 | **A-S4** | `langfuse_trace_id` → `tracker_trace_ids: dict[str,str]` (도메인의 벤더 누수 제거) | adapter | H | 1d | `domain/entities/result.py`, `base_sql.py:52,148,667,1177` + DB 마이그레이션 1회 | A-S3 |
 | **D-S5** | `RagasEvaluator` 핵심 좁히기 (cost/fallback/custom-metric scoring 분리) | domain | H | 1주 | `evaluator.py`, `multiturn_evaluator.py`, `memory_aware_evaluator.py`, `prompt_scoring_service.py`, `graph_rag_experiment.py`, 2개 신규 서비스 | D-S2 |
 
+### Phase 3.5 — 외부 라이브러리 일제 업데이트 (Phase 3 완료 직후, Phase 4 이전)
+
+> 2026-05-21 사용자 지침으로 신설. Phase 3로 도메인 구조가 안정된 직후, **모든 외부 의존성의 최신 버전 가용성을 확인하고 안전한 범위에서 업데이트**한다. 동시에 업데이트된 라이브러리의 신 기능 중 EvalVault에 도움이 되는 것은 적극 채택. 라이브러리 안정화 후 Phase 4(웹 개편)로 진입해야 redesign이 stale 의존성 위에서 진행되는 일을 막을 수 있다.
+>
+> **두 단계로 진행**:
+> 1. **버전 audit + 안전 업데이트** — pyproject.toml + frontend/package.json + uv.lock 전체 점검. 각 의존성을 (a) 안전한 minor/patch 업데이트, (b) breaking change 동반 major 업데이트(별도 audit 필요), (c) 의도된 핀(이유 문서화)로 분류. (a)는 일괄 적용, (b)는 슬라이스 단위 audit 후 적용, (c)는 핀 이유와 함께 명시.
+> 2. **신 기능 채택** — CHANGELOG / release notes에서 EvalVault에 가치 있는 것만 골라 적용. 새로움 그 자체를 위한 채택은 금지.
+>
+> **메모리 적용**: `project-phase35-library-update` (마스터 지침), `llm-prompt-discipline` (LLM 관련 라이브러리 업데이트 시 프롬프트 byte-identical 유지), `project-decision-authority-t2` (새 결정 emit 기능은 T2 cap 존중).
+
+| ID | 슬라이스 | 영역 | Risk | Wall | 영향 파일 | 비고 |
+|---|---|---|---|---|---|---|
+| **L-S0** | 전체 의존성 인벤토리 + (a)(b)(c) 분류 + 핀 이유 문서화 | discovery | L | 1d | `pyproject.toml`, `frontend/package.json`, `uv.lock`, `docs/dependency-audit-2026-05.md`(신규) | 사용자 결정이 필요한 핀들 명시 (예: `ragas==0.4.2`, `matplotlib<3.9.0`) |
+| **L-S1** | 안전 minor/patch 일괄 업데이트 (분류 (a)) | dependency | L-M | 4h | `pyproject.toml`, `uv.lock` | `uv sync` + 전체 unit 테스트 회귀 검증 |
+| **L-S2** | ragas major 업데이트 (0.4.2 → 1.x) — 별도 슬라이스 | dependency | H | 1주 | `evaluator.py`, `metric_scoring.py`, `faithfulness_fallback.py`, `ragas_korean_prompts.py`, `domain/metrics/*` | regression-gate baseline 영향 大. 별도 sprint. ragas v1 metric API 변경 흡수. |
+| **L-S3** | pydantic v2 / pydantic-settings 최신화 + 신 기능 (model_validator, computed_field 등) 적용 | dependency | M | 2~3d | `domain/entities/*`, `config/settings.py`, 모든 BaseModel | A-S5(model_copy) + A-S1(RetryPolicy)이 이미 v2 기반이라 호환 |
+| **L-S4** | FastAPI / typer / instructor 최신화 + 신 기능 채택 | dependency | M | 2d | `adapters/inbound/{api,cli}`, `prompt_registry.py` (D-S5d 산물) | typer 자동완성, instructor 새 schema 기능, fastapi async 패턴 |
+| **L-S5** | mkdocs + mkdocs-material + mkdocstrings 업데이트 + 신 테마 기능 | dependency | L | 4h | `mkdocs.yml`, `docs/stylesheets/` | mkdocs Material 최신 features (i18n, search.boost 등) |
+| **L-S6** | frontend dependency 업데이트 (React 19 patch, Vite 7 patch, Tailwind 4 patch, AI SDK 등) | dependency | M | 1d | `frontend/package.json`, `frontend/package-lock.json` | Phase 4 시작 전에 안정화. major React/Vite 변경은 Phase 4 redesign과 같이 진행 가능 |
+
+**의존 그래프**: L-S0 → L-S1 → (L-S2, L-S3, L-S4, L-S5, L-S6 병렬 가능). L-S2는 가장 위험 — 단독 sprint.
+
+**선행 조건**: Phase 3 D-S5 완료 (regression-gate baseline 안정). **후행**: L-S6 완료 후 Phase 4(웹 개편) 진입.
+
+---
+
+### Phase 4 — 웹 프론트엔드 전면 개선 (별도 sprint, CLI 안정 후)
+
+> 2026-05-21 사용자 지침으로 신설. CLI는 큰 문제 없으나 웹페이지 쪽이 심각하다는 판단. 다음 액션 계획 라운드에서 본격 슬라이스 분해.
+>
+> **방향성**: Claude design language(Anthropic / Claude.ai UI 패턴)를 **깊게** 활용. 단순 색·폰트 모방이 아니라 — 타이포그래피 위계, 색 절제(중성 기반 + 소수 강조색), 여백 후함, 명확한 primary action, 적절한 monospace, 시각적 잡음 제거 — 의 디자인 철학을 채택.
+>
+> **선행 조건**: Phase 3 A-S3 (MultiTrackerAdapter 실구현) + A-S4 (`tracker_trace_ids` 스키마 + DB 마이그레이션) 완료 후 시작. 그 전엔 FastAPI Web UI 백엔드(`src/evalvault/adapters/inbound/api/`)가 흔들리기 때문에 프론트 작업이 지속적으로 회귀 위험.
+>
+> **현재 17개 페이지** (`frontend/src/pages/`): `AiSdkChat`, `AnalysisCompareView`, `AnalysisLab`, `AnalysisResultView`, `Chat`, `CompareRuns`, `ComprehensiveAnalysis`, `CustomerReport`, `Dashboard`, `DomainMemory`, `EvaluationStudio`, `JudgeCalibration`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`, `VisualizationHome`. 일부는 합치거나 제거될 가능성 있음 — Phase 4 디스커버리에서 결정.
+
+| ID | 슬라이스 | 영역 | Risk | Wall | 영향 파일 | 의존 |
+|---|---|---|---|---|---|---|
+| **W-S0** | 디스커버리: 페이지별 문제점 인벤토리 (스크린샷, IA / 인터랙션 / 비주얼 / 성능 / a11y 분류) + 사용자 페인 포인트 청취 + Claude design tokens(palette, type scale, spacing, motion) 정의 | discovery | L | 2~3d | `docs/frontend/W-S0-inventory.md` (신규), 디자인 토큰 파일 | Phase 3 안정화 |
+| **W-S1** | 디자인 시스템 기반 구축: tailwind 토큰 재설정 + 공통 컴포넌트 라이브러리 (Button, Card, Table, EmptyState, StatusBadge, MetricChip 등) 1차 구축. Storybook 또는 ladle 도입 검토 | design-system | M | 1주 | `frontend/src/design/*` (신규), `frontend/tailwind.config.*` | W-S0 |
+| **W-S2** | 진입 동선 재설계: `Dashboard` / `EvaluationStudio` / `AnalysisLab` 3대 페이지를 Claude design 베이스로 재설계. CLI `run_id` 기반 일관성 유지 | redesign | M-H | 1~2주 | 3개 페이지 + 라우팅 | W-S1 |
+| **W-S3** | 분석 페이지군 정리: `AnalysisCompareView`/`AnalysisResultView`/`ComprehensiveAnalysis`/`CompareRuns` 4개를 **2개로 통합** (비교 vs 단일 결과). 시각화 라이브러리 재검토 (Plotly+Recharts → 더 단순한 single-purpose 시각화) | redesign | H | 1주 | 위 4 페이지 + 시각화 컴포넌트 | W-S1 |
+| **W-S4** | LLM 상호작용 페이지: `AiSdkChat`, `Chat`, `JudgeCalibration` 재설계. **LLM 프롬프트 디스시플린 메모리 준수** — 프롬프트 변경 시 명시적 디자인 결정으로 처리 | redesign | M-H | 1주 | 3 페이지 | W-S1, [[llm-prompt-discipline]] |
+| **W-S5** | 부수 페이지 정리: `CustomerReport`, `DomainMemory`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`/`VisualizationHome` — 합치거나 제거 결정 + 필요 시 재설계 | cleanup | M | 1주 | 6~7 페이지 | W-S1 |
+| **W-S6** | Playwright e2e 테스트 갱신: 재설계된 인터랙션에 맞춰 모든 e2e 갱신, 회귀 검증 | test | M | 3~5d | `frontend/tests/` (Playwright) | W-S2~5 |
+| **W-S7** | 의사결정 권한 가시화: 회귀 게이트 결과 등 T2/T1 decision artifact를 UI에서 표시할 때 `authority_level` 필드를 솔직하게 노출 (T2 verdict는 "evaluation passed"로 표시, "promoted"라고 표시하지 않음) | redesign | L | 2d | 위 페이지 중 결정 표시 영역 | W-S2, [[project-decision-authority-t2]] |
+
+**디스커버리 단계(W-S0)에서 결정해야 할 항목**:
+- 17개 페이지 중 유지/통합/제거 분류
+- Claude design tokens (palette, type scale, spacing, motion durations)의 구체값
+- Plotly + Recharts 유지 여부 / 대안 (visx, 직접 SVG, 또는 단순 D3)
+- 디자인 시스템 호스팅 (Storybook vs ladle vs 인라인 prose 문서)
+- FastAPI Web UI 백엔드와의 인터페이스 변경 필요 여부 (Phase 3 A-S4 이후 자연스러운 변경 흡수)
+
+**관련 메모리**: `project_phase4_web_frontend_overhaul.md` (이 디렉티브의 원본 기록).
+
 ---
 
 ## 4. 인수팀이 결정해야 할 미해결 질문 (Phase 2 전까지 합의 필요)
