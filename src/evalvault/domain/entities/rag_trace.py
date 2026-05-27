@@ -26,11 +26,11 @@ Example:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class RetrievalMethod(str, Enum):
+class RetrievalMethod(StrEnum):
     """검색 방법 유형."""
 
     BM25 = "bm25"
@@ -40,7 +40,7 @@ class RetrievalMethod(str, Enum):
     RERANK = "rerank"
 
 
-class RerankMethod(str, Enum):
+class RerankMethod(StrEnum):
     """리랭킹 방법 유형."""
 
     CROSS_ENCODER = "cross_encoder"

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ErrorStage(str, Enum):
+class ErrorStage(StrEnum):
     preprocess = "preprocess"
     evaluate = "evaluate"
     analyze = "analyze"
@@ -67,7 +67,7 @@ class GetRunSummaryResponse(BaseModel):
     errors: list[McpError] = Field(default_factory=list)
 
 
-class ArtifactsKind(str, Enum):
+class ArtifactsKind(StrEnum):
     analysis = "analysis"
     comparison = "comparison"
 

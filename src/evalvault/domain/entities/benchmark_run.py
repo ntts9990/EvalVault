@@ -5,17 +5,17 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class BenchmarkType(str, Enum):
+class BenchmarkType(StrEnum):
     KMMLU = "kmmlu"
     MMLU = "mmlu"
     CUSTOM = "custom"
 
 
-class BenchmarkStatus(str, Enum):
+class BenchmarkStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"

@@ -16,11 +16,11 @@ References:
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """벤치마크 태스크 타입 (MTEB + DeepEval 호환)."""
 
     # MTEB standard tasks
@@ -40,7 +40,7 @@ class TaskType(str, Enum):
     KEYWORD_EXTRACTION = "KeywordExtraction"
 
 
-class MetricType(str, Enum):
+class MetricType(StrEnum):
     """벤치마크 메트릭 타입."""
 
     # MTEB/lm-harness metrics
