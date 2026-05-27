@@ -33,14 +33,14 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md) to maintain a w
    ```
 3. Make your changes following our coding standards
 4. Write or update tests as needed
-5. Run the test suite:
+5. Run the test suite (CI excludes API/external-runtime markers):
    ```bash
-   uv run pytest tests/ -v
+   uv run pytest tests/ -v -m "not requires_openai and not requires_langfuse"
    ```
-6. Run linting:
+6. Run linting and formatting (CI checks both `src/` and `tests/`):
    ```bash
-   uv run ruff check src/
-   uv run ruff format src/
+   uv run ruff check src/ tests/
+   uv run ruff format --check src/ tests/
    ```
 7. Commit with a clear message
 8. Push and create a Pull Request
@@ -114,8 +114,11 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) with automat
 feat(metrics): Add custom insurance accuracy metric
 fix(cli): Handle empty dataset gracefully
 docs: Update installation guide
-chore(deps): Bump ragas to 1.0.5
+chore(deps): bump arize-phoenix to 16
 ```
+
+> Lint is pinned to a single ruff minor (`pyproject.toml` dev deps + CI) for
+> deterministic results — `uv run ruff` uses the same version locally and in CI.
 
 **Important**: When your PR is merged to `main`, the Release workflow automatically:
 1. Analyzes commits to determine version bump
@@ -148,9 +151,11 @@ New adapters should:
 - Write tests **before** implementation (TDD)
 - Unit tests in `tests/unit/`
 - Integration tests in `tests/integration/`
-- Use `@pytest.mark.requires_openai` for tests needing real API
-- Use `@pytest.mark.requires_langfuse` for tests needing Langfuse
+- Mark tests that need external resources so CI can exclude them:
+  `requires_openai`, `requires_langfuse`, `requires_phoenix`, `requires_ollama`, `slow`
 - Aim for high coverage but prioritize meaningful tests
+- Quality gates, regression gate, and the full test policy live in
+  [docs/handbook/CHAPTERS/06_quality_and_testing.md](docs/handbook/CHAPTERS/06_quality_and_testing.md)
 
 ## Questions?
 
