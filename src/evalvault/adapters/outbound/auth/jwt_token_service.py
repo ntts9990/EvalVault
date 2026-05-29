@@ -59,5 +59,7 @@ class JwtTokenService:
         except jwt.PyJWTError as exc:
             raise TokenError(str(exc)) from exc
         if expected_type is not None and payload.get("type") != expected_type:
-            raise TokenError(f"Expected token of type {expected_type!r}, got {payload.get('type')!r}")
+            raise TokenError(
+                f"Expected token of type {expected_type!r}, got {payload.get('type')!r}"
+            )
         return payload

@@ -9,12 +9,13 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
+from starlette import status
+
 from evalvault.adapters.inbound.api.main import create_app
 from evalvault.config.model_config import reset_model_config
 from evalvault.config.settings import reset_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
-from fastapi.testclient import TestClient
-from starlette import status
 
 
 @dataclass
