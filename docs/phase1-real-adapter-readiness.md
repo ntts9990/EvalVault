@@ -1,12 +1,13 @@
 # Phase 1 Real Adapter Readiness
 
-Status: **PARTIAL / BLOCKED**
+Status: **PARTIAL / BLOCKED ON EVIDENCE HASH**
 
 This note records the narrow readiness finding for replacing a Phase 0 thin
 EvalVault adapter with a real adapter. It intentionally does not claim full
-production multi-user readiness yet: the SQLite-backed project isolation path is
-now exercised across the live HTTP and MCP surfaces, but Postgres identity
-storage parity and downstream evidence-hash fields are still open.
+production multi-user readiness yet: the project isolation path is now
+exercised across the live HTTP and MCP surfaces, and identity storage has both
+SQLite and Postgres adapter coverage. Downstream evidence-hash fields are still
+open.
 
 ## What Is Scoped Today
 
@@ -54,9 +55,10 @@ storage parity and downstream evidence-hash fields are still open.
   token and passes that principal into all run tools. Project-scoped MCP calls
   enforce membership/role and storage filtering; shared MCP/API service tokens
   keep only the legacy no-project behavior — see "MCP Surface Isolation" below.
-- Run storage now has a first-class `project_id` isolation key. The remaining
-  gap for auth/backend parity is a Postgres `IdentityStoragePort` adapter, not
-  run storage, HTTP file-backed surfaces, or MCP run tools.
+- Run storage now has a first-class `project_id` isolation key. Identity storage
+  also has SQLite + Postgres adapter coverage, so the remaining real-adapter
+  blocker is downstream evidence/source hash integrity rather than project
+  isolation backend parity.
 
 ## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
 
@@ -72,6 +74,12 @@ Implemented as a coherent, test-backed vertical slice honoring Principle 2
 - **Identity storage** (`IdentityStoragePort` + `SqliteIdentityStorageAdapter`):
   users, projects, memberships, API keys, refresh tokens; idempotent admin
   bootstrap (`bootstrap_admin`, env `EVALVAULT_ADMIN_EMAIL` / `_PASSWORD`).
+- **Postgres identity storage** (`PostgresIdentityStorageAdapter` +
+  `build_identity_storage_adapter`): same `IdentityStoragePort` surface as the
+  SQLite adapter for users, projects, memberships, API keys, and refresh tokens.
+  The live API principal resolver now builds the identity store through this
+  settings-aware factory, so `DB_BACKEND=postgres` no longer silently falls back
+  to SQLite identity state.
 - **Authorization** (`domain/services/authorization.py`): `Principal` + role
   ordering (admin > editor > viewer); membership/role resolution.
 - **API principal primitives** (`adapters/inbound/api/principal.py`): resolve a
@@ -86,7 +94,32 @@ Implemented as a coherent, test-backed vertical slice honoring Principle 2
 
 Proof: `tests/integration/test_run_project_isolation.py` (end-to-end: real
 identity + run storage + JWT + authz), `tests/unit/test_storage_project_isolation.py`,
-`tests/unit/test_identity_storage.py`, `tests/unit/test_authorization.py`.
+`tests/unit/test_identity_storage.py`, `tests/unit/test_postgres_identity_storage.py`,
+`tests/unit/test_identity_factory.py`, `tests/unit/test_authorization.py`.
+
+## Postgres Identity Backend Parity — Landed This Pass
+
+`IdentityStoragePort` now has a PostgreSQL implementation with the same
+contract surface as the SQLite identity adapter:
+
+- schema creation for `users`, `projects`, `memberships`, `api_keys`, and
+  `refresh_tokens`;
+- user/project CRUD and membership upsert/list/get;
+- API-key lookup by non-revoked prefix plus `last_used_at` update;
+- refresh-token create/get/revoke;
+- Postgres-level foreign keys for user/project-owned identity rows, with
+  idempotent constraint backfill for existing tables, plus unique lookup indexes
+  for API-key prefixes and refresh-token hashes;
+- settings-aware construction through `build_identity_storage_adapter`, using
+  SQLite only when `DB_BACKEND=sqlite` and Postgres otherwise.
+
+The FastAPI principal resolver now calls the factory lazily instead of
+hard-coding `SqliteIdentityStorageAdapter`, while preserving test/DI override
+through `app.state.identity_store`.
+
+Proof: `tests/unit/test_postgres_identity_storage.py`,
+`tests/unit/test_identity_factory.py`, plus the existing live project-isolation
+route and MCP suites listed below.
 
 ## Live Run-Route Wiring — Landed This Pass
 
@@ -188,10 +221,15 @@ model as the live HTTP run routes:
 - The router resolves a `Principal` from the HTTP `Authorization: Bearer` token
   using the existing identity path (session access JWT or per-user API key).
   That principal is passed to every MCP tool as a keyword-only argument.
+- The MCP router owns its own bearer gate instead of inheriting the generic
+  `/api/v1` service-token dependency, so a distinct `MCP_AUTH_TOKENS` value can
+  authorize legacy MCP calls even when `API_AUTH_TOKENS` is also configured.
 - Shared `MCP_AUTH_TOKENS` / fallback `API_AUTH_TOKENS` remain valid for
   **legacy no-project** MCP calls, but they resolve to `principal=None` and
-  therefore never satisfy project membership. A shared token plus `project_id`
-  returns a structured MCP auth error instead of project data.
+  therefore never satisfy project membership. Shared service tokens short-circuit
+  before identity-store lookup, so legacy calls do not probe project auth state.
+  A shared token plus `project_id` returns a structured MCP auth error instead
+  of project data.
 - `list_runs`, `get_run_summary`, `analyze_compare`, and `get_artifacts` require
   project membership when `project_id` is supplied and pass `project_id` into
   run storage reads (`list_runs(..., project_id=...)`,
@@ -233,14 +271,13 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation — run routes + dataset/retriever-doc + knowledge + MCP DONE; remaining
-   backend parity:** the storage-enforced scoping, identity persistence,
-   membership/role resolution, the principal/denial primitives, the live
-   `/api/v1/runs` route wiring, **dataset upload/list/read + retriever-doc
-   upload/read**, **knowledge upload/list/build/jobs/stats**, and **MCP run
-   tools** are implemented and proven. **Remaining**: a **Postgres
-   `IdentityStoragePort` adapter** (only SQLite identity exists today) is still
-   needed for backend parity. Storage run-mutation methods (`delete_run`,
+1. **Project isolation — run routes + dataset/retriever-doc + knowledge + MCP +
+   Postgres identity backend parity DONE:** the storage-enforced scoping,
+   identity persistence, membership/role resolution, the principal/denial
+   primitives, the live `/api/v1/runs` route wiring, **dataset upload/list/read
+   + retriever-doc upload/read**, **knowledge upload/list/build/jobs/stats**,
+   **MCP run tools**, and a **Postgres `IdentityStoragePort` adapter** are
+   implemented and proven. Storage run-mutation methods (`delete_run`,
    `update_run_metadata`, `save_feedback`, cluster maps) remain scoped at the
    route layer via the `get_run(project_id=...)` membership chokepoint rather
    than being independently project-parameterized.
@@ -265,4 +302,6 @@ Contract fixtures and executable examples live in:
    scipy pinning for cross-version hash equality.
 
 Readiness remains **PARTIAL** for local/offline single-tenant regression-gate
-consumption and **BLOCKED** for multi-user project-scoped replacement.
+consumption and **BLOCKED** for real-adapter replacement until the
+evidence/source hash fields are emitted and pinned to the downstream reference
+integrity contract.

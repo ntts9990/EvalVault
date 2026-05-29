@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from evalvault.adapters.inbound.api.main import get_principal
+from evalvault.adapters.inbound.api.main import resolve_bearer_principal
 from evalvault.adapters.inbound.mcp import tools as mcp_tools
 from evalvault.config.settings import Settings, get_settings
 from evalvault.domain.services.authorization import Principal
@@ -31,7 +31,6 @@ def _normalize_tokens(raw_tokens: str | None) -> set[str]:
 def _require_mcp_auth(
     request: Request,
     settings: Settings = Depends(get_settings),
-    principal: Principal | None = Depends(get_principal),
 ) -> Principal | None:
     if not settings.mcp_enabled:
         raise HTTPException(status_code=404, detail="MCP is disabled")
@@ -40,17 +39,19 @@ def _require_mcp_auth(
         raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
     token = auth_header[7:].strip()
 
-    if principal is not None:
-        return principal
-
     tokens = _normalize_tokens(settings.mcp_auth_tokens) or _normalize_tokens(
         settings.api_auth_tokens
     )
+    if token in tokens:
+        return None
+
+    principal = resolve_bearer_principal(request, token)
+    if principal is not None:
+        return principal
+
     if not tokens:
         raise HTTPException(status_code=401, detail="MCP auth tokens are required")
-    if token not in tokens:
-        raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
-    return None
+    raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
 
 
 def _tool_registry() -> dict[str, Any]:

@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from evalvault.adapters.inbound.api.adapter import WebUIAdapter
 from evalvault.adapters.inbound.api.main import create_app
+from evalvault.adapters.inbound.api.routers import mcp as mcp_router
 from evalvault.adapters.outbound.auth.jwt_token_service import JwtTokenService
 from evalvault.adapters.outbound.storage.sqlite_adapter import SQLiteStorageAdapter
 from evalvault.adapters.outbound.storage.sqlite_identity import SqliteIdentityStorageAdapter
@@ -59,7 +60,7 @@ def wired(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MCP_ENABLED", "true")
     monkeypatch.setenv("MCP_AUTH_TOKENS", "shared-mcp-token")
-    monkeypatch.delenv("API_AUTH_TOKENS", raising=False)
+    monkeypatch.setenv("API_AUTH_TOKENS", "api-service-token")
     monkeypatch.setenv("DB_BACKEND", "sqlite")
     monkeypatch.setenv("EVALVAULT_DB_PATH", str(tmp_path / "data" / "db" / "evalvault.db"))
     reset_settings()
@@ -141,6 +142,18 @@ def test_user_jwt_scopes_project_mcp_list_runs(wired) -> None:
 
 
 def test_shared_mcp_token_without_project_keeps_legacy_access(wired) -> None:
+    payload = _call_list_runs(wired, "shared-mcp-token", {})
+
+    assert payload["errors"] == []
+    assert {run["run_id"] for run in payload["runs"]} >= {"run-a", "run-b"}
+
+
+def test_shared_mcp_token_does_not_probe_identity(wired, monkeypatch) -> None:
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("shared MCP service token should not resolve identity")
+
+    monkeypatch.setattr(mcp_router, "resolve_bearer_principal", fail_if_called)
+
     payload = _call_list_runs(wired, "shared-mcp-token", {})
 
     assert payload["errors"] == []

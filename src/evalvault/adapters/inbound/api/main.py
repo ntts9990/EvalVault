@@ -26,6 +26,8 @@ from evalvault.adapters.inbound.api.principal import (
 from evalvault.config.runtime_services import ensure_local_observability
 from evalvault.config.settings import Settings, get_settings, is_production_profile
 from evalvault.domain.services.authorization import Principal
+from evalvault.ports.outbound.auth_port import PasswordHasherPort, TokenError, TokenServicePort
+from evalvault.ports.outbound.identity_port import IdentityStoragePort
 
 logger = logging.getLogger(__name__)
 
@@ -159,20 +161,20 @@ def require_api_token(
 # exactly as before (the shared API token alone confers no project membership).
 
 
-def _resolve_identity_store(request: Request):
+def _resolve_identity_store(request: Request) -> IdentityStoragePort:
     store = getattr(request.app.state, "identity_store", None)
     if store is not None:
         return store
-    from evalvault.adapters.outbound.storage.sqlite_identity import (
-        SqliteIdentityStorageAdapter,
+    from evalvault.adapters.outbound.storage.identity_factory import (
+        build_identity_storage_adapter,
     )
 
-    store = SqliteIdentityStorageAdapter(db_path=get_settings().evalvault_db_path)
+    store = build_identity_storage_adapter(get_settings())
     request.app.state.identity_store = store
     return store
 
 
-def _resolve_token_service(request: Request):
+def _resolve_token_service(request: Request) -> TokenServicePort | None:
     service = getattr(request.app.state, "token_service", None)
     if service is not None:
         return service
@@ -186,7 +188,7 @@ def _resolve_token_service(request: Request):
     return service
 
 
-def _resolve_password_hasher(request: Request):
+def _resolve_password_hasher(request: Request) -> PasswordHasherPort:
     hasher = getattr(request.app.state, "password_hasher", None)
     if hasher is not None:
         return hasher
@@ -198,23 +200,33 @@ def _resolve_password_hasher(request: Request):
 
 
 class _NoJwtTokenService:
-    def decode(self, token: str, *, expected_type: str | None = None) -> dict:
-        from evalvault.ports.outbound.auth_port import TokenError
+    def issue_access_token(self, subject: str, extra: dict | None = None) -> str:
+        raise TokenError("JWT auth is not configured")
 
+    def issue_refresh_token(self, subject: str, extra: dict | None = None) -> str:
+        raise TokenError("JWT auth is not configured")
+
+    def decode(self, token: str, *, expected_type: str | None = None) -> dict:
         raise TokenError("JWT auth is not configured")
 
 
 def _resolve_principal_from_token(request: Request, token: str | None) -> Principal | None:
     if not token:
         return None
-    token_service = _resolve_token_service(request) or _NoJwtTokenService()
-    hasher = _resolve_password_hasher(request)
-    store = _resolve_identity_store(request)
-    if store is None or hasher is None:
+    try:
+        token_service = _resolve_token_service(request) or _NoJwtTokenService()
+        hasher = _resolve_password_hasher(request)
+        store = _resolve_identity_store(request)
+        return resolve_principal(
+            token, identity_store=store, token_service=token_service, hasher=hasher
+        )
+    except Exception as exc:
+        logger.warning(
+            "Identity principal resolution failed for bearer token %s: %s",
+            _hash_token(token),
+            exc,
+        )
         return None
-    return resolve_principal(
-        token, identity_store=store, token_service=token_service, hasher=hasher
-    )
 
 
 def get_principal(
@@ -228,6 +240,11 @@ def get_principal(
     not a real identity credential resolves to ``None`` (no project membership).
     """
     token = credentials.credentials if credentials else None
+    return _resolve_principal_from_token(request, token)
+
+
+def resolve_bearer_principal(request: Request, token: str | None) -> Principal | None:
+    """Resolve a project-scoped principal from a raw bearer token."""
     return _resolve_principal_from_token(request, token)
 
 
@@ -394,7 +411,6 @@ def create_app() -> FastAPI:
         mcp.router,
         prefix="/api/v1/mcp",
         tags=["mcp"],
-        dependencies=auth_dependencies,
     )
     app.include_router(
         calibration.router,
