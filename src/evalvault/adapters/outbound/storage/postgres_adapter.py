@@ -124,7 +124,7 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'evaluation_runs'
-              AND column_name IN ('metadata', 'retrieval_metadata', 'tracker_trace_ids')
+              AND column_name IN ('metadata', 'retrieval_metadata', 'tracker_trace_ids', 'project_id')
             """
         )
         columns = {row[0] for row in cursor.fetchall()}
@@ -136,6 +136,13 @@ class PostgreSQLStorageAdapter(BaseSQLStorageAdapter):
             # A-S4: per-provider trace IDs replacing langfuse_trace_id.
             # The legacy column is kept for backward-compat reads.
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN tracker_trace_ids JSONB")
+        if "project_id" not in columns:
+            # G4 project isolation: additive column; legacy rows are backfilled
+            # to the deterministic default project so list/get scoping is total.
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN project_id VARCHAR(255)")
+            conn.execute(
+                "UPDATE evaluation_runs SET project_id = 'default' WHERE project_id IS NULL"
+            )
 
         pipeline_cursor = conn.execute(
             """

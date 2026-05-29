@@ -22,6 +22,12 @@ from evalvault.domain.entities import (
     SatisfactionFeedback,
     TestCaseResult,
 )
+from evalvault.domain.entities.auth import DEFAULT_PROJECT_ID
+
+# G4 project isolation: runs saved without an explicit project_id are normalized
+# to DEFAULT_PROJECT_ID (used in _run_params / get_run below) so list/get scoping
+# is total. DEFAULT_PROJECT_ID is defined once in ``domain.entities.auth`` and
+# shared with admin bootstrap.
 
 
 class SQLQueries:
@@ -44,13 +50,13 @@ class SQLQueries:
         return ", ".join([self.placeholder] * count)
 
     def insert_run(self) -> str:
-        values = self._values(14)
+        values = self._values(15)
         return f"""
         INSERT INTO evaluation_runs (
             run_id, dataset_name, dataset_version, model_name,
             started_at, finished_at, total_tokens, total_cost_usd,
             pass_rate, metrics_evaluated, thresholds, tracker_trace_ids,
-            metadata, retrieval_metadata
+            metadata, retrieval_metadata, project_id
         ) VALUES ({values})
         """
 
@@ -154,7 +160,7 @@ class SQLQueries:
                started_at, finished_at, total_tokens, total_cost_usd,
                pass_rate, metrics_evaluated, thresholds,
                tracker_trace_ids,
-               metadata, retrieval_metadata
+               metadata, retrieval_metadata, project_id
         FROM evaluation_runs
         WHERE run_id = {self.placeholder}
         """
@@ -369,12 +375,19 @@ class BaseSQLStorageAdapter(ABC):
         )
         return self._fetch_lastrowid(cursor)
 
-    def get_run(self, run_id: str) -> EvaluationRun:
+    def get_run(self, run_id: str, project_id: str | None = None) -> EvaluationRun:
         with self._get_connection() as conn:
             cursor = self._execute(conn, self.queries.select_run(), (run_id,))
             run_row = cursor.fetchone()
             if not run_row:
                 raise KeyError(f"Run not found: {run_id}")
+
+            # G4 storage-enforced isolation: a run belonging to another project
+            # must be indistinguishable from a missing run (no existence leak).
+            if project_id is not None:
+                row_project = self._row_value(run_row, "project_id") or DEFAULT_PROJECT_ID
+                if row_project != project_id:
+                    raise KeyError(f"Run not found: {run_id}")
 
             result_rows = self._execute(
                 conn, self.queries.select_test_case_results(), (run_id,)
@@ -387,6 +400,7 @@ class BaseSQLStorageAdapter(ABC):
                 dataset_name=run_row["dataset_name"],
                 dataset_version=run_row["dataset_version"],
                 model_name=run_row["model_name"],
+                project_id=self._row_value(run_row, "project_id"),
                 started_at=self._deserialize_datetime(run_row["started_at"]) or datetime.now(),
                 finished_at=self._deserialize_datetime(run_row["finished_at"]),
                 total_tokens=run_row["total_tokens"],
@@ -405,6 +419,7 @@ class BaseSQLStorageAdapter(ABC):
         offset: int = 0,
         dataset_name: str | None = None,
         model_name: str | None = None,
+        project_id: str | None = None,
     ) -> list[EvaluationRun]:
         with self._get_connection() as conn:
             query = self.queries.list_runs_base()
@@ -418,13 +433,23 @@ class BaseSQLStorageAdapter(ABC):
                 query += f" AND model_name = {self.queries.placeholder}"
                 params.append(model_name)
 
+            if project_id is not None:
+                # G4: storage-enforced project scope for run listing.
+                query += f" AND project_id = {self.queries.placeholder}"
+                params.append(project_id)
+
             query += self.queries.list_runs_ordering()
             params.extend([limit, offset])
 
             cursor = self._execute(conn, query, params)
             run_ids = [row["run_id"] for row in cursor.fetchall()]
 
-        return [self.get_run(run_id) for run_id in run_ids]
+        # When scoping, re-hydrate under the same project scope so the isolation
+        # invariant holds defense-in-depth (not just via the id-set filter above).
+        # Unscoped path keeps the legacy single-arg call shape.
+        if project_id is None:
+            return [self.get_run(run_id) for run_id in run_ids]
+        return [self.get_run(run_id, project_id=project_id) for run_id in run_ids]
 
     def delete_run(self, run_id: str) -> bool:
         with self._get_connection() as conn:
@@ -679,6 +704,7 @@ class BaseSQLStorageAdapter(ABC):
             self._serialize_json(run.tracker_trace_ids) if run.tracker_trace_ids else None,
             self._serialize_json(run.tracker_metadata),
             self._serialize_json(run.retrieval_metadata),
+            run.project_id or DEFAULT_PROJECT_ID,
         )
 
     def _test_case_params(self, run_id: str, result: TestCaseResult) -> Sequence[Any]:

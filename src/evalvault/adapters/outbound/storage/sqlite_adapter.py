@@ -98,6 +98,13 @@ class SQLiteStorageAdapter(BaseSQLStorageAdapter):
             # A-S4: per-provider trace IDs replacing langfuse_trace_id.
             # The legacy column is kept for backward-compat reads.
             conn.execute("ALTER TABLE evaluation_runs ADD COLUMN tracker_trace_ids TEXT")
+        if "project_id" not in columns:
+            # G4 project isolation: additive column; legacy rows are backfilled
+            # to the deterministic default project so list/get scoping is total.
+            conn.execute("ALTER TABLE evaluation_runs ADD COLUMN project_id TEXT")
+            conn.execute(
+                "UPDATE evaluation_runs SET project_id = 'default' WHERE project_id IS NULL"
+            )
 
         cluster_cursor = conn.execute("PRAGMA table_info(run_cluster_maps)")
         cluster_columns = {row[1] for row in cluster_cursor.fetchall()}

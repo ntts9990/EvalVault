@@ -13,6 +13,12 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import uuid4
 
+# Deterministic default project (G4). Legacy / unscoped evaluation runs are
+# persisted under this project id, and admin bootstrap creates a project whose
+# id equals this value so those runs are owned by a real, membership-checkable
+# project. Single source of truth shared by storage scoping and bootstrap.
+DEFAULT_PROJECT_ID = "default"
+
 
 class Role(StrEnum):
     """Project membership role. Order reflects privilege (admin > editor > viewer)."""

@@ -18,13 +18,16 @@ CREATE TABLE IF NOT EXISTS evaluation_runs (
     tracker_trace_ids TEXT,  -- JSON: {"mlflow": "...", "phoenix": "...", "langfuse": "..."}
     metadata TEXT,  -- Tracker metadata (Phoenix, Langfuse, etc.)
     retrieval_metadata TEXT,  -- Retrieval metadata by test case
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Appended last to match the additive ALTER migration column order (G4).
+    project_id TEXT  -- Project isolation key; legacy rows backfilled to 'default'
 );
 
 -- Index for querying by dataset and model
 CREATE INDEX IF NOT EXISTS idx_runs_dataset ON evaluation_runs(dataset_name);
 CREATE INDEX IF NOT EXISTS idx_runs_model ON evaluation_runs(model_name);
 CREATE INDEX IF NOT EXISTS idx_runs_started_at ON evaluation_runs(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_runs_project ON evaluation_runs(project_id);
 
 -- Test case results table
 CREATE TABLE IF NOT EXISTS test_case_results (

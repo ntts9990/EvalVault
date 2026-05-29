@@ -33,9 +33,10 @@ multi-user readiness: project isolation is not enforced today.
 - Auth foundation exists as domain entities (`User`, `Project`, `Membership`,
   `Role`) and token services, but FastAPI routes do not resolve a current user,
   project membership, or project-scoped role.
-- Run start accepts `project_name`, but it is stored as metadata only. There is
-  no `project_id` on `evaluation_runs`, no storage-level project filter, and no
-  membership check.
+- Run start accepts `project_name`, but live routes still do not resolve an
+  authenticated `project_id` or membership. `evaluation_runs.project_id` and
+  storage-level filters now exist (see "G4 Project Isolation" below), but they
+  are not yet wired into the FastAPI route dependencies.
 - Run list/get/query surfaces are keyed by raw `run_id` or global filters:
   `/api/v1/runs/`, `/api/v1/runs/{run_id}`, compare, visual-space, prompt diff,
   stage events/metrics, quality gate, debug/analysis/dashboard/report, feedback,
@@ -47,8 +48,38 @@ multi-user readiness: project isolation is not enforced today.
 - Knowledge upload/read is global: uploads go to `data/raw`, graph output goes
   to `data/kg`, and in-memory `KG_JOBS` is shared process state. Shared
   read/write tokens are not project membership.
-- SQLite/Postgres schemas and `StoragePort` do not expose `project_id` as a
-  first-class isolation key.
+- Run storage now has a first-class `project_id` isolation key. The remaining
+  gaps above are live-route wiring and non-run tenant surfaces, not run storage.
+
+## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
+
+Implemented as a coherent, test-backed vertical slice honoring Principle 2
+(storage-enforced isolation, not route-only checks):
+
+- **`project_id` on `evaluation_runs`** (SQLite + Postgres; additive ALTER
+  migration; legacy rows backfilled to the deterministic default project).
+  `StoragePort` exposes it as a first-class isolation key: `get_run(run_id,
+  project_id=...)` refuses cross-project reads (raises `KeyError`, no existence
+  leak) and `list_runs(..., project_id=...)` is storage-filtered. Unscoped saves
+  normalize to `DEFAULT_PROJECT_ID`.
+- **Identity storage** (`IdentityStoragePort` + `SqliteIdentityStorageAdapter`):
+  users, projects, memberships, API keys, refresh tokens; idempotent admin
+  bootstrap (`bootstrap_admin`, env `EVALVAULT_ADMIN_EMAIL` / `_PASSWORD`).
+- **Authorization** (`domain/services/authorization.py`): `Principal` + role
+  ordering (admin > editor > viewer); membership/role resolution.
+- **API principal primitives** (`adapters/inbound/api/principal.py`): resolve a
+  principal from a session access JWT or per-user API key; current-project
+  precedence (`X-Project-Id` header → `project_id` query → body); denial policy.
+
+### Denial policy (authored for G4)
+- Unresolvable principal where auth is required → **401**.
+- Authenticated **non-member** of the target project → **404** (do not leak the
+  existence of foreign projects/runs).
+- Member with **insufficient role** for a write → **403**.
+
+Proof: `tests/integration/test_run_project_isolation.py` (end-to-end: real
+identity + run storage + JWT + authz), `tests/unit/test_storage_project_isolation.py`,
+`tests/unit/test_identity_storage.py`, `tests/unit/test_authorization.py`.
 
 ## Stable Output Seam
 
@@ -75,11 +106,18 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation blocker:** every run/dataset/retriever/knowledge route
-   that can read or mutate tenant data needs authenticated `project_id`
-   resolution, membership enforcement, and storage-level filtering.
-2. **Role gate blocker:** route-level viewer/editor/admin checks are not wired
-   to `Membership.role`; only shared API or knowledge tokens are enforced.
+1. **Project isolation — live route wiring (remaining):** the storage-enforced
+   scoping, identity persistence, membership/role resolution, and the
+   principal/denial primitives are implemented and proven end-to-end (see "G4
+   Project Isolation" above). What remains is injecting the `principal.py`
+   primitives into the live FastAPI run routes
+   (list/get/compare/start/feedback/cluster-maps/visual-space) and the
+   dataset/retriever/knowledge + MCP run-tool surfaces, plus a Postgres identity
+   adapter for parity. Until wired, the live HTTP routes keep legacy shared-token
+   behavior; enforcement is active only where the primitives are applied.
+2. **Role gate — wiring (remaining):** `require_role` and viewer/editor/admin
+   semantics are implemented and tested (`test_authorization.py`,
+   `test_run_project_isolation.py`); route-level application is the remaining step.
 3. **Evidence hash blocker (partially addressed):** numeric serialization is now
    canonical/deterministic (see above), which removes the cross-platform
    float-noise obstacle to hashing the report. Two gaps remain: (a)

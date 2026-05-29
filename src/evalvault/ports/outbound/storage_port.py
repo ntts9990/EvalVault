@@ -66,17 +66,19 @@ class StoragePort(Protocol):
         """Load the prompt set bundle linked to a run."""
         ...
 
-    def get_run(self, run_id: str) -> EvaluationRun:
+    def get_run(self, run_id: str, project_id: str | None = None) -> EvaluationRun:
         """저장된 평가 실행 결과를 조회합니다.
 
         Args:
             run_id: 조회할 run의 ID
+            project_id: 지정 시 해당 프로젝트 소속 run만 반환(G4 격리).
+                다른 프로젝트의 run이면 존재를 노출하지 않고 KeyError.
 
         Returns:
             EvaluationRun 객체
 
         Raises:
-            KeyError: run_id에 해당하는 결과가 없는 경우
+            KeyError: run_id에 해당하는 결과가 없거나 project_id가 불일치하는 경우
         """
         ...
 
@@ -86,6 +88,7 @@ class StoragePort(Protocol):
         offset: int = 0,
         dataset_name: str | None = None,
         model_name: str | None = None,
+        project_id: str | None = None,
     ) -> list[EvaluationRun]:
         """저장된 평가 실행 결과 목록을 조회합니다.
 
@@ -94,6 +97,7 @@ class StoragePort(Protocol):
             offset: 조회 시작 위치 (선택)
             dataset_name: 필터링할 데이터셋 이름 (선택)
             model_name: 필터링할 모델 이름 (선택)
+            project_id: 지정 시 해당 프로젝트 소속 run만 반환(G4 격리)
 
         Returns:
             EvaluationRun 객체 리스트 (최신순)

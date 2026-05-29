@@ -166,6 +166,10 @@ class EvaluationRun:
     started_at: datetime = field(default_factory=datetime.now)
     finished_at: datetime | None = None
 
+    # 프로젝트 격리 (G4): 이 run이 속한 프로젝트 ID. None이면 storage가
+    # 결정적 기본 프로젝트("default")로 정규화하여 영속한다.
+    project_id: str | None = None
+
     # 개별 결과
     results: list[TestCaseResult] = field(default_factory=list)
 
