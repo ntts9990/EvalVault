@@ -731,6 +731,10 @@ class WebUIAdapter:
             result.tracker_metadata.setdefault("evaluation_task", request.evaluation_task)
         if request.project_name:
             result.tracker_metadata["project"] = request.project_name
+        # G4: persist the authorized project on the run for storage-enforced
+        # isolation. project_id is resolved/authorized at the route boundary.
+        if request.project_id:
+            result.project_id = request.project_id
         if request.prompt_config:
             result.tracker_metadata["prompt_config"] = request.prompt_config
         if retriever_instance:
@@ -895,6 +899,7 @@ class WebUIAdapter:
         limit: int = 50,
         offset: int = 0,
         filters: RunFilters | None = None,
+        project_id: str | None = None,
     ) -> list[RunSummary]:
         """평가 목록 조회.
 
@@ -912,8 +917,8 @@ class WebUIAdapter:
         resolver = self._get_phoenix_resolver()
 
         try:
-            # 저장소에서 평가 목록 조회
-            runs = self._storage.list_runs(limit=limit, offset=offset)
+            # 저장소에서 평가 목록 조회 (G4: project_id 지정 시 저장소 단 필터링)
+            runs = self._storage.list_runs(limit=limit, offset=offset, project_id=project_id)
 
             # RunSummary로 변환
             summaries = []
@@ -993,22 +998,24 @@ class WebUIAdapter:
             logger.error(f"Failed to list runs: {e}")
             return []
 
-    def get_run_details(self, run_id: str) -> EvaluationRun:
+    def get_run_details(self, run_id: str, project_id: str | None = None) -> EvaluationRun:
         """평가 상세 조회.
 
         Args:
             run_id: 평가 ID
+            project_id: 지정 시 해당 프로젝트 소속 run만 반환(G4 격리). 다른
+                프로젝트의 run이면 존재를 노출하지 않고 KeyError.
 
         Returns:
             평가 상세 정보
 
         Raises:
-            KeyError: 평가를 찾을 수 없는 경우
+            KeyError: 평가를 찾을 수 없거나 project_id가 불일치하는 경우
         """
         if self._storage is None:
             raise RuntimeError("Storage not configured")
 
-        run = self._storage.get_run(run_id)
+        run = self._storage.get_run(run_id, project_id=project_id)
         if run is None:
             raise KeyError(f"Run not found: {run_id}")
 

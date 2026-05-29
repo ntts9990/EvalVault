@@ -31,16 +31,13 @@ multi-user readiness: project isolation is not enforced today.
 ## What Is Not Project-Isolated
 
 - Auth foundation exists as domain entities (`User`, `Project`, `Membership`,
-  `Role`) and token services, but FastAPI routes do not resolve a current user,
-  project membership, or project-scoped role.
-- Run start accepts `project_name`, but live routes still do not resolve an
-  authenticated `project_id` or membership. `evaluation_runs.project_id` and
-  storage-level filters now exist (see "G4 Project Isolation" below), but they
-  are not yet wired into the FastAPI route dependencies.
-- Run list/get/query surfaces are keyed by raw `run_id` or global filters:
-  `/api/v1/runs/`, `/api/v1/runs/{run_id}`, compare, visual-space, prompt diff,
-  stage events/metrics, quality gate, debug/analysis/dashboard/report, feedback,
-  and cluster-map endpoints are not scoped by authenticated project membership.
+  `Role`) and token services. Live run routes now resolve a current user,
+  project membership, and project-scoped role; non-run tenant surfaces still do
+  not.
+- (RESOLVED this pass for run routes) Run routes now resolve a principal +
+  current project and enforce project scope when a project context is supplied —
+  see "Live Run-Route Wiring" below. Without a project context, legacy/default
+  behavior is preserved.
 - Dataset upload/read is global: files are saved under `data/datasets`, and
   listing reads `data/datasets`, `data/inputs`, and the repository root.
 - Retriever-doc upload/read is global: files are saved under
@@ -81,6 +78,42 @@ Proof: `tests/integration/test_run_project_isolation.py` (end-to-end: real
 identity + run storage + JWT + authz), `tests/unit/test_storage_project_isolation.py`,
 `tests/unit/test_identity_storage.py`, `tests/unit/test_authorization.py`.
 
+## Live Run-Route Wiring — Landed This Pass
+
+The principal/denial primitives are now wired into the live FastAPI **run**
+routes (`/api/v1/runs`):
+
+- `get_principal` resolves a `Principal` from the bearer token (session JWT or
+  per-user API key) via injected/lazily-built identity store + token service +
+  hasher. `get_current_project_id` resolves the project with precedence
+  `X-Project-Id` header → `project_id` query (request-body `project_id` for
+  `start`). Both live in `adapters/inbound/api/main.py`.
+- A router-level guard (`runs.enforce_run_path_access`) enforces, for any
+  `{run_id}` route when a project context is supplied: membership (else 401/404)
+  and storage-scoped existence via `adapter.get_run_details(run_id,
+  project_id=...)` → `BaseSQLStorageAdapter.get_run(project_id=...)` (foreign /
+  unknown run → 404, no existence leak). This covers get, feedback read,
+  stage-events/metrics, quality-gate, debug/dashboard/report/improvement/
+  analysis, and cluster-map reads with no per-handler code.
+- Non-`{run_id}` and write routes are wired in-handler: `GET /runs/` lists only
+  the member project via `adapter.list_runs(..., project_id=...)`; `compare` and
+  `prompt-diff` validate BOTH runs; `visual-space` validates the optional
+  `base_run_id`; **writes** (`start`, feedback save, cluster-map save/delete)
+  require the **editor** role; `start` persists the resolved `project_id` onto
+  the new `EvaluationRun`.
+- The denial policy maps to HTTP via app exception handlers
+  (`PrincipalRequiredError`→401, `ProjectAccessDeniedError`→404,
+  `InsufficientRoleError`→403).
+- **Backward compatible:** with no project context, routes behave exactly as
+  before; the shared `API_AUTH_TOKENS` service token alone confers no project
+  membership (a project-scoped request requires a real identity principal).
+
+Proof: `tests/integration/test_run_route_isolation.py` (live TestClient over a
+real adapter + real SQLite run storage + real identity + JWT): list scoping,
+foreign-run 404, missing-principal 401, non-member 404, viewer-write 403, and
+legacy no-project pass-through. Existing `tests/integration/test_pipeline_api_contracts.py`
+remains green (no regression).
+
 ## Stable Output Seam
 
 The stable candidate seam for solution-platform integration is:
@@ -106,18 +139,23 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation — live route wiring (remaining):** the storage-enforced
-   scoping, identity persistence, membership/role resolution, and the
-   principal/denial primitives are implemented and proven end-to-end (see "G4
-   Project Isolation" above). What remains is injecting the `principal.py`
-   primitives into the live FastAPI run routes
-   (list/get/compare/start/feedback/cluster-maps/visual-space) and the
-   dataset/retriever/knowledge + MCP run-tool surfaces, plus a Postgres identity
-   adapter for parity. Until wired, the live HTTP routes keep legacy shared-token
-   behavior; enforcement is active only where the primitives are applied.
-2. **Role gate — wiring (remaining):** `require_role` and viewer/editor/admin
-   semantics are implemented and tested (`test_authorization.py`,
-   `test_run_project_isolation.py`); route-level application is the remaining step.
+1. **Project isolation — run routes DONE; non-run surfaces remaining:** the
+   storage-enforced scoping, identity persistence, membership/role resolution,
+   the principal/denial primitives, AND the live `/api/v1/runs` route wiring are
+   implemented and proven (see "Live Run-Route Wiring" above). **Remaining**:
+   the **dataset upload/list**, **retriever-docs upload**, **knowledge
+   upload/build**, and **MCP run-tool** surfaces are not yet project-scoped;
+   and a **Postgres `IdentityStoragePort` adapter** (only SQLite identity exists
+   today) for backend parity. Storage mutation methods (`delete_run`,
+   `update_run_metadata`, `save_feedback`, cluster maps) are still scoped at the
+   route layer via the `get_run(project_id=...)` membership chokepoint rather
+   than being independently project-parameterized.
+2. **Role gate — run routes DONE; non-run remaining:** `require_role` /
+   viewer-editor-admin is applied to run writes (start, feedback save,
+   cluster-map save/delete) and proven (`test_run_route_isolation.py`).
+   Applying it to the non-run write surfaces above is the remaining step. Admin
+   membership-management endpoints are not yet introduced (conditional per the
+   plan).
 3. **Evidence hash blocker (partially addressed):** numeric serialization is now
    canonical/deterministic (see above), which removes the cross-platform
    float-noise obstacle to hashing the report. Two gaps remain: (a)

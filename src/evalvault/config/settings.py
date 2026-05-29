@@ -85,6 +85,7 @@ def resolve_tracker_providers(provider: str | None) -> list[str]:
 
 SECRET_REFERENCE_FIELDS = (
     "api_auth_tokens",
+    "auth_secret_key",
     "knowledge_read_tokens",
     "knowledge_write_tokens",
     "openai_api_key",
@@ -178,6 +179,13 @@ class Settings(BaseSettings):
         description=(
             "Comma-separated list of API bearer tokens for FastAPI auth. "
             "Leave empty to disable authentication."
+        ),
+    )
+    auth_secret_key: str | None = Field(
+        default=None,
+        description=(
+            "Secret for signing/verifying session JWTs used by project-scoped "
+            "auth. Empty disables JWT principal resolution (API keys still work)."
         ),
     )
     knowledge_read_tokens: str | None = Field(

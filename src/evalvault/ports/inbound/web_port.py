@@ -26,6 +26,7 @@ class EvalRequest:
     parallel: bool = True
     batch_size: int = 5
     project_name: str | None = None
+    project_id: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None

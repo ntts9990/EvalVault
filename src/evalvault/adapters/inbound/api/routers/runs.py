@@ -10,14 +10,19 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-from evalvault.adapters.inbound.api.main import AdapterDep
+from evalvault.adapters.inbound.api.main import AdapterDep, PrincipalDep, ProjectIdDep
 from evalvault.adapters.inbound.api.path_safety import (
     UnsafePathError,
     resolve_user_path,
+)
+from evalvault.adapters.inbound.api.principal import (
+    ProjectAccessDeniedError,
+    require_member,
+    require_role,
 )
 from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_csv,
@@ -33,6 +38,7 @@ from evalvault.domain.entities import (
     EvaluationRun,
     SatisfactionFeedback,
 )
+from evalvault.domain.entities.auth import Role
 from evalvault.domain.services.domain_learning_hook import DomainLearningHook
 from evalvault.domain.services.ragas_prompt_overrides import (
     PromptOverrideError,
@@ -41,7 +47,35 @@ from evalvault.domain.services.ragas_prompt_overrides import (
 from evalvault.domain.services.visual_space_service import VisualSpaceQuery
 from evalvault.ports.inbound.web_port import EvalProgress, EvalRequest
 
-router = APIRouter()
+
+def enforce_run_path_access(
+    request: Request,
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+) -> None:
+    """Router-level G4 guard for run-scoped routes.
+
+    No-op unless a project context is supplied (legacy/default behavior is
+    preserved). When a project is supplied and the route has a ``{run_id}`` path
+    param, enforce membership (401/404) and storage-scoped existence so a foreign
+    or unknown run is indistinguishable from "not found" (404). Routes without a
+    ``{run_id}`` path param (list / compare / start / prompt-diff / options)
+    enforce in-handler.
+    """
+    if project_id is None:
+        return
+    run_id = request.path_params.get("run_id")
+    if not run_id:
+        return
+    require_member(principal, project_id)
+    try:
+        adapter.get_run_details(run_id, project_id=project_id)
+    except KeyError as exc:
+        raise ProjectAccessDeniedError(run_id) from exc
+
+
+router = APIRouter(dependencies=[Depends(enforce_run_path_access)])
 
 
 # --- Pydantic Models for Response ---
@@ -123,6 +157,7 @@ class StartEvaluationRequest(BaseModel):
     thresholds: dict[str, float] | None = None
     threshold_profile: str | None = None
     project_name: str | None = None
+    project_id: str | None = None
     retriever_config: dict[str, Any] | None = None
     memory_config: dict[str, Any] | None = None
     tracker_config: dict[str, Any] | None = None
@@ -612,12 +647,16 @@ def save_cluster_map(
     run_id: str,
     payload: ClusterMapSaveRequest,
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ) -> ClusterMapSaveResponse:
     """Save a cluster map for a run."""
+    if project_id is not None:
+        require_role(principal, project_id, Role.editor)
     if not payload.items:
         raise HTTPException(status_code=400, detail="Cluster map is empty")
     try:
-        run = adapter.get_run_details(run_id)
+        run = adapter.get_run_details(run_id, project_id=project_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -659,9 +698,11 @@ def save_cluster_map_version(
     run_id: str,
     payload: ClusterMapSaveRequest,
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ) -> ClusterMapSaveResponse:
     """Save a cluster map version for a run."""
-    return save_cluster_map(run_id, payload, adapter)
+    return save_cluster_map(run_id, payload, adapter, principal, project_id)
 
 
 @router.get("/{run_id}/cluster-maps", response_model=list[ClusterMapVersionResponse])
@@ -721,11 +762,17 @@ def get_cluster_map_version(run_id: str, map_id: str, adapter: AdapterDep) -> Cl
 
 @router.delete("/{run_id}/cluster-maps/{map_id}", response_model=ClusterMapDeleteResponse)
 def delete_cluster_map_version(
-    run_id: str, map_id: str, adapter: AdapterDep
+    run_id: str,
+    map_id: str,
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ) -> ClusterMapDeleteResponse:
     """Delete a cluster map version for a run."""
+    if project_id is not None:
+        require_role(principal, project_id, Role.editor)
     try:
-        adapter.get_run_details(run_id)
+        adapter.get_run_details(run_id, project_id=project_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -742,11 +789,19 @@ def delete_cluster_map_version(
 
 @router.post("/{run_id}/visual-space", response_model=None)
 def get_visual_space(
-    run_id: str, payload: VisualSpaceRequest, adapter: AdapterDep
+    run_id: str,
+    payload: VisualSpaceRequest,
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ) -> dict[str, Any]:
     """Build visual space coordinates for a run."""
+    # Path run_id is validated by the router guard; the optional base_run_id is
+    # a second run reference that must also be in the same project.
     try:
-        adapter.get_run_details(run_id)
+        adapter.get_run_details(run_id, project_id=project_id)
+        if project_id is not None and payload.base_run_id:
+            adapter.get_run_details(payload.base_run_id, project_id=project_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -774,20 +829,29 @@ def get_visual_space(
 @router.get("/compare", response_model=None)
 def compare_runs(
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
     base: str | None = Query(None, description="Base run ID"),
     target: str | None = Query(None, description="Target run ID"),
     run_id1: str | None = Query(None, description="Base run ID (alias)"),
     run_id2: str | None = Query(None, description="Target run ID (alias)"),
 ) -> dict[str, Any]:
-    """Compare two evaluation runs and return summary + run details."""
+    """Compare two evaluation runs and return summary + run details.
+
+    With a project context, the caller must be a member and BOTH runs must
+    belong to that project (a foreign run reads as 404, no existence leak).
+    """
     base_id = base or run_id1
     target_id = target or run_id2
     if not base_id or not target_id:
         raise HTTPException(status_code=400, detail="base and target run IDs are required")
 
+    if project_id is not None:
+        require_member(principal, project_id)
+
     try:
-        base_run = adapter.get_run_details(base_id)
-        target_run = adapter.get_run_details(target_id)
+        base_run = adapter.get_run_details(base_id, project_id=project_id)
+        target_run = adapter.get_run_details(target_id, project_id=project_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
     except Exception as exc:
@@ -829,8 +893,15 @@ def compare_runs(
 async def start_evaluation_endpoint(
     request: StartEvaluationRequest,
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ):
-    """Start evaluation with streaming progress."""
+    """Start evaluation with streaming progress.
+
+    When a project context is supplied (``X-Project-Id`` / ``project_id`` query /
+    request-body ``project_id``, in that precedence), the caller must be an
+    editor of that project; the resolved project is persisted on the new run.
+    """
     ragas_prompt_overrides = None
     if request.ragas_prompts_yaml or request.ragas_prompts:
         try:
@@ -838,6 +909,12 @@ async def start_evaluation_endpoint(
             ragas_prompt_overrides = normalize_ragas_prompt_overrides(raw)
         except PromptOverrideError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Project precedence: X-Project-Id header / project_id query (project_id dep)
+    # then request-body project_id. Writing requires the editor role.
+    effective_project_id = project_id or request.project_id
+    if effective_project_id is not None:
+        require_role(principal, effective_project_id, Role.editor)
 
     # dataset_path is request-controlled; confine it to the allowed data roots
     # before it reaches the dataset loader (prevents path-traversal file read).
@@ -856,6 +933,7 @@ async def start_evaluation_endpoint(
         thresholds=request.thresholds or {},
         threshold_profile=request.threshold_profile,
         project_name=request.project_name,
+        project_id=effective_project_id,
         retriever_config=request.retriever_config,
         memory_config=request.memory_config,
         tracker_config=request.tracker_config,
@@ -968,17 +1046,27 @@ async def start_evaluation_endpoint(
 @router.get("/", response_model=list[RunSummaryResponse])
 def list_runs(
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
     limit: int = 50,
     offset: int = Query(0, ge=0, description="Pagination offset"),
     dataset_name: str | None = Query(None, description="Filter by dataset name"),
     model_name: str | None = Query(None, description="Filter by model name"),
     include_feedback: bool = Query(False, description="Include feedback count"),
 ) -> list[Any]:
-    """List evaluation runs."""
+    """List evaluation runs.
+
+    When a project context (``X-Project-Id`` / ``project_id``) is supplied, the
+    caller must be a member and results are storage-filtered to that project.
+    """
     from evalvault.ports.inbound.web_port import RunFilters
 
+    if project_id is not None:
+        require_member(principal, project_id)
     filters = RunFilters(dataset_name=dataset_name, model_name=model_name)
-    summaries = adapter.list_runs(limit=limit, offset=offset, filters=filters)
+    summaries = adapter.list_runs(
+        limit=limit, offset=offset, filters=filters, project_id=project_id
+    )
     feedback_counts: dict[str, int] = {}
     if include_feedback:
         feedback_counts = {
@@ -1014,6 +1102,36 @@ def list_runs(
     ]
 
 
+@router.get("/prompt-diff", response_model=PromptDiffResponse)
+def prompt_diff(
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    base_run_id: str = Query(..., description="Base run id"),
+    target_run_id: str = Query(..., description="Target run id"),
+    max_lines: int = Query(40, ge=1, le=200),
+    include_diff: bool = Query(True),
+):
+    if project_id is not None:
+        require_member(principal, project_id)
+        try:
+            adapter.get_run_details(base_run_id, project_id=project_id)
+            adapter.get_run_details(target_run_id, project_id=project_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        return adapter.compare_prompt_sets(
+            base_run_id,
+            target_run_id,
+            max_lines=max_lines,
+            include_diff=include_diff,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Prompt set not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{run_id}", response_model=None)
 def get_run_details(run_id: str, adapter: AdapterDep) -> dict[str, Any]:
     """Get detailed information for a specific run."""
@@ -1032,9 +1150,15 @@ def save_feedback(
     run_id: str,
     request: FeedbackSaveRequest,
     adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
 ) -> dict[str, Any]:
+    # Router guard already validated membership + run existence under project_id;
+    # writing additionally requires the editor role.
+    if project_id is not None:
+        require_role(principal, project_id, Role.editor)
     try:
-        adapter.get_run_details(run_id)
+        adapter.get_run_details(run_id, project_id=project_id)
         thumb_feedback = request.thumb_feedback
         if thumb_feedback == "none":
             thumb_feedback = None
@@ -1124,27 +1248,6 @@ def list_stage_metrics(
         return [metric.to_dict() for metric in metrics]
     except KeyError:
         raise HTTPException(status_code=404, detail="Run not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/prompt-diff", response_model=PromptDiffResponse)
-def prompt_diff(
-    adapter: AdapterDep,
-    base_run_id: str = Query(..., description="Base run id"),
-    target_run_id: str = Query(..., description="Target run id"),
-    max_lines: int = Query(40, ge=1, le=200),
-    include_diff: bool = Query(True),
-):
-    try:
-        return adapter.compare_prompt_sets(
-            base_run_id,
-            target_run_id,
-            max_lines=max_lines,
-            include_diff=include_diff,
-        )
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Prompt set not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

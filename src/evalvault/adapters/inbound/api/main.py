@@ -16,8 +16,16 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.responses import JSONResponse
 
 from evalvault.adapters.inbound.api.adapter import WebUIAdapter, create_adapter
+from evalvault.adapters.inbound.api.principal import (
+    InsufficientRoleError,
+    PrincipalRequiredError,
+    ProjectAccessDeniedError,
+    resolve_current_project_id,
+    resolve_principal,
+)
 from evalvault.config.runtime_services import ensure_local_observability
 from evalvault.config.settings import Settings, get_settings, is_production_profile
+from evalvault.domain.services.authorization import Principal
 
 logger = logging.getLogger(__name__)
 
@@ -125,19 +133,135 @@ def ensure_safe_network_bind(host: str, settings: Settings) -> None:
 
 
 def require_api_token(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(auth_scheme)],
     settings: Settings = Depends(get_settings),
 ) -> str | None:
     tokens = _normalize_api_tokens(settings.api_auth_tokens)
     if not tokens:
         return None
-    if credentials is None or credentials.credentials not in tokens:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return credentials.credentials
+    raw_token = credentials.credentials if credentials else None
+    if raw_token and raw_token in tokens:
+        return raw_token
+    if raw_token and _resolve_principal_from_token(request, raw_token) is not None:
+        return raw_token
+    raise HTTPException(
+        status_code=401,
+        detail="Invalid or missing API token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+# --- Project-scoped principal resolution (G4 live route wiring) -------------
+# Providers prefer an injected ``app.state`` value (tests / DI) and otherwise
+# build lazily from settings. They are only reached when a request actually
+# carries a bearer token, so legacy / no-project requests pay nothing and behave
+# exactly as before (the shared API token alone confers no project membership).
+
+
+def _resolve_identity_store(request: Request):
+    store = getattr(request.app.state, "identity_store", None)
+    if store is not None:
+        return store
+    from evalvault.adapters.outbound.storage.sqlite_identity import (
+        SqliteIdentityStorageAdapter,
+    )
+
+    store = SqliteIdentityStorageAdapter(db_path=get_settings().evalvault_db_path)
+    request.app.state.identity_store = store
+    return store
+
+
+def _resolve_token_service(request: Request):
+    service = getattr(request.app.state, "token_service", None)
+    if service is not None:
+        return service
+    secret = get_settings().auth_secret_key
+    if not secret:
+        return None
+    from evalvault.adapters.outbound.auth.jwt_token_service import JwtTokenService
+
+    service = JwtTokenService(secret=secret)
+    request.app.state.token_service = service
+    return service
+
+
+def _resolve_password_hasher(request: Request):
+    hasher = getattr(request.app.state, "password_hasher", None)
+    if hasher is not None:
+        return hasher
+    from evalvault.adapters.outbound.auth.argon2_hasher import Argon2PasswordHasher
+
+    hasher = Argon2PasswordHasher()
+    request.app.state.password_hasher = hasher
+    return hasher
+
+
+class _NoJwtTokenService:
+    def decode(self, token: str, *, expected_type: str | None = None) -> dict:
+        from evalvault.ports.outbound.auth_port import TokenError
+
+        raise TokenError("JWT auth is not configured")
+
+
+def _resolve_principal_from_token(request: Request, token: str | None) -> Principal | None:
+    if not token:
+        return None
+    token_service = _resolve_token_service(request) or _NoJwtTokenService()
+    hasher = _resolve_password_hasher(request)
+    store = _resolve_identity_store(request)
+    if store is None or hasher is None:
+        return None
+    return resolve_principal(
+        token, identity_store=store, token_service=token_service, hasher=hasher
+    )
+
+
+def get_principal(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(auth_scheme)],
+) -> Principal | None:
+    """Resolve a project-scoped principal from the bearer token, or ``None``.
+
+    Returns ``None`` when no token is presented or identity is not configured,
+    so legacy / no-project requests are unaffected. A shared API token that is
+    not a real identity credential resolves to ``None`` (no project membership).
+    """
+    token = credentials.credentials if credentials else None
+    return _resolve_principal_from_token(request, token)
+
+
+def get_current_project_id(request: Request, project_id: str | None = None) -> str | None:
+    """Current project id with documented precedence: ``X-Project-Id`` header →
+    ``project_id`` query param. Body-supplied project_id is handled per-route."""
+    return resolve_current_project_id(
+        header=request.headers.get("X-Project-Id"),
+        query=project_id,
+    )
+
+
+PrincipalDep = Annotated[Principal | None, Depends(get_principal)]
+ProjectIdDep = Annotated[str | None, Depends(get_current_project_id)]
+
+
+def _handle_principal_required(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Authentication required"},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _handle_project_access_denied(request: Request, exc: Exception) -> JSONResponse:
+    # 404 (not 403) so a non-member cannot tell a foreign project/run apart from
+    # one that does not exist.
+    return JSONResponse(status_code=404, content={"detail": "Run not found"})
+
+
+def _handle_insufficient_role(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=403, content={"detail": "Insufficient role for this operation"}
+    )
 
 
 def create_app() -> FastAPI:
@@ -216,6 +340,11 @@ def create_app() -> FastAPI:
         pipeline,
         runs,
     )
+
+    # Map the project-scoped denial policy to HTTP status codes (G4).
+    app.add_exception_handler(PrincipalRequiredError, _handle_principal_required)
+    app.add_exception_handler(ProjectAccessDeniedError, _handle_project_access_denied)
+    app.add_exception_handler(InsufficientRoleError, _handle_insufficient_role)
 
     auth_dependencies = [Depends(require_api_token)]
 
