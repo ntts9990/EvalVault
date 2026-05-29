@@ -9,7 +9,8 @@
 - P1은 자동화된 품질 차단(회귀 게이트): 사람이 매번 판단하면 언젠가 실수한다.
 - P2는 멀티턴/대화 평가: 제품이 대화형으로 갈수록 단일 QA 평가는 충분하지 않다.
 - P3는 GraphRAG/고급 리트리벌 비교: “좋아졌다”를 실험 프레임워크로 증명해야 한다.
-- P4는 Web UI 기반 Judge 캘리브레이션: 운영과 공유의 효율을 높인다.
+- 현재 실행 포커스(2026-05-29): Web UI 신규 개발은 잠시 보류하고, CLI/API 기능·계약·테스트를 먼저 안정화한다.
+- P4는 CLI/API 운영 표면 강화: 자동화 가능한 CLI와 재사용 가능한 FastAPI 계약을 우선한다. 기존 Web UI 기반 Judge 캘리브레이션은 유지하되 신규 UI 확장은 보류한다.
 
 ## 목표
 
@@ -141,28 +142,37 @@
 
 - GraphRAG 실험 서비스: `src/evalvault/domain/services/graph_rag_experiment.py`
 
-### P4: Judge 캘리브레이션 Web UI
+### P4: CLI/API 운영 표면 강화
 
-핵심 질문: “캘리브레이션 결과를 UI에서 이해/공유/반복 실행할 수 있나?”
+핵심 질문: “사용자가 CLI와 API만으로 평가·분석·비교·게이트를 재현 가능하게 실행하고 자동화할 수 있나?”
 
 대표 작업:
 
-- 설정/실행/히스토리/시각화
-- 아티팩트 링크(근거) 제공
+- CLI 명령의 입출력, exit code, 에러 메시지 의미 고정
+- FastAPI 응답 스키마와 에러 계약 테스트 보강
+- CLI와 API가 같은 도메인 서비스/스키마를 공유하도록 중복 제거
+- API-first로 신규 기능을 구현하되, 향후 Web UI 재개 시 그대로 연결 가능한 계약 유지
+- 기존 Web UI와 Playwright 테스트는 회귀 방지 범위에서 유지
 
 완료 정의(DoD):
 
-- UI에서 캘리브레이션 결과를 탐색 가능하며, 핵심 지표를 이해할 수 있다.
+- 핵심 워크플로(run/analyze/compare/regress/gate)가 CLI에서 자동화 가능하다.
+- API 응답 스키마와 실패 의미가 테스트로 고정되어 있다.
+- CLI와 API에서 같은 `run_id`, DB, artifacts 규약을 사용한다.
+- Web UI 없이도 운영자가 평가 결과를 재현, 조회, 비교, 게이트 판단할 수 있다.
 
 최근 진행(워크로그 기준):
 
 - [2026-01-27] JudgeCalibration API/페이지/라우팅/클라이언트 추가 + Playwright e2e 테스트.
+- [2026-05-29] 개발 우선순위를 CLI/API 중심으로 재조정. Web UI 신규 개발은 보류하고 API 계약/CLI 자동화를 우선.
 - 근거: `.sisyphus/notepads/p1-webui/worklog.md`
 
-근거(UI/서비스):
+근거(CLI/API/서비스):
 
-- UI 페이지: `frontend/src/pages/JudgeCalibration.tsx`
+- CLI 진입점: `src/evalvault/adapters/inbound/cli/commands/`
+- API 진입점: `src/evalvault/adapters/inbound/api/`
 - 관련 서비스(보정/통계): `src/evalvault/domain/services/judge_calibration_service.py`
+- 기존 UI 페이지(유지 대상): `frontend/src/pages/JudgeCalibration.tsx`
 
 ---
 
@@ -174,7 +184,7 @@
 2) 이것이 없으면 사람이 매번 판단해야 해서 실수가 발생하는가? (P1)
 3) 사용자/제품이 실제로 겪는 문제를 측정하지 못하고 있는가? (P2)
 4) 성능 개선을 주장하려면 실험 프레임워크가 필요한가? (P3)
-5) 공유/운영 효율을 크게 올리는가? (P4)
+5) CLI 자동화/API 계약을 안정화해 공유/운영 효율을 크게 올리는가? (P4)
 
 ---
 
@@ -183,6 +193,7 @@
 - 외부 LLM 의존: 비용/레이트리밋/데이터 유출 위험 → 프로필 분리, 샘플 최소화, 레덕션
 - 그래프 기반 기능 복잡도(P3): 범위 폭발 → v0(휴리스틱) → v1(LLM) 단계화
 - 멀티턴 메트릭 정의(P2): 해석 난이도 → 메트릭 정의/한계/예시를 문서로 고정
+- Web UI 범위 확장(P4): 화면 작업이 API/도메인 계약보다 앞서면 재작업 위험 → CLI/API 먼저 완성하고 UI는 명시 요청 시 연결
 
 ---
 

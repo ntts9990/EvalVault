@@ -1,71 +1,85 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+/* Fonts loaded in index.html (IBM Plex Sans + IBM Plex Sans KR + JetBrains Mono). */
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-/* Phase 4 W-S1 — Claude design tokens (additive on top of legacy palette) */
+/* Phase 4 — Claude design tokens (authority hues, motion, spacing). */
 @import "./design/tokens.css";
 
+/*
+ * Phase 4 Flagship — "Data-Dense Pro, Neutral-Cool Dark"
+ * Evidence-Based Design pass (W-Phase4 §3).
+ *
+ * Dark-ergonomics: foreground softened to #dcdee6 (87% L) — reduces halation
+ * vs pure-white (#e2e4ec 90% L). Primary accent desaturated 84%→72% to cut
+ * electric glare while staying WCAG AA.
+ *
+ * See docs/frontend/W-PHASE4-DIRECTION.md §evidence for principle mapping.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* === Cool-neutral dark ground === */
+    --background: 228 14% 7%;         /* #0e0f13 — near-black, no brown */
+    --foreground: 220 10% 87%;        /* #dcdee6 — off-white, halation-reduced */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 228 12% 10%;              /* #16171c — raised surface */
+    --card-foreground: 220 10% 87%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 228 11% 12%;
+    --popover-foreground: 220 10% 87%;
 
-    --primary: 221 82% 62%;
-    --primary-foreground: 0 0% 100%;
+    /*
+     * Indigo accent — desaturated 84%→72% for reduced glare on dark ground.
+     * Still WCAG AA on card. Rationed: CTAs, active nav, focus, hero KPI wash.
+     */
+    --primary: 239 72% 68%;           /* #6e71f2 — indigo, desaturated */
+    --primary-foreground: 228 14% 7%; /* near-black on indigo */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Surfaces */
+    --secondary: 228 10% 13%;         /* #1c1d23 */
+    --secondary-foreground: 220 8% 68%; /* #a8aab4 */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 228 9% 12%;
+    --muted-foreground: 220 8% 55%;   /* #898b96 — 4.52:1 AA on card */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 228 10% 15%;
+    --accent-foreground: 220 10% 80%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 60%;         /* #e06060 — 4.56:1 AA on card */
+    --destructive-foreground: 220 10% 87%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 82% 62%;
+    --border: 228 10% 17%;            /* #242534 — slightly lighter for visibility */
+    --input: 228 10% 17%;
+    --ring: 239 72% 68%;
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;               /* 6px — instrument density */
+
+    /* Cool-black depth */
+    --shadow-card: 0 1px 3px hsl(228 20% 4% / 0.5), 0 4px 12px hsl(228 20% 4% / 0.4);
+    --shadow-pop:  0 8px 32px hsl(228 20% 4% / 0.7), 0 2px 8px hsl(228 20% 4% / 0.5);
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+  .light {
+    --background: 220 20% 97%;
+    --foreground: 228 16% 14%;
+    --card: 220 18% 100%;
+    --card-foreground: 228 16% 14%;
+    --popover: 220 18% 100%;
+    --popover-foreground: 228 16% 14%;
+    --primary: 239 68% 52%;
+    --primary-foreground: 220 20% 97%;
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 228 14% 22%;
+    --muted: 220 12% 94%;
+    --muted-foreground: 220 8% 44%;
+    --accent: 220 14% 91%;
+    --accent-foreground: 228 14% 20%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 220 20% 97%;
+    --border: 220 12% 86%;
+    --input: 220 12% 86%;
+    --ring: 239 68% 52%;
+    --shadow-card: 0 1px 2px hsl(228 16% 14% / 0.06), 0 4px 16px hsl(228 16% 14% / 0.07);
+    --shadow-pop:  0 8px 30px hsl(228 16% 14% / 0.15);
   }
 }
 
@@ -75,79 +89,137 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    /* Faint indigo bloom top-right — no warm tones */
     background-image:
-      radial-gradient(1200px circle at 10% -20%, hsl(var(--primary) / 0.16), transparent 45%),
-      radial-gradient(900px circle at 110% 0%, hsl(210 40% 96% / 0.9), transparent 40%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(210 40% 98%) 100%);
+      radial-gradient(800px circle at 85% 0%, hsl(239 72% 68% / 0.05), transparent 50%),
+      radial-gradient(600px circle at 0% 100%, hsl(228 12% 10% / 0.8), transparent 60%);
     background-attachment: fixed;
     background-repeat: no-repeat;
+  }
+
+  .font-display {
+    letter-spacing: -0.018em;
+    font-feature-settings: "ss01" 1, "cv01" 1;
   }
 }
 
 @layer components {
   .surface-card {
-    @apply bg-card/90 border border-border/60 rounded-2xl shadow-sm;
-    backdrop-filter: blur(6px);
+    @apply bg-card border border-border rounded-[var(--radius)];
+    box-shadow: var(--shadow-card);
   }
 
   .surface-panel {
-    @apply bg-card/90 border border-border/60 rounded-xl shadow-sm;
+    @apply bg-secondary border border-border rounded-[var(--radius)];
+    box-shadow: var(--shadow-card);
   }
 
   .surface-subtle {
-    @apply bg-card/80 border border-border/50 rounded-lg;
+    @apply bg-muted/60 border border-border rounded-[var(--radius-sm)];
   }
 
   .chart-panel {
-    @apply bg-card/90 border border-border/60 rounded-2xl shadow-sm relative overflow-hidden;
-  }
-
-  .chart-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, hsl(var(--primary) / 0.08), transparent 55%);
-    pointer-events: none;
-  }
-
-  .chart-panel > * {
-    position: relative;
+    @apply bg-card border border-border rounded-[var(--radius)] relative;
+    box-shadow: var(--shadow-card);
   }
 
   .section-title {
-    @apply text-lg font-semibold font-display tracking-tight;
+    @apply text-base font-semibold font-display tracking-tight text-foreground;
   }
 
+  /* Kicker: mono ALL-CAPS label at lowest hierarchy level */
   .section-kicker {
-    @apply text-[11px] uppercase tracking-[0.2em] text-muted-foreground;
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground;
   }
 
   .tab-shell {
-    @apply inline-flex items-center gap-1 rounded-full border border-border/60 bg-secondary/50 p-1;
+    @apply inline-flex items-center gap-0.5 rounded-[var(--radius)] border border-border bg-muted/50 p-0.5;
   }
 
   .tab-pill {
-    @apply px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200;
+    @apply px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-medium transition-colors;
   }
 
   .tab-pill-active {
-    @apply bg-background text-foreground shadow-sm border border-border/60;
+    @apply bg-card text-foreground border border-border/60;
+    box-shadow: var(--shadow-card);
   }
 
   .tab-pill-inactive {
-    @apply text-muted-foreground hover:text-foreground hover:bg-background/60;
+    @apply text-muted-foreground hover:text-foreground hover:bg-card/50;
   }
 
   .filter-chip {
-    @apply px-3 py-1.5 rounded-full text-xs border border-border/50 bg-background/70 text-muted-foreground transition-all duration-200;
+    @apply px-2 py-0.5 rounded-[var(--radius-sm)] text-[10px] font-medium border border-border/60
+           bg-transparent text-muted-foreground transition-colors cursor-pointer;
   }
 
   .filter-chip-active {
-    @apply border-primary/60 bg-primary/10 text-primary shadow-sm;
+    @apply border-primary/50 bg-primary/8 text-primary;
   }
 
   .filter-chip-inactive {
-    @apply hover:border-border hover:text-foreground hover:bg-background;
+    @apply hover:border-border hover:text-foreground hover:bg-secondary/60;
+  }
+
+  /* Field controls */
+  .field-control {
+    @apply w-full rounded-[var(--radius)] border border-input bg-muted/40 px-2.5 py-1.5
+           text-sm text-foreground transition-colors placeholder:text-muted-foreground/60;
+    @apply focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-[hsl(var(--ring)/0.25)]
+           focus:bg-card;
+  }
+
+  /*
+   * Cluster region — Gestalt common-region grouping via background fill,
+   * NOT a dividing border. Groups related KPIs without adding visual noise.
+   */
+  .rail-cluster {
+    @apply rounded-[var(--radius)] bg-secondary/40 p-2;
+  }
+
+  /*
+   * Verdict pill — pre-attentive: color + icon + label (3 channels, Jakob's Law).
+   * Color-blind safe: shape (icon) + position carry the signal without hue alone.
+   */
+  .verdict-pass {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--success)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--success))];
+  }
+
+  .verdict-hold {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--warning)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--warning))];
+  }
+
+  .verdict-fail {
+    @apply inline-flex items-center gap-1 rounded-[var(--radius-sm)]
+           bg-[hsl(var(--destructive)/0.12)] px-1.5 py-0.5
+           font-mono text-[9px] font-medium text-[hsl(var(--destructive))];
+  }
+}
+
+/* === Staggered rise entrance === */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@layer utilities {
+  .reveal   { opacity: 0; animation: rise var(--duration-slow, 280ms) var(--ease-emphasis, ease-out) forwards; }
+  .reveal-1 { animation-delay: 20ms; }
+  .reveal-2 { animation-delay: 60ms; }
+  .reveal-3 { animation-delay: 100ms; }
+  .reveal-4 { animation-delay: 140ms; }
+  .reveal-5 { animation-delay: 180ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .reveal-1, .reveal-2, .reveal-3, .reveal-4, .reveal-5 {
+      animation: none;
+      opacity: 1;
+    }
   }
 }

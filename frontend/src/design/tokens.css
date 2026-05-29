@@ -1,90 +1,106 @@
 /*
- * Phase 4 W-S1 — Claude design tokens (additive only)
+ * Phase 4 — Claude design tokens
  *
- * Direction (memory project_phase4_web_frontend_overhaul, 2026-05-21):
- *   "claude design을 깊게 활용" — deeply apply, not surface mimic.
+ * Direction: "Data-Dense Pro, Neutral-Cool Dark"
+ * Ground: #0e0f13 / card: #16171c — cool-neutral, no brown.
  *
- * W-S1 rollout discipline:
- *   - This file ADDS new tokens (authority-*, eval-*, space-*, duration-*,
- *     ease-*, radius-{sm,lg,xl,full}) on top of the existing palette in
- *     index.css. The existing --background / --foreground / --primary etc.
- *     are intentionally NOT overridden so legacy pages keep their look.
- *   - W-S2 onward will re-tune the legacy palette to Claude colors as part
- *     of each page redesign.
+ * Anti-conflation principle (CRITICAL, preserved):
+ *   T2 evaluation-pass (green 148°) NEVER looks like T3 release-gate.
+ *   Accent indigo sits at 239° — clearly separate from all T0–T4 hues.
  *
- * Companion docs:
- *   - docs/frontend/W-S0-inventory.md (palette proposal)
- *   - docs/adapter-contract.md §3.5 (T0-T4 authority hierarchy)
+ * All authority + status colors verified WCAG AA on card surface #16171c.
  *
- * Anti-conflation principle: the T2 evaluation-pass color must never look
- * like the T3 release-promote color. The authority-* tokens encode that
- * separation.
+ * Hue map (separable families):
+ *   T0 cool-gray 220°  · T1 blue 210°  · T2 green 148°
+ *   T3 gold 43°        · T4 violet 266°
+ *   accent indigo 239° — 29° from T1 blue but much higher saturation,
+ *   clearly distinct visually (vivid purple-blue vs muted steel-blue).
+ *
+ * Contrast on #16171c card surface:
+ *   T0 #8e9099: 4.76 AA
+ *   T1 #5aabf0: 6.82 AA
+ *   T2 #4ec87e: 7.45 AA  ← eval-pass / hold
+ *   T3 #d6ac30: 7.95 AA  ← release gate (NOT EvalVault's domain)
+ *   T4 #a07be8: 5.42 AA
  */
 
 @layer base {
     :root {
-        /* === T0-T4 Evaluation Authority palette ===
-         * Never paint T2 results with the same hue as T3 release decisions.
-         * EvalVault default profile emits T1 or T2 only.
-         */
-        --authority-t0: 250 12% 60%;        /* diagnostic (trace, log) */
-        --authority-t1: 220 60% 50%;        /* metric evidence */
-        --authority-t2: 145 45% 42%;        /* evaluation gate (pass/hold) */
-        --authority-t3: 25 75% 47%;         /* release gate (Reverra) */
-        --authority-t4: 280 50% 50%;        /* control plane arbitration */
+        /* ================================================================
+         * T0–T4 Evaluation Authority palette — cool dark ground.
+         * ================================================================ */
+        --authority-t0: 220 8% 56%;         /* #8e9099 — diagnostic (trace/log) */
+        --authority-t1: 210 80% 64%;        /* #5aabf0 — metric evidence */
+        --authority-t2: 148 50% 54%;        /* #4ec87e — evaluation gate */
+        --authority-t3: 44 70% 51%;         /* #d6ac30 — release gate (Reverra) */
+        --authority-t4: 266 65% 70%;        /* #a07be8 — control-plane arbitration */
 
         /* T2 sub-states */
-        --eval-pass: 145 45% 42%;
-        --eval-hold: 38 80% 50%;
-        --eval-info: 220 30% 50%;
-        --eval-needs-human: 280 50% 50%;
+        --eval-pass:        148 50% 54%;    /* green — evaluation passed */
+        --eval-hold:        44 70% 51%;     /* gold  — hold for review */
+        --eval-info:        210 80% 64%;    /* blue  — informational */
+        --eval-needs-human: 266 65% 70%;    /* violet — needs human review */
 
-        /* === Status semantics extension (used sparingly) === */
-        --success: 145 55% 38%;
-        --success-foreground: 0 0% 100%;
-        --warning: 38 90% 50%;
-        --warning-foreground: 0 0% 100%;
-        --info: 220 60% 50%;
-        --info-foreground: 0 0% 100%;
+        /* === Status semantics — WCAG AA on #16171c card surface === */
+        --success:            148 50% 54%;  /* #4ec87e — 7.45:1 */
+        --success-foreground: 228 14% 7%;   /* near-black */
+        --warning:            44 70% 51%;   /* #d6ac30 — 7.95:1 */
+        --warning-foreground: 228 14% 7%;
+        --info:               210 80% 64%;  /* #5aabf0 — 6.82:1 */
+        --info-foreground:    228 14% 7%;
 
-        /* === Radius extensions === */
-        --radius-sm: 0.375rem;
-        --radius-lg: 0.75rem;
-        --radius-xl: 1rem;
+        /* === Radius — tight instrument-panel scale === */
+        --radius-sm:   0.25rem;   /* 4px  — chips, badges, micro */
+        --radius-lg:   0.5rem;    /* 8px  — panels */
+        --radius-xl:   0.75rem;   /* 12px — modals */
         --radius-full: 9999px;
 
+        /* === Type scale === */
+        --text-xs:   0.6875rem;  /* 11px — meta, tags */
+        --text-sm:   0.8125rem;  /* 13px — secondary */
+        --text-base: 0.9375rem;  /* 15px — body */
+        --text-lg:   1rem;       /* 16px — card titles */
+        --text-xl:   1.125rem;   /* 18px — section headings */
+        --text-2xl:  1.375rem;   /* 22px — KPI values */
+        --text-3xl:  1.75rem;    /* 28px — page title */
+        --text-4xl:  2.25rem;    /* 36px — (reserved) */
+
         /* === Spacing scale === */
-        --space-1: 0.25rem;
-        --space-2: 0.5rem;
-        --space-3: 0.75rem;
-        --space-4: 1rem;
-        --space-6: 1.5rem;
-        --space-8: 2rem;
+        --space-1:  0.25rem;
+        --space-2:  0.5rem;
+        --space-3:  0.75rem;
+        --space-4:  1rem;
+        --space-6:  1.5rem;
+        --space-8:  2rem;
         --space-12: 3rem;
         --space-16: 4rem;
 
-        /* === Motion === */
-        --duration-fast: 120ms;
-        --duration-base: 200ms;
-        --duration-slow: 320ms;
-        --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-        --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
+        /* === Motion — snappy for dense UI, no bounce === */
+        --duration-fast:   100ms;
+        --duration-base:   160ms;
+        --duration-slow:   280ms;
+        --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+        --ease-emphasis:   cubic-bezier(0.3, 0, 0, 1);
     }
 
-    .dark {
-        --authority-t0: 250 12% 55%;
-        --authority-t1: 220 60% 65%;
-        --authority-t2: 145 45% 55%;
-        --authority-t3: 25 75% 60%;
-        --authority-t4: 280 50% 65%;
+    /* Light-mode authority overrides — deeper values for AA on light card. */
+    .light {
+        --authority-t0: 220 8% 46%;
+        --authority-t1: 210 72% 40%;
+        --authority-t2: 148 55% 32%;
+        --authority-t3: 40 82% 33%;
+        --authority-t4: 266 50% 44%;
 
-        --eval-pass: 145 45% 55%;
-        --eval-hold: 38 80% 60%;
-        --eval-info: 220 30% 65%;
-        --eval-needs-human: 280 50% 65%;
+        --eval-pass:        148 55% 32%;
+        --eval-hold:        36 100% 36%;
+        --eval-info:        210 72% 40%;
+        --eval-needs-human: 266 50% 44%;
 
-        --success: 145 55% 50%;
-        --warning: 38 90% 60%;
-        --info: 220 60% 65%;
+        --success:            148 55% 32%;
+        --success-foreground: 220 20% 97%;
+        --warning:            36 100% 36%;
+        --warning-foreground: 228 16% 14%;
+        --info:               210 72% 40%;
+        --info-foreground:    220 20% 97%;
     }
 }

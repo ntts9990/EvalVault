@@ -87,6 +87,11 @@ services:
       API_AUTH_TOKENS: ${API_AUTH_TOKENS:-}
       KNOWLEDGE_READ_TOKENS: ${KNOWLEDGE_READ_TOKENS:-}
       KNOWLEDGE_WRITE_TOKENS: ${KNOWLEDGE_WRITE_TOKENS:-}
+      # The API binds 0.0.0.0 inside the container; the EvalVault Auth P1.0
+      # fail-closed guard would refuse that without auth. This single-tenant
+      # offline appliance sits behind nginx, so allow it by default.
+      # TODO(Auth P1.5): replace with real API_AUTH_TOKENS / project auth.
+      EVALVAULT_ALLOW_INSECURE_NETWORK: ${EVALVAULT_ALLOW_INSECURE_NETWORK:-1}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     volumes:
       - ./data:/app/data

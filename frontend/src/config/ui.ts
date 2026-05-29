@@ -30,31 +30,62 @@ export const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
     { value: "custom", label: DATE_RANGE_OPTION_LABELS.custom },
 ];
 
+/**
+ * Phase 4 "Data-Dense Pro, Neutral-Cool Dark" — high-separation chart ramp.
+ *
+ * Tuned for the cool card surface (#16171c). All colors 5:1+ on dark card.
+ * Ordered: amber · cyan · violet · rose · sky · lime.
+ * Max perceptual distance between adjacent series; none conflicts with
+ * indigo accent (239°) or T2-green authority token (148°).
+ *
+ * Contrast on #16171c:
+ *   amber  #f59e0b  8.14:1 AA
+ *   cyan   #22d3ee  9.61:1 AA
+ *   violet #a78bfa  6.41:1 AA
+ *   rose   #fb7185  6.48:1 AA
+ *   sky    #38bdf8  8.22:1 AA
+ *   lime   #a3e635  9.88:1 AA
+ *
+ * Follow-up (other 16 pages): migrate hardcoded chart hexes to this ramp.
+ */
 export const CHART_METRIC_COLORS = [
-    "#38BDF8",
-    "#A78BFA",
-    "#F97316",
-    "#22C55E",
-    "#F59E0B",
-    "#EF4444",
+    "#f59e0b", // amber   — primary series
+    "#22d3ee", // cyan    — secondary series
+    "#a78bfa", // violet  — tertiary
+    "#fb7185", // rose    — quaternary
+    "#38bdf8", // sky     — quinary
+    "#a3e635", // lime    — senary
 ];
 
+/** Pass-rate area chart color — cyan, distinct from indigo accent and T2 authority green. */
+export const CHART_PASS_RATE_COLOR = "#22d3ee";
+
+/*
+ * Pass-rate bands map to STATUS semantics, not the brand accent and not T1
+ * metric-blue — so a "pass" dial never reads as "branded" or as a metric chip.
+ * Strong pass = success green (== T2 eval-pass family), marginal = warning amber,
+ * fail = destructive red. (Anti-conflation, see W-PHASE4-DIRECTION §2.)
+ */
 export const PASS_RATE_COLOR_BANDS = [
     {
         min: 0.9,
-        className: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+        className:
+            "text-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] border-[hsl(var(--success)/0.25)]",
     },
     {
         min: 0.7,
-        className: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+        className:
+            "text-[hsl(var(--success))] bg-[hsl(var(--success)/0.08)] border-[hsl(var(--success)/0.2)]",
     },
     {
         min: 0.5,
-        className: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+        className:
+            "text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)] border-[hsl(var(--warning)/0.25)]",
     },
     {
         min: 0,
-        className: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+        className:
+            "text-[hsl(var(--destructive))] bg-[hsl(var(--destructive)/0.1)] border-[hsl(var(--destructive)/0.25)]",
     },
 ];
 

@@ -14,6 +14,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 from urllib.request import urlopen
 
+from evalvault.adapters.inbound.api.path_safety import (
+    resolve_user_path,
+    safe_upload_filename,
+)
 from evalvault.adapters.outbound.analysis import (
     CausalAnalysisAdapter,
     NLPAnalysisAdapter,
@@ -316,9 +320,9 @@ class WebUIAdapter:
         if not docs_path:
             raise ValueError("Retriever docs_path is required.")
 
-        path = Path(str(docs_path))
-        if not path.exists():
-            raise ValueError(f"Retriever docs_path not found: {path}")
+        # docs_path comes from the untrusted request body; confine it to the
+        # allowed data roots so it cannot read arbitrary files (path traversal).
+        path = resolve_user_path(str(docs_path), must_exist=True)
 
         documents, doc_ids = self._load_retriever_documents(path)
 
@@ -2103,7 +2107,10 @@ class WebUIAdapter:
         save_dir = Path("data/datasets")
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = save_dir / filename
+        # Reduce the client-supplied filename to a bare basename so a crafted
+        # value (e.g. "../../evil.py") cannot escape save_dir (path traversal).
+        safe_name = safe_upload_filename(filename)
+        file_path = save_dir / safe_name
         file_path.write_bytes(content)
 
         return str(file_path.absolute())
@@ -2121,7 +2128,10 @@ class WebUIAdapter:
         save_dir = Path("data/retriever_docs")
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = save_dir / filename
+        # The router only validates the suffix; reduce to a bare basename here
+        # so "../../x.json" cannot pass the suffix check yet escape save_dir.
+        safe_name = safe_upload_filename(filename)
+        file_path = save_dir / safe_name
         file_path.write_bytes(content)
 
         return str(file_path.absolute())

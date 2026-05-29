@@ -15,6 +15,10 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, Response, Streami
 from pydantic import BaseModel
 
 from evalvault.adapters.inbound.api.main import AdapterDep
+from evalvault.adapters.inbound.api.path_safety import (
+    UnsafePathError,
+    resolve_user_path,
+)
 from evalvault.adapters.outbound.dataset.templates import (
     render_dataset_template_csv,
     render_dataset_template_json,
@@ -449,6 +453,8 @@ async def upload_dataset(adapter: AdapterDep, file: UploadFile = File(...)):
             "path": saved_path,
             "filename": file.filename,
         }
+    except UnsafePathError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save dataset: {e}")
 
@@ -471,6 +477,8 @@ async def upload_retriever_docs(adapter: AdapterDep, file: UploadFile = File(...
             "path": saved_path,
             "filename": file.filename,
         }
+    except UnsafePathError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save retriever docs: {e}")
 
@@ -831,8 +839,15 @@ async def start_evaluation_endpoint(
         except PromptOverrideError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # dataset_path is request-controlled; confine it to the allowed data roots
+    # before it reaches the dataset loader (prevents path-traversal file read).
+    try:
+        safe_dataset_path = resolve_user_path(request.dataset_path, must_exist=False)
+    except UnsafePathError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     eval_req = EvalRequest(
-        dataset_path=request.dataset_path,
+        dataset_path=str(safe_dataset_path),
         metrics=request.metrics,
         model_name=request.model,
         evaluation_task=request.evaluation_task or "qa",

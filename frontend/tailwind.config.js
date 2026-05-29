@@ -17,9 +17,10 @@ export default {
         },
         extend: {
             fontFamily: {
-                sans: ["IBM Plex Sans KR", "sans-serif"],
-                display: ["Space Grotesk", "IBM Plex Sans KR", "sans-serif"],
-                mono: ["JetBrains Mono", "monospace"],
+                // Data-Dense Pro × Warm: confident sans for display + UI; mono for all numerics.
+                sans: ["IBM Plex Sans", "IBM Plex Sans KR", "system-ui", "sans-serif"],
+                display: ["IBM Plex Sans", "IBM Plex Sans KR", "system-ui", "sans-serif"],
+                mono: ["JetBrains Mono", "ui-monospace", "monospace"],
             },
             colors: {
                 border: "hsl(var(--border))",
@@ -60,6 +61,11 @@ export default {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "var(--radius-xl)",
+            },
+            boxShadow: {
+                card: "var(--shadow-card)",
+                pop: "var(--shadow-pop)",
             },
             keyframes: {
                 "accordion-down": {

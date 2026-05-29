@@ -37,6 +37,9 @@ export {
     type AuthorityLevel,
     type DecisionScope,
 } from "./components/AuthorityBadge";
+// Phase 4 Flagship additions (Dashboard redesign):
+export { StatCard, type StatCardProps, type StatTone } from "./components/StatCard";
+export { Dial, type DialProps } from "./components/Dial";
 
 // Tokens are consumed via CSS — no JS re-export. Importing this barrel is
 // enough to opt into the design language because tokens.css is loaded at

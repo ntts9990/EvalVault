@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
+from evalvault.adapters.inbound.api.path_safety import UnsafePathError, safe_upload_filename
 from evalvault.adapters.outbound.kg.parallel_kg_builder import ParallelKGBuilder
 from evalvault.config.settings import Settings, get_settings
 
@@ -77,10 +78,14 @@ async def upload_files(
     for file in files:
         if not file.filename:
             continue
-        file_path = DATA_DIR / file.filename
+        try:
+            safe_name = safe_upload_filename(file.filename)
+        except UnsafePathError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        file_path = DATA_DIR / safe_name
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        uploaded.append(file.filename)
+        uploaded.append(safe_name)
     return {"message": f"Uploaded {len(uploaded)} files", "files": uploaded}
 
 
