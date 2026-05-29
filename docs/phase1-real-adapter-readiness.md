@@ -1,6 +1,6 @@
 # Phase 1 Real Adapter Readiness
 
-Status: **PARTIAL / HASH FIELDS LANDED / PROOF ARTIFACT PENDING**
+Status: **PARTIAL / HASH FIELDS + PROOF GENERATOR LANDED**
 
 This note records the narrow readiness finding for replacing a Phase 0 thin
 EvalVault adapter with a real adapter. It intentionally does not claim full
@@ -38,6 +38,10 @@ still the next step before `solution-platform` should run live EvalVault.
   prompts/contexts, trace IDs, and secrets; it includes stable run IDs,
   project/dataset/model identifiers, metric names, thresholds, test case IDs,
   score/pass booleans, and canonicalized comparison results.
+- `evalvault regress-readiness-proof --evidence ...` now emits the external
+  `evalvault.g4-readiness-proof.v1` JSON proof consumed by `solution-platform`
+  `phase1-real-live`. The proof is generated from repo-local gate evidence and
+  records the commit, required G4 gates, and passing command records.
 
 ## What Is Not Project-Isolated
 
@@ -66,8 +70,9 @@ still the next step before `solution-platform` should run live EvalVault.
 - Run storage now has a first-class `project_id` isolation key. Identity storage
   also has SQLite + Postgres adapter coverage, so the remaining real-adapter
   blocker is downstream evidence/source hash integrity rather than project
-  isolation backend parity. The generated G4 proof artifact remains to be
-  added so `solution-platform` can consume this evidence automatically.
+  isolation backend parity. The generated G4 proof artifact can now be emitted
+  from `tests/fixtures/e2e/regression_gate/g4_readiness_evidence.json` so
+  `solution-platform` can consume this evidence automatically.
 
 ## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
 

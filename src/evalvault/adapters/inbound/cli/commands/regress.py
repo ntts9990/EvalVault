@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import typer
 from rich.console import Console
@@ -22,6 +24,7 @@ from evalvault.adapters.outbound.report.pr_comment_formatter import (
 )
 from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
+from evalvault.domain.services.readiness_proof_service import build_evalvault_readiness_proof
 from evalvault.domain.services.regression_gate_service import (
     RegressionGateReport,
     RegressionGateService,
@@ -105,6 +108,42 @@ def _build_envelope(
         payload["error_code"] = error_code
         payload["error_category"] = error_category
     return payload
+
+
+def _load_readiness_evidence(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("readiness evidence must be a JSON object")
+
+    gates = payload.get("gates")
+    if not isinstance(gates, dict):
+        raise ValueError("readiness evidence gates must be an object")
+
+    commands = payload.get("commands")
+    if not isinstance(commands, list) or not all(isinstance(command, dict) for command in commands):
+        raise ValueError("readiness evidence commands must be a list of objects")
+    return gates, commands
+
+
+def _resolve_readiness_commit(commit: str | None) -> str:
+    if commit and commit.strip():
+        return commit.strip()
+    env_commit = os.environ.get("EVALVAULT_GIT_COMMIT", "").strip()
+    if env_commit:
+        return env_commit
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if completed.returncode == 0 and completed.stdout.strip():
+        return completed.stdout.strip()
+    raise ValueError("readiness proof commit is required outside a git checkout")
+
+
+def _dump_stable_json(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def register_regress_commands(app: typer.Typer, console: Console) -> None:
@@ -493,6 +532,44 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
         else:
             console.print(f"[red]Error:[/red] Unknown action: {action}. Use 'set' or 'get'.")
             raise typer.Exit(1)
+
+    @app.command(name="regress-readiness-proof")
+    def regress_readiness_proof(
+        evidence: Path = typer.Option(
+            ...,
+            "--evidence",
+            "-e",
+            help="JSON evidence with G4 gates and command records.",
+        ),
+        commit: str | None = typer.Option(
+            None,
+            "--commit",
+            help="EvalVault commit to bind into the proof. Defaults to git HEAD.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Write the readiness proof JSON to this path.",
+        ),
+    ) -> None:
+        """Build an EvalVault G4 readiness proof for external adapter wiring."""
+        try:
+            gates, commands = _load_readiness_evidence(evidence)
+            proof = build_evalvault_readiness_proof(
+                commit=_resolve_readiness_commit(commit),
+                gates=gates,
+                commands=commands,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1)
+
+        rendered = _dump_stable_json(proof)
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered + "\n", encoding="utf-8")
+        typer.echo(rendered)
 
 
 def _render_table(report: RegressionGateReport, console: Console) -> None:

@@ -1,0 +1,33 @@
+{
+  "commands": [
+    {
+      "command": "uv run pytest tests/integration/test_run_route_isolation.py tests/integration/test_dataset_route_isolation.py tests/integration/test_knowledge_route_isolation.py tests/integration/test_mcp_project_isolation.py -q",
+      "exit_code": 0,
+      "name": "project-isolation-routes-and-mcp",
+      "passed": true,
+      "summary": "Run, dataset, knowledge, and MCP project isolation tests passed."
+    },
+    {
+      "command": "uv run pytest tests/unit/test_identity_factory.py tests/unit/test_postgres_identity_storage.py -q",
+      "exit_code": 0,
+      "name": "postgres-identity-parity",
+      "passed": true,
+      "summary": "SQLite/Postgres identity storage parity tests passed."
+    },
+    {
+      "command": "uv run pytest tests/unit/test_regression_gate_fixtures.py -q",
+      "exit_code": 0,
+      "name": "regression-gate-hash-evidence",
+      "passed": true,
+      "summary": "RegressionGateReport emits hash-anchored source and evidence fields."
+    }
+  ],
+  "gates": {
+    "dataset_route_project_isolation": true,
+    "evidence_source_hash_fields": true,
+    "knowledge_route_project_isolation": true,
+    "mcp_project_isolation": true,
+    "postgres_identity_parity": true,
+    "run_route_project_isolation": true
+  }
+}
