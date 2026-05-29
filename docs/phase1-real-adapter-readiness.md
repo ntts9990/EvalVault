@@ -3,8 +3,10 @@
 Status: **PARTIAL / BLOCKED**
 
 This note records the narrow readiness finding for replacing a Phase 0 thin
-EvalVault adapter with a real adapter. It intentionally does not claim
-multi-user readiness: project isolation is not enforced today.
+EvalVault adapter with a real adapter. It intentionally does not claim full
+production multi-user readiness yet: the SQLite-backed project isolation path is
+now exercised across the live HTTP and MCP surfaces, but Postgres identity
+storage parity and downstream evidence-hash fields are still open.
 
 ## What Is Scoped Today
 
@@ -47,9 +49,14 @@ multi-user readiness: project isolation is not enforced today.
   entries carry `project_id` so project-scoped job/status reads cannot reveal
   another project's jobs — see "Knowledge Surface Isolation" below. No project
   context keeps the legacy global dirs + shared `KNOWLEDGE_*_TOKENS` behavior.
+- (RESOLVED this pass for MCP run tools) The MCP JSON-RPC endpoint now accepts a
+  real identity principal (session JWT or per-user API key) from the HTTP bearer
+  token and passes that principal into all run tools. Project-scoped MCP calls
+  enforce membership/role and storage filtering; shared MCP/API service tokens
+  keep only the legacy no-project behavior — see "MCP Surface Isolation" below.
 - Run storage now has a first-class `project_id` isolation key. The remaining
-  gaps are the MCP run tools and Postgres identity parity, not run storage or
-  the file-backed HTTP surfaces.
+  gap for auth/backend parity is a Postgres `IdentityStoragePort` adapter, not
+  run storage, HTTP file-backed surfaces, or MCP run tools.
 
 ## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
 
@@ -173,6 +180,34 @@ real identity + JWT): cross-project upload/list isolation, non-member 404,
 missing-principal 401, viewer upload/build 403, traversal-400, project-scoped
 job-status 404, project-scoped stats dir, and legacy shared-token pass/deny.
 
+## MCP Surface Isolation — Landed This Pass (Phase 1-2C)
+
+The MCP JSON-RPC route (`/api/v1/mcp`) now has the same project-scoped authority
+model as the live HTTP run routes:
+
+- The router resolves a `Principal` from the HTTP `Authorization: Bearer` token
+  using the existing identity path (session access JWT or per-user API key).
+  That principal is passed to every MCP tool as a keyword-only argument.
+- Shared `MCP_AUTH_TOKENS` / fallback `API_AUTH_TOKENS` remain valid for
+  **legacy no-project** MCP calls, but they resolve to `principal=None` and
+  therefore never satisfy project membership. A shared token plus `project_id`
+  returns a structured MCP auth error instead of project data.
+- `list_runs`, `get_run_summary`, `analyze_compare`, and `get_artifacts` require
+  project membership when `project_id` is supplied and pass `project_id` into
+  run storage reads (`list_runs(..., project_id=...)`,
+  `get_run(..., project_id=...)`).
+- `run_evaluation` requires the **editor** role when `project_id` is supplied,
+  confines `dataset_path` to `data/datasets/<project_id>/`, and persists the
+  resolved `project_id` onto the new `EvaluationRun`.
+- Legacy tool calls without `project_id` preserve the existing shared-token /
+  local behavior and direct tool unit-call compatibility.
+
+Proof: `tests/unit/adapters/inbound/mcp/test_project_tools.py` and
+`tests/integration/test_mcp_project_isolation.py`: project-scoped list/get/
+compare/artifact checks, no-principal auth errors, viewer-write denial,
+foreign dataset-path rejection, bearer API-key + JWT project scoping, shared
+MCP-token legacy success, and shared MCP-token + `project_id` denial.
+
 ## Stable Output Seam
 
 The stable candidate seam for solution-platform integration is:
@@ -198,23 +233,23 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation — run routes + dataset/retriever-doc + knowledge DONE; remaining
-   surfaces:** the storage-enforced scoping, identity persistence,
+1. **Project isolation — run routes + dataset/retriever-doc + knowledge + MCP DONE; remaining
+   backend parity:** the storage-enforced scoping, identity persistence,
    membership/role resolution, the principal/denial primitives, the live
    `/api/v1/runs` route wiring, **dataset upload/list/read + retriever-doc
-   upload/read**, and **knowledge upload/list/build/jobs/stats** are implemented
-   and proven. **Remaining**: **MCP run-tool** project context is not yet
-   project-scoped; a **Postgres `IdentityStoragePort` adapter** (only SQLite
-   identity exists today) is still needed for backend parity. Storage
-   run-mutation methods (`delete_run`, `update_run_metadata`, `save_feedback`,
-   cluster maps) remain scoped at the route layer via the
-   `get_run(project_id=...)` membership chokepoint rather than being
-   independently project-parameterized.
-2. **Role gate — run + dataset/retriever-doc + knowledge writes DONE; remaining:**
+   upload/read**, **knowledge upload/list/build/jobs/stats**, and **MCP run
+   tools** are implemented and proven. **Remaining**: a **Postgres
+   `IdentityStoragePort` adapter** (only SQLite identity exists today) is still
+   needed for backend parity. Storage run-mutation methods (`delete_run`,
+   `update_run_metadata`, `save_feedback`, cluster maps) remain scoped at the
+   route layer via the `get_run(project_id=...)` membership chokepoint rather
+   than being independently project-parameterized.
+2. **Role gate — run + dataset/retriever-doc + knowledge + MCP writes DONE; remaining:**
    `require_role` / viewer-editor-admin is applied to run writes (start, feedback
-   save, cluster-map save/delete), dataset/retriever-doc uploads, and knowledge
-   upload/build, all proven (`test_run_route_isolation.py`,
-   `test_dataset_route_isolation.py`, `test_knowledge_route_isolation.py`).
+   save, cluster-map save/delete), dataset/retriever-doc uploads, knowledge
+   upload/build, and MCP `run_evaluation`, all proven (`test_run_route_isolation.py`,
+   `test_dataset_route_isolation.py`, `test_knowledge_route_isolation.py`,
+   `test_mcp_project_isolation.py`, `test_project_tools.py`).
    Admin membership-management endpoints are not yet introduced (conditional per
    the plan).
 3. **Evidence hash blocker (partially addressed):** numeric serialization is now

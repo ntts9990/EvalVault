@@ -8,6 +8,17 @@ from typing import Any
 from pydantic import ValidationError
 
 from evalvault.adapters.inbound.api.adapter import WebUIAdapter
+from evalvault.adapters.inbound.api.path_safety import (
+    UnsafePathError,
+    ensure_within_project_resource,
+)
+from evalvault.adapters.inbound.api.principal import (
+    InsufficientRoleError,
+    PrincipalRequiredError,
+    ProjectAccessDeniedError,
+    require_member,
+    require_role,
+)
 from evalvault.adapters.inbound.cli.utils.analysis_io import (
     extract_markdown_report,
     resolve_artifact_dir,
@@ -23,7 +34,9 @@ from evalvault.adapters.outbound.nlp.korean.toolkit_factory import try_create_ko
 from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings, apply_profile
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+from evalvault.domain.entities.auth import Role
 from evalvault.domain.services.analysis_service import AnalysisService
+from evalvault.domain.services.authorization import Principal
 from evalvault.domain.services.evaluator import RagasEvaluator
 from evalvault.ports.inbound.web_port import EvalRequest, RunFilters, RunSummary
 from evalvault.ports.outbound.storage_port import StoragePort
@@ -70,7 +83,11 @@ def get_tool_specs() -> list[dict[str, Any]]:
     return [spec.to_dict() for spec in TOOL_SPECS]
 
 
-def list_runs(payload: dict[str, Any] | ListRunsRequest) -> ListRunsResponse:
+def list_runs(
+    payload: dict[str, Any] | ListRunsRequest,
+    *,
+    principal: Principal | None = None,
+) -> ListRunsResponse:
     try:
         request = ListRunsRequest.model_validate(payload)
     except ValidationError as exc:
@@ -83,6 +100,15 @@ def list_runs(payload: dict[str, Any] | ListRunsRequest) -> ListRunsResponse:
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)]
         )
 
+    auth_error = _authorize_project(
+        principal,
+        request.project_id,
+        required_role=None,
+        stage=ErrorStage.storage,
+    )
+    if auth_error is not None:
+        return ListRunsResponse(errors=[auth_error])
+
     storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     adapter = WebUIAdapter(storage=storage, settings=Settings())
 
@@ -94,7 +120,9 @@ def list_runs(payload: dict[str, Any] | ListRunsRequest) -> ListRunsResponse:
     )
 
     try:
-        summaries = adapter.list_runs(limit=request.limit, filters=filters)
+        summaries = adapter.list_runs(
+            limit=request.limit, filters=filters, project_id=request.project_id
+        )
     except Exception as exc:
         return ListRunsResponse(errors=[_error("EVAL_LIST_RUNS_FAILED", str(exc))])
 
@@ -104,7 +132,11 @@ def list_runs(payload: dict[str, Any] | ListRunsRequest) -> ListRunsResponse:
     )
 
 
-def get_run_summary(payload: dict[str, Any] | GetRunSummaryRequest) -> GetRunSummaryResponse:
+def get_run_summary(
+    payload: dict[str, Any] | GetRunSummaryRequest,
+    *,
+    principal: Principal | None = None,
+) -> GetRunSummaryResponse:
     try:
         request = GetRunSummaryRequest.model_validate(payload)
     except ValidationError as exc:
@@ -124,9 +156,18 @@ def get_run_summary(payload: dict[str, Any] | GetRunSummaryRequest) -> GetRunSum
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)]
         )
 
+    auth_error = _authorize_project(
+        principal,
+        request.project_id,
+        required_role=None,
+        stage=ErrorStage.storage,
+    )
+    if auth_error is not None:
+        return GetRunSummaryResponse(errors=[auth_error])
+
     storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     try:
-        run = storage.get_run(request.run_id)
+        run = storage.get_run(request.run_id, project_id=request.project_id)
     except KeyError as exc:
         return GetRunSummaryResponse(
             errors=[_error("EVAL_RUN_NOT_FOUND", str(exc), stage=ErrorStage.storage)]
@@ -140,11 +181,24 @@ def get_run_summary(payload: dict[str, Any] | GetRunSummaryRequest) -> GetRunSum
     return GetRunSummaryResponse(summary=summary_payload, errors=[])
 
 
-def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluationResponse:
+def run_evaluation(
+    payload: dict[str, Any] | RunEvaluationRequest,
+    *,
+    principal: Principal | None = None,
+) -> RunEvaluationResponse:
     try:
         request = RunEvaluationRequest.model_validate(payload)
     except ValidationError as exc:
         return RunEvaluationResponse(run_id="", errors=[_validation_error(exc)])
+
+    auth_error = _authorize_project(
+        principal,
+        request.project_id,
+        required_role=Role.editor,
+        stage=ErrorStage.storage,
+    )
+    if auth_error is not None:
+        return RunEvaluationResponse(run_id="", errors=[auth_error])
 
     try:
         dataset_path = _resolve_dataset_path(request.dataset_path)
@@ -161,6 +215,22 @@ def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluat
             run_id="",
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)],
         )
+
+    if request.project_id is not None:
+        try:
+            ensure_within_project_resource(
+                dataset_path,
+                base_dir="data/datasets",
+                project_id=request.project_id,
+                resource_name="Dataset path",
+            )
+        except UnsafePathError as exc:
+            return RunEvaluationResponse(
+                run_id="",
+                errors=[
+                    _error("EVAL_DATASET_UNSAFE_PATH", str(exc), stage=ErrorStage.preprocess)
+                ],
+            )
 
     settings = Settings()
     if request.profile:
@@ -196,6 +266,7 @@ def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluat
         threshold_profile=request.threshold_profile,
         parallel=request.parallel,
         batch_size=request.batch_size,
+        project_id=request.project_id,
     )
 
     try:
@@ -238,7 +309,11 @@ def run_evaluation(payload: dict[str, Any] | RunEvaluationRequest) -> RunEvaluat
     )
 
 
-def analyze_compare(payload: dict[str, Any] | AnalyzeCompareRequest) -> AnalyzeCompareResponse:
+def analyze_compare(
+    payload: dict[str, Any] | AnalyzeCompareRequest,
+    *,
+    principal: Principal | None = None,
+) -> AnalyzeCompareResponse:
     try:
         request = AnalyzeCompareRequest.model_validate(payload)
     except ValidationError as exc:
@@ -267,10 +342,23 @@ def analyze_compare(payload: dict[str, Any] | AnalyzeCompareRequest) -> AnalyzeC
             errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)],
         )
 
+    auth_error = _authorize_project(
+        principal,
+        request.project_id,
+        required_role=None,
+        stage=ErrorStage.storage,
+    )
+    if auth_error is not None:
+        return AnalyzeCompareResponse(
+            baseline_run_id=request.run_id_a,
+            candidate_run_id=request.run_id_b,
+            errors=[auth_error],
+        )
+
     storage = build_storage_adapter(settings=Settings(), db_path=db_path)
     try:
-        run_a = storage.get_run(request.run_id_a)
-        run_b = storage.get_run(request.run_id_b)
+        run_a = storage.get_run(request.run_id_a, project_id=request.project_id)
+        run_b = storage.get_run(request.run_id_b, project_id=request.project_id)
     except KeyError as exc:
         return AnalyzeCompareResponse(
             baseline_run_id=request.run_id_a,
@@ -394,7 +482,11 @@ def analyze_compare(payload: dict[str, Any] | AnalyzeCompareRequest) -> AnalyzeC
     )
 
 
-def get_artifacts(payload: Any) -> GetArtifactsResponse:
+def get_artifacts(
+    payload: Any,
+    *,
+    principal: Principal | None = None,
+) -> GetArtifactsResponse:
     try:
         request = GetArtifactsRequest.model_validate(payload)
     except ValidationError as exc:
@@ -419,6 +511,39 @@ def get_artifacts(payload: Any) -> GetArtifactsResponse:
                 _error("EVAL_ARTIFACT_UNSAFE_PATH", str(exc), stage=_stage_for_kind(request.kind))
             ],
         )
+
+    auth_error = _authorize_project(
+        principal,
+        request.project_id,
+        required_role=None,
+        stage=_stage_for_kind(request.kind),
+    )
+    if auth_error is not None:
+        return GetArtifactsResponse(run_id=request.run_id, errors=[auth_error])
+
+    if request.project_id is not None:
+        try:
+            db_path = _resolve_db_path(request.db_path)
+        except ValueError as exc:
+            return GetArtifactsResponse(
+                run_id=request.run_id,
+                errors=[_error("EVAL_DB_UNSAFE_PATH", str(exc), stage=ErrorStage.storage)],
+            )
+        storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+        try:
+            storage.get_run(request.run_id, project_id=request.project_id)
+            if request.comparison_run_id:
+                storage.get_run(request.comparison_run_id, project_id=request.project_id)
+        except KeyError as exc:
+            return GetArtifactsResponse(
+                run_id=request.run_id,
+                errors=[_error("EVAL_RUN_NOT_FOUND", str(exc), stage=ErrorStage.storage)],
+            )
+        except Exception as exc:
+            return GetArtifactsResponse(
+                run_id=request.run_id,
+                errors=[_error("EVAL_RUN_LOAD_FAILED", str(exc), stage=ErrorStage.storage)],
+            )
 
     if request.kind == ArtifactsKind.comparison:
         if not request.comparison_run_id:
@@ -502,6 +627,38 @@ def _serialize_run_summary(summary: RunSummary) -> RunSummaryPayload:
         "thresholds": None,
     }
     return RunSummaryPayload.model_validate(payload)
+
+
+def _authorize_project(
+    principal: Principal | None,
+    project_id: str | None,
+    *,
+    required_role: Role | None,
+    stage: ErrorStage,
+) -> McpError | None:
+    """Return an MCP auth error when project-scoped access is denied."""
+    if project_id is None:
+        return None
+    try:
+        if required_role is None:
+            require_member(principal, project_id)
+        else:
+            require_role(principal, project_id, required_role)
+    except PrincipalRequiredError:
+        return _error(
+            "EVAL_AUTH_REQUIRED",
+            "Authentication is required for project-scoped MCP access.",
+            stage=stage,
+        )
+    except ProjectAccessDeniedError:
+        return _error("EVAL_PROJECT_NOT_FOUND", "Project resource not found.", stage=stage)
+    except InsufficientRoleError:
+        return _error(
+            "EVAL_INSUFFICIENT_ROLE",
+            "Insufficient role for this operation.",
+            stage=stage,
+        )
+    return None
 
 
 def _resolve_db_path(db_path: Path | None) -> Path | None:

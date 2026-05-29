@@ -7,8 +7,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from evalvault.adapters.inbound.api.main import get_principal
 from evalvault.adapters.inbound.mcp import tools as mcp_tools
 from evalvault.config.settings import Settings, get_settings
+from evalvault.domain.services.authorization import Principal
 
 router = APIRouter(tags=["mcp"])
 
@@ -26,23 +28,29 @@ def _normalize_tokens(raw_tokens: str | None) -> set[str]:
     return {token.strip() for token in raw_tokens.split(",") if token.strip()}
 
 
-def _require_mcp_token(
+def _require_mcp_auth(
     request: Request,
     settings: Settings = Depends(get_settings),
-) -> None:
+    principal: Principal | None = Depends(get_principal),
+) -> Principal | None:
     if not settings.mcp_enabled:
         raise HTTPException(status_code=404, detail="MCP is disabled")
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
+    token = auth_header[7:].strip()
+
+    if principal is not None:
+        return principal
+
     tokens = _normalize_tokens(settings.mcp_auth_tokens) or _normalize_tokens(
         settings.api_auth_tokens
     )
     if not tokens:
         raise HTTPException(status_code=401, detail="MCP auth tokens are required")
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
-    token = auth_header[7:].strip()
     if token not in tokens:
         raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
+    return None
 
 
 def _tool_registry() -> dict[str, Any]:
@@ -84,7 +92,7 @@ def _jsonrpc_error(rpc_id: int | str | None, code: int, message: str) -> dict[st
 def handle_mcp_request(
     request: JsonRpcRequest,
     settings: Settings = Depends(get_settings),
-    _: None = Depends(_require_mcp_token),
+    principal: Principal | None = Depends(_require_mcp_auth),
 ) -> dict[str, Any]:
     method = request.method
     params = request.params or {}
@@ -125,7 +133,7 @@ def handle_mcp_request(
             return _jsonrpc_error(request.id, -32601, "Tool not found")
 
         try:
-            result = tool_fn(tool_args)
+            result = tool_fn(tool_args, principal=principal)
         except Exception as exc:
             return _jsonrpc_error(request.id, -32000, f"Tool execution failed: {exc}")
 

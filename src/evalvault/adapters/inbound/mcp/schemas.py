@@ -50,6 +50,7 @@ class ListRunsRequest(BaseModel):
     run_mode: str | None = None
     project_names: list[str] | None = None
     db_path: Path | None = None
+    project_id: str | None = None
 
 
 class ListRunsResponse(BaseModel):
@@ -60,6 +61,7 @@ class ListRunsResponse(BaseModel):
 class GetRunSummaryRequest(BaseModel):
     run_id: str
     db_path: Path | None = None
+    project_id: str | None = None
 
 
 class GetRunSummaryResponse(BaseModel):
@@ -77,6 +79,8 @@ class GetArtifactsRequest(BaseModel):
     kind: ArtifactsKind = ArtifactsKind.analysis
     comparison_run_id: str | None = None
     base_dir: Path | None = None
+    db_path: Path | None = None
+    project_id: str | None = None
 
 
 class ArtifactsPayload(BaseModel):
@@ -108,6 +112,7 @@ class RunEvaluationRequest(BaseModel):
     analysis_output: Path | None = None
     analysis_report: Path | None = None
     analysis_dir: Path | None = None
+    project_id: str | None = None
 
 
 class EvaluationArtifactsPayload(BaseModel):
@@ -135,6 +140,7 @@ class AnalyzeCompareRequest(BaseModel):
     output: Path | None = None
     report: Path | None = None
     output_dir: Path | None = None
+    project_id: str | None = None
 
 
 class MetricsDeltaPayload(BaseModel):
