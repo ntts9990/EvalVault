@@ -88,8 +88,71 @@ _QUALITY_STEADY = RegressSampleScenario(
 )
 
 
+# --- Scientific-forecasting track samples (Phase 1-5A, Tier A) -------------
+# These mirror the calibration / overconfidence / leakage forecast scenarios the
+# platform demo consumes. EvalVault stays strictly T2: scenario names, run IDs,
+# and dataset names deliberately avoid release vocabulary (promote/hold/rollback)
+# so the emitted envelope is clean under the consumer's T2 assertion. The verdict
+# is "passed"/"failed" only; the platform decides the release outcome downstream.
+# Each pair uses exact-mean alternating scores (same tight-spread pattern as
+# quality-steady) so means are exact decimals and the t-test is robustly
+# significant without flirting with the p<0.05 boundary.
+
+# Well-calibrated, low-risk forecast: candidate drifts -0.02, inside the 0.05
+# budget -> regression=False -> status "passed".
+_FORECAST_CALIBRATED = RegressSampleScenario(
+    name="forecast-calibrated",
+    metric="forecast_calibration_score",
+    threshold=0.75,
+    dataset_name="regression-gate-forecast-calibrated",
+    model_name="fixture-model",
+    baseline_run_id="baseline-forecast-calibrated",
+    candidate_run_id="candidate-forecast-calibrated",
+    baseline_scores=(0.815, 0.825) * 5,
+    candidate_scores=(0.795, 0.805) * 5,
+    fail_on_regression=0.05,
+)
+
+# Overconfident forecast: candidate drops -0.10, beyond the 0.06 budget ->
+# regression=True -> status "failed" (platform gates this to a human-review hold).
+_FORECAST_OVERCONFIDENT = RegressSampleScenario(
+    name="forecast-overconfident",
+    metric="forecast_calibration_score",
+    threshold=0.65,
+    dataset_name="regression-gate-forecast-overconfident",
+    model_name="fixture-model",
+    baseline_run_id="baseline-forecast-overconfident",
+    candidate_run_id="candidate-forecast-overconfident",
+    baseline_scores=(0.795, 0.805) * 5,
+    candidate_scores=(0.695, 0.705) * 5,
+    fail_on_regression=0.06,
+)
+
+# Post-cutoff leakage: leakage-resistance collapses -0.19, far beyond the 0.06
+# budget -> regression=True -> status "failed". Criticality is the platform's to
+# assert from the change-spec; EvalVault only reports the T2 regression verdict.
+_FORECAST_LEAKAGE = RegressSampleScenario(
+    name="forecast-leakage",
+    metric="leakage_resistance_score",
+    threshold=0.70,
+    dataset_name="regression-gate-forecast-leakage",
+    model_name="fixture-model",
+    baseline_run_id="baseline-forecast-leakage",
+    candidate_run_id="candidate-forecast-leakage",
+    baseline_scores=(0.945, 0.955) * 5,
+    candidate_scores=(0.755, 0.765) * 5,
+    fail_on_regression=0.06,
+)
+
+
 REGRESS_SAMPLE_SCENARIOS: dict[str, RegressSampleScenario] = {
-    _QUALITY_STEADY.name: _QUALITY_STEADY,
+    scenario.name: scenario
+    for scenario in (
+        _QUALITY_STEADY,
+        _FORECAST_CALIBRATED,
+        _FORECAST_OVERCONFIDENT,
+        _FORECAST_LEAKAGE,
+    )
 }
 
 

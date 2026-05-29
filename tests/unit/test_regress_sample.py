@@ -155,3 +155,101 @@ def test_regress_sample_rejects_unknown_scenario() -> None:
     result = _invoke("--scenario", "does-not-exist")
     assert result.exit_code == 1
     assert "quality-steady" in result.stdout
+
+
+# --- Forecast track scenarios (Phase 1-5A, Tier A) ------------------------
+
+ALL_SCENARIOS = (
+    "quality-steady",
+    "forecast-calibrated",
+    "forecast-overconfident",
+    "forecast-leakage",
+)
+
+# name, metric, baseline_mean, candidate_mean, fail_on_regression, status, regression
+FORECAST_CASES = [
+    ("forecast-calibrated", "forecast_calibration_score", 0.82, 0.80, 0.05, "passed", False),
+    ("forecast-overconfident", "forecast_calibration_score", 0.80, 0.70, 0.06, "failed", True),
+    ("forecast-leakage", "leakage_resistance_score", 0.95, 0.76, 0.06, "failed", True),
+]
+
+
+def test_registry_contains_all_tier_a_scenarios() -> None:
+    assert set(REGRESS_SAMPLE_SCENARIOS) == set(ALL_SCENARIOS)
+
+
+def test_forecast_scenarios_have_exact_means() -> None:
+    for name, _metric, b_mean, c_mean, *_rest in FORECAST_CASES:
+        sc = REGRESS_SAMPLE_SCENARIOS[name]
+        assert statistics.fmean(sc.baseline_scores) == pytest.approx(b_mean, abs=1e-9), name
+        assert statistics.fmean(sc.candidate_scores) == pytest.approx(c_mean, abs=1e-9), name
+
+
+@pytest.mark.parametrize(
+    ("name", "metric", "b_mean", "c_mean", "fail_on", "status", "regression"),
+    FORECAST_CASES,
+)
+def test_forecast_scenario_envelope(
+    name: str,
+    metric: str,
+    b_mean: float,
+    c_mean: float,
+    fail_on: float,
+    status: str,
+    regression: bool,
+) -> None:
+    """Each forecast scenario emits an adapter-compatible T2 envelope with the
+    expected verdict and exact arithmetic."""
+    result = _invoke("--scenario", name)
+    assert result.exit_code == 0, result.stdout
+    envelope = json.loads(result.stdout)
+
+    _assert_adapter_compatible(envelope)
+
+    data = envelope["data"]
+    assert data["status"] == status
+    assert data["regression_detected"] is regression
+    assert data["metrics"] == [metric]
+    assert data["baseline_run_id"] == f"baseline-{name}"
+    assert data["candidate_run_id"] == f"candidate-{name}"
+    assert data["fail_on_regression"] == fail_on
+    assert data["test"] == "t-test"
+
+    (row,) = data["results"]
+    assert row["metric"] == metric
+    assert row["regression"] is regression
+    assert row["baseline_score"] == pytest.approx(b_mean, abs=1e-3)
+    assert row["candidate_score"] == pytest.approx(c_mean, abs=1e-3)
+    assert row["diff"] == pytest.approx(c_mean - b_mean, abs=1e-3)
+    assert 0.0 <= row["p_value"] <= 1.0
+    assert row["effect_level"] in EFFECT_LEVELS
+    assert isinstance(row["is_significant"], bool)
+
+
+@pytest.mark.parametrize("name", ALL_SCENARIOS)
+def test_scenario_is_byte_deterministic(name: str) -> None:
+    """Every scenario emits byte-identical JSON across invocations."""
+    first = _invoke("--scenario", name)
+    second = _invoke("--scenario", name)
+    assert first.exit_code == 0 and second.exit_code == 0, (first.stdout, second.stdout)
+    assert first.stdout == second.stdout
+
+
+@pytest.mark.parametrize("name", ALL_SCENARIOS)
+def test_scenario_has_no_t3_vocabulary(name: str) -> None:
+    """No release vocabulary (promote/hold/rollback) in the envelope OR in the
+    scenario's own identifiers (run IDs / dataset / metric / name)."""
+    result = _invoke("--scenario", name)
+    assert result.exit_code == 0, result.stdout
+    serialized = json.dumps(json.loads(result.stdout), ensure_ascii=False, sort_keys=True)
+    assert T3_RELEASE_VOCABULARY.search(serialized) is None, f"envelope leaked T3 vocab: {name}"
+
+    sc = REGRESS_SAMPLE_SCENARIOS[name]
+    for text in (
+        sc.name,
+        sc.metric,
+        sc.dataset_name,
+        sc.baseline_run_id,
+        sc.candidate_run_id,
+    ):
+        assert T3_RELEASE_VOCABULARY.search(text) is None, f"identifier leaked T3 vocab: {text!r}"
