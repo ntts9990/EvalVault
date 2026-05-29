@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,6 +15,24 @@ from evalvault.ports.outbound.storage_port import StoragePort
 logger = logging.getLogger(__name__)
 
 TestType = str
+
+# Fixed precision for serialized numeric fields. Chosen so cross-platform /
+# cross-scipy-version float noise collapses to a single representation while
+# preserving gate-relevant precision (scores are 0..1, diffs small).
+CANONICAL_FLOAT_DECIMALS = 6
+
+
+def canonical_float(value: float, ndigits: int = CANONICAL_FLOAT_DECIMALS) -> float:
+    """Canonicalize a float for deterministic JSON serialization / hash anchoring.
+
+    Rounds to a fixed number of decimals so cross-platform ~ULP float noise
+    collapses to one representation, and normalizes ``-0.0`` to ``0.0``.
+    Non-finite values pass through unchanged. This affects only the serialized
+    representation — never the values used to compute verdicts.
+    """
+    if not math.isfinite(value):
+        return value
+    return round(float(value), ndigits) + 0.0
 
 
 @dataclass(frozen=True)
@@ -52,14 +71,16 @@ class RegressionMetricResult:
         )
 
     def to_dict(self) -> dict[str, float | str | bool]:
+        # Numeric fields are canonicalized for deterministic serialization
+        # (hash anchoring). Booleans/enums/verdicts are unchanged.
         return {
             "metric": self.metric,
-            "baseline_score": self.baseline_score,
-            "candidate_score": self.candidate_score,
-            "diff": self.diff,
-            "diff_percent": self.diff_percent,
-            "p_value": self.p_value,
-            "effect_size": self.effect_size,
+            "baseline_score": canonical_float(self.baseline_score),
+            "candidate_score": canonical_float(self.candidate_score),
+            "diff": canonical_float(self.diff),
+            "diff_percent": canonical_float(self.diff_percent),
+            "p_value": canonical_float(self.p_value),
+            "effect_size": canonical_float(self.effect_size),
             "effect_level": self.effect_level.value,
             "is_significant": self.is_significant,
             "regression": self.regression,

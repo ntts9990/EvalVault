@@ -220,3 +220,6 @@ def test_regress_fixture_incomplete_provenance(tmp_path: Path) -> None:
     assert payload["error_type"] == expected["error_type"] == "ValueError"
     assert payload["message"] == expected["message"]
     assert "shared metrics" in payload["message"]
+    # Stable machine-readable taxonomy: error_code is the contract (error_type kept for compat).
+    assert payload["error_code"] == expected["error_code"] == "EVAL_INCOMPLETE_PROVENANCE"
+    assert payload["error_category"] == expected["error_category"] == "provenance"

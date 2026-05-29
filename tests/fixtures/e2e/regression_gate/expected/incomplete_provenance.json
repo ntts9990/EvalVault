@@ -9,6 +9,8 @@
   "data": null,
   "message": "No shared metrics available for regression gate.",
   "error_type": "ValueError",
+  "error_code": "EVAL_INCOMPLETE_PROVENANCE",
+  "error_category": "provenance",
   "_meta": {
     "exit_code": 1,
     "runtime_fields": ["started_at", "finished_at", "duration_ms"],

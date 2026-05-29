@@ -16,6 +16,17 @@ multi-user readiness: project isolation is not enforced today.
   `KNOWLEDGE_READ_TOKENS` and `KNOWLEDGE_WRITE_TOKENS`.
 - `RegressionGateReport` output is T2-only: `evalvault regress --format json`
   emits `passed` / `failed` / error envelope states, not T3 release decisions.
+- The `regress --format json` error envelope carries a **stable machine-readable
+  taxonomy**: `error_code` (UPPER_SNAKE — `EVAL_INCOMPLETE_PROVENANCE`,
+  `EVAL_RUN_NOT_FOUND`, `EVAL_INVALID_INPUT`, `EVAL_INTERNAL_ERROR`) plus
+  `error_category` (`provenance` / `input` / `internal`). The legacy
+  `error_type` (Python class name) is retained for backward compatibility but is
+  no longer the contract — adapters switch on `error_code`.
+- Numeric report fields (`baseline_score`, `candidate_score`, `diff`,
+  `diff_percent`, `p_value`, `effect_size`) are **canonicalized** with
+  6-decimal rounding (`-0.0` normalized), so the JSON serialization is
+  deterministic across platforms and stable to hash. Verdict computation is
+  unchanged.
 
 ## What Is Not Project-Isolated
 
@@ -53,7 +64,9 @@ uv run evalvault regress <candidate_run_id> \
 
 The JSON envelope has `command: "regress"`, `version: 1`, `status`, runtime
 timestamps, and `data` containing the `RegressionGateReport` fields documented
-in `docs/adapter-contract.md`.
+in `docs/adapter-contract.md`. On the error/abstain path (`status: "error"`,
+`data: null`) the envelope additionally carries `message`, `error_type` (legacy,
+compat-only), and the stable `error_code` / `error_category`.
 
 Contract fixtures and executable examples live in:
 
@@ -67,11 +80,17 @@ Contract fixtures and executable examples live in:
    resolution, membership enforcement, and storage-level filtering.
 2. **Role gate blocker:** route-level viewer/editor/admin checks are not wired
    to `Membership.role`; only shared API or knowledge tokens are enforced.
-3. **Evidence hash blocker:** `RegressionGateReport` does not yet emit the
-   Phase 1 evidence/source hash fields expected by downstream reference
-   integrity (`content_hash`, `source_hash`, or `evidence_refs`). The current
-   seam is stable for T2 regression results, but incomplete for a hash-anchored
-   real adapter contract.
+3. **Evidence hash blocker (partially addressed):** numeric serialization is now
+   canonical/deterministic (see above), which removes the cross-platform
+   float-noise obstacle to hashing the report. Two gaps remain: (a)
+   `RegressionGateReport` still does not emit the Phase 1 evidence/source hash
+   fields expected by downstream reference integrity (`content_hash`,
+   `source_hash`, or `evidence_refs`), and (b) `p_value` / `effect_size` are
+   scipy-derived, so byte-for-byte reproducibility across **scipy versions** also
+   requires version pinning, not just serialization canonicalization. The seam is
+   stable and hash-anchorable for the deterministic arithmetic fields
+   (scores/diffs); the statistical fields are stable in representation but need
+   scipy pinning for cross-version hash equality.
 
 Readiness remains **PARTIAL** for local/offline single-tenant regression-gate
 consumption and **BLOCKED** for multi-user project-scoped replacement.

@@ -202,9 +202,18 @@ EVALVAULT_PROFILE=ollama-local uv run evalvault run tests/fixtures/e2e/edge_case
 
 ## 6. 구조적 에러 동작 (Structured Error Behavior)
 
-- CLI 명령은 실패 시 exit code non-zero + stderr에 human-readable 메시지.
-- `--format json`을 지원하는 명령(`history`, `regress` 등)은 오류도 JSON으로 출력하지 않음 (현재); CI에서 JSON 파싱하기 전에 exit code를 먼저 검사할 것.
-- 향후 어댑터 통합을 위해 **structured error JSON 출력** 옵션 (`--error-format json` 또는 자동 wrap)이 next_priorities에 있음. 현재는 stderr 텍스트로 가정하고 어댑터 작성.
+- CLI 명령은 실패 시 exit code non-zero. `regress --format json`은 **오류도 JSON 엔벨로프**로 출력한다(`status: "error"`, `data: null`). 그 외 명령의 `--format json` 오류 출력은 아직 stderr 텍스트일 수 있으므로 CI는 JSON 파싱 전 exit code를 먼저 검사할 것.
+- `regress` 에러 엔벨로프 필드:
+
+  | 필드 | 타입 | 의미 |
+  |---|---|---|
+  | `message` | string | human-readable 설명 (안정 계약 아님) |
+  | `error_type` | string | Python 예외 클래스명. **하위호환용**, 안정 계약 아님 |
+  | `error_code` | string | **안정 계약**. UPPER_SNAKE: `EVAL_INCOMPLETE_PROVENANCE`(공유 메트릭 없음 → verdict 불가), `EVAL_RUN_NOT_FOUND`, `EVAL_INVALID_INPUT`, `EVAL_INTERNAL_ERROR` |
+  | `error_category` | string | `provenance` / `input` / `internal` |
+
+  어댑터는 `error_type`가 아니라 `error_code`로 분기할 것. exit code: `EVAL_INCOMPLETE_PROVENANCE`, `EVAL_RUN_NOT_FOUND`, `EVAL_INVALID_INPUT` → 1, 예기치 못한 내부 오류 → 3.
+- 숫자 필드(`baseline_score`/`candidate_score`/`diff`/`diff_percent`/`p_value`/`effect_size`)는 6자리 반올림으로 canonicalize되어(−0.0 정규화) 직렬화가 결정적이다. 단 `p_value`/`effect_size`의 cross-scipy-version 동일성은 scipy 버전 고정이 필요하다.
 
 ---
 

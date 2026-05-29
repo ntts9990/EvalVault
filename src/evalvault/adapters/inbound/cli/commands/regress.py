@@ -42,6 +42,37 @@ def _coerce_test_type(value: str) -> TestType:
 OutputFormat = Literal["table", "json", "github-actions"]
 CIGateOutputFormat = Literal["github", "gitlab", "json", "pr-comment"]
 
+# Stable, machine-readable error taxonomy for the regress JSON envelope.
+# `error_type` (Python class name) is kept for backward compatibility, but
+# adapters should switch on these UPPER_SNAKE `error_code` values, which are
+# part of the stable contract and independent of Python internals.
+ERROR_CATEGORY_PROVENANCE = "provenance"
+ERROR_CATEGORY_INPUT = "input"
+ERROR_CATEGORY_INTERNAL = "internal"
+
+ERROR_CODE_INCOMPLETE_PROVENANCE = "EVAL_INCOMPLETE_PROVENANCE"
+ERROR_CODE_RUN_NOT_FOUND = "EVAL_RUN_NOT_FOUND"
+ERROR_CODE_INVALID_INPUT = "EVAL_INVALID_INPUT"
+ERROR_CODE_INTERNAL = "EVAL_INTERNAL_ERROR"
+
+
+def classify_regress_error(exc: BaseException) -> tuple[str, str]:
+    """Map an exception to a stable ``(error_code, error_category)``.
+
+    The mapping is the external contract; it deliberately does not expose the
+    Python exception class. Detection keys off exception type and the gate
+    service's own (stable) abstain messages.
+    """
+    if isinstance(exc, KeyError):
+        return ERROR_CODE_RUN_NOT_FOUND, ERROR_CATEGORY_INPUT
+    if isinstance(exc, ValueError):
+        message = str(exc).lower()
+        if "shared metric" in message or "comparable metric" in message:
+            # Gate cannot render a verdict: no overlapping metrics to compare.
+            return ERROR_CODE_INCOMPLETE_PROVENANCE, ERROR_CATEGORY_PROVENANCE
+        return ERROR_CODE_INVALID_INPUT, ERROR_CATEGORY_INPUT
+    return ERROR_CODE_INTERNAL, ERROR_CATEGORY_INTERNAL
+
 
 def _format_timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
@@ -54,8 +85,7 @@ def _build_envelope(
     started_at: datetime,
     finished_at: datetime,
     duration_ms: int,
-    message: str | None = None,
-    error_type: str | None = None,
+    error: BaseException | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "command": "regress",
@@ -67,10 +97,13 @@ def _build_envelope(
         "artifacts": None,
         "data": report.to_dict() if report else None,
     }
-    if message:
-        payload["message"] = message
-    if error_type:
-        payload["error_type"] = error_type
+    if error is not None:
+        error_code, error_category = classify_regress_error(error)
+        payload["message"] = str(error)
+        # error_type kept for backward compatibility; error_code is the stable contract.
+        payload["error_type"] = type(error).__name__
+        payload["error_code"] = error_code
+        payload["error_category"] = error_category
     return payload
 
 
@@ -157,8 +190,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
                 started_at=started_at,
                 finished_at=finished_at,
                 duration_ms=duration_ms,
-                message=str(exc),
-                error_type=type(exc).__name__,
+                error=exc,
             )
             if output:
                 write_json(output, payload)
@@ -176,8 +208,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
                 started_at=started_at,
                 finished_at=finished_at,
                 duration_ms=duration_ms,
-                message=str(exc),
-                error_type=type(exc).__name__,
+                error=exc,
             )
             if output:
                 write_json(output, payload)
@@ -264,8 +295,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
                 started_at=started_at,
                 finished_at=finished_at,
                 duration_ms=duration_ms,
-                message=str(exc),
-                error_type=type(exc).__name__,
+                error=exc,
             )
             if output_format == "json":
                 console.print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -281,8 +311,7 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
                 started_at=started_at,
                 finished_at=finished_at,
                 duration_ms=duration_ms,
-                message=str(exc),
-                error_type=type(exc).__name__,
+                error=exc,
             )
             if output_format == "json":
                 console.print(json.dumps(payload, ensure_ascii=False, indent=2))
