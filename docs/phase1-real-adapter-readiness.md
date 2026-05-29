@@ -1,6 +1,6 @@
 # Phase 1 Real Adapter Readiness
 
-Status: **PARTIAL / HASH FIELDS + PROOF GENERATOR LANDED**
+Status: **PARTIAL / HASH FIELDS + PROOF GENERATOR + DB SAMPLE SEAM LANDED**
 
 This note records the narrow readiness finding for replacing a Phase 0 thin
 EvalVault adapter with a real adapter. It intentionally does not claim full
@@ -8,7 +8,9 @@ production multi-user readiness yet: the project isolation path is now
 exercised across the live HTTP and MCP surfaces, identity storage has both
 SQLite and Postgres adapter coverage, and the regression gate JSON now carries
 hash-anchored source/evidence fields. EvalVault can now generate the G4
-readiness proof consumed by `solution-platform`'s proof-gated live profile.
+readiness proof consumed by `solution-platform`'s proof-gated live profile, and
+it exposes a deterministic DB-backed sample seam that downstream real-adapter
+smoke tests can execute without carrying hand-authored EvalVault fixtures.
 
 ## What Is Scoped Today
 
@@ -42,6 +44,11 @@ readiness proof consumed by `solution-platform`'s proof-gated live profile.
   `evalvault.g4-readiness-proof.v1` JSON proof consumed by `solution-platform`
   `phase1-real-live`. The proof is generated from repo-local gate evidence and
   records the commit, required G4 gates, and passing command records.
+- `evalvault regress-sample --scenario quality-steady` seeds a temp (or supplied)
+  SQLite DB, invokes the real `RegressionGateService`, and emits a byte-stable
+  standard regress envelope for the platform adapter smoke path. This command is
+  not a replacement for production `regress`; it is the deterministic
+  EvalVault-owned fixture generator for cross-repo integration tests.
 
 ## What Is Not Project-Isolated
 
@@ -262,7 +269,7 @@ MCP-token legacy success, and shared MCP-token + `project_id` denial.
 
 ## Stable Output Seam
 
-The stable candidate seam for solution-platform integration is:
+The production-style candidate seam for solution-platform integration remains:
 
 ```bash
 uv run evalvault regress <candidate_run_id> \
@@ -278,10 +285,26 @@ in `docs/adapter-contract.md`. On the error/abstain path (`status: "error"`,
 `data: null`) the envelope additionally carries `message`, `error_type` (legacy,
 compat-only), and the stable `error_code` / `error_category`.
 
+For deterministic cross-repo smoke tests, EvalVault also owns this DB-backed
+sample seam:
+
+```bash
+uv run evalvault regress-sample \
+  --scenario quality-steady \
+  --output <path>
+```
+
+When `--db` is omitted, the command uses a throwaway SQLite DB. When
+`--db <path>` is supplied, it seeds that DB and still drives the real regress
+service path. The emitted envelope has pinned wall-clock fields and sorted keys,
+so it is byte-stable on the same dependency stack while preserving
+EvalVault-owned source/evidence hashes.
+
 Contract fixtures and executable examples live in:
 
 - `tests/fixtures/e2e/regression_gate/`
 - `tests/unit/test_regression_gate_fixtures.py`
+- `tests/unit/test_regress_sample.py`
 
 ## Blockers Before Real Adapter Replacement
 
@@ -306,11 +329,12 @@ Contract fixtures and executable examples live in:
 3. **Evidence hash and proof generation DONE:** numeric serialization is now
    canonical/deterministic, `RegressionGateReport` emits hash-anchored source
    and evidence fields, and `evalvault regress-readiness-proof --evidence ...`
-   emits `evalvault.g4-readiness-proof.v1` for downstream proof gates. The
-   remaining integration work is to bind a proof-backed live
-   `evalvault regress --format json` command into the platform adapter config.
+   emits `evalvault.g4-readiness-proof.v1` for downstream proof gates. The G4
+   evidence fixture now records the deterministic `regress-sample` command, and
+   `solution-platform` can call that command for an opt-in real-adapter smoke
+   profile without weakening the Phase 0 thin default.
 
 Readiness remains **PARTIAL** for full production multi-user operation, but the
-Phase 1 live-adapter proof blocker is closed. The next blocker is adapter
-translation: `solution-platform` must consume the real `regress` JSON envelope
-without weakening T2 vocabulary or reference integrity.
+EvalVault-side Phase 1 live-adapter proof blocker is closed. The remaining
+adapter-translation work is downstream: `solution-platform` must consume the
+real regress envelope without weakening T2 vocabulary or reference integrity.

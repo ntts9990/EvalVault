@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -25,11 +26,16 @@ from evalvault.adapters.outbound.report.pr_comment_formatter import (
 from evalvault.adapters.outbound.storage.factory import build_storage_adapter
 from evalvault.config.settings import Settings
 from evalvault.domain.services.readiness_proof_service import build_evalvault_readiness_proof
+from evalvault.domain.services.regress_sample import (
+    REGRESS_SAMPLE_SCENARIOS,
+    RegressSampleScenario,
+)
 from evalvault.domain.services.regression_gate_service import (
     RegressionGateReport,
     RegressionGateService,
     TestType,
 )
+from evalvault.ports.outbound.storage_port import StoragePort
 
 from ..utils.formatters import format_diff, format_score, format_status
 from ..utils.options import db_option
@@ -144,6 +150,51 @@ def _resolve_readiness_commit(commit: str | None) -> str:
 
 def _dump_stable_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+# Wall-clock envelope fields (started_at/finished_at/duration_ms) are the only
+# non-deterministic part of a regress envelope. The sample generator pins them
+# to a fixed instant so its output is byte-stable across runs; the downstream
+# adapter ignores these fields anyway.
+DETERMINISTIC_SAMPLE_TIMESTAMP = datetime(2026, 5, 29, tzinfo=UTC)
+
+
+def generate_regress_sample_envelope(
+    scenario: RegressSampleScenario,
+    *,
+    storage: StoragePort,
+) -> dict[str, Any]:
+    """Seed ``storage`` from ``scenario`` and return a deterministic regress envelope.
+
+    Drives the real :class:`RegressionGateService` path (the same service the
+    ``regress`` command uses), then builds the standard envelope with the
+    wall-clock fields pinned for byte-stability. The result is the exact shape
+    consumed by ``platform.adapters.evalvault_regress_adapter``.
+    """
+    baseline, candidate = scenario.build_runs()
+    storage.save_run(baseline)
+    storage.save_run(candidate)
+
+    service = RegressionGateService(
+        storage=storage,
+        analysis_adapter=StatisticalAnalysisAdapter(),
+    )
+    report = service.run_gate(
+        candidate.run_id,
+        baseline.run_id,
+        metrics=[scenario.metric],
+        test_type=_coerce_test_type(scenario.test_type),
+        fail_on_regression=scenario.fail_on_regression,
+        parallel=True,
+        concurrency=None,
+    )
+    return _build_envelope(
+        report=report,
+        status="ok",
+        started_at=DETERMINISTIC_SAMPLE_TIMESTAMP,
+        finished_at=DETERMINISTIC_SAMPLE_TIMESTAMP,
+        duration_ms=0,
+    )
 
 
 def register_regress_commands(app: typer.Typer, console: Console) -> None:
@@ -566,6 +617,57 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
             raise typer.Exit(1)
 
         rendered = _dump_stable_json(proof)
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered + "\n", encoding="utf-8")
+        typer.echo(rendered)
+
+    @app.command(name="regress-sample")
+    def regress_sample(
+        scenario: str = typer.Option(
+            "quality-steady",
+            "--scenario",
+            "-s",
+            help="Built-in deterministic scenario name.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Write the regress evidence JSON to this path.",
+        ),
+        db_path: Path | None = db_option(
+            default=None,
+            help_text="Optional SQLite DB to seed; a temp DB is used when omitted.",
+        ),
+    ) -> None:
+        """Generate a deterministic, DB-backed T2 regression-gate evidence envelope.
+
+        Seeds a SQLite database (a throwaway temp DB unless ``--db`` is given)
+        with a built-in scenario and invokes the real regression-gate path, then
+        emits a byte-stable envelope (wall-clock fields pinned, keys sorted)
+        compatible with ``platform.adapters.evalvault_regress_adapter``. Intended
+        for downstream adapter wiring / integration tests, not LLM evaluation.
+        """
+        selected = REGRESS_SAMPLE_SCENARIOS.get(scenario)
+        if selected is None:
+            available = ", ".join(sorted(REGRESS_SAMPLE_SCENARIOS))
+            console.print(
+                f"[red]Error:[/red] Unknown scenario '{scenario}'. Available: {available}"
+            )
+            raise typer.Exit(1)
+
+        if db_path is not None:
+            storage = build_storage_adapter(settings=Settings(), db_path=db_path)
+            payload = generate_regress_sample_envelope(selected, storage=storage)
+        else:
+            with tempfile.TemporaryDirectory(prefix="evalvault-regress-sample-") as tmp:
+                storage = build_storage_adapter(
+                    settings=Settings(), db_path=Path(tmp) / "regress-sample.db"
+                )
+                payload = generate_regress_sample_envelope(selected, storage=storage)
+
+        rendered = _dump_stable_json(payload)
         if output is not None:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(rendered + "\n", encoding="utf-8")
