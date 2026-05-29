@@ -14,6 +14,7 @@ jitter, and scipy-derived statistical fields are checked by range/sign only.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -44,6 +45,7 @@ EXACT_REPORT_FIELDS = (
 )
 # Score/diff fields: deterministic arithmetic, asserted within 3-decimal tolerance.
 TOLERANCE_RESULT_FIELDS = ("baseline_score", "candidate_score", "diff", "diff_percent")
+T3_RELEASE_VOCABULARY = re.compile(r"\b(promote|hold|rollback)\b", re.IGNORECASE)
 
 
 def _load_run(fixture_name: str) -> EvaluationRun:
@@ -112,6 +114,31 @@ def _assert_envelope_shape(payload: dict, *, status: str) -> None:
         assert field in payload
 
 
+def _assert_no_t3_release_vocabulary(payload: dict) -> None:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    match = T3_RELEASE_VOCABULARY.search(serialized)
+    assert match is None, f"EvalVault T2 output emitted T3 vocabulary: {match.group(0)!r}"
+
+
+@pytest.mark.parametrize(
+    ("baseline_fixture", "candidate_fixture"),
+    [
+        ("pass_baseline.json", "pass_candidate.json"),
+        ("fail_baseline.json", "fail_candidate.json"),
+        ("incomplete_baseline.json", "incomplete_candidate.json"),
+    ],
+)
+def test_regress_json_output_never_emits_t3_release_vocabulary(
+    tmp_path: Path,
+    baseline_fixture: str,
+    candidate_fixture: str,
+) -> None:
+    """RegressionGateReport is a T2 artifact and must not emit T3 release decisions."""
+    _, payload = _seed_and_invoke(tmp_path, baseline_fixture, candidate_fixture)
+
+    _assert_no_t3_release_vocabulary(payload)
+
+
 def test_regress_fixture_pass(tmp_path: Path) -> None:
     """Candidate ≈ baseline → no regression, verdict 'passed', exit 0."""
     expected = _load_expected("pass.json")
@@ -119,6 +146,7 @@ def test_regress_fixture_pass(tmp_path: Path) -> None:
 
     assert exit_code == expected["_meta"]["exit_code"] == 0
     _assert_envelope_shape(payload, status="ok")
+    _assert_no_t3_release_vocabulary(payload)
 
     data = payload["data"]
     exp = expected["data"]
@@ -147,6 +175,7 @@ def test_regress_fixture_fail(tmp_path: Path) -> None:
 
     assert exit_code == expected["_meta"]["exit_code"] == 2
     _assert_envelope_shape(payload, status="ok")
+    _assert_no_t3_release_vocabulary(payload)
 
     data = payload["data"]
     exp = expected["data"]
@@ -154,8 +183,6 @@ def test_regress_fixture_fail(tmp_path: Path) -> None:
         assert data[field] == exp[field], f"contract field drift: {field}"
     assert data["status"] == "failed"
     assert data["regression_detected"] is True
-    # Verdict vocabulary never leaks T3 release decisions (adapter-contract.md §9).
-    assert data["status"] not in {"promote", "rollback", "hold"}
 
     actual_by_metric = {r["metric"]: r for r in data["results"]}
     exp_by_metric = {r["metric"]: r for r in exp["results"]}
@@ -186,6 +213,7 @@ def test_regress_fixture_incomplete_provenance(tmp_path: Path) -> None:
 
     assert exit_code == expected["_meta"]["exit_code"] == 1
     _assert_envelope_shape(payload, status="error")
+    _assert_no_t3_release_vocabulary(payload)
 
     # Abstain semantics: never a passed/failed verdict, no report payload.
     assert payload["data"] is None
