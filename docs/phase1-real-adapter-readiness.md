@@ -1,13 +1,14 @@
 # Phase 1 Real Adapter Readiness
 
-Status: **PARTIAL / BLOCKED ON EVIDENCE HASH**
+Status: **PARTIAL / HASH FIELDS LANDED / PROOF ARTIFACT PENDING**
 
 This note records the narrow readiness finding for replacing a Phase 0 thin
 EvalVault adapter with a real adapter. It intentionally does not claim full
 production multi-user readiness yet: the project isolation path is now
-exercised across the live HTTP and MCP surfaces, and identity storage has both
-SQLite and Postgres adapter coverage. Downstream evidence-hash fields are still
-open.
+exercised across the live HTTP and MCP surfaces, identity storage has both
+SQLite and Postgres adapter coverage, and the regression gate JSON now carries
+hash-anchored source/evidence fields. A generated G4 readiness proof artifact is
+still the next step before `solution-platform` should run live EvalVault.
 
 ## What Is Scoped Today
 
@@ -30,6 +31,13 @@ open.
   6-decimal rounding (`-0.0` normalized), so the JSON serialization is
   deterministic across platforms and stable to hash. Verdict computation is
   unchanged.
+- `RegressionGateReport` now emits deterministic hash anchors:
+  `source_artifact_hash` plus `evidence.baseline_run_hash`,
+  `evidence.candidate_run_hash`, `evidence.comparison_results_hash`, and
+  `evidence.evidence_hash`. The hash payload excludes wall-clock fields, raw
+  prompts/contexts, trace IDs, and secrets; it includes stable run IDs,
+  project/dataset/model identifiers, metric names, thresholds, test case IDs,
+  score/pass booleans, and canonicalized comparison results.
 
 ## What Is Not Project-Isolated
 
@@ -58,7 +66,8 @@ open.
 - Run storage now has a first-class `project_id` isolation key. Identity storage
   also has SQLite + Postgres adapter coverage, so the remaining real-adapter
   blocker is downstream evidence/source hash integrity rather than project
-  isolation backend parity.
+  isolation backend parity. The generated G4 proof artifact remains to be
+  added so `solution-platform` can consume this evidence automatically.
 
 ## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
 

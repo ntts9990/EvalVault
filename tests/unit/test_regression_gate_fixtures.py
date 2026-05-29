@@ -120,6 +120,21 @@ def _assert_no_t3_release_vocabulary(payload: dict) -> None:
     assert match is None, f"EvalVault T2 output emitted T3 vocabulary: {match.group(0)!r}"
 
 
+def _assert_hash_anchored_evidence(data: dict) -> None:
+    evidence = data["evidence"]
+    assert data["source_artifact_hash"].startswith("sha256:")
+    assert evidence["schema_version"] == "evalvault.regression-gate.hashes.v1"
+    assert evidence["source_artifact_hash"] == data["source_artifact_hash"]
+    for field in (
+        "baseline_run_hash",
+        "candidate_run_hash",
+        "comparison_results_hash",
+        "evidence_hash",
+    ):
+        assert evidence[field].startswith("sha256:"), field
+    assert evidence["hash_algorithm"] == "sha256"
+
+
 @pytest.mark.parametrize(
     ("baseline_fixture", "candidate_fixture"),
     [
@@ -154,6 +169,7 @@ def test_regress_fixture_pass(tmp_path: Path) -> None:
         assert data[field] == exp[field], f"contract field drift: {field}"
     assert data["status"] == "passed"
     assert data["regression_detected"] is False
+    _assert_hash_anchored_evidence(data)
 
     actual_by_metric = {r["metric"]: r for r in data["results"]}
     exp_by_metric = {r["metric"]: r for r in exp["results"]}
@@ -166,6 +182,21 @@ def test_regress_fixture_pass(tmp_path: Path) -> None:
         assert 0.0 <= result["p_value"] <= 1.0
         assert result["effect_level"] in EFFECT_LEVELS
         assert isinstance(result["is_significant"], bool)
+
+
+def test_regress_fixture_hashes_are_stable_for_identical_inputs(tmp_path: Path) -> None:
+    """Source/evidence hashes ignore wall-clock envelope fields."""
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    _, first = _seed_and_invoke(first_dir, "pass_baseline.json", "pass_candidate.json")
+    _, second = _seed_and_invoke(second_dir, "pass_baseline.json", "pass_candidate.json")
+
+    first_data = first["data"]
+    second_data = second["data"]
+    assert first_data["source_artifact_hash"] == second_data["source_artifact_hash"]
+    assert first_data["evidence"] == second_data["evidence"]
 
 
 def test_regress_fixture_fail(tmp_path: Path) -> None:
@@ -183,6 +214,7 @@ def test_regress_fixture_fail(tmp_path: Path) -> None:
         assert data[field] == exp[field], f"contract field drift: {field}"
     assert data["status"] == "failed"
     assert data["regression_detected"] is True
+    _assert_hash_anchored_evidence(data)
 
     actual_by_metric = {r["metric"]: r for r in data["results"]}
     exp_by_metric = {r["metric"]: r for r in exp["results"]}

@@ -17,6 +17,13 @@ from evalvault.domain.services.regression_gate_service import (
 runner = CliRunner()
 
 REGRESS_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.regress"
+TEST_HASHES = {
+    "source_artifact_hash": "sha256:" + "1" * 64,
+    "baseline_run_hash": "sha256:" + "2" * 64,
+    "candidate_run_hash": "sha256:" + "3" * 64,
+    "comparison_results_hash": "sha256:" + "4" * 64,
+    "evidence_hash": "sha256:" + "5" * 64,
+}
 
 
 def _build_run(
@@ -52,6 +59,7 @@ def _make_report(results: list[RegressionMetricResult]) -> RegressionGateReport:
         duration_ms=10,
         parallel=True,
         concurrency=8,
+        **TEST_HASHES,
     )
 
 

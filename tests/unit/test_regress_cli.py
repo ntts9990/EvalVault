@@ -16,6 +16,13 @@ from evalvault.domain.services.regression_gate_service import (
 runner = CliRunner()
 
 REGRESS_COMMAND_MODULE = "evalvault.adapters.inbound.cli.commands.regress"
+TEST_HASHES = {
+    "source_artifact_hash": "sha256:" + "1" * 64,
+    "baseline_run_hash": "sha256:" + "2" * 64,
+    "candidate_run_hash": "sha256:" + "3" * 64,
+    "comparison_results_hash": "sha256:" + "4" * 64,
+    "evidence_hash": "sha256:" + "5" * 64,
+}
 
 
 def _make_report(regression: bool) -> RegressionGateReport:
@@ -44,6 +51,7 @@ def _make_report(regression: bool) -> RegressionGateReport:
         duration_ms=10,
         parallel=True,
         concurrency=8,
+        **TEST_HASHES,
     )
 
 
@@ -79,6 +87,8 @@ def test_regress_json_output(mock_storage_cls, mock_service_cls, tmp_path) -> No
     assert payload["command"] == "regress"
     assert payload["status"] == "ok"
     assert payload["data"]["regression_detected"] is False
+    assert payload["data"]["source_artifact_hash"].startswith("sha256:")
+    assert payload["data"]["evidence"]["evidence_hash"].startswith("sha256:")
 
 
 @patch(f"{REGRESS_COMMAND_MODULE}.RegressionGateService")
