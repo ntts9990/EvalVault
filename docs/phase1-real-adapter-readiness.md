@@ -38,10 +38,10 @@ multi-user readiness: project isolation is not enforced today.
   current project and enforce project scope when a project context is supplied —
   see "Live Run-Route Wiring" below. Without a project context, legacy/default
   behavior is preserved.
-- Dataset upload/read is global: files are saved under `data/datasets`, and
-  listing reads `data/datasets`, `data/inputs`, and the repository root.
-- Retriever-doc upload/read is global: files are saved under
-  `data/retriever_docs`, and evaluation can read any allowed-root docs path.
+- (RESOLVED this pass for dataset upload/list/read + retriever-doc upload/read) These now
+  isolate into project-owned subdirectories when a project context is supplied —
+  see "Non-Run Surface Isolation" below. No project context keeps the legacy
+  global behavior.
 - Knowledge upload/read is global: uploads go to `data/raw`, graph output goes
   to `data/kg`, and in-memory `KG_JOBS` is shared process state. Shared
   read/write tokens are not project membership.
@@ -114,6 +114,36 @@ foreign-run 404, missing-principal 401, non-member 404, viewer-write 403, and
 legacy no-project pass-through. Existing `tests/integration/test_pipeline_api_contracts.py`
 remains green (no regression).
 
+## Non-Run Surface Isolation — Landed This Pass (Block 1)
+
+Dataset and retriever-doc HTTP surfaces are now project-scoped using
+**project-owned subdirectories**, the smallest pattern consistent with the
+file-backed storage:
+
+- `GET /options/datasets`: with a project context the caller must be a member;
+  listing is scoped to `data/datasets/<project_id>/` (only that project's
+  datasets). No project context keeps the legacy global listing.
+- `POST /options/datasets`: with a project context the caller must be an
+  **editor**; the file is stored under `data/datasets/<project_id>/`.
+- `POST /options/retriever-docs`: with a project context the caller must be an
+  **editor**; the file is stored under `data/retriever_docs/<project_id>/`.
+- `POST /start`: with a project context the supplied `dataset_path` must resolve
+  inside `data/datasets/<project_id>/`, and `retriever_config.docs_path` must
+  resolve inside `data/retriever_docs/<project_id>/`.
+- The `project_id` directory segment is guarded by `safe_upload_filename`, and
+  the existing per-file `safe_upload_filename` traversal guard is unchanged — a
+  crafted filename (e.g. `../evil.json`) is still rejected with 400 even under a
+  project context.
+- Denial policy is identical to the run routes (401 / 404-non-member /
+  403-insufficient-role), and legacy `API_AUTH_TOKENS` alone confers no
+  membership.
+
+Proof: `tests/integration/test_dataset_route_isolation.py` (live TestClient,
+real adapter + identity + JWT): cross-project list isolation, non-member 404,
+missing-principal 401, viewer-upload 403, path-traversal-still-400, legacy
+pass-through, dataset read containment, retriever-doc read containment, and
+retriever-doc editor/viewer/no-principal cases.
+
 ## Stable Output Seam
 
 The stable candidate seam for solution-platform integration is:
@@ -139,21 +169,24 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation — run routes DONE; non-run surfaces remaining:** the
-   storage-enforced scoping, identity persistence, membership/role resolution,
-   the principal/denial primitives, AND the live `/api/v1/runs` route wiring are
-   implemented and proven (see "Live Run-Route Wiring" above). **Remaining**:
-   the **dataset upload/list**, **retriever-docs upload**, **knowledge
-   upload/build**, and **MCP run-tool** surfaces are not yet project-scoped;
-   and a **Postgres `IdentityStoragePort` adapter** (only SQLite identity exists
-   today) for backend parity. Storage mutation methods (`delete_run`,
-   `update_run_metadata`, `save_feedback`, cluster maps) are still scoped at the
-   route layer via the `get_run(project_id=...)` membership chokepoint rather
-   than being independently project-parameterized.
-2. **Role gate — run routes DONE; non-run remaining:** `require_role` /
-   viewer-editor-admin is applied to run writes (start, feedback save,
-   cluster-map save/delete) and proven (`test_run_route_isolation.py`).
-   Applying it to the non-run write surfaces above is the remaining step. Admin
+1. **Project isolation — run routes + dataset/retriever-doc DONE; remaining
+   surfaces:** the storage-enforced scoping, identity persistence,
+   membership/role resolution, the principal/denial primitives, the live
+   `/api/v1/runs` route wiring, AND **dataset upload/list/read + retriever-doc
+   upload/read** (see "Non-Run Surface Isolation" above) are implemented and proven.
+   **Remaining**: **knowledge upload/build** (`/api/v1/knowledge/*`, separate
+   router with its own token scheme + shared `KG_JOBS` state) and **MCP run-tool**
+   project context are not yet project-scoped; a **Postgres
+   `IdentityStoragePort` adapter** (only SQLite identity exists today) is still
+   needed for backend parity. Storage run-mutation methods (`delete_run`,
+   `update_run_metadata`, `save_feedback`, cluster maps) remain scoped at the route layer via the
+   `get_run(project_id=...)` membership chokepoint rather than being
+   independently project-parameterized.
+2. **Role gate — run + dataset/retriever-doc writes DONE; remaining:**
+   `require_role` / viewer-editor-admin is applied to run writes (start, feedback
+   save, cluster-map save/delete) and to dataset/retriever-doc uploads, all
+   proven (`test_run_route_isolation.py`, `test_dataset_route_isolation.py`).
+   Applying it to the knowledge write surface is the remaining step. Admin
    membership-management endpoints are not yet introduced (conditional per the
    plan).
 3. **Evidence hash blocker (partially addressed):** numeric serialization is now

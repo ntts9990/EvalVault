@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from urllib.request import urlopen
 
 from evalvault.adapters.inbound.api.path_safety import (
+    ensure_within_project_resource,
+    project_resource_root,
     resolve_user_path,
     safe_upload_filename,
 )
@@ -311,6 +313,7 @@ class WebUIAdapter:
         self,
         config: dict[str, Any],
         settings: Settings,
+        project_id: str | None = None,
     ) -> tuple[Any, list[str], int, str, str]:
         mode = str(config.get("mode") or "").lower()
         if mode not in {"bm25", "hybrid"}:
@@ -323,6 +326,13 @@ class WebUIAdapter:
         # docs_path comes from the untrusted request body; confine it to the
         # allowed data roots so it cannot read arbitrary files (path traversal).
         path = resolve_user_path(str(docs_path), must_exist=True)
+        if project_id is not None:
+            ensure_within_project_resource(
+                path,
+                base_dir="data/retriever_docs",
+                project_id=project_id,
+                resource_name="Retriever docs path",
+            )
 
         documents, doc_ids = self._load_retriever_documents(path)
 
@@ -476,7 +486,11 @@ class WebUIAdapter:
                     retriever_top_k,
                     retriever_mode,
                     retriever_docs_path,
-                ) = self._build_retriever(request.retriever_config, settings)
+                ) = self._build_retriever(
+                    request.retriever_config,
+                    settings,
+                    project_id=request.project_id,
+                )
             except Exception as exc:
                 logger.warning("Failed to initialize retriever: %s", exc)
                 raise
@@ -2079,10 +2093,17 @@ class WebUIAdapter:
             thresholds=thresholds or run.thresholds,
         )
 
-    def list_datasets(self) -> list[dict[str, str | int]]:
-        """사용 가능한 데이터셋 목록 조회."""
+    def list_datasets(self, project_id: str | None = None) -> list[dict[str, str | int]]:
+        """사용 가능한 데이터셋 목록 조회.
+
+        project_id 지정 시 해당 프로젝트 전용 하위 디렉터리(``data/datasets/<project_id>``)
+        만 조회한다(G4 격리). 미지정 시 기존 전역 디렉터리를 조회한다.
+        """
         datasets = []
-        data_dirs = ["data/datasets", "data/inputs", "."]
+        if project_id is not None:
+            data_dirs = [str(project_resource_root("data/datasets", project_id))]
+        else:
+            data_dirs = ["data/datasets", "data/inputs", "."]
 
         for dir_path in data_dirs:
             path = Path(dir_path)
@@ -2101,17 +2122,22 @@ class WebUIAdapter:
                     )
         return datasets
 
-    def save_dataset_file(self, filename: str, content: bytes) -> str:
+    def save_dataset_file(
+        self, filename: str, content: bytes, project_id: str | None = None
+    ) -> str:
         """데이터셋 파일 저장.
 
         Args:
             filename: 파일명
             content: 파일 내용
+            project_id: 지정 시 ``data/datasets/<project_id>`` 하위에 저장(G4 격리).
 
         Returns:
             저장된 파일 경로
         """
         save_dir = Path("data/datasets")
+        if project_id is not None:
+            save_dir = project_resource_root(save_dir, project_id)
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Reduce the client-supplied filename to a bare basename so a crafted
@@ -2122,17 +2148,22 @@ class WebUIAdapter:
 
         return str(file_path.absolute())
 
-    def save_retriever_docs_file(self, filename: str, content: bytes) -> str:
+    def save_retriever_docs_file(
+        self, filename: str, content: bytes, project_id: str | None = None
+    ) -> str:
         """리트리버 문서 파일 저장.
 
         Args:
             filename: 파일명
             content: 파일 내용
+            project_id: 지정 시 ``data/retriever_docs/<project_id>`` 하위에 저장(G4 격리).
 
         Returns:
             저장된 파일 경로
         """
         save_dir = Path("data/retriever_docs")
+        if project_id is not None:
+            save_dir = project_resource_root(save_dir, project_id)
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # The router only validates the suffix; reduce to a bare basename here

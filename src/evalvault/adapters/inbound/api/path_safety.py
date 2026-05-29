@@ -100,3 +100,27 @@ def resolve_user_path(raw: str | Path | None, *, must_exist: bool = True) -> Pat
     if must_exist and not resolved.exists():
         raise UnsafePathError(f"Path does not exist: {raw!r}")
     return resolved
+
+
+def project_resource_root(base_dir: str | Path, project_id: str) -> Path:
+    """Return the fixed per-project resource root under ``base_dir``.
+
+    ``project_id`` is treated as a filesystem segment only after passing the
+    same strict basename guard used for upload filenames.
+    """
+    return (Path(base_dir) / safe_upload_filename(project_id)).resolve()
+
+
+def ensure_within_project_resource(
+    path: Path,
+    *,
+    base_dir: str | Path,
+    project_id: str,
+    resource_name: str = "Path",
+) -> None:
+    """Raise unless ``path`` resolves inside the current project's resource root."""
+    project_root = project_resource_root(base_dir, project_id)
+    if not path.resolve().is_relative_to(project_root):
+        raise UnsafePathError(
+            f"{resource_name} is outside the current project's resource directory."
+        )

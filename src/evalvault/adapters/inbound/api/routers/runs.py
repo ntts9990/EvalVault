@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from evalvault.adapters.inbound.api.main import AdapterDep, PrincipalDep, ProjectIdDep
 from evalvault.adapters.inbound.api.path_safety import (
     UnsafePathError,
+    ensure_within_project_resource,
     resolve_user_path,
 )
 from evalvault.adapters.inbound.api.principal import (
@@ -472,17 +473,35 @@ def _build_case_counts(base_run: EvaluationRun, target_run: EvaluationRun) -> di
 
 
 @router.get("/options/datasets", response_model=list[DatasetItemResponse])
-def list_datasets(adapter: AdapterDep):
-    """Get available datasets."""
-    return adapter.list_datasets()
+def list_datasets(adapter: AdapterDep, principal: PrincipalDep, project_id: ProjectIdDep):
+    """Get available datasets.
+
+    With a project context, the caller must be a member and only that project's
+    datasets (under its owned subdirectory) are listed. No project context keeps
+    the legacy global listing.
+    """
+    if project_id is not None:
+        require_member(principal, project_id)
+    return adapter.list_datasets(project_id=project_id)
 
 
 @router.post("/options/datasets")
-async def upload_dataset(adapter: AdapterDep, file: UploadFile = File(...)):
-    """Upload a new dataset file."""
+async def upload_dataset(
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    file: UploadFile = File(...),
+):
+    """Upload a new dataset file.
+
+    With a project context, the caller must be an editor; the file is stored in
+    the project's owned subdirectory. No project context keeps legacy behavior.
+    """
+    if project_id is not None:
+        require_role(principal, project_id, Role.editor)
     try:
         content = await file.read()
-        saved_path = adapter.save_dataset_file(file.filename, content)
+        saved_path = adapter.save_dataset_file(file.filename, content, project_id=project_id)
         return {
             "message": "Dataset uploaded successfully",
             "path": saved_path,
@@ -495,8 +514,17 @@ async def upload_dataset(adapter: AdapterDep, file: UploadFile = File(...)):
 
 
 @router.post("/options/retriever-docs")
-async def upload_retriever_docs(adapter: AdapterDep, file: UploadFile = File(...)):
-    """Upload retriever documents file."""
+async def upload_retriever_docs(
+    adapter: AdapterDep,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    file: UploadFile = File(...),
+):
+    """Upload retriever documents file.
+
+    With a project context, the caller must be an editor; the file is stored in
+    the project's owned subdirectory.
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -504,9 +532,12 @@ async def upload_retriever_docs(adapter: AdapterDep, file: UploadFile = File(...
     if suffix not in {".json", ".jsonl", ".txt"}:
         raise HTTPException(status_code=400, detail="Unsupported retriever docs format.")
 
+    if project_id is not None:
+        require_role(principal, project_id, Role.editor)
+
     try:
         content = await file.read()
-        saved_path = adapter.save_retriever_docs_file(file.filename, content)
+        saved_path = adapter.save_retriever_docs_file(file.filename, content, project_id=project_id)
         return {
             "message": "Retriever docs uploaded successfully",
             "path": saved_path,
@@ -920,6 +951,13 @@ async def start_evaluation_endpoint(
     # before it reaches the dataset loader (prevents path-traversal file read).
     try:
         safe_dataset_path = resolve_user_path(request.dataset_path, must_exist=False)
+        if effective_project_id is not None:
+            ensure_within_project_resource(
+                safe_dataset_path,
+                base_dir="data/datasets",
+                project_id=effective_project_id,
+                resource_name="Dataset path",
+            )
     except UnsafePathError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
