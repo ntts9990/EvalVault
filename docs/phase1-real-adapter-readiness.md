@@ -7,8 +7,8 @@ EvalVault adapter with a real adapter. It intentionally does not claim full
 production multi-user readiness yet: the project isolation path is now
 exercised across the live HTTP and MCP surfaces, identity storage has both
 SQLite and Postgres adapter coverage, and the regression gate JSON now carries
-hash-anchored source/evidence fields. A generated G4 readiness proof artifact is
-still the next step before `solution-platform` should run live EvalVault.
+hash-anchored source/evidence fields. EvalVault can now generate the G4
+readiness proof consumed by `solution-platform`'s proof-gated live profile.
 
 ## What Is Scoped Today
 
@@ -303,19 +303,14 @@ Contract fixtures and executable examples live in:
    `test_mcp_project_isolation.py`, `test_project_tools.py`).
    Admin membership-management endpoints are not yet introduced (conditional per
    the plan).
-3. **Evidence hash blocker (partially addressed):** numeric serialization is now
-   canonical/deterministic (see above), which removes the cross-platform
-   float-noise obstacle to hashing the report. Two gaps remain: (a)
-   `RegressionGateReport` still does not emit the Phase 1 evidence/source hash
-   fields expected by downstream reference integrity (`content_hash`,
-   `source_hash`, or `evidence_refs`), and (b) `p_value` / `effect_size` are
-   scipy-derived, so byte-for-byte reproducibility across **scipy versions** also
-   requires version pinning, not just serialization canonicalization. The seam is
-   stable and hash-anchorable for the deterministic arithmetic fields
-   (scores/diffs); the statistical fields are stable in representation but need
-   scipy pinning for cross-version hash equality.
+3. **Evidence hash and proof generation DONE:** numeric serialization is now
+   canonical/deterministic, `RegressionGateReport` emits hash-anchored source
+   and evidence fields, and `evalvault regress-readiness-proof --evidence ...`
+   emits `evalvault.g4-readiness-proof.v1` for downstream proof gates. The
+   remaining integration work is to bind a proof-backed live
+   `evalvault regress --format json` command into the platform adapter config.
 
-Readiness remains **PARTIAL** for local/offline single-tenant regression-gate
-consumption and **BLOCKED** for real-adapter replacement until the
-evidence/source hash fields are emitted and pinned to the downstream reference
-integrity contract.
+Readiness remains **PARTIAL** for full production multi-user operation, but the
+Phase 1 live-adapter proof blocker is closed. The next blocker is adapter
+translation: `solution-platform` must consume the real `regress` JSON envelope
+without weakening T2 vocabulary or reference integrity.
