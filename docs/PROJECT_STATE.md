@@ -17,7 +17,8 @@
 - **무엇인가**: RAG(Retrieval-Augmented Generation) 시스템을 대상으로 **평가(Eval) → 분석(Analysis) → 추적(Tracing) → 개선** 루프를 묶는 **CLI + Web UI 플랫폼**. Ragas v0.4.2를 코어로 쓰고, MLflow + Phoenix dual-tracker가 기본값.
 - **누구를 위해 만드는가**: RAG 시스템을 운영하며 "변경이 진짜 개선인지" 데이터셋·메트릭으로 재현 가능하게 검증해야 하는 팀. 한국어 보험 도메인이 1차 검증 도메인.
 - **지금 상태**: **Production-ready**. Phase 1–14 완료, v1.77.0이 PyPI에 올라가 있고 CI는 Ubuntu/macOS/Windows × Python 3.12/3.13에서 통과. 1,352 tests passing, coverage 89%.
-- **활발한 워크 스트림**: P0(안정성/재현성) · P1(자동 회귀 게이트, `.github/workflows/regression-gate.yml`) · P2(멀티턴 평가) · P3(GraphRAG 실험) · P4(Judge 캘리브레이션 Web UI) — 전부 코드는 있으나 일부는 "운영에서의 강제(브랜치 보호 등)"가 아직 끝나지 않음. §8 참고.
+- **현재 개발 포커스(2026-05-29 결정)**: Web UI 신규 개발은 잠시 보류하고, **CLI와 FastAPI API 중심**으로 기능·계약·테스트를 먼저 안정화한다. 기존 Web UI는 유지하되 신규 UX/화면 작업은 명시 요청이 있을 때만 진행한다.
+- **활발한 워크 스트림**: P0(안정성/재현성) · P1(자동 회귀 게이트, `.github/workflows/regression-gate.yml`) · P2(멀티턴 평가) · P3(GraphRAG 실험) · P4(CLI/API 운영 표면 강화) — 일부는 "운영에서의 강제(브랜치 보호 등)"가 아직 끝나지 않음. §8 참고.
 - **5분 안에 동작 확인**:
   ```bash
   uv sync --extra dev
@@ -38,6 +39,15 @@
 - **Artifacts-first**: 결과 점수만이 아니라 **모듈별 원본 산출물**(retrieval 결과, prompt, judge log, embedding, KG 등)을 구조화 저장.
 - **옵션형 Observability**: Phoenix / Langfuse / MLflow는 필요한 만큼만 켤 수 있음 (기본은 MLflow + Phoenix dual).
 - **CLI + Web UI 동등성**: 같은 `run_id` 기준으로 히스토리·비교·리포트가 양쪽에서 일관되게 보임.
+
+### 1.1.1 현재 개발 우선순위: CLI/API 먼저, Web UI는 보류
+
+2026-05-29 기준 실행 전략:
+
+- 신규 기능은 우선 **도메인 서비스 → CLI 명령 → FastAPI API 계약** 순서로 완성한다.
+- Web UI는 기존 기능을 깨지 않도록 유지하되, 신규 화면/대규모 UX 개편은 명시 요청 전까지 진행하지 않는다.
+- API 응답은 향후 Web UI 재개를 고려해 안정적인 스키마와 테스트를 먼저 갖춘다.
+- 기능 완료 판단은 CLI smoke test, API 테스트, 단위/통합 테스트 통과를 기본 증거로 삼는다.
 
 ### 1.2 비목표 (Non-goals)
 
@@ -207,6 +217,8 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 
 ### 4.2 Web UI 페이지 (총 16개; W-S3-Phase2에서 orphan `ComprehensiveAnalysis` 삭제됨)
 
+> 현재 개발 정책(2026-05-29): Web UI 신규 개발은 보류 상태다. 아래 목록은 이미 존재하는 구현 현황이며, 당분간 기능 개발의 기본 진입점은 CLI와 FastAPI API다.
+
 `frontend/src/pages/`:
 
 `AiSdkChat`, `AnalysisCompareView`, `AnalysisLab`, `AnalysisResultView`, `Chat`, `CompareRuns`, `CustomerReport`, `Dashboard`, `DomainMemory`, `EvaluationStudio`, `JudgeCalibration`, `KnowledgeBase`, `RunDetails`, `Settings`, `Visualization`, `VisualizationHome`
@@ -218,8 +230,9 @@ Reports + Artifacts (data/, reports/) — run_id 기반 조회
 ### 4.3 FastAPI 백엔드
 
 - 기동: `uv run evalvault serve-api --reload` (개발) 또는 `uv run evalvault serve-api --host 0.0.0.0 --port 8000` (프로덕션).
-- 위치: `src/evalvault/adapters/inbound/api/` (Web UI 전용).
-- 외부 SLA 대상 아님. Web UI 백엔드로만 사용.
+- 위치: `src/evalvault/adapters/inbound/api/`.
+- 현재 우선순위에서는 Web UI 백엔드 역할뿐 아니라 CLI와 나란히 검증 가능한 **API 계약 표면**으로 관리한다.
+- 외부 SLA 대상은 아니지만, API 응답 스키마와 에러 의미는 테스트로 고정해 향후 Web UI 재개/외부 통합에 대비한다.
 
 ---
 
@@ -398,7 +411,7 @@ uv run pytest tests/ -v
 | **P1** 자동 회귀 게이트 | baseline vs current 자동 비교 → PR 차단 | 코드 ✅, 운영 강제 ⚠️ | `regression-gate.yml`은 있지만, **GitHub 브랜치 보호 룰에서 required check로 지정해야 진짜로 막힘**. 인수팀이 직접 설정 필요 |
 | **P2** 멀티턴 RAG 평가 | 턴별/전체 일관성·드리프트 메트릭 | 진행 중 | 스키마/CLI 로더 추가됨 (2026-01-27). 벤치마크 데이터셋(`tests/fixtures/e2e/multiturn_benchmark.json`)이 3–10턴 + 드리프트 케이스 |
 | **P3** GraphRAG 실험 프레임워크 | top-k vs GraphRAG A/B, 하이브리드(BM25+Dense), pgvector | 진행 중 | `graph_rag_experiment.py` 있음. 범위 폭발 위험 — v0(휴리스틱) → v1(LLM) 단계화 합의 필요 |
-| **P4** Judge 캘리브레이션 Web UI | 캘리브레이션 결과 UI 탐색·공유 | 진행 중 | `frontend/src/pages/JudgeCalibration.tsx` + Playwright e2e 추가됨 (2026-01-27) |
+| **P4** CLI/API 운영 표면 강화 | CLI 자동화, API 계약, 에러/스키마 테스트 | 진행 중 | 2026-05-29 결정: Web UI 신규 개발은 보류. Judge 캘리브레이션 UI 등 기존 화면은 유지하되, 신규 작업은 CLI/API 먼저 구현 |
 
 **우선순위 결정 규칙** (인수 후에도 유지 권장):
 
@@ -406,7 +419,7 @@ uv run pytest tests/ -v
 2. 사람이 매번 판단해야 해서 실수 위험이 있는가? → P1
 3. 사용자가 실제로 겪는 문제를 측정 못 하는가? → P2
 4. 성능 개선 주장에 실험 프레임이 필요한가? → P3
-5. 공유/운영 효율을 크게 올리는가? → P4
+5. CLI 자동화/API 계약을 안정화해 운영 효율을 크게 올리는가? → P4
 
 ### 8.1 슬라이스 프로그램 — 머지 완료 + 남은 작업 (2026-05-27 기준)
 
@@ -422,6 +435,7 @@ uv run pytest tests/ -v
 
 **남은 작업 (의도적 보류 / 미착수):**
 
+- **Web UI 신규 개발 (보류)**: 2026-05-29 결정에 따라 당분간 `frontend/` 신규 화면/대규모 UX 개편은 진행하지 않는다. 기능은 CLI/API에서 먼저 완성하고, Web UI는 기존 기능 유지와 명시 요청된 보수 범위로 제한한다.
 - **Phase 4 — 웹 *전면* 오버홀 (미착수)**: 위 W-시리즈는 디자인 토대 + surgical 이식까지. Claude 디자인 언어로 17개 페이지를 통째로 재구성하는 comprehensive overhaul은 별도 라운드(2026-05-21 사용자 플래그).
 - **D-S5 프롬프트 품질 (미착수)**: evaluator 구조 분해는 완료(971L, ≤700L는 가치/위험 역전으로 추구 안 함). 메모리 [[feedback_llm_prompt_discipline]] / [[project_phase3_d_s5_prompt_focus]]의 프롬프트 품질(DSPy/Instructor) 재설계는 남음.
 - **rich 15+ bump (deferred)**: instructor 1.15 metadata가 `rich<15`를 강제 → US-008 트래킹. 우회/캡 해제 시 진행.
@@ -477,8 +491,9 @@ uv run pytest tests/ -v
 1. 로컬 환경 구성 (`uv sync --extra dev`).
 2. `uv run pytest tests/ -v -m "not requires_openai and not requires_langfuse"` 전체 통과 확인.
 3. `tests/fixtures/e2e/insurance_qa_korean.json`로 dry-run.
-4. Web UI 띄워서 `EvaluationStudio`에서 같은 데이터셋 실행 → 같은 `run_id`로 history/compare 동작 확인.
-5. `docs/handbook/CHAPTERS/00_overview.md` + `01_architecture.md` 정독.
+4. `uv run evalvault --help`, 주요 CLI smoke test, FastAPI API 기동(`uv run evalvault serve-api --reload`)을 확인.
+5. Web UI 확인은 보류된 선택 작업으로 취급한다. 필요할 때만 `EvaluationStudio`에서 같은 데이터셋 실행 → 같은 `run_id`로 history/compare 동작을 확인한다.
+6. `docs/handbook/CHAPTERS/00_overview.md` + `01_architecture.md` 정독.
 
 ### 10.2 둘째 주: "운영을 점검한다"
 
@@ -570,8 +585,10 @@ uv run evalvault regress
 uv run evalvault regress-baseline
 uv run evalvault ci-gate
 
-# Web UI
-uv run evalvault serve-api --reload      # 백엔드
+# API 우선 개발
+uv run evalvault serve-api --reload      # FastAPI API
+
+# Web UI (보류된 선택 작업)
 cd frontend && npm install && npm run dev  # 프론트 (localhost:5173)
 
 # 품질 게이트
