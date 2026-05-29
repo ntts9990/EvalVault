@@ -5,9 +5,16 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from evalvault.adapters.inbound.api.path_safety import UnsafePathError, safe_upload_filename
+from evalvault.adapters.inbound.api.main import PrincipalDep, ProjectIdDep
+from evalvault.adapters.inbound.api.path_safety import (
+    UnsafePathError,
+    project_resource_root,
+    safe_upload_filename,
+)
+from evalvault.adapters.inbound.api.principal import require_member, require_role
 from evalvault.adapters.outbound.kg.parallel_kg_builder import ParallelKGBuilder
 from evalvault.config.settings import Settings, get_settings
+from evalvault.domain.entities.auth import Role
 
 router = APIRouter(tags=["knowledge"])
 
@@ -61,6 +68,48 @@ def _require_knowledge_write_token(
         raise HTTPException(status_code=403, detail="Invalid or missing knowledge write token")
 
 
+def _enforce_knowledge_access(
+    request: Request,
+    principal,
+    project_id: str | None,
+    settings: Settings,
+    *,
+    write: bool,
+) -> None:
+    """Authorize a knowledge request.
+
+    In project mode (``project_id`` supplied) identity auth is the authority:
+    reads require membership (401 no-principal / 404 non-member) and writes
+    require the editor role (403 otherwise); the legacy shared knowledge token is
+    NOT additionally required. With no project context, the legacy
+    ``KNOWLEDGE_READ_TOKENS`` / ``KNOWLEDGE_WRITE_TOKENS`` behavior is preserved.
+    """
+    if project_id is not None:
+        if write:
+            require_role(principal, project_id, Role.editor)
+        else:
+            require_member(principal, project_id)
+        return
+    if write:
+        _require_knowledge_write_token(request, settings)
+    else:
+        _require_knowledge_read_token(request, settings)
+
+
+def _knowledge_data_dir(project_id: str | None) -> Path:
+    """Upload directory: ``data/raw`` globally, ``data/raw/<project_id>`` scoped."""
+    if project_id is None:
+        return DATA_DIR
+    return project_resource_root("data/raw", project_id)
+
+
+def _knowledge_kg_dir(project_id: str | None) -> Path:
+    """Graph-output directory: ``data/kg`` globally, ``data/kg/<project_id>`` scoped."""
+    if project_id is None:
+        return KG_OUTPUT_DIR
+    return project_resource_root("data/kg", project_id)
+
+
 class BuildKGRequest(BaseModel):
     workers: int = 4
     batch_size: int = 32
@@ -70,10 +119,16 @@ class BuildKGRequest(BaseModel):
 
 @router.post("/upload")
 async def upload_files(
+    request: Request,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
     files: list[UploadFile] = File(...),
-    _: None = Depends(_require_knowledge_write_token),
+    settings: Settings = Depends(get_settings),
 ):
     """Upload documents for Knowledge Graph building."""
+    _enforce_knowledge_access(request, principal, project_id, settings, write=True)
+    data_dir = _knowledge_data_dir(project_id)
+    data_dir.mkdir(parents=True, exist_ok=True)
     uploaded = []
     for file in files:
         if not file.filename:
@@ -82,7 +137,7 @@ async def upload_files(
             safe_name = safe_upload_filename(file.filename)
         except UnsafePathError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        file_path = DATA_DIR / safe_name
+        file_path = data_dir / safe_name
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         uploaded.append(safe_name)
@@ -91,12 +146,17 @@ async def upload_files(
 
 @router.get("/files")
 def list_files(
-    _: None = Depends(_require_knowledge_read_token),
+    request: Request,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    settings: Settings = Depends(get_settings),
 ):
-    """List uploaded files."""
+    """List uploaded files (scoped to the project's directory when supplied)."""
+    _enforce_knowledge_access(request, principal, project_id, settings, write=False)
+    data_dir = _knowledge_data_dir(project_id)
     files = []
-    if DATA_DIR.exists():
-        files = [f.name for f in DATA_DIR.iterdir() if f.is_file() and f.name != ".gitkeep"]
+    if data_dir.exists():
+        files = [f.name for f in data_dir.iterdir() if f.is_file() and f.name != ".gitkeep"]
     return files
 
 
@@ -104,11 +164,25 @@ def list_files(
 async def build_knowledge_graph(
     request: BuildKGRequest,
     background_tasks: BackgroundTasks,
-    _: None = Depends(_require_knowledge_write_token),
+    http_request: Request,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    settings: Settings = Depends(get_settings),
 ):
     """Trigger background Knowledge Graph construction."""
+    _enforce_knowledge_access(http_request, principal, project_id, settings, write=True)
+    data_dir = _knowledge_data_dir(project_id)
+    kg_dir = _knowledge_kg_dir(project_id)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    kg_dir.mkdir(parents=True, exist_ok=True)
+
     job_id = f"kg_build_{len(KG_JOBS) + 1}"
-    KG_JOBS[job_id] = {"status": "pending", "progress": "0%", "details": "Queued"}
+    KG_JOBS[job_id] = {
+        "status": "pending",
+        "progress": "0%",
+        "details": "Queued",
+        "project_id": project_id,
+    }
 
     def _run_build():
         try:
@@ -117,7 +191,7 @@ async def build_knowledge_graph(
 
             # Load documents (simple text loader matching CLI logic)
             documents = []
-            for path in sorted(DATA_DIR.rglob("*")):
+            for path in sorted(data_dir.rglob("*")):
                 if path.is_file() and path.suffix.lower() in {".txt", ".md", ".json", ".csv"}:
                     text = path.read_text(encoding="utf-8").strip()
                     if text:
@@ -125,7 +199,7 @@ async def build_knowledge_graph(
 
             if not documents:
                 KG_JOBS[job_id]["status"] = "failed"
-                KG_JOBS[job_id]["details"] = "No documents found in data/raw"
+                KG_JOBS[job_id]["details"] = f"No documents found in {data_dir}"
                 return
 
             KG_JOBS[job_id]["details"] = f"Processing {len(documents)} documents..."
@@ -148,8 +222,8 @@ async def build_knowledge_graph(
 
             result = builder.build(documents)
 
-            # Save default output
-            output_path = KG_OUTPUT_DIR / "knowledge_graph.json"
+            # Save default output (project-scoped directory when applicable)
+            output_path = kg_dir / "knowledge_graph.json"
 
             # Save result logic (simplified from CLI)
             payload = {
@@ -179,22 +253,32 @@ async def build_knowledge_graph(
 @router.get("/jobs/{job_id}")
 def get_job_status(
     job_id: str,
-    _: None = Depends(_require_knowledge_read_token),
+    request: Request,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    settings: Settings = Depends(get_settings),
 ):
+    _enforce_knowledge_access(request, principal, project_id, settings, write=False)
     job = KG_JOBS.get(job_id)
-    if not job:
+    # Do not reveal jobs that belong to a different project (or legacy vs scoped):
+    # a mismatch is indistinguishable from "not found".
+    if not job or job.get("project_id") != project_id:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 
 @router.get("/stats")
 def get_graph_stats(
-    _: None = Depends(_require_knowledge_read_token),
+    request: Request,
+    principal: PrincipalDep,
+    project_id: ProjectIdDep,
+    settings: Settings = Depends(get_settings),
 ):
-    """Get statistics of the built Knowledge Graph."""
+    """Get statistics of the built Knowledge Graph (project-scoped when supplied)."""
+    _enforce_knowledge_access(request, principal, project_id, settings, write=False)
     # Try to load from memory DB or default output JSON
     # For now, we'll try to load the JSON if it exists, or just return empty
-    output_path = KG_OUTPUT_DIR / "knowledge_graph.json"
+    output_path = _knowledge_kg_dir(project_id) / "knowledge_graph.json"
     if not output_path.exists():
         return {"num_entities": 0, "num_relations": 0, "status": "not_built"}
 

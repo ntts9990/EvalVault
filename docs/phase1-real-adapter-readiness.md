@@ -32,8 +32,8 @@ multi-user readiness: project isolation is not enforced today.
 
 - Auth foundation exists as domain entities (`User`, `Project`, `Membership`,
   `Role`) and token services. Live run routes now resolve a current user,
-  project membership, and project-scoped role; non-run tenant surfaces still do
-  not.
+  project membership, and project-scoped role; file-backed HTTP tenant surfaces
+  now use the same denial policy when a project context is supplied.
 - (RESOLVED this pass for run routes) Run routes now resolve a principal +
   current project and enforce project scope when a project context is supplied —
   see "Live Run-Route Wiring" below. Without a project context, legacy/default
@@ -42,11 +42,14 @@ multi-user readiness: project isolation is not enforced today.
   isolate into project-owned subdirectories when a project context is supplied —
   see "Non-Run Surface Isolation" below. No project context keeps the legacy
   global behavior.
-- Knowledge upload/read is global: uploads go to `data/raw`, graph output goes
-  to `data/kg`, and in-memory `KG_JOBS` is shared process state. Shared
-  read/write tokens are not project membership.
+- (RESOLVED this pass for knowledge upload/list/build/jobs/stats) These now
+  isolate into `data/raw/<project_id>` and `data/kg/<project_id>`, and `KG_JOBS`
+  entries carry `project_id` so project-scoped job/status reads cannot reveal
+  another project's jobs — see "Knowledge Surface Isolation" below. No project
+  context keeps the legacy global dirs + shared `KNOWLEDGE_*_TOKENS` behavior.
 - Run storage now has a first-class `project_id` isolation key. The remaining
-  gaps above are live-route wiring and non-run tenant surfaces, not run storage.
+  gaps are the MCP run tools and Postgres identity parity, not run storage or
+  the file-backed HTTP surfaces.
 
 ## G4 Project Isolation — Landed This Pass (storage-enforced foundation)
 
@@ -144,6 +147,32 @@ missing-principal 401, viewer-upload 403, path-traversal-still-400, legacy
 pass-through, dataset read containment, retriever-doc read containment, and
 retriever-doc editor/viewer/no-principal cases.
 
+## Knowledge Surface Isolation — Landed This Pass (Phase 1-2C)
+
+The knowledge endpoints (`/api/v1/knowledge/*`) are now project-scoped while
+preserving the legacy shared-token path:
+
+- `POST /upload` (write→**editor**), `GET /files` (read→**member**),
+  `POST /build` (write→**editor**), `GET /jobs/{job_id}` (read→**member**),
+  `GET /stats` (read→**member**).
+- In **project mode** (`X-Project-Id` / `project_id`) identity auth is the sole
+  authority (401 no-principal / 404 non-member / 403 viewer-write); the legacy
+  `KNOWLEDGE_READ_TOKENS` / `KNOWLEDGE_WRITE_TOKENS` are **not** additionally
+  required, and a shared knowledge token does not confer membership. In **legacy
+  mode** (no project) the shared-token behavior is unchanged.
+- Uploaded files live under `data/raw/<project_id>/`; graph output under
+  `data/kg/<project_id>/`. The `project_id` segment is guarded by
+  `safe_upload_filename` and per-file uploads keep the `safe_upload_filename`
+  traversal guard (`../evil.txt` → 400).
+- `KG_JOBS` entries carry `project_id`; `GET /jobs/{job_id}` and `GET /stats`
+  return 404 / empty for jobs/graphs belonging to another project (or to the
+  legacy global scope), so no cross-project job/status leak occurs.
+
+Proof: `tests/integration/test_knowledge_route_isolation.py` (live TestClient,
+real identity + JWT): cross-project upload/list isolation, non-member 404,
+missing-principal 401, viewer upload/build 403, traversal-400, project-scoped
+job-status 404, project-scoped stats dir, and legacy shared-token pass/deny.
+
 ## Stable Output Seam
 
 The stable candidate seam for solution-platform integration is:
@@ -169,26 +198,25 @@ Contract fixtures and executable examples live in:
 
 ## Blockers Before Real Adapter Replacement
 
-1. **Project isolation — run routes + dataset/retriever-doc DONE; remaining
+1. **Project isolation — run routes + dataset/retriever-doc + knowledge DONE; remaining
    surfaces:** the storage-enforced scoping, identity persistence,
    membership/role resolution, the principal/denial primitives, the live
-   `/api/v1/runs` route wiring, AND **dataset upload/list/read + retriever-doc
-   upload/read** (see "Non-Run Surface Isolation" above) are implemented and proven.
-   **Remaining**: **knowledge upload/build** (`/api/v1/knowledge/*`, separate
-   router with its own token scheme + shared `KG_JOBS` state) and **MCP run-tool**
-   project context are not yet project-scoped; a **Postgres
-   `IdentityStoragePort` adapter** (only SQLite identity exists today) is still
-   needed for backend parity. Storage run-mutation methods (`delete_run`,
-   `update_run_metadata`, `save_feedback`, cluster maps) remain scoped at the route layer via the
+   `/api/v1/runs` route wiring, **dataset upload/list/read + retriever-doc
+   upload/read**, and **knowledge upload/list/build/jobs/stats** are implemented
+   and proven. **Remaining**: **MCP run-tool** project context is not yet
+   project-scoped; a **Postgres `IdentityStoragePort` adapter** (only SQLite
+   identity exists today) is still needed for backend parity. Storage
+   run-mutation methods (`delete_run`, `update_run_metadata`, `save_feedback`,
+   cluster maps) remain scoped at the route layer via the
    `get_run(project_id=...)` membership chokepoint rather than being
    independently project-parameterized.
-2. **Role gate — run + dataset/retriever-doc writes DONE; remaining:**
+2. **Role gate — run + dataset/retriever-doc + knowledge writes DONE; remaining:**
    `require_role` / viewer-editor-admin is applied to run writes (start, feedback
-   save, cluster-map save/delete) and to dataset/retriever-doc uploads, all
-   proven (`test_run_route_isolation.py`, `test_dataset_route_isolation.py`).
-   Applying it to the knowledge write surface is the remaining step. Admin
-   membership-management endpoints are not yet introduced (conditional per the
-   plan).
+   save, cluster-map save/delete), dataset/retriever-doc uploads, and knowledge
+   upload/build, all proven (`test_run_route_isolation.py`,
+   `test_dataset_route_isolation.py`, `test_knowledge_route_isolation.py`).
+   Admin membership-management endpoints are not yet introduced (conditional per
+   the plan).
 3. **Evidence hash blocker (partially addressed):** numeric serialization is now
    canonical/deterministic (see above), which removes the cross-platform
    float-noise obstacle to hashing the report. Two gaps remain: (a)
