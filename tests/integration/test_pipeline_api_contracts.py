@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
-from starlette import status
-
 from evalvault.adapters.inbound.api.main import create_app
 from evalvault.config.model_config import reset_model_config
 from evalvault.config.settings import reset_settings
 from evalvault.domain.entities.analysis_pipeline import AnalysisIntent
+from fastapi.testclient import TestClient
+from starlette import status
 
 
 @dataclass
@@ -353,6 +353,35 @@ def test_knowledge_requires_write_token(knowledge_client: TestClient) -> None:
         files=files,
     )
     assert response.status_code == status.HTTP_200_OK
+
+
+def test_knowledge_upload_rejects_path_traversal_filename(knowledge_client: TestClient) -> None:
+    """A crafted multipart filename must not escape data/raw (path traversal)."""
+    files = {"files": ("../../EVALVAULT_PWN_KNOWLEDGE.txt", b"pwned", "text/plain")}
+
+    response = knowledge_client.post(
+        "/api/v1/knowledge/upload",
+        headers={"Authorization": "Bearer write-token"},
+        files=files,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    # The endpoint must reject before writing anything outside data/raw.
+    assert not Path("EVALVAULT_PWN_KNOWLEDGE.txt").exists()
+
+
+def test_start_evaluation_rejects_path_traversal_dataset_path(api_client: TestClient) -> None:
+    """dataset_path must be confined to the allowed data roots (arbitrary read)."""
+    response = api_client.post(
+        "/api/v1/runs/start",
+        json={
+            "dataset_path": "../../../../etc/passwd",
+            "metrics": ["faithfulness"],
+            "model": "openai/gpt-4o-mini",
+        },
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_rate_limit_blocks_excess_requests(rate_limited_client: TestClient) -> None:

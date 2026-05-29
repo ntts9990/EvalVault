@@ -6,7 +6,8 @@ import typer
 import uvicorn
 from rich.console import Console
 
-from evalvault.adapters.inbound.api.main import create_app
+from evalvault.adapters.inbound.api.main import create_app, ensure_safe_network_bind
+from evalvault.config.settings import get_settings
 
 
 def register_api_command(app: typer.Typer, console: Console) -> None:
@@ -33,6 +34,14 @@ def register_api_command(app: typer.Typer, console: Console) -> None:
         ),
     ) -> None:
         """Start the EvalVault FastAPI Backend Server."""
+        # Fail-closed (EvalVault Auth P1.0): never expose the API on a
+        # non-loopback interface without authentication configured.
+        try:
+            ensure_safe_network_bind(host, get_settings())
+        except RuntimeError as exc:
+            console.print(f"[bold red]Refusing to start:[/bold red] {exc}")
+            raise typer.Exit(code=1) from exc
+
         console.print(f"[bold green]Starting EvalVault API[/bold green] at http://{host}:{port}")
         console.print("[dim]Press Ctrl+C to stop.[/dim]")
 

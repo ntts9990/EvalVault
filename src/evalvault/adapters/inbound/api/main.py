@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -85,6 +86,44 @@ def _normalize_api_tokens(raw_tokens: str | None) -> set[str]:
     return {token.strip() for token in raw_tokens.split(",") if token.strip()}
 
 
+# Hosts that only accept connections from the local machine.
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1", ""}
+
+
+def is_loopback_host(host: str | None) -> bool:
+    """True if binding ``host`` only exposes the API to the local machine."""
+    return (host or "").strip().lower() in _LOOPBACK_HOSTS
+
+
+def ensure_safe_network_bind(host: str, settings: Settings) -> None:
+    """Fail-closed (EvalVault Auth P1.0): refuse to expose the API on a
+    non-loopback interface when no authentication is configured.
+
+    Binding to a non-loopback host (e.g. ``0.0.0.0``) publishes every
+    ``/api/v1`` endpoint to the network. Until project-scoped auth is enforced,
+    doing so without at least a shared API token is an unauthenticated network
+    exposure, so we refuse to start. Local-only binds are unaffected.
+
+    Escape hatch: set ``EVALVAULT_ALLOW_INSECURE_NETWORK=1`` to override (e.g.
+    when fronted by an external auth proxy). Not recommended.
+    """
+    if is_loopback_host(host):
+        return
+    if _normalize_api_tokens(settings.api_auth_tokens):
+        return
+    if os.getenv("EVALVAULT_ALLOW_INSECURE_NETWORK") == "1":
+        logger.warning(
+            "EVALVAULT_ALLOW_INSECURE_NETWORK=1: binding to %r without authentication.",
+            host,
+        )
+        return
+    raise RuntimeError(
+        f"Refusing to bind the EvalVault API to non-loopback host {host!r} without "
+        "authentication. Set API_AUTH_TOKENS to require a token, bind to 127.0.0.1 for "
+        "local-only use, or set EVALVAULT_ALLOW_INSECURE_NETWORK=1 to override (not recommended)."
+    )
+
+
 def require_api_token(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(auth_scheme)],
     settings: Settings = Depends(get_settings),
@@ -143,6 +182,12 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     settings = get_settings()
+    if not _normalize_api_tokens(settings.api_auth_tokens):
+        logger.warning(
+            "API authentication is DISABLED: api_auth_tokens (API_AUTH_TOKENS) is empty, "
+            "so all /api/v1 endpoints are reachable without a bearer token. "
+            "Set API_AUTH_TOKENS to require authentication."
+        )
     cors_origins = [
         origin.strip() for origin in (settings.cors_origins or "").split(",") if origin.strip()
     ]
