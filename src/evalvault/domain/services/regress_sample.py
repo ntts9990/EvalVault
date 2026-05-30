@@ -14,9 +14,14 @@ layer's job (see ``evalvault regress-sample``).
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
+from typing import Any
 
 from evalvault.domain.entities.result import EvaluationRun, MetricScore, TestCaseResult
+
+REGRESS_SAMPLE_CATALOG_SCHEMA_VERSION = "evalvault.regress-sample-catalog.v1"
 
 
 @dataclass(frozen=True)
@@ -41,7 +46,14 @@ class RegressSampleScenario:
     # Optional, forecast-only evidence-quality diagnostics. When set, the CLI
     # layer attaches it to the envelope as ``data.evidence_diagnostics``. Absent
     # (None) for every non-forecast scenario, so their envelopes stay byte-stable.
-    evidence_diagnostics: dict[str, int | str] | None = None
+    evidence_diagnostics: dict[str, bool | float | int | str] | None = None
+
+    @property
+    def expected_t2_status(self) -> str:
+        """Expected status for catalog metadata; release decisions live downstream."""
+        baseline_mean = sum(self.baseline_scores) / len(self.baseline_scores)
+        candidate_mean = sum(self.candidate_scores) / len(self.candidate_scores)
+        return "failed" if baseline_mean - candidate_mean > self.fail_on_regression else "passed"
 
     def build_runs(self) -> tuple[EvaluationRun, EvaluationRun]:
         """Build the (baseline, candidate) runs for this scenario."""
@@ -115,6 +127,11 @@ _FORECAST_CALIBRATED = RegressSampleScenario(
     baseline_scores=(0.815, 0.825) * 5,
     candidate_scores=(0.795, 0.805) * 5,
     fail_on_regression=0.05,
+    evidence_diagnostics={
+        "calibration_sample_count": 10,
+        "calibration_score_evidence": "paired_baseline_candidate_scores",
+        "schema_version": "evalvault.evidence-diagnostics.v1",
+    },
 )
 
 # Overconfident forecast: candidate drops -0.10, beyond the 0.06 budget ->
@@ -130,6 +147,11 @@ _FORECAST_OVERCONFIDENT = RegressSampleScenario(
     baseline_scores=(0.795, 0.805) * 5,
     candidate_scores=(0.695, 0.705) * 5,
     fail_on_regression=0.06,
+    evidence_diagnostics={
+        "calibration_gap": 0.10,
+        "forecast_calibration_signal": "overconfident",
+        "schema_version": "evalvault.evidence-diagnostics.v1",
+    },
 )
 
 # Post-cutoff leakage: leakage-resistance collapses -0.19, far beyond the 0.06
@@ -146,6 +168,11 @@ _FORECAST_LEAKAGE = RegressSampleScenario(
     baseline_scores=(0.945, 0.955) * 5,
     candidate_scores=(0.755, 0.765) * 5,
     fail_on_regression=0.06,
+    evidence_diagnostics={
+        "leakage_risk": "post_cutoff_signal_detected",
+        "post_cutoff_evidence": "candidate_knowledge_after_cutoff",
+        "schema_version": "evalvault.evidence-diagnostics.v1",
+    },
 )
 
 
@@ -186,5 +213,42 @@ REGRESS_SAMPLE_SCENARIOS: dict[str, RegressSampleScenario] = {
     )
 }
 
+def build_regress_sample_catalog() -> dict[str, Any]:
+    """Return the deterministic machine-readable catalog for built-in samples."""
+    samples = [
+        {
+            "evalvault_sample_id": scenario.name,
+            "required_t2_metric": scenario.metric,
+            "metrics": [scenario.metric],
+            "expected_t2_status": scenario.expected_t2_status,
+            "dataset_name": scenario.dataset_name,
+            "baseline_run_id": scenario.baseline_run_id,
+            "candidate_run_id": scenario.candidate_run_id,
+            "fail_on_regression": scenario.fail_on_regression,
+            "test": scenario.test_type,
+            "diagnostics_available": scenario.evidence_diagnostics is not None,
+            "diagnostic_fields": sorted(
+                key
+                for key in (scenario.evidence_diagnostics or {})
+                if key != "schema_version"
+            ),
+        }
+        for scenario in (REGRESS_SAMPLE_SCENARIOS[name] for name in sorted(REGRESS_SAMPLE_SCENARIOS))
+    ]
+    payload: dict[str, Any] = {
+        "schema_version": REGRESS_SAMPLE_CATALOG_SCHEMA_VERSION,
+        "generated_at": "2026-05-30T00:00:00Z",
+        "status_vocabulary": ["passed", "failed"],
+        "sample_count": len(samples),
+        "samples": samples,
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    payload["catalog_hash"] = "sha256:" + hashlib.sha256(canonical).hexdigest()
+    return payload
 
-__all__ = ["REGRESS_SAMPLE_SCENARIOS", "RegressSampleScenario"]
+__all__ = [
+    "REGRESS_SAMPLE_CATALOG_SCHEMA_VERSION",
+    "REGRESS_SAMPLE_SCENARIOS",
+    "RegressSampleScenario",
+    "build_regress_sample_catalog",
+]

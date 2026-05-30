@@ -29,6 +29,7 @@ from evalvault.domain.services.readiness_proof_service import build_evalvault_re
 from evalvault.domain.services.regress_sample import (
     REGRESS_SAMPLE_SCENARIOS,
     RegressSampleScenario,
+    build_regress_sample_catalog,
 )
 from evalvault.domain.services.regression_gate_service import (
     RegressionGateReport,
@@ -632,6 +633,17 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
 
     @app.command(name="regress-sample")
     def regress_sample(
+        list_scenarios: bool = typer.Option(
+            False,
+            "--list",
+            help="Emit the deterministic built-in scenario catalog instead of one sample.",
+        ),
+        output_format: Literal["json"] = typer.Option(
+            "json",
+            "--format",
+            "-f",
+            help="Output format. Only json is supported for this agent-facing command.",
+        ),
         scenario: str = typer.Option(
             "quality-steady",
             "--scenario",
@@ -657,6 +669,18 @@ def register_regress_commands(app: typer.Typer, console: Console) -> None:
         compatible with ``platform.adapters.evalvault_regress_adapter``. Intended
         for downstream adapter wiring / integration tests, not LLM evaluation.
         """
+        if output_format != "json":
+            console.print(f"[red]Error:[/red] Unsupported format '{output_format}'. Only json is supported.")
+            raise typer.Exit(1)
+
+        if list_scenarios:
+            rendered = _dump_stable_json(build_regress_sample_catalog())
+            if output is not None:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(rendered + "\n", encoding="utf-8")
+            typer.echo(rendered)
+            return
+
         selected = REGRESS_SAMPLE_SCENARIOS.get(scenario)
         if selected is None:
             available = ", ".join(sorted(REGRESS_SAMPLE_SCENARIOS))

@@ -9,6 +9,7 @@ solution-platform calls instead of carrying a hand-authored static fixture.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import statistics
@@ -17,7 +18,10 @@ import pytest
 from typer.testing import CliRunner
 
 from evalvault.adapters.inbound.cli import app
-from evalvault.domain.services.regress_sample import REGRESS_SAMPLE_SCENARIOS
+from evalvault.domain.services.regress_sample import (
+    REGRESS_SAMPLE_CATALOG_SCHEMA_VERSION,
+    REGRESS_SAMPLE_SCENARIOS,
+)
 
 runner = CliRunner()
 
@@ -157,6 +161,55 @@ def test_regress_sample_rejects_unknown_scenario() -> None:
     assert "quality-steady" in result.stdout
 
 
+def test_regress_sample_catalog_is_source_owned_and_hash_stable() -> None:
+    """`--list --format json` emits the EvalVault-owned sample catalog."""
+    result = _invoke("--list", "--format", "json")
+    assert result.exit_code == 0, result.stdout
+    catalog = json.loads(result.stdout)
+
+    assert catalog["schema_version"] == REGRESS_SAMPLE_CATALOG_SCHEMA_VERSION
+    assert catalog["sample_count"] == len(REGRESS_SAMPLE_SCENARIOS)
+    assert catalog["status_vocabulary"] == ["passed", "failed"]
+    assert catalog["catalog_hash"].startswith("sha256:")
+    without_hash = dict(catalog)
+    catalog_hash = without_hash.pop("catalog_hash")
+    canonical = json.dumps(
+        without_hash, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+    assert catalog_hash == "sha256:" + hashlib.sha256(canonical).hexdigest()
+
+    samples = {sample["evalvault_sample_id"]: sample for sample in catalog["samples"]}
+    assert set(samples) == set(ALL_SCENARIOS)
+    assert samples["forecast-overconfident"]["expected_t2_status"] == "failed"
+    assert samples["forecast-calibrated"]["expected_t2_status"] == "passed"
+    assert samples["forecast-insufficient-evidence"]["diagnostics_available"] is True
+    assert samples["forecast-calibrated"]["diagnostic_fields"] == [
+        "calibration_sample_count",
+        "calibration_score_evidence",
+    ]
+    assert samples["forecast-overconfident"]["diagnostic_fields"] == [
+        "calibration_gap",
+        "forecast_calibration_signal",
+    ]
+    assert samples["forecast-leakage"]["diagnostic_fields"] == [
+        "leakage_risk",
+        "post_cutoff_evidence",
+    ]
+    assert samples["quality-steady"]["diagnostics_available"] is False
+    assert samples["quality-steady"]["diagnostic_fields"] == []
+    for sample_id, sample in samples.items():
+        assert sample["metrics"] == [sample["required_t2_metric"]]
+        assert sample["expected_t2_status"] in ALLOWED_EVALVAULT_STATUS
+        assert T3_RELEASE_VOCABULARY.search(sample_id) is None
+
+
+def test_regress_sample_catalog_is_byte_deterministic() -> None:
+    first = _invoke("--list", "--format", "json")
+    second = _invoke("--list", "--format", "json")
+    assert first.exit_code == 0 and second.exit_code == 0
+    assert first.stdout == second.stdout
+
+
 # --- Forecast track scenarios (Phase 1-5A, Tier A) ------------------------
 
 ALL_SCENARIOS = (
@@ -292,15 +345,24 @@ def test_insufficient_evidence_emits_zero_pair_diagnostics() -> None:
     assert T3_RELEASE_VOCABULARY.search(json.dumps(diagnostics, sort_keys=True)) is None
 
 
-def test_only_insufficient_evidence_carries_diagnostics() -> None:
-    """Diagnostics are additive: the other scenarios omit the key entirely so
-    their envelopes remain byte-stable."""
+def test_forecast_scenarios_carry_source_diagnostics() -> None:
+    """Forecast diagnostics are source-owned while quality-steady stays unchanged."""
+    expected_fields = {
+        "forecast-calibrated": {"calibration_sample_count", "calibration_score_evidence"},
+        "forecast-overconfident": {"calibration_gap", "forecast_calibration_signal"},
+        "forecast-leakage": {"leakage_risk", "post_cutoff_evidence"},
+        INSUFFICIENT: {"eligible_pair_count", "sample_coverage", "resolution_card_count"},
+    }
     for name in ALL_SCENARIOS:
         envelope = json.loads(_invoke("--scenario", name).stdout)
-        if name == INSUFFICIENT:
-            assert "evidence_diagnostics" in envelope["data"]
-        else:
+        if name == "quality-steady":
             assert "evidence_diagnostics" not in envelope["data"], name
+            continue
+
+        diagnostics = envelope["data"]["evidence_diagnostics"]
+        assert diagnostics["schema_version"] == "evalvault.evidence-diagnostics.v1"
+        assert set(diagnostics) >= expected_fields[name] | {"schema_version"}
+        assert T3_RELEASE_VOCABULARY.search(json.dumps(diagnostics, sort_keys=True)) is None
 
 
 def test_insufficient_evidence_db_backed_path(tmp_path) -> None:
