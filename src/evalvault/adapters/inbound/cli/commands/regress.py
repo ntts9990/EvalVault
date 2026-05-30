@@ -188,13 +188,21 @@ def generate_regress_sample_envelope(
         parallel=True,
         concurrency=None,
     )
-    return _build_envelope(
+    envelope = _build_envelope(
         report=report,
         status="ok",
         started_at=DETERMINISTIC_SAMPLE_TIMESTAMP,
         finished_at=DETERMINISTIC_SAMPLE_TIMESTAMP,
         duration_ms=0,
     )
+    # Forecast-only: surface evidence-quality diagnostics on the envelope. This
+    # is additive and optional — scenarios without diagnostics are untouched, so
+    # their envelopes stay byte-stable.
+    if scenario.evidence_diagnostics is not None:
+        data = envelope["data"]
+        if isinstance(data, dict):
+            data["evidence_diagnostics"] = dict(scenario.evidence_diagnostics)
+    return envelope
 
 
 def register_regress_commands(app: typer.Typer, console: Console) -> None:

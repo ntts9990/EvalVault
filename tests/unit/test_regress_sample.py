@@ -164,6 +164,7 @@ ALL_SCENARIOS = (
     "forecast-calibrated",
     "forecast-overconfident",
     "forecast-leakage",
+    "forecast-insufficient-evidence",
 )
 
 # name, metric, baseline_mean, candidate_mean, fail_on_regression, status, regression
@@ -171,6 +172,15 @@ FORECAST_CASES = [
     ("forecast-calibrated", "forecast_calibration_score", 0.82, 0.80, 0.05, "passed", False),
     ("forecast-overconfident", "forecast_calibration_score", 0.80, 0.70, 0.06, "failed", True),
     ("forecast-leakage", "leakage_resistance_score", 0.95, 0.76, 0.06, "failed", True),
+    (
+        "forecast-insufficient-evidence",
+        "forecast_resolution_coverage",
+        0.80,
+        0.74,
+        0.05,
+        "failed",
+        True,
+    ),
 ]
 
 
@@ -253,3 +263,53 @@ def test_scenario_has_no_t3_vocabulary(name: str) -> None:
         sc.candidate_run_id,
     ):
         assert T3_RELEASE_VOCABULARY.search(text) is None, f"identifier leaked T3 vocab: {text!r}"
+
+
+# --- forecast-insufficient-evidence diagnostics (Phase 1-16A) -------------
+
+INSUFFICIENT = "forecast-insufficient-evidence"
+
+
+def test_insufficient_evidence_emits_zero_pair_diagnostics() -> None:
+    """The scenario emits a failed T2 verdict plus zero-pair evidence diagnostics
+    in the adapter-accepted `data.evidence_diagnostics` shape."""
+    result = _invoke("--scenario", INSUFFICIENT)
+    assert result.exit_code == 0, result.stdout
+    envelope = json.loads(result.stdout)
+
+    _assert_adapter_compatible(envelope)
+
+    data = envelope["data"]
+    assert data["status"] == "failed"
+    assert data["metrics"] == ["forecast_resolution_coverage"]
+
+    diagnostics = data["evidence_diagnostics"]
+    assert diagnostics["eligible_pair_count"] == 0
+    assert diagnostics["sample_coverage"] == 0
+    assert diagnostics["resolution_card_count"] == 0
+    # Stable, self-describing marker (no release vocabulary).
+    assert diagnostics["schema_version"] == "evalvault.evidence-diagnostics.v1"
+    assert T3_RELEASE_VOCABULARY.search(json.dumps(diagnostics, sort_keys=True)) is None
+
+
+def test_only_insufficient_evidence_carries_diagnostics() -> None:
+    """Diagnostics are additive: the other scenarios omit the key entirely so
+    their envelopes remain byte-stable."""
+    for name in ALL_SCENARIOS:
+        envelope = json.loads(_invoke("--scenario", name).stdout)
+        if name == INSUFFICIENT:
+            assert "evidence_diagnostics" in envelope["data"]
+        else:
+            assert "evidence_diagnostics" not in envelope["data"], name
+
+
+def test_insufficient_evidence_db_backed_path(tmp_path) -> None:
+    """`--db` routes the new scenario through a real on-disk SQLite DB and still
+    emits the diagnostics + failed verdict."""
+    db_path = tmp_path / "regress-sample.db"
+    result = _invoke("--scenario", INSUFFICIENT, "--db", str(db_path))
+    assert result.exit_code == 0, result.stdout
+    assert db_path.exists()
+    data = json.loads(result.stdout)["data"]
+    assert data["status"] == "failed"
+    assert data["evidence_diagnostics"]["eligible_pair_count"] == 0

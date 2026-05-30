@@ -38,6 +38,10 @@ class RegressSampleScenario:
     candidate_scores: tuple[float, ...]
     fail_on_regression: float = 0.05
     test_type: str = "t-test"
+    # Optional, forecast-only evidence-quality diagnostics. When set, the CLI
+    # layer attaches it to the envelope as ``data.evidence_diagnostics``. Absent
+    # (None) for every non-forecast scenario, so their envelopes stay byte-stable.
+    evidence_diagnostics: dict[str, int | str] | None = None
 
     def build_runs(self) -> tuple[EvaluationRun, EvaluationRun]:
         """Build the (baseline, candidate) runs for this scenario."""
@@ -145,6 +149,32 @@ _FORECAST_LEAKAGE = RegressSampleScenario(
 )
 
 
+# Insufficient evidence: the candidate drops -0.06 (beyond the 0.05 budget) ->
+# regression=True -> status "failed", AND there were zero cutoff-eligible
+# resolution pairs to score the forecast against. The zero-pair facts ride along
+# as forecast-only ``data.evidence_diagnostics`` (the platform reads these to
+# drive its conservative no-eligible-pairs path). Strict T2: the marker carries
+# no release vocabulary (no promote/hold/rollback).
+_FORECAST_INSUFFICIENT_EVIDENCE = RegressSampleScenario(
+    name="forecast-insufficient-evidence",
+    metric="forecast_resolution_coverage",
+    threshold=0.70,
+    dataset_name="regression-gate-forecast-insufficient-evidence",
+    model_name="fixture-model",
+    baseline_run_id="baseline-forecast-insufficient-evidence",
+    candidate_run_id="candidate-forecast-insufficient-evidence",
+    baseline_scores=(0.795, 0.805) * 5,
+    candidate_scores=(0.735, 0.745) * 5,
+    fail_on_regression=0.05,
+    evidence_diagnostics={
+        "eligible_pair_count": 0,
+        "sample_coverage": 0,
+        "resolution_card_count": 0,
+        "schema_version": "evalvault.evidence-diagnostics.v1",
+    },
+)
+
+
 REGRESS_SAMPLE_SCENARIOS: dict[str, RegressSampleScenario] = {
     scenario.name: scenario
     for scenario in (
@@ -152,6 +182,7 @@ REGRESS_SAMPLE_SCENARIOS: dict[str, RegressSampleScenario] = {
         _FORECAST_CALIBRATED,
         _FORECAST_OVERCONFIDENT,
         _FORECAST_LEAKAGE,
+        _FORECAST_INSUFFICIENT_EVIDENCE,
     )
 }
 
