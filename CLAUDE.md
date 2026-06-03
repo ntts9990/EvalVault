@@ -62,7 +62,7 @@ src/evalvault/
 ## External Services Configuration
 
 ### OpenAI
-- **Model**: `gpt-5-mini` (default, configurable via OPENAI_MODEL)
+- **Model**: `gpt-5.4-mini` (default, configurable via OPENAI_MODEL)
 - **Note**: OpenAI 모델은 비용이 발생하므로 필요할 때만 선택합니다.
 - **Usage**: Ragas metric evaluation via LangChain
 
@@ -205,7 +205,7 @@ Create `.env` file (copy from `.env.example`):
 ```bash
 # OpenAI (required)
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5-nano
+OPENAI_MODEL=gpt-5.4-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # OPENAI_BASE_URL=https://api.openai.com/v1  # optional
 

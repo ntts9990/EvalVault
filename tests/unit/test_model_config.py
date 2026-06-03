@@ -62,7 +62,7 @@ class TestModelConfig:
                     "description": "OpenAI",
                     "llm": {
                         "provider": "openai",
-                        "model": "gpt-5-mini",
+                        "model": "gpt-5.4-mini",
                     },
                     "embedding": {
                         "provider": "openai",
@@ -115,7 +115,7 @@ class TestModelConfig:
         profile = config.get_profile("openai")
 
         assert profile.llm.provider == "openai"
-        assert profile.llm.model == "gpt-5-mini"
+        assert profile.llm.model == "gpt-5.4-mini"
         assert profile.embedding.model == "text-embedding-3-small"
 
     def test_get_profile_not_found(self, config_file):

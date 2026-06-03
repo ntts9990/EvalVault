@@ -169,7 +169,7 @@ class TestApplyProfileIntegration:
         settings = apply_profile(settings, "openai")
 
         assert settings.llm_provider == "openai"
-        assert settings.openai_model == "gpt-5-mini"
+        assert settings.openai_model == "gpt-5.4-mini"
         assert settings.openai_embedding_model == "text-embedding-3-small"
 
     def test_env_settings_preserved_after_profile(self):
