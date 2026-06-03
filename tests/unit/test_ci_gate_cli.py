@@ -36,7 +36,7 @@ def _build_run(
     return EvaluationRun(
         run_id=run_id,
         dataset_name="demo",
-        model_name="gpt-5-mini",
+        model_name="gpt-5.4-mini",
         started_at=datetime.now(),
         results=[TestCaseResult(test_case_id="tc-1", metrics=metrics)],
         metrics_evaluated=list(scores.keys()),

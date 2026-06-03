@@ -21,7 +21,7 @@ async def debug_ragas():
 
     # Mock LLM Port - needed for Ragas metric init (though we might hit init issues if it tries real validation)
     mock_llm = MagicMock(spec=LLMPort)
-    mock_llm.get_model_name.return_value = "gpt-4o"
+    mock_llm.get_model_name.return_value = "gpt-5.4-mini"
     # Mock as_ragas_llm to return something Ragas accepts - ideally a LangChain wrapper or Ragas LLM
     # But RagasEvaluator just passes it to metric init.
     # Let's see if we can just trigger the _score_single_sample logic.
