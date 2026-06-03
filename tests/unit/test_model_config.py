@@ -5,7 +5,7 @@
   - 운영 LLM: gpt-oss-safeguard:20b
   - 개발 임베딩: qwen3-embedding:0.6b
   - 운영 임베딩: qwen3-embedding:8b
-  - OpenAI LLM: gpt-5-mini
+  - OpenAI LLM: gpt-5.4-mini
   - OpenAI 임베딩: text-embedding-3-small
 """
 
@@ -161,11 +161,11 @@ class TestLLMConfig:
         """OpenAI LLM 설정 테스트."""
         config = LLMConfig(
             provider="openai",
-            model="gpt-5-mini",
+            model="gpt-5.4-mini",
         )
 
         assert config.provider == "openai"
-        assert config.model == "gpt-5-mini"
+        assert config.model == "gpt-5.4-mini"
 
 
 class TestEmbeddingConfig:

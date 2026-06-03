@@ -3,7 +3,7 @@
 프로필 기반 모델 설정 테스트:
 - dev: gemma3:1b (Ollama)
 - prod: gpt-oss-safeguard:20b (Ollama)
-- openai: gpt-5-mini (OpenAI)
+- openai: gpt-5.4-mini (OpenAI)
 """
 
 import json
