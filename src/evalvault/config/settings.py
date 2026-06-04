@@ -273,7 +273,7 @@ class Settings(BaseSettings):
         ),
     )
     default_fallback_model: str = Field(
-        default="gpt-4o-mini",
+        default="gpt-5.4-mini",
         description=(
             "Default model name used as the openai-provider faithfulness fallback "
             "when no explicit faithfulness_fallback_model is configured."
@@ -308,7 +308,7 @@ class Settings(BaseSettings):
         default=None, description="Custom OpenAI API base URL (optional)"
     )
     openai_model: str = Field(
-        default="gpt-5-mini",
+        default="gpt-5.4-mini",
         description="OpenAI model to use for evaluation",
     )
     openai_embedding_model: str = Field(

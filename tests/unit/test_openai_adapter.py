@@ -75,7 +75,7 @@ class TestOpenAIAdapter:
         settings = Settings(
             openai_api_key="test-key",
             openai_base_url="https://custom-api.example.com/v1",
-            openai_model="gpt-5-mini",
+            openai_model="gpt-5.4-mini",
         )
         adapter = OpenAIAdapter(settings)
         ragas_llm = adapter.as_ragas_llm()
@@ -83,7 +83,7 @@ class TestOpenAIAdapter:
         # Verify adapter was created with custom base URL
         assert ragas_llm is not None
         # The Ragas LLM wraps the OpenAI client, verify adapter is functional
-        assert adapter.get_model_name() == "gpt-5-mini"
+        assert adapter.get_model_name() == "gpt-5.4-mini"
 
     def test_token_usage_methods_exist(self, settings):
         """토큰 사용량 추적 메서드가 존재하는지 테스트."""

@@ -19,7 +19,7 @@ async def debug_ragas_real():
     settings = get_settings()
     # Ensure we use OpenAI
     settings.llm_provider = "openai"
-    settings.openai_model = "gpt-4o"  # Force override to bypass .env
+    settings.openai_model = "gpt-5.4-mini"  # Force override to bypass .env
     # Assuming ENV vars are set for OpenAI API key. If not, this might fail on auth, which is a good test.
     # Assuming ENV vars are set for OpenAI API key. If not, this might fail on auth, which is a good test.
 
