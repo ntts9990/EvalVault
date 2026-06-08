@@ -218,6 +218,7 @@ ALL_SCENARIOS = (
     "forecast-overconfident",
     "forecast-leakage",
     "forecast-insufficient-evidence",
+    "company-rag-leakage",
 )
 
 # name, metric, baseline_mean, candidate_mean, fail_on_regression, status, regression
@@ -352,6 +353,7 @@ def test_forecast_scenarios_carry_source_diagnostics() -> None:
         "forecast-overconfident": {"calibration_gap", "forecast_calibration_signal"},
         "forecast-leakage": {"leakage_risk", "post_cutoff_evidence"},
         INSUFFICIENT: {"eligible_pair_count", "sample_coverage", "resolution_card_count"},
+        "company-rag-leakage": {"leakage_risk", "permission_boundary_evidence"},
     }
     for name in ALL_SCENARIOS:
         envelope = json.loads(_invoke("--scenario", name).stdout)
